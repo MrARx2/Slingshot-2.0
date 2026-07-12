@@ -29,6 +29,22 @@ namespace TrackGeneration.Macro
         [Tooltip("Root-local bounds of this section's geometry.")]
         public Bounds SectionBounds;
 
+        [Header("Boundary Open/Closed Metadata")]
+        [Tooltip("Generate a closing cap across the entry cross-section. Never set on an open boundary.")]
+        public bool CapStart;
+
+        [Tooltip("Generate a closing cap across the exit cross-section. Never set on an open boundary.")]
+        public bool CapEnd;
+
+        [Tooltip("The entry boundary is an OPEN edge (landing mouth): no cap, no geometry across the incoming flight path.")]
+        public bool OpenStart;
+
+        [Tooltip("The exit boundary is an OPEN edge (jump lip): no cap, no geometry across the launch direction.")]
+        public bool OpenEnd;
+
+        [Tooltip("This section borders an AirGap — its air-gap-facing boundary must stay open.")]
+        public bool ConnectsToAirGap;
+
         /// <summary>The GameObject built for this section (set by the mesh builder).</summary>
         [NonSerialized]
         public GameObject SectionObject;

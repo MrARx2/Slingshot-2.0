@@ -63,6 +63,17 @@ public class VectoringComputer : MonoBehaviour
 
     public void EvaluateIntent(PilotCommand command, CraftTelemetry telemetry)
     {
+        EvaluateIntent(command, telemetry, OverchargeTarget.None);
+    }
+
+    /// <param name="lockedOverchargeTarget">
+    /// The target OverchargeCore locked when charging began (None when not charging).
+    /// While a charge is in progress the capture logic MUST follow the locked target,
+    /// not a fresh key-based selection — otherwise changing held keys mid-charge
+    /// un-captures the charging thruster group and it direct-fires while charging.
+    /// </param>
+    public void EvaluateIntent(PilotCommand command, CraftTelemetry telemetry, OverchargeTarget lockedOverchargeTarget)
+    {
         if (command.stabilizerTogglePressed && command.sampleFrame != _lastStabilizerToggleFrame)
         {
             _stabilizerArmed = !_stabilizerArmed;
@@ -87,7 +98,9 @@ public class VectoringComputer : MonoBehaviour
         float throttle = Mathf.Max(0f, command.throttle);
         float brake = Mathf.Max(0f, -command.throttle);
 
-        OverchargeTarget overchargeTarget = SelectOverchargeTarget(command);
+        OverchargeTarget overchargeTarget = lockedOverchargeTarget != OverchargeTarget.None
+            ? lockedOverchargeTarget
+            : SelectOverchargeTarget(command);
         bool overcharging = command.overchargeHeld;
 
         // When Space is held, the selected thruster group is captured by
@@ -152,9 +165,7 @@ public class VectoringComputer : MonoBehaviour
 
             stabilizerArmed = _stabilizerArmed,
             verticalThrustersLockedByStabilizer = verticalLockedByStabilizer,
-            recoveryOverrideActive = recoveryOverride,
-
-            wantsJump = false
+            recoveryOverrideActive = recoveryOverride
         };
     }
 

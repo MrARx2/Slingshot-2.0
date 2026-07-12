@@ -81,7 +81,11 @@ public class SceneBootstrapper : MonoBehaviour
         core.hoverArray = craft.AddComponent<HoverStabilizerArray>();
         core.drive = craft.AddComponent<DriveCore>();
         core.vectorThrusters = craft.AddComponent<VectorThrusterArray>();
+        core.attitude = craft.AddComponent<AttitudeControlArray>();
+        core.overcharge = craft.AddComponent<OverchargeCore>();
+        core.energy = craft.AddComponent<EnergyCore>();
         core.feedback = craft.AddComponent<CraftFeedbackSystem>();
+        craft.AddComponent<SectionAdaptiveSuspension>(); // per-track-section suspension tuning
 
         // Wire visual bindings to the feedback system
         core.feedback.thrusterVisuals = new List<CraftFeedbackSystem.ThrusterVisualBinding>();
@@ -95,32 +99,31 @@ public class SceneBootstrapper : MonoBehaviour
             });
         }
 
-        // Initialize the thruster bus
+        // Initialize the thruster bus (auto-added by CraftCore's RequireComponent,
+        // but do not rely on that side effect).
         ThrusterBus bus = craft.GetComponent<ThrusterBus>();
+        if (bus == null) bus = craft.AddComponent<ThrusterBus>();
         bus.DiscoverThrusters();
 
         // ── Camera and HUD ─────────────────────────────────────────
         Rigidbody rb = craft.GetComponent<Rigidbody>();
         GameObject camObj = SetupCamera(craft.transform, rb);
 
-        // Debug HUD
-        HovercraftDebugHUD existingDebug = camObj.GetComponent<HovercraftDebugHUD>();
-        if (existingDebug != null) Object.DestroyImmediate(existingDebug);
-        HovercraftDebugHUD debugHud = camObj.AddComponent<HovercraftDebugHUD>();
-        debugHud.craftCore = core;
-        debugHud.showHUD = false; // Canvas HUD is primary now
+        // Player HUD (always on) + debug HUD (F2)
+        CraftHUD existingHud = camObj.GetComponent<CraftHUD>();
+        if (existingHud != null) Object.DestroyImmediate(existingHud);
+        CraftHUD hud = camObj.AddComponent<CraftHUD>();
+        hud.craftCore = core;
 
-        // Canvas HUD
-        HovercraftCanvasHUD existingCanvas = camObj.GetComponent<HovercraftCanvasHUD>();
-        if (existingCanvas != null) Object.DestroyImmediate(existingCanvas);
-        HovercraftCanvasHUD canvasHud = camObj.AddComponent<HovercraftCanvasHUD>();
-        canvasHud.craftCore = core;
-        canvasHud.showHUD = true;
+        CraftDebugHUD existingDebug = camObj.GetComponent<CraftDebugHUD>();
+        if (existingDebug != null) Object.DestroyImmediate(existingDebug);
+        CraftDebugHUD debugHud = camObj.AddComponent<CraftDebugHUD>();
+        debugHud.craftCore = core;
 
         SetupLighting();
 
         Debug.Log("<b>[Hovercraft V2]</b> Setup complete! Press Play to test the modular craft.");
-        Debug.Log("<b>[Hovercraft V2]</b> Controls: W/S = Throttle/Brake, Mouse X = Steering, Mouse Y = Pitch shift, A/D = Edge shift, Shift = Grip breaker, Space = Jump.");
+        Debug.Log("<b>[Hovercraft V2]</b> Controls: W/S = Throttle/Brake, Mouse X = Steering, Mouse Y = Pitch shift, A/D = Edge shift, Shift = Grip breaker, Space = Overcharge (hold + release), Q/E = Roof/Bottom thrusters, R = Stabilizer toggle, P = Cycle camera view, O = Camera ground orientation, F2 = Debug HUD.");
 
         Selection.activeGameObject = craft;
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(

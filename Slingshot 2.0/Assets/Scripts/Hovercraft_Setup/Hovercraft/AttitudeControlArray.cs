@@ -37,11 +37,6 @@ public class AttitudeControlArray : MonoBehaviour
 
     public void ApplyAttitudeControl(CraftIntent intent, CraftTelemetry telemetry, TractionState traction)
     {
-        ApplyAttitudeControl(intent, telemetry, traction, EnergyState.Full);
-    }
-
-    public void ApplyAttitudeControl(CraftIntent intent, CraftTelemetry telemetry, TractionState traction, EnergyState energy)
-    {
         if (thrusterBus == null)
         {
             _currentRoofThrottle = 0f;

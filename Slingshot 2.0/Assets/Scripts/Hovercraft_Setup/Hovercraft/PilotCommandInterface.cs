@@ -19,6 +19,7 @@ public class PilotCommandInterface : MonoBehaviour
     public Key bottomThrusterKey = Key.E;
     public Key overchargeKey = Key.Space;
     public Key stabilizerToggleKey = Key.R;
+    public Key gripBreakerKey = Key.LeftShift;
 
     [Header("Execution")]
     public bool sampleInputInternally = false;
@@ -100,7 +101,7 @@ public class PilotCommandInterface : MonoBehaviour
         bool roofThrustersHeld = IsPressed(_roofThrustersAction, roofThrusterKey);
         bool bottomThrustersHeld = IsPressed(_bottomThrustersAction, bottomThrusterKey);
         bool overchargeHeld = IsPressed(_overchargeAction, overchargeKey);
-        bool gripBreakerHeld = _gripBreakerAction != null && _gripBreakerAction.IsPressed();
+        bool gripBreakerHeld = IsPressed(_gripBreakerAction, gripBreakerKey);
 
         bool overchargePressed = _overchargePressedLatch;
         bool overchargeReleased = _overchargeReleasedLatch;
@@ -124,8 +125,7 @@ public class PilotCommandInterface : MonoBehaviour
             overchargePressed = overchargePressed,
             overchargeReleased = overchargeReleased,
             stabilizerTogglePressed = stabilizerTogglePressed,
-            gripBreakerHeld = gripBreakerHeld,
-            jumpPressed = false
+            gripBreakerHeld = gripBreakerHeld
         };
     }
 

@@ -62,11 +62,6 @@ public class OverchargeCore : MonoBehaviour
     private float _burstDuration;
     private int _lastReleaseFrame = -1;
 
-    public void TickOvercharge(CraftIntent intent, CraftTelemetry telemetry)
-    {
-        TickOvercharge(intent, telemetry, EnergyState.Full);
-    }
-
     public void TickOvercharge(CraftIntent intent, CraftTelemetry telemetry, EnergyState energy)
     {
         float dt = Time.fixedDeltaTime;

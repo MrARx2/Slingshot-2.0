@@ -39,6 +39,18 @@ namespace TrackGeneration.Macro
         [Tooltip("Half-pipe side height at this frame (meters). Set by the cross-section blend pass; the mesh builder reads it so depth changes blend smoothly.")]
         public float SideHeight;
 
+        [Tooltip("Suppression of the LEFT half-pipe wall. 0 = full wall (default), 1 = fully open, NEGATIVE = boosted wall (bobsled-banked outside wall). Stored as suppression so default-constructed frames keep full walls. Set by the wall-mask pass (splits/merges) and the corner banking pass.")]
+        public float LeftWallSuppression;
+
+        [Tooltip("Suppression of the RIGHT half-pipe wall. 0 = full wall (default), 1 = fully open, negative = boosted.")]
+        public float RightWallSuppression;
+
+        /// <summary>Left wall height multiplier (1 = full half-pipe wall, 0 = open edge, above 1 = banked outside wall).</summary>
+        public float LeftWallMultiplier => Mathf.Clamp(1f - LeftWallSuppression, 0f, 3f);
+
+        /// <summary>Right wall height multiplier (1 = full half-pipe wall, 0 = open edge, above 1 = banked outside wall).</summary>
+        public float RightWallMultiplier => Mathf.Clamp(1f - RightWallSuppression, 0f, 3f);
+
         /// <summary>An identity frame at the origin facing +Z with the given width.</summary>
         public static TrackConnectionFrame Origin(float width)
         {

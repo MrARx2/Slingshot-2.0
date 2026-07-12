@@ -25,7 +25,9 @@ namespace TrackGeneration.Macro
     /// </summary>
     public class MacroTrackLayoutGenerator
     {
-        private const int MaxAttempts = 8;
+        // High turn counts make valid (non-self-intersecting) layouts rarer — attempts
+        // are cheap (layout math only, no meshes), so search harder before falling back.
+        private const int MaxAttempts = 24;
         private const float MinAdjustableStraight = 30f;
         private const float JumpRampLength = 15f;
         private const float LandingRampLength = 16f;
@@ -33,6 +35,31 @@ namespace TrackGeneration.Macro
         // Fallback bank ease fraction when a blend length cannot be honored.
         private const float MinBankEaseFraction = 0.15f;
         private const float MaxBankEaseFraction = 0.5f;
+
+        // ── Bobsled banking (flat floor, asymmetric walls) ──
+        // At full bank (90°) the outside half-pipe wall grows by this multiplier
+        // fraction (1 = double height) and the inside wall shrinks by the trim
+        // fraction. The road floor itself never leaves grade.
+        private const float BobsledOuterWallBoost = 1.0f;
+        private const float BobsledInnerWallTrim = 0.45f;
+
+        // ── Clothoid-style loop profile ──
+        // Fraction of the loop arc spent easing curvature in/out at each end.
+        // A perfect circle has a curvature DISCONTINUITY at entry/exit (0 → 1/R in
+        // one ring) — at racing speed that kink bumps the craft off the road no
+        // matter how good the suspension is. Easing the curvature (like real
+        // roller-coaster clothoid loops) removes the kink entirely.
+        private const float LoopCurvatureEaseFraction = 0.18f;
+        private const int LoopProfileSamples = 512;
+
+        // Lazily built normalized loop tables (deterministic, RNG-free).
+        private static float[] _loopThetaTable;      // pitch angle (radians) over u ∈ [0,1]
+        private static Vector2[] _loopPlaneTable;    // (forward, up) position / loop length
+        private static float _loopForwardDisplacementFactor; // net forward displacement / length
+
+        // Half-loop (Immelmann) profile tables: pitch 0→180° with the same eased curvature.
+        private static float[] _halfLoopThetaTable;
+        private static Vector2[] _halfLoopPlaneTable;
 
         // Ring budget (set from the resolved config each generation).
         private int _maxRingsPerSection = 512;
@@ -49,12 +76,13 @@ namespace TrackGeneration.Macro
                 if (attemptSeed == 0) attemptSeed = 1;
                 var attemptRng = new Unity.Mathematics.Random(attemptSeed);
 
-                List<TrackMacroSectionDefinition> defs = BuildSequence(cfg, ref attemptRng);
+                List<TrackMacroSectionDefinition> defs = BuildSequence(cfg, ref attemptRng, attempt);
                 SolveStraightLengths(defs, cfg);
                 PlanElevation(defs, cfg, ref attemptRng);
                 List<GeneratedTrackSection> sections = LayoutFrames(defs, cfg);
                 DistributeResidual(sections);
                 ApplyCrossSectionBlend(sections, cfg);
+                ApplyWallMasks(sections, cfg);
 
                 if (Validate(sections, cfg))
                 {
@@ -70,31 +98,104 @@ namespace TrackGeneration.Macro
             List<GeneratedTrackSection> fallback = LayoutFrames(template, cfg);
             DistributeResidual(fallback);
             ApplyCrossSectionBlend(fallback, cfg);
+            ApplyWallMasks(fallback, cfg);
             LogTrackSummary(fallback, cfg);
             return fallback;
         }
 
         // ──────────────────────────── 1. Sequence (the grammar) ────────────────────────────
 
-        private List<TrackMacroSectionDefinition> BuildSequence(ResolvedTrackGenerationConfig cfg, ref Unity.Mathematics.Random rng)
+        private List<TrackMacroSectionDefinition> BuildSequence(ResolvedTrackGenerationConfig cfg, ref Unity.Mathematics.Random rng, int attempt = 0)
         {
             var defs = new List<TrackMacroSectionDefinition>();
             float width = cfg.RoadWidth;
 
-            // ── Corner plan: angles sum to exactly 360° ──
+            // ── Corner plan ──
+            // Automatic (TurnCount = 0): classic same-direction circuit — unsigned
+            // angles composing exactly 360°.
+            // Explicit TurnCount: mountain-pass mode — MIXED left/right corners
+            // (switchback-biased) whose SIGNED sum closes the lap at ±360°.
             int[] angleOptions = SanitizeAngleOptions(cfg.CornerAngleOptions);
-            List<int> cornerAngles = PlanCornerAngles(angleOptions, cfg.TargetMacroSectionCount, ref rng);
+            List<int> signedAngles;
 
-            SectionTurnDirection loopDir = rng.NextBool() ? SectionTurnDirection.Right : SectionTurnDirection.Left;
+            if (cfg.TargetTurnCount > 0)
+            {
+                signedAngles = PlanSignedCorners(cfg, angleOptions, ref rng);
+            }
+            else
+            {
+                int dirSign = rng.NextBool() ? 1 : -1;
+                List<int> plain = PlanCornerAngles(angleOptions, cfg.TargetMacroSectionCount, ref rng);
+                signedAngles = new List<int>(plain.Count);
+                foreach (int a in plain) signedAngles.Add(a * dirSign);
+            }
+
+            bool mixedDirections = cfg.TargetTurnCount > 0;
+
+            // ── Room-driven radii (mountain-pass mode) ──
+            // An explicit TurnCount is a COMMAND, and turns deserve ROOM: corner radii
+            // honor the rulebook band (sharper corner → tighter end of the band) and
+            // the LAP GROWS to fit them — the length preset is a starting point, not a
+            // cage. Radii only shrink when the absolute MaxTrackLength cap forces it,
+            // plus a gentle per-attempt shrink that helps a colliding layout untangle.
+            float radiusScale = 1f;
+            if (mixedDirections)
+            {
+                float totalArc = 0f;
+                foreach (int a in signedAngles)
+                {
+                    float mag = Mathf.Abs(a);
+                    totalArc += mag * Mathf.Deg2Rad * Mathf.Lerp(cfg.MaxCurveRadius, cfg.MinCurveRadius, mag / 180f);
+                }
+
+                float requiredLength = totalArc * 2f; // corners ≈ half the lap
+                float lengthCap = Mathf.Max(cfg.TargetTrackLength, cfg.MaxTrackLength);
+
+                if (requiredLength > lengthCap)
+                {
+                    radiusScale = lengthCap / requiredLength;
+                    if (attempt == 0)
+                        Debug.LogWarning($"[MacroTrackLayoutGenerator] TurnCount {cfg.TargetTurnCount}: even at MaxTrackLength {lengthCap:F0}m the turns must scale to {radiusScale:P0} of rulebook radii. Raise MaxTrackLength in TrackConfig for wider turns.");
+                }
+                else if (attempt == 0 && requiredLength > cfg.TargetTrackLength)
+                {
+                    Debug.Log($"[MacroTrackLayoutGenerator] TurnCount {cfg.TargetTurnCount}: lap grows to ~{requiredLength:F0}m so all {signedAngles.Count} turns keep rulebook-sized radii.");
+                }
+
+                radiusScale *= Mathf.Pow(0.95f, attempt);
+            }
 
             var corners = new List<TrackMacroSectionDefinition>();
             bool hairpinPlaced = false;
-            foreach (int angle in cornerAngles)
-            {
-                bool isHairpin = !hairpinPlaced && angle >= 120 && rng.NextFloat() < cfg.HairpinChance;
-                if (isHairpin) hairpinPlaced = true;
+            int halfLoopTwistsPlaced = 0;
 
-                float radius = PickRadius(cfg, ref rng, isHairpin);
+            foreach (int signedAngle in signedAngles)
+            {
+                int angle = Mathf.Abs(signedAngle);
+                SectionTurnDirection dir = signedAngle >= 0 ? SectionTurnDirection.Right : SectionTurnDirection.Left;
+
+                // A near-reversal corner may become a half-loop + half-twist (Immelmann):
+                // same 180° heading change, delivered as a vertical spectacle.
+                if (angle >= 170 && halfLoopTwistsPlaced < 2 && cfg.HalfLoopTwistChance > 0f
+                    && rng.NextFloat() < cfg.HalfLoopTwistChance)
+                {
+                    halfLoopTwistsPlaced++;
+                    corners.Add(MakeHalfLoopTwist(cfg, dir, width, ref rng));
+                    continue;
+                }
+
+                // Mountain-pass mode allows MANY sharp corners; the classic mode keeps
+                // the original single-hairpin rule.
+                bool isHairpin = mixedDirections
+                    ? angle >= 130
+                    : !hairpinPlaced && angle >= 120 && rng.NextFloat() < cfg.HairpinChance;
+                if (isHairpin && !mixedDirections) hairpinPlaced = true;
+
+                // Sharper corners bind to the tighter end of the rulebook band so
+                // switchbacks read as switchbacks; sweepers stay grand.
+                float radius = mixedDirections
+                    ? Mathf.Max(Mathf.Lerp(cfg.MaxCurveRadius, cfg.MinCurveRadius, angle / 180f) * radiusScale * (isHairpin ? 0.8f : 1f), cfg.RoadWidth * 1.5f)
+                    : PickRadius(cfg, ref rng, isHairpin);
                 float bank = ComputeBankAngle(cfg, angle, isHairpin);
 
                 corners.Add(new TrackMacroSectionDefinition
@@ -102,22 +203,33 @@ namespace TrackGeneration.Macro
                     SectionType = isHairpin ? TrackMacroSectionType.BankedHairpin : TrackMacroSectionType.BankedCurve,
                     Length = Mathf.Deg2Rad * angle * radius,
                     Width = width,
-                    Direction = loopDir,
+                    Direction = dir,
                     TurnAngle = angle,
                     Radius = radius,
                     BankingAngle = bank,
                     SpeedIntent = isHairpin ? SectionSpeedIntent.Slow : (angle >= 90 ? SectionSpeedIntent.Medium : SectionSpeedIntent.Fast),
                     RiskLevel = isHairpin ? SectionRiskLevel.Risky : SectionRiskLevel.Normal,
                     RequiresRecoveryAfter = isHairpin,
-                    DebugName = $"{(isHairpin ? "BankedHairpin" : "BankedCurve")}_{angle}deg_{loopDir}"
+                    DebugName = $"{(isHairpin ? "BankedHairpin" : "BankedCurve")}_{angle}deg_{dir}"
                 });
             }
 
+            // Corner arc budget sanity (automatic mode only — mountain-pass mode grows
+            // the lap deliberately and reports its own scaling above).
+            if (!mixedDirections)
+            {
+                float totalCornerArc = 0f;
+                foreach (var c in corners) totalCornerArc += c.Length;
+                if (totalCornerArc > cfg.TargetTrackLength * 0.8f)
+                    Debug.LogWarning($"[MacroTrackLayoutGenerator] WARNING: {corners.Count} corners need {totalCornerArc:F0}m of arc vs target track length {cfg.TargetTrackLength:F0}m — the lap will run long. Lower TurnCount or reduce MinCurveRadius in TrackConfig.");
+            }
+
             // ── Fill the gaps between corners ──
-            int jumpsPlaced = 0, sCurvesPlaced = 0, chicanesPlaced = 0, loopsPlaced = 0, corksPlaced = 0, layeredPlaced = 0, crossingsPlaced = 0;
+            int jumpsPlaced = 0, sCurvesPlaced = 0, chicanesPlaced = 0, loopsPlaced = 0, corksPlaced = 0, layeredPlaced = 0, crossingsPlaced = 0, spiralsPlaced = 0;
             int lastCorkGap = -10;
             int maxJumps = cfg.JumpChance > 0.5f ? 3 : 2;
             int maxLoops = cfg.LoopChance >= 0.5f ? 3 : 2;
+            int maxSpirals = cfg.SpiralChance >= 0.5f ? 3 : 2;
             const int maxCorks = 2;
 
             for (int i = 0; i < corners.Count; i++)
@@ -143,9 +255,10 @@ namespace TrackGeneration.Macro
                                    (mustPlaceLayered || rng.NextFloat() < layeredChance);
                 bool wantLoop = !wantLayered && loopsPlaced < maxLoops && rng.NextFloat() < cfg.LoopChance;
                 bool wantCork = !wantLayered && !wantLoop && corksPlaced < maxCorks && (i - lastCorkGap) >= 2 && rng.NextFloat() < cfg.CorkscrewChance;
-                bool wantJump = !wantLayered && !wantLoop && !wantCork && jumpsPlaced < maxJumps && rng.NextFloat() < cfg.JumpChance;
-                bool wantSCurve = !wantLayered && !wantLoop && !wantCork && !wantJump && sCurvesPlaced < 2 && rng.NextFloat() < cfg.SCurveChance;
-                bool wantChicane = !wantLayered && !wantLoop && !wantCork && !wantJump && !wantSCurve && chicanesPlaced < 2 && rng.NextFloat() < cfg.ChicaneChance;
+                bool wantSpiral = !wantLayered && !wantLoop && !wantCork && spiralsPlaced < maxSpirals && rng.NextFloat() < cfg.SpiralChance;
+                bool wantJump = !wantLayered && !wantLoop && !wantCork && !wantSpiral && jumpsPlaced < maxJumps && rng.NextFloat() < cfg.JumpChance;
+                bool wantSCurve = !wantLayered && !wantLoop && !wantCork && !wantSpiral && !wantJump && sCurvesPlaced < 2 && rng.NextFloat() < cfg.SCurveChance;
+                bool wantChicane = !wantLayered && !wantLoop && !wantCork && !wantSpiral && !wantJump && !wantSCurve && chicanesPlaced < 2 && rng.NextFloat() < cfg.ChicaneChance;
 
                 if (wantLayered)
                 {
@@ -153,8 +266,14 @@ namespace TrackGeneration.Macro
                     // group: both routes span the same split/merge frames.
                     layeredPlaced++;
 
-                    float groupLen = rng.NextFloat(cfg.MinLayeredRouteLength, cfg.MaxLayeredRouteLength);
-                    float sep = cfg.LayeredHeightSeparation;
+                    // Long routes read as two genuinely separate roads, not a forked line.
+                    float groupLen = rng.NextFloat(
+                        Mathf.Lerp(cfg.MinLayeredRouteLength, cfg.MaxLayeredRouteLength, 0.4f),
+                        cfg.MaxLayeredRouteLength);
+
+                    // DECOUPLED: height separation between the routes comes from the
+                    // VERTICALITY preset. Low verticality = flat side-by-side branches.
+                    float sep = cfg.TargetElevationAmplitude >= 12f ? cfg.LayeredHeightSeparation : 0f;
 
                     // Staged split structure (sideways FIRST, then up/down) needs room for:
                     // lateral separation → vertical divergence → body → vertical convergence
@@ -175,7 +294,8 @@ namespace TrackGeneration.Macro
                         sep = maxSepBySlope;
                     }
 
-                    bool crossing = cfg.OverUnderCrossingChance > 0f &&
+                    bool crossing = sep > 0.01f &&
+                                    cfg.OverUnderCrossingChance > 0f &&
                                     crossingsPlaced < 4 &&
                                     (rng.NextFloat() < cfg.OverUnderCrossingChance || (cfg.ForceAtLeastOneOverpass && crossingsPlaced == 0));
 
@@ -186,7 +306,11 @@ namespace TrackGeneration.Macro
                     }
                     if (crossing) crossingsPlaced++;
 
-                    float lateral = Mathf.Max(cfg.RouteLateralSeparation, cfg.RouteWidth * 0.5f + width * 0.5f + 3f);
+                    // Separation proportional to road width: at least a full road width of
+                    // daylight between the two routes so they read as separate roads.
+                    float lateral = Mathf.Max(
+                        Mathf.Max(cfg.RouteLateralSeparation, cfg.RouteWidth * 0.5f + width * 0.5f + 3f),
+                        width * 1.25f);
 
                     defs.Add(MakeStraight(TrackMacroSectionType.Straight, Mathf.Max(Mathf.Max(cfg.LayeredRouteApproachLength, cfg.RouteSplitApproachLength), mainLen * 0.35f), width, "SplitApproach", locked: true));
 
@@ -234,7 +358,10 @@ namespace TrackGeneration.Macro
                     defs.Add(new TrackMacroSectionDefinition
                     {
                         SectionType = TrackMacroSectionType.Loop,
-                        Length = 2f * Mathf.PI * loopRadius,
+                        // Eased (clothoid-style) curvature spends part of the arc below peak
+                        // curvature, so the loop needs extra length for the MID-loop radius
+                        // to stay at the requested value.
+                        Length = 2f * Mathf.PI * loopRadius / (1f - LoopCurvatureEaseFraction),
                         Width = width,
                         Radius = loopRadius,
                         Direction = SectionTurnDirection.Right, // lateral exit offset side
@@ -276,6 +403,46 @@ namespace TrackGeneration.Macro
                     });
 
                     defs.Add(MakeStraight(TrackMacroSectionType.RecoveryStraight, cfg.CorkscrewRecoveryLength, width, "RecoveryStraight", locked: true));
+                }
+                else if (wantSpiral)
+                {
+                    // Parking-garage helix: full revolutions exit directly above/below the
+                    // entry (zero net 2D displacement, heading unchanged) — closure-free.
+                    spiralsPlaced++;
+
+                    float spiralRadius = Mathf.Max(cfg.RoadWidth * 2f, cfg.MinCurveRadius * rng.NextFloat(0.45f, 0.75f));
+
+                    // Coil-to-coil spacing: VerticalClearance is already wall-aware
+                    // (includes the boosted half-pipe walls), plus a slab margin.
+                    float climbPerRev = cfg.VerticalClearance + 8f;
+
+                    // Spirals only CLIMB: the track baseline is ground level, so a
+                    // descending spiral would drill below grade. The elevation plan
+                    // brings the gained height back down on later straights instead.
+                    int revs = rng.NextInt(1, 3); // 1 or 2 full revolutions
+                    if (climbPerRev * revs > 240f) revs = 1;
+                    SectionTurnDirection spiralDir = rng.NextBool() ? SectionTurnDirection.Right : SectionTurnDirection.Left;
+
+                    defs.Add(MakeStraight(TrackMacroSectionType.Straight, Mathf.Max(cfg.RecoveryLength, mainLen * 0.35f), width, "SpiralApproach", locked: true));
+
+                    defs.Add(new TrackMacroSectionDefinition
+                    {
+                        SectionType = TrackMacroSectionType.Spiral,
+                        Length = 2f * Mathf.PI * spiralRadius * revs,
+                        Width = width,
+                        Radius = spiralRadius,
+                        Direction = spiralDir,
+                        TurnAngle = 360f * revs,
+                        BankingAngle = ComputeBankAngle(cfg, 90, false) * 0.8f,
+                        ElevationChange = climbPerRev * revs,
+                        SpeedIntent = SectionSpeedIntent.Medium,
+                        RiskLevel = SectionRiskLevel.Normal,
+                        RequiresRecoveryAfter = true,
+                        LockLength = true,
+                        DebugName = $"Spiral_{revs}rev_Up_{spiralDir}"
+                    });
+
+                    defs.Add(MakeStraight(TrackMacroSectionType.RecoveryStraight, cfg.RecoveryLength, width, "RecoveryStraight", locked: true));
                 }
                 else if (wantJump)
                 {
@@ -409,6 +576,13 @@ namespace TrackGeneration.Macro
                     }
                 }
 
+                // A half-loop twist launches vertically — give it a locked, readable approach.
+                if (corners[i].SectionType == TrackMacroSectionType.HalfLoopTwist)
+                {
+                    defs.Add(MakeStraight(TrackMacroSectionType.Straight,
+                        Mathf.Max(cfg.LoopApproachLength * 0.6f, 150f), width, "HalfLoopApproach", locked: true));
+                }
+
                 defs.Add(corners[i]);
             }
 
@@ -427,6 +601,113 @@ namespace TrackGeneration.Macro
                 RiskLevel = SectionRiskLevel.Safe,
                 LockLength = locked,
                 DebugName = name
+            };
+        }
+
+        /// <summary>
+        /// Mountain-pass corner planner: exactly TargetTurnCount corners with MIXED
+        /// left/right directions (switchback-biased sign flips) whose SIGNED angles sum
+        /// to exactly ±360° so the lap closes. Magnitudes are nudged (and signs flipped
+        /// when saturated) until the residual vanishes; fully deterministic via the
+        /// seeded rng. Falls back to the automatic planner if it cannot converge.
+        /// </summary>
+        private List<int> PlanSignedCorners(ResolvedTrackGenerationConfig cfg, int[] options, ref Unity.Mathematics.Random rng)
+        {
+            int count = Mathf.Max(3, cfg.TargetTurnCount);
+
+            int minA = int.MaxValue, maxA = int.MinValue;
+            foreach (int o in options) { minA = Mathf.Min(minA, o); maxA = Mathf.Max(maxA, o); }
+            minA = Mathf.Clamp(minA, 15, 180);
+            maxA = Mathf.Clamp(maxA, minA, 180);
+
+            var signed = new List<int>(count);
+            int prevSign = rng.NextBool() ? 1 : -1;
+            for (int i = 0; i < count; i++)
+            {
+                int mag = Mathf.Clamp(Mathf.RoundToInt(rng.NextFloat(minA, maxA) / 5f) * 5, minA, maxA);
+                int sign = rng.NextFloat() < 0.65f ? -prevSign : prevSign; // switchback bias
+                prevSign = sign;
+                signed.Add(sign * mag);
+            }
+
+            int sum = 0;
+            foreach (int a in signed) sum += a;
+            int target = sum >= 0 ? 360 : -360;
+
+            for (int pass = 0; pass < 96 && sum != target; pass++)
+            {
+                int residual = target - sum;
+
+                int idx = rng.NextInt(0, signed.Count);
+                int sign = signed[idx] >= 0 ? 1 : -1;
+                int mag = Mathf.Abs(signed[idx]);
+
+                // Grow/shrink this corner toward the target in gentle steps (keeps variety).
+                int step = Mathf.Clamp(residual * sign, -20, 20);
+                int newMag = Mathf.Clamp(mag + step, minA, maxA);
+
+                if (newMag == mag && pass > count * 2)
+                {
+                    // Magnitudes saturated: flip the corner whose flip best approaches the target.
+                    int bestIdx = -1, bestErr = Mathf.Abs(residual);
+                    for (int i = 0; i < signed.Count; i++)
+                    {
+                        int err = Mathf.Abs(target - (sum - 2 * signed[i]));
+                        if (err < bestErr) { bestErr = err; bestIdx = i; }
+                    }
+                    if (bestIdx >= 0) { sum -= 2 * signed[bestIdx]; signed[bestIdx] = -signed[bestIdx]; }
+                    continue;
+                }
+
+                sum += (newMag - mag) * sign;
+                signed[idx] = sign * newMag;
+            }
+
+            if (sum != target)
+            {
+                Debug.LogWarning($"[MacroTrackLayoutGenerator] WARNING: Could not close {count} signed corners to ±360° (residual {target - sum}°) — using the automatic corner plan instead.");
+                int dirSign = target >= 0 ? 1 : -1;
+                var fallback = new List<int>();
+                foreach (int a in PlanCornerAngles(options, cfg.TargetMacroSectionCount, ref rng)) fallback.Add(a * dirSign);
+                return fallback;
+            }
+
+            return signed;
+        }
+
+        /// <summary>
+        /// A near-180° corner realized as a half loop + half twist (Immelmann):
+        /// same heading reversal as a hairpin, delivered vertically. Exits at the
+        /// half-loop top height; the elevation plan pays that back elsewhere.
+        /// </summary>
+        private TrackMacroSectionDefinition MakeHalfLoopTwist(ResolvedTrackGenerationConfig cfg, SectionTurnDirection rollDir, float width, ref Unity.Mathematics.Random rng)
+        {
+            EnsureHalfLoopProfile();
+
+            float radius = Mathf.Lerp(cfg.MinLoopRadius, cfg.MaxLoopRadius, rng.NextFloat(0.35f, 0.85f));
+            float halfArc = HalfLoopArcLength(radius);
+
+            // The roll-out is the "half corkscrew" leg: generously long so the 180°
+            // roll unwinds gradually at racing speed instead of snapping — it blends
+            // the inverted loop top into level flight over several seconds of travel.
+            float rollOut = Mathf.Max(radius * 2.5f, 800f);
+
+            return new TrackMacroSectionDefinition
+            {
+                SectionType = TrackMacroSectionType.HalfLoopTwist,
+                Length = halfArc + rollOut,
+                Width = width,
+                Radius = radius,
+                Direction = rollDir,
+                TurnAngle = 180f,
+                PitchChange = 180f,
+                RollChange = rollDir == SectionTurnDirection.Right ? 180f : -180f,
+                ElevationChange = HalfLoopTopHeight(halfArc),
+                SpeedIntent = SectionSpeedIntent.FullThrottle,
+                RiskLevel = SectionRiskLevel.Extreme,
+                RequiresRecoveryAfter = true,
+                LockLength = true,
+                DebugName = $"HalfLoopTwist_R{radius:F0}m_{rollDir}"
             };
         }
 
@@ -583,7 +864,17 @@ namespace TrackGeneration.Macro
         /// </summary>
         private void PlanElevation(List<TrackMacroSectionDefinition> defs, ResolvedTrackGenerationConfig cfg, ref Unity.Mathematics.Random rng)
         {
-            if (cfg.TargetElevationAmplitude < 6f) return; // Flat preset: 0-5 m by design
+            // Fixed elevation carried by geometry sections (spirals, half-loop twists)
+            // must be paid back by the major climbs/drops for the lap to close flat.
+            float fixedElevation = 0f;
+            foreach (var d in defs)
+            {
+                if (d.SectionType == TrackMacroSectionType.Spiral || d.SectionType == TrackMacroSectionType.HalfLoopTwist)
+                    fixedElevation += d.ElevationChange;
+            }
+            bool needCompensation = Mathf.Abs(fixedElevation) > 1f;
+
+            if (cfg.TargetElevationAmplitude < 6f && !needCompensation) return; // Flat preset: 0-5 m by design
 
             // Carriers: plain (non-safety) straights. Approaches/recoveries stay flat so
             // loops, corkscrews, jumps and merges always launch from level ground.
@@ -600,12 +891,16 @@ namespace TrackGeneration.Macro
 
             if (eligible.Count < 2)
             {
-                Debug.LogWarning($"[MacroTrackLayoutGenerator] Verticality preset requested {cfg.DebugVerticalityLabel}, but no eligible straights can carry elevation — track will stay flat.");
+                if (needCompensation)
+                    Debug.LogWarning($"[MacroTrackLayoutGenerator] WARNING: Spirals/half-loops carry {fixedElevation:F0}m of net elevation but no straights can pay it back — the residual pass will tilt the whole lap to close it.");
+                else
+                    Debug.LogWarning($"[MacroTrackLayoutGenerator] Verticality preset requested {cfg.DebugVerticalityLabel}, but no eligible straights can carry elevation — track will stay flat.");
                 return;
             }
 
             // ── Major climbs/drops ──
             int majors = Mathf.Clamp(rng.NextInt(cfg.MinMajorElevationSections, cfg.MaxMajorElevationSections + 1), 0, eligible.Count);
+            if (needCompensation) majors = Mathf.Clamp(Mathf.Max(majors, 2), 0, eligible.Count);
             var majorSet = new HashSet<int>();
 
             if (majors >= 2)
@@ -635,7 +930,11 @@ namespace TrackGeneration.Macro
                 foreach (int idx in eligible) if (majorSet.Contains(idx)) order.Add(idx);
 
                 var deltas = new float[order.Count];
-                float level = 0f;
+
+                // Seeding the walk with the fixed elevation makes the majors' deltas sum
+                // to exactly -fixedElevation: the lap returns to its start height even
+                // with climbing spirals / half-loop twists on it.
+                float level = fixedElevation;
                 for (int k = 0; k < order.Count; k++)
                 {
                     float delta;
@@ -760,10 +1059,25 @@ namespace TrackGeneration.Macro
                 }
                 else if (d.SectionType == TrackMacroSectionType.Loop)
                 {
-                    // A loop returns to its entry point but exits laterally offset (to the right)
-                    // so it cannot collide with its own entry. Heading is unchanged.
+                    // The eased-curvature loop is nearly straight at entry/exit, so unlike a
+                    // perfect circle it carries a small net FORWARD displacement, plus the
+                    // lateral exit offset that keeps it clear of its own entry. Heading unchanged.
                     Vector2 right = new Vector2(fwd.y, -fwd.x);
-                    endPos += right * LoopLateralOffset(d);
+                    endPos += fwd * LoopForwardDisplacement(d.Length) + right * LoopLateralOffset(d);
+                }
+                else if (d.SectionType == TrackMacroSectionType.Spiral)
+                {
+                    // Full revolutions exit directly above/below the entry:
+                    // zero net 2D displacement, heading unchanged.
+                }
+                else if (d.SectionType == TrackMacroSectionType.HalfLoopTwist)
+                {
+                    // Half loop reverses the heading; the twist roll-out then travels
+                    // along the NEW heading at the top height.
+                    float halfArc = HalfLoopArcLength(d.Radius);
+                    endPos += fwd * HalfLoopForwardDisplacement(halfArc);
+                    heading += 180f;
+                    endPos += HeadingToDir(heading) * Mathf.Max(0f, d.Length - halfArc);
                 }
                 else if (d.SectionType == TrackMacroSectionType.SCurve)
                 {
@@ -883,11 +1197,19 @@ namespace TrackGeneration.Macro
                         break;
 
                     case TrackMacroSectionType.Loop:
-                        section.SubdivisionFrames = LayoutLoop(frame, def, Mathf.Max(0.5f, cfg.LoopMetersPerRing));
+                        section.SubdivisionFrames = LayoutLoop(frame, def, Mathf.Max(0.5f, cfg.LoopMetersPerRing), cfg.MaxRingFacetAngle);
                         break;
 
                     case TrackMacroSectionType.Corkscrew:
-                        section.SubdivisionFrames = LayoutCorkscrew(frame, def, Mathf.Max(0.5f, cfg.CorkscrewMetersPerRing));
+                        section.SubdivisionFrames = LayoutCorkscrew(frame, def, Mathf.Max(0.5f, cfg.CorkscrewMetersPerRing), cfg.MaxRingFacetAngle);
+                        break;
+
+                    case TrackMacroSectionType.Spiral:
+                        section.SubdivisionFrames = LayoutSpiral(frame, def, density, cfg);
+                        break;
+
+                    case TrackMacroSectionType.HalfLoopTwist:
+                        section.SubdivisionFrames = LayoutHalfLoopTwist(frame, def, Mathf.Max(0.5f, cfg.LoopMetersPerRing), cfg.MaxRingFacetAngle);
                         break;
 
                     case TrackMacroSectionType.AirGap:
@@ -896,6 +1218,26 @@ namespace TrackGeneration.Macro
 
                     default:
                         section.SubdivisionFrames = LayoutStraight(frame, def, density, cfg);
+                        break;
+                }
+
+                // ── Boundary open/closed metadata ──
+                // Any boundary that touches an AirGap is an OPEN edge: no end caps, no
+                // geometry across the flight path. Normal section boundaries stay uncapped
+                // too — connected meshes share identical rings, so nothing is exposed.
+                switch (def.SectionType)
+                {
+                    case TrackMacroSectionType.JumpRamp:
+                        section.OpenEnd = true;          // launch lip: nothing may cross the launch direction
+                        section.ConnectsToAirGap = true;
+                        break;
+                    case TrackMacroSectionType.LandingRamp:
+                        section.OpenStart = true;        // landing mouth: open to the incoming craft
+                        section.ConnectsToAirGap = true;
+                        break;
+                    case TrackMacroSectionType.AirGap:
+                        section.OpenStart = true;        // the gap itself has no road mesh at all
+                        section.OpenEnd = true;
                         break;
                 }
 
@@ -1161,27 +1503,25 @@ namespace TrackGeneration.Macro
             float side = Mathf.Sign(signedAngleDeg);
             float arcLen = Mathf.Deg2Rad * angleAbs * radius;
 
-            int rings = Mathf.Clamp(Mathf.CeilToInt(arcLen / density) + 1, 9, _maxRingsPerSection);
+            // Facet-angle bound: tight corners must not become visible/physical polygons.
+            int facetRings = Mathf.CeilToInt(angleAbs / Mathf.Max(0.2f, cfg.MaxRingFacetAngle)) + 1;
+            int rings = Mathf.Clamp(Mathf.Max(Mathf.CeilToInt(arcLen / density) + 1, facetRings), 9, _maxRingsPerSection);
             var frames = new TrackConnectionFrame[rings];
 
             Vector3 fwdH = Flatten(entry.Forward);
             Vector3 rightH = Flatten(entry.Right);
             Vector3 center = entry.Position + rightH * (side * radius);
             Vector3 toStart = entry.Position - center;
-            float halfWidth = entry.Width * 0.5f;
 
-            // ── Bank blend length + ramp safety ──
-            // Banking raises the outside edge by tan(bank)·width. If that height change
-            // happens over too little track length, the bank-in behaves like a launch ramp.
-            // The blend auto-expands so its effective ramp angle stays legal.
-            float requestedBlend = cfg.BankBlendLength;
-            float bankHeightDelta = Mathf.Tan(Mathf.Abs(bankDeg) * Mathf.Deg2Rad) * entry.Width;
-            float rampPeak = TrackBlend.PeakDerivative(cfg.BlendCurve);
-            float minSafeBlend = bankHeightDelta * rampPeak / Mathf.Tan(Mathf.Max(1f, cfg.MaxBankRampAngle) * Mathf.Deg2Rad);
-            float blendLen = Mathf.Max(requestedBlend, minSafeBlend);
-            if (minSafeBlend > requestedBlend + 0.5f)
-                Debug.LogWarning($"[MacroTrackLayoutGenerator] WARNING: Bank blend too short; auto-expanded from {requestedBlend:F0}m to {blendLen:F0}m (bank {bankDeg:F0}°, width {entry.Width:F0}m).");
-
+            // ── BOBSLED BANKING ──
+            // Corners no longer roll the road geometrically (rolling + baseline lift
+            // turned wide, steeply banked corners into literal ramps — at 100 m width
+            // and 75° the outside edge climbed ~90 m). Instead the FLOOR stays at
+            // grade and the banking is expressed through the half-pipe cross-section:
+            // the OUTSIDE wall grows taller/deeper, the INSIDE wall shrinks, and the
+            // craft banks by riding up the outside wall — exactly how a bobsled track
+            // corners. BankAngle on the frame is kept as informational metadata.
+            float blendLen = cfg.BankBlendLength;
             float easeFrac = Mathf.Clamp(blendLen / Mathf.Max(1f, arcLen), MinBankEaseFraction, MaxBankEaseFraction);
 
             for (int i = 0; i < rings; i++)
@@ -1195,26 +1535,25 @@ namespace TrackGeneration.Macro
                 Vector3 right = yaw * rightH;
 
                 float bank = bankDeg * BankProfile(u, easeFrac, cfg.BlendCurve);
-                Quaternion roll = Quaternion.AngleAxis(-side * bank, fwd);
+                float bank01 = Mathf.Clamp01(bank / 90f);
 
-                // BASELINE RULE: banking must never dip the inside edge below the section
-                // baseline (that made mini-drops entering corners and bumps exiting them).
-                // Rotating around the centerline lowers the inside edge by halfWidth·sin(bank),
-                // so the whole cross-section is lifted by exactly that amount: the inside edge
-                // stays at baseline and only the outside edge rises.
-                float baselineLift = halfWidth * Mathf.Sin(bank * Mathf.Deg2Rad);
-                pos += Vector3.up * baselineLift;
+                // Outside wall boost / inside wall trim (negative suppression = boost).
+                // Right turn (side > 0): outside is the LEFT side, and vice versa.
+                float outsideBoost = -bank01 * BobsledOuterWallBoost;
+                float insideTrim = bank01 * BobsledInnerWallTrim;
 
                 frames[i] = new TrackConnectionFrame
                 {
                     Position = pos,
                     Forward = fwd,
-                    Right = roll * right,
-                    Up = roll * Vector3.up,
+                    Right = right,
+                    Up = Vector3.up,
                     Width = entry.Width,
                     BankAngle = side * bank,
                     PitchAngle = 0f,
-                    ArcLength = entry.ArcLength + arcLen * u
+                    ArcLength = entry.ArcLength + arcLen * u,
+                    LeftWallSuppression = side > 0f ? outsideBoost : insideTrim,
+                    RightWallSuppression = side > 0f ? insideTrim : outsideBoost
                 };
             }
 
@@ -1284,16 +1623,32 @@ namespace TrackGeneration.Macro
 
         /// <summary>
         /// One vertical loop as ONE macro section: pitch rotates a full 360° through clean
-        /// prism subdivisions. The exit is laterally offset (two road widths to the right)
-        /// so the loop never intersects its own entry — the classic offset loop.
+        /// prism subdivisions with EASED curvature (clothoid-style). A perfect circle has a
+        /// curvature DISCONTINUITY at entry/exit (0 → 1/R in one ring) — at racing speed
+        /// that kink bumps the craft no matter how good the suspension is. Here curvature
+        /// ramps 0 → 1/R → 0, so the craft transitions smoothly on and off the loop.
+        /// The exit is laterally offset (two road widths to the right) so the loop never
+        /// intersects its own entry — the classic offset loop. Unlike a circle, the eased
+        /// loop carries a small net forward displacement (accounted for in the closure solve).
         /// </summary>
-        private TrackConnectionFrame[] LayoutLoop(TrackConnectionFrame entry, TrackMacroSectionDefinition def, float density)
+        private TrackConnectionFrame[] LayoutLoop(TrackConnectionFrame entry, TrackMacroSectionDefinition def, float density, float maxFacetAngle)
         {
-            float R = def.Radius;
-            float lateral = LoopLateralOffset(def);
-            float arcLen = 2f * Mathf.PI * R;
+            EnsureLoopProfile();
 
-            int rings = Mathf.Clamp(Mathf.CeilToInt(arcLen / density) + 1, 24, _maxRingsPerSection);
+            float arcLen = def.Length;
+            float lateral = LoopLateralOffset(def);
+
+            // Facet-angle bound: the loop's bumpiness IS its facet angle, so ring
+            // count must satisfy the max facet angle regardless of the configured
+            // meters-per-ring. Peak pitch rate per ring is (360° / easeIntegral) /
+            // rings, so rings ≥ 360 / (easeIntegral · maxFacet).
+            int facetRings = Mathf.CeilToInt(360f / (Mathf.Max(0.2f, maxFacetAngle) * (1f - LoopCurvatureEaseFraction))) + 1;
+            int lengthRings = Mathf.CeilToInt(arcLen / density) + 1;
+
+            int rings = Mathf.Clamp(Mathf.Max(facetRings, lengthRings), 24, _maxRingsPerSection);
+            if (rings < facetRings)
+                Debug.LogWarning($"[MacroTrackLayoutGenerator] WARNING: Loop '{def.DebugName}' ring budget caps facets at {360f / ((1f - LoopCurvatureEaseFraction) * rings):F1}°/ring (target {maxFacetAngle:F1}°) — raise MaxRingsPerMacroSection for a smoother loop.");
+
             var frames = new TrackConnectionFrame[rings];
 
             Vector3 fwdH = Flatten(entry.Forward);
@@ -1302,24 +1657,35 @@ namespace TrackGeneration.Macro
 
             Vector3 PosAt(float u)
             {
-                float t = u * 2f * Mathf.PI;
+                Vector2 pl = LoopPlaneAt(u) * arcLen;
                 // Lateral offset is smoothstepped so its derivative is zero at entry/exit —
                 // the loop's tangent is then exactly the flat approach direction at both ends,
                 // and the weld to the neighboring straights is kink-free.
                 return basePos
-                     + fwdH * (R * Mathf.Sin(t))
-                     + Vector3.up * (R * (1f - Mathf.Cos(t)))
+                     + fwdH * pl.x
+                     + Vector3.up * pl.y
                      + rightH * (lateral * Smooth01(u));
+            }
+
+            // Analytic tangent of PosAt. A finite difference here is NOT good enough: its
+            // one-sided error at the end rings leaves a sub-degree tilt that reads as a
+            // physical bump where the loop welds back onto the road at racing speed.
+            // The plane path is the integral of the unit tangent (cos θ, sin θ), so its
+            // derivative is exact by construction.
+            Vector3 TanAt(float u)
+            {
+                float theta = LoopThetaAt(u);
+                return fwdH * (arcLen * Mathf.Cos(theta))
+                     + Vector3.up * (arcLen * Mathf.Sin(theta))
+                     + rightH * (lateral * 6f * u * (1f - u));
             }
 
             for (int i = 0; i < rings; i++)
             {
                 float u = (float)i / (rings - 1);
-                float thetaDeg = 360f * u;
+                float thetaDeg = LoopThetaAt(u) * Mathf.Rad2Deg;
 
-                // Tangent by finite difference of the analytic path (robust at every pitch).
-                float eps = 0.25f / rings;
-                Vector3 fwd = (PosAt(Mathf.Min(1f, u + eps)) - PosAt(Mathf.Max(0f, u - eps))).normalized;
+                Vector3 fwd = TanAt(u).normalized;
 
                 // Up rotates with pitch around the (constant) right axis; orthonormalize vs fwd.
                 Vector3 up = Quaternion.AngleAxis(-thetaDeg, rightH) * Vector3.up;
@@ -1339,9 +1705,17 @@ namespace TrackGeneration.Macro
                 };
             }
 
-            // Force a clean, flat exit frame for the connection contract.
+            // Weld contract: the entry ring is bit-identical to the incoming frame, and the
+            // exit ring is the exact flat exit pose. With analytic tangents both are already
+            // correct to float precision, so these snaps close the weld without creating a
+            // kink against the neighbouring rings.
+            var first = frames[0];
+            frames[0] = entry;
+            frames[0].PitchAngle = first.PitchAngle;
+            frames[0].ArcLength = first.ArcLength;
+
             var last = frames[rings - 1];
-            last.Position = basePos + rightH * lateral;
+            last.Position = basePos + fwdH * LoopForwardDisplacement(arcLen) + rightH * lateral;
             last.Forward = fwdH;
             last.Right = rightH;
             last.Up = Vector3.up;
@@ -1352,16 +1726,293 @@ namespace TrackGeneration.Macro
         }
 
         /// <summary>
+        /// Builds the shared normalized loop profile tables. Pitch θ(u) is the cumulative
+        /// integral of the eased curvature profile (normalized to exactly 360°), and the
+        /// (forward, up) plane path is the cumulative integral of the unit tangent
+        /// (cos θ, sin θ). The symmetric ease guarantees the loop returns to entry height;
+        /// the leftover is the net forward displacement factor. Deterministic and RNG-free.
+        /// </summary>
+        private static void EnsureLoopProfile()
+        {
+            if (_loopThetaTable != null) return;
+            BuildPitchProfile(2f * Mathf.PI, LoopCurvatureEaseFraction, LoopProfileSamples, out _loopThetaTable, out _loopPlaneTable);
+            _loopForwardDisplacementFactor = _loopPlaneTable[LoopProfileSamples].x;
+        }
+
+        private static void EnsureHalfLoopProfile()
+        {
+            if (_halfLoopThetaTable != null) return;
+            BuildPitchProfile(Mathf.PI, LoopCurvatureEaseFraction, LoopProfileSamples, out _halfLoopThetaTable, out _halfLoopPlaneTable);
+        }
+
+        /// <summary>
+        /// Builds an eased-curvature pitch profile of the given total angle: pitch θ(u)
+        /// is the cumulative integral of the eased curvature (normalized to exactly the
+        /// total), and the (forward, up) plane path is the cumulative integral of the
+        /// unit tangent, normalized by arc length. Shared by full loops (360°) and
+        /// half-loop twists (180°). Deterministic and RNG-free.
+        /// </summary>
+        private static void BuildPitchProfile(float totalRadians, float easeFrac, int n, out float[] thetaTable, out Vector2[] planeTable)
+        {
+            var theta = new float[n + 1];
+            var raw = new float[n + 1];
+
+            for (int i = 0; i <= n; i++)
+            {
+                raw[i] = BankProfile((float)i / n, easeFrac, TrackBlendCurve.SmootherStep);
+            }
+
+            float acc = 0f;
+            for (int i = 1; i <= n; i++)
+            {
+                acc += (raw[i - 1] + raw[i]) * 0.5f / n;
+                theta[i] = acc;
+            }
+
+            float scale = totalRadians / theta[n];
+            for (int i = 0; i <= n; i++) theta[i] *= scale;
+
+            var plane = new Vector2[n + 1];
+            Vector2 p = Vector2.zero;
+            for (int i = 1; i <= n; i++)
+            {
+                Vector2 t0 = new Vector2(Mathf.Cos(theta[i - 1]), Mathf.Sin(theta[i - 1]));
+                Vector2 t1 = new Vector2(Mathf.Cos(theta[i]), Mathf.Sin(theta[i]));
+                p += (t0 + t1) * (0.5f / n);
+                plane[i] = p;
+            }
+
+            thetaTable = theta;
+            planeTable = plane;
+        }
+
+        private static float TableThetaAt(float[] table, float u)
+        {
+            float x = Mathf.Clamp01(u) * LoopProfileSamples;
+            int i = Mathf.Min((int)x, LoopProfileSamples - 1);
+            return Mathf.Lerp(table[i], table[i + 1], x - i);
+        }
+
+        private static Vector2 TablePlaneAt(Vector2[] table, float u)
+        {
+            float x = Mathf.Clamp01(u) * LoopProfileSamples;
+            int i = Mathf.Min((int)x, LoopProfileSamples - 1);
+            return Vector2.Lerp(table[i], table[i + 1], x - i);
+        }
+
+        /// <summary>Loop pitch angle (radians) at normalized arc position u.</summary>
+        private static float LoopThetaAt(float u) => TableThetaAt(_loopThetaTable, u);
+
+        /// <summary>Loop (forward, up) plane position at u, normalized by loop length.</summary>
+        private static Vector2 LoopPlaneAt(float u) => TablePlaneAt(_loopPlaneTable, u);
+
+        /// <summary>Arc length of the eased half loop for a given mid-arc radius.</summary>
+        private static float HalfLoopArcLength(float radius)
+            => Mathf.PI * radius / (1f - LoopCurvatureEaseFraction);
+
+        /// <summary>Net forward displacement of the half loop (entry → top), from its arc length.</summary>
+        private static float HalfLoopForwardDisplacement(float halfArcLength)
+        {
+            EnsureHalfLoopProfile();
+            return _halfLoopPlaneTable[LoopProfileSamples].x * halfArcLength;
+        }
+
+        /// <summary>Top height of the half loop (the exit elevation), from its arc length.</summary>
+        private static float HalfLoopTopHeight(float halfArcLength)
+        {
+            EnsureHalfLoopProfile();
+            return _halfLoopPlaneTable[LoopProfileSamples].y * halfArcLength;
+        }
+
+        /// <summary>Net forward displacement of an eased loop of the given arc length.</summary>
+        private static float LoopForwardDisplacement(float length)
+        {
+            EnsureLoopProfile();
+            return _loopForwardDisplacementFactor * length;
+        }
+
+        /// <summary>
+        /// Parking-garage spiral: full revolutions around a vertical axis while climbing
+        /// or descending, exiting directly above/below the entry with the entry heading
+        /// (zero net 2D displacement — closure-free by construction). Uses bobsled
+        /// banking like every corner: flat floor, boosted outside wall.
+        /// </summary>
+        private TrackConnectionFrame[] LayoutSpiral(TrackConnectionFrame entry, TrackMacroSectionDefinition def, float density, ResolvedTrackGenerationConfig cfg)
+        {
+            float totalAngle = Mathf.Max(360f, def.TurnAngle);
+            float side = def.TurnSign != 0 ? def.TurnSign : 1f;
+            float radius = Mathf.Max(cfg.RoadWidth, def.Radius);
+            float arcLen = def.Length;
+            float climb = def.ElevationChange;
+
+            int facetRings = Mathf.CeilToInt(totalAngle / Mathf.Max(0.2f, cfg.MaxRingFacetAngle)) + 1;
+            int rings = Mathf.Clamp(Mathf.Max(Mathf.CeilToInt(arcLen / density) + 1, facetRings), 24, _maxRingsPerSection);
+            var frames = new TrackConnectionFrame[rings];
+
+            Vector3 fwdH = Flatten(entry.Forward);
+            Vector3 rightH = Flatten(entry.Right);
+            Vector3 center = entry.Position + rightH * (side * radius);
+            Vector3 toStart = entry.Position - center;
+
+            for (int i = 0; i < rings; i++)
+            {
+                float u = (float)i / (rings - 1);
+                float theta = side * totalAngle * u;
+
+                Quaternion yaw = Quaternion.AngleAxis(theta, Vector3.up);
+                Vector3 pos = center + yaw * toStart + Vector3.up * (climb * Smooth01(u));
+
+                // dh/ds of the smoothstepped climb (zero at both ends → flat welds).
+                float slope = climb * 6f * u * (1f - u) / Mathf.Max(arcLen, 0.01f);
+                Vector3 flatFwd = yaw * fwdH;
+                Vector3 fwd = (flatFwd + Vector3.up * slope).normalized;
+                Vector3 right = yaw * rightH;
+                Vector3 up = Vector3.Cross(fwd, right).normalized;
+
+                float bankNow = def.BankingAngle * BankProfile(u, 0.1f, cfg.BlendCurve);
+                float bank01 = Mathf.Clamp01(bankNow / 90f);
+                float outsideBoost = -bank01 * BobsledOuterWallBoost;
+                float insideTrim = bank01 * BobsledInnerWallTrim;
+
+                frames[i] = new TrackConnectionFrame
+                {
+                    Position = pos,
+                    Forward = fwd,
+                    Right = right,
+                    Up = up,
+                    Width = entry.Width,
+                    BankAngle = side * bankNow,
+                    PitchAngle = Mathf.Rad2Deg * Mathf.Atan(slope),
+                    ArcLength = entry.ArcLength + arcLen * u,
+                    LeftWallSuppression = side > 0f ? outsideBoost : insideTrim,
+                    RightWallSuppression = side > 0f ? insideTrim : outsideBoost
+                };
+            }
+
+            // Exact exit: directly above/below the entry, entry heading, level and unbanked.
+            var last = frames[rings - 1];
+            last.Position = entry.Position + Vector3.up * climb;
+            last.Forward = fwdH;
+            last.Right = rightH;
+            last.Up = Vector3.up;
+            last.PitchAngle = 0f;
+            last.BankAngle = 0f;
+            last.LeftWallSuppression = 0f;
+            last.RightWallSuppression = 0f;
+            frames[rings - 1] = last;
+
+            return frames;
+        }
+
+        /// <summary>
+        /// Half loop + half twist (Immelmann): pitches up and over to inverted with the
+        /// eased clothoid profile, then rolls 180° back to upright while flying level at
+        /// the top height. Exits with the heading REVERSED — the corner plan treats it
+        /// as a 180° turn; the elevation plan pays back the exit height elsewhere.
+        /// </summary>
+        private TrackConnectionFrame[] LayoutHalfLoopTwist(TrackConnectionFrame entry, TrackMacroSectionDefinition def, float density, float maxFacetAngle)
+        {
+            EnsureHalfLoopProfile();
+
+            float halfArc = HalfLoopArcLength(def.Radius);
+            float rollLen = Mathf.Max(10f, def.Length - halfArc);
+            float topHeight = HalfLoopTopHeight(halfArc);
+            float rollSign = def.RollChange >= 0f ? 1f : -1f;
+
+            Vector3 fwdH = Flatten(entry.Forward);
+            Vector3 rightH = Flatten(entry.Right);
+            Vector3 basePos = entry.Position;
+
+            float facet = Mathf.Max(0.2f, maxFacetAngle);
+            int ringsA = Mathf.Clamp(
+                Mathf.Max(Mathf.CeilToInt(halfArc / density), Mathf.CeilToInt(180f / ((1f - LoopCurvatureEaseFraction) * facet))) + 1,
+                16, _maxRingsPerSection / 2);
+            int ringsB = Mathf.Clamp(
+                Mathf.Max(Mathf.CeilToInt(rollLen / density), Mathf.CeilToInt(180f * 1.5f / facet)) + 1,
+                16, _maxRingsPerSection / 2);
+
+            var frames = new TrackConnectionFrame[ringsA + ringsB - 1]; // phases share the top ring
+
+            // ── Phase A: half loop, upright → inverted ──
+            for (int i = 0; i < ringsA; i++)
+            {
+                float u = (float)i / (ringsA - 1);
+                float theta = TableThetaAt(_halfLoopThetaTable, u); // 0..π
+                Vector2 pl = TablePlaneAt(_halfLoopPlaneTable, u) * halfArc;
+
+                Vector3 pos = basePos + fwdH * pl.x + Vector3.up * pl.y;
+                Vector3 fwd = (fwdH * Mathf.Cos(theta) + Vector3.up * Mathf.Sin(theta)).normalized;
+                Vector3 up = Quaternion.AngleAxis(-theta * Mathf.Rad2Deg, rightH) * Vector3.up;
+                up = (up - Vector3.Dot(up, fwd) * fwd).normalized;
+                Vector3 right = Vector3.Cross(up, fwd).normalized;
+
+                frames[i] = new TrackConnectionFrame
+                {
+                    Position = pos,
+                    Forward = fwd,
+                    Right = right,
+                    Up = up,
+                    Width = entry.Width,
+                    BankAngle = 0f,
+                    PitchAngle = theta * Mathf.Rad2Deg,
+                    ArcLength = entry.ArcLength + halfArc * u
+                };
+            }
+
+            // ── Phase B: level roll-out, inverted → upright, heading reversed ──
+            Vector3 topPos = frames[ringsA - 1].Position;
+            Vector3 exitFwd = -fwdH;
+
+            for (int j = 1; j < ringsB; j++)
+            {
+                float t = (float)j / (ringsB - 1);
+                float roll = 180f * Smooth01(t); // zero roll-rate at both ends → clean welds
+
+                Vector3 up = Quaternion.AngleAxis(rollSign * roll, exitFwd) * (-Vector3.up);
+                up = (up - Vector3.Dot(up, exitFwd) * exitFwd).normalized;
+                Vector3 right = Vector3.Cross(up, exitFwd).normalized;
+
+                frames[ringsA - 1 + j] = new TrackConnectionFrame
+                {
+                    Position = topPos + exitFwd * (rollLen * t),
+                    Forward = exitFwd,
+                    Right = right,
+                    Up = up,
+                    Width = entry.Width,
+                    BankAngle = rollSign * (180f - roll), // informational: remaining inversion
+                    PitchAngle = 0f,
+                    ArcLength = entry.ArcLength + halfArc + rollLen * t
+                };
+            }
+
+            // Exact exit: level, reversed heading, at the top height.
+            int lastIdx = frames.Length - 1;
+            var last = frames[lastIdx];
+            last.Position = basePos + fwdH * HalfLoopForwardDisplacement(halfArc) + exitFwd * rollLen + Vector3.up * topHeight;
+            last.Forward = exitFwd;
+            last.Right = Vector3.Cross(Vector3.up, exitFwd).normalized;
+            last.Up = Vector3.up;
+            last.BankAngle = 0f;
+            last.PitchAngle = 0f;
+            frames[lastIdx] = last;
+
+            return frames;
+        }
+
+        /// <summary>
         /// One corkscrew as ONE macro section: the road rolls gradually around the travel
         /// axis while moving forward (helix centerline), entering and exiting upright.
         /// </summary>
-        private TrackConnectionFrame[] LayoutCorkscrew(TrackConnectionFrame entry, TrackMacroSectionDefinition def, float density)
+        private TrackConnectionFrame[] LayoutCorkscrew(TrackConnectionFrame entry, TrackMacroSectionDefinition def, float density, float maxFacetAngle)
         {
             float L = def.Length;
             float r = def.Radius;
             float rollTotal = def.RollChange; // signed
 
-            int rings = Mathf.Clamp(Mathf.CeilToInt(L / density) + 1, 24, _maxRingsPerSection);
+            // Facet-angle bound on the roll: smoothstepped roll peaks at 1.5× the
+            // average rate, so budget rings for the PEAK roll per ring.
+            int facetRings = Mathf.CeilToInt(Mathf.Abs(rollTotal) * 1.5f / Mathf.Max(0.2f, maxFacetAngle)) + 1;
+            int rings = Mathf.Clamp(Mathf.Max(Mathf.CeilToInt(L / density) + 1, facetRings), 24, _maxRingsPerSection);
             var frames = new TrackConnectionFrame[rings];
 
             Vector3 fwdH = Flatten(entry.Forward);
@@ -1377,13 +2028,23 @@ namespace TrackGeneration.Macro
                 return basePos + fwdH * (L * u) + Vector3.up * r + radial * r;
             }
 
+            // Analytic tangent of PosAt (d(radial)/du = rollRate · fwdH × radial). A finite
+            // difference leaves a sub-degree tilt at the end rings that reads as a physical
+            // bump where the corkscrew welds back onto the road at racing speed.
+            Vector3 TanAt(float u)
+            {
+                float roll = rollTotal * Smooth01(u);
+                Vector3 radial = Quaternion.AngleAxis(roll, fwdH) * (-Vector3.up);
+                float rollRateRad = rollTotal * 6f * u * (1f - u) * Mathf.Deg2Rad;
+                return fwdH * L + Vector3.Cross(fwdH, radial) * (r * rollRateRad);
+            }
+
             for (int i = 0; i < rings; i++)
             {
                 float u = (float)i / (rings - 1);
                 float roll = rollTotal * Smooth01(u);
 
-                float eps = 0.25f / rings;
-                Vector3 fwd = (PosAt(Mathf.Min(1f, u + eps)) - PosAt(Mathf.Max(0f, u - eps))).normalized;
+                Vector3 fwd = TanAt(u).normalized;
 
                 Vector3 up = Quaternion.AngleAxis(roll, fwdH) * Vector3.up;
                 up = (up - Vector3.Dot(up, fwd) * fwd).normalized;
@@ -1402,7 +2063,14 @@ namespace TrackGeneration.Macro
                 };
             }
 
-            // Clean upright exit at exactly entry + forward * L.
+            // Weld contract: entry ring bit-identical to the incoming frame, exit ring the
+            // exact upright pose at entry + forward * L. With analytic tangents both are
+            // already correct to float precision — no kink against the neighbouring rings.
+            var first = frames[0];
+            frames[0] = entry;
+            frames[0].BankAngle = first.BankAngle;
+            frames[0].ArcLength = first.ArcLength;
+
             var last = frames[rings - 1];
             last.Position = basePos + fwdH * L;
             last.Forward = fwdH;
@@ -1590,8 +2258,168 @@ namespace TrackGeneration.Macro
             TrackMacroSectionType.JumpRamp => 0.9f,        // slightly shallower for clean lips
             TrackMacroSectionType.AirGap => 0.9f,
             TrackMacroSectionType.LandingRamp => 0.9f,     // forgiving, stylish half-pipe landing
+            TrackMacroSectionType.Spiral => 1.15f,         // deeper channel holds the helix line
+            TrackMacroSectionType.HalfLoopTwist => 1.1f,
             _ => 1f
         };
+
+        // ──────────────────────────── 4c. Junction wall masks (split/merge open throats) ────────────────────────────
+
+        /// <summary>
+        /// Suppresses the INNER half-pipe walls of split-route pairs near the split and
+        /// merge so the fork reads as one shared open throat instead of two full
+        /// half-pipes crossing through each other.
+        ///
+        /// Rules:
+        /// <list type="bullet">
+        /// <item>Each branch keeps its OUTER wall — those continue the approach road's walls.</item>
+        /// <item>The inner wall (facing the sibling route) starts fully open at the split,
+        /// and may only regrow AFTER the open throat length AND once the route centerlines
+        /// are separated by at least width + 2·sideHeight + margin (or stacked with vertical
+        /// clearance for crossing routes).</item>
+        /// <item>Before the merge the inner wall eases back down to fully open, completing
+        /// before separation is lost and before the merge throat begins.</item>
+        /// <item>All transitions use the resolved blend curve — the channel opens into a
+        /// fork, never a sudden wall cut.</item>
+        /// </list>
+        /// The half-pipe never turns off: floors and outer walls stay untouched.
+        /// </summary>
+        private void ApplyWallMasks(List<GeneratedTrackSection> sections, ResolvedTrackGenerationConfig cfg)
+        {
+            if (!cfg.HalfPipeEnabled || cfg.RoadProfile == null) return;
+
+            for (int i = 0; i < sections.Count - 1; i++)
+            {
+                if (sections[i].Definition.SectionType != TrackMacroSectionType.SplitRoute ||
+                    sections[i + 1].Definition.SectionType != TrackMacroSectionType.SplitRoute)
+                    continue;
+
+                MaskSplitPair(sections[i], sections[i + 1], cfg);
+                i++; // consumed the pair
+            }
+        }
+
+        /// <summary>Masks the inner walls of one split-route pair (both span the same split→merge frames).</summary>
+        private void MaskSplitPair(GeneratedTrackSection a, GeneratedTrackSection b, ResolvedTrackGenerationConfig cfg)
+        {
+            var fa = a.SubdivisionFrames;
+            var fb = b.SubdivisionFrames;
+            if (fa == null || fb == null || fa.Length < 2 || fb.Length < 2) return;
+
+            int rings = Mathf.Min(fa.Length, fb.Length);
+            float L = Mathf.Max(0.01f, a.EndFrame.ArcLength - a.StartFrame.ArcLength);
+
+            // Spec rule: inner walls may only be full once the centerlines are at least
+            // roadWidth + halfPipeSideHeight·2 + safetyMargin apart — otherwise the two
+            // half-pipe channels physically intersect. Crossing routes are also legal
+            // when stacked with the resolved vertical clearance.
+            float required = Mathf.Max(a.Definition.Width, b.Definition.Width)
+                           + cfg.RoadProfile.SideHeight * 2f
+                           + Mathf.Max(0f, cfg.WallMaskSafetyMargin);
+            float verticalOk = Mathf.Max(1f, cfg.VerticalClearance);
+
+            var separated = new bool[rings];
+            for (int r = 0; r < rings; r++)
+            {
+                Vector3 d = fa[r].Position - fb[r].Position;
+                float horizSq = d.x * d.x + d.z * d.z;
+                separated[r] = horizSq >= required * required || Mathf.Abs(d.y) >= verticalOk;
+            }
+
+            int firstOk = -1, lastOk = -1;
+            for (int r = 0; r < rings; r++) if (separated[r]) { firstOk = r; break; }
+            for (int r = rings - 1; r >= 0; r--) if (separated[r]) { lastOk = r; break; }
+
+            if (firstOk < 0)
+                Debug.LogWarning($"[MacroTrackLayoutGenerator] WARNING: Split routes '{a.Definition.DebugName}' / '{b.Definition.DebugName}' never reach the required separation ({required:F0}m) — inner half-pipe walls stay open across the whole split.");
+
+            float ArcOf(int r) => fa[Mathf.Clamp(r, 0, fa.Length - 1)].ArcLength - a.StartFrame.ArcLength;
+
+            // Regrowth may start only after the open split throat AND real separation;
+            // the merge fade must complete before separation is lost AND before the merge throat.
+            float sGrow = firstOk >= 0 ? Mathf.Max(cfg.SplitInnerWallFadeOutLength, ArcOf(firstOk)) : float.MaxValue;
+            float sFadeEnd = lastOk >= 0 ? Mathf.Min(L - cfg.MergeInnerWallFadeInLength, ArcOf(lastOk)) : float.MinValue;
+
+            MaskRoute(a, sGrow, sFadeEnd, cfg);
+            MaskRoute(b, sGrow, sFadeEnd, cfg);
+
+            // ── Overlap audit: facing walls must never both be up while too close ──
+            for (int r = 0; r < rings; r++)
+            {
+                if (separated[r]) continue;
+
+                Vector3 toSibling = fb[r].Position - fa[r].Position;
+                if (toSibling.sqrMagnitude < 0.25f) continue; // routes not yet diverged: shared throat, outer walls only
+
+                float faceA = Vector3.Dot(toSibling, fa[r].Right) >= 0f ? fa[r].RightWallMultiplier : fa[r].LeftWallMultiplier;
+                float faceB = Vector3.Dot(-toSibling, fb[r].Right) >= 0f ? fb[r].RightWallMultiplier : fb[r].LeftWallMultiplier;
+
+                if (faceA > 0.55f && faceB > 0.55f)
+                {
+                    Debug.LogWarning($"[MacroTrackLayoutGenerator] WARNING: Branch inner walls overlap near split '{a.Definition.DebugName}' — inner wall regrew before route separation was sufficient (ring {r}, separation < {required:F0}m).");
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Applies the inner-wall suppression profile to one route. For crossing routes the
+        /// inner side swaps mid-body: the start-inner side only obeys the split regrowth and
+        /// the end-inner side only obeys the merge fade (mid-body they are vertically stacked).
+        /// </summary>
+        private void MaskRoute(GeneratedTrackSection route, float sGrow, float sFadeEnd, ResolvedTrackGenerationConfig cfg)
+        {
+            var def = route.Definition;
+            var frames = route.SubdivisionFrames;
+
+            // A route offset to the RIGHT of the group centerline faces its sibling on its LEFT.
+            bool startInnerIsLeft = def.RouteLateralStart > 0f;
+            bool endInnerIsLeft = def.RouteLateralEnd > 0f;
+            bool crossing = startInnerIsLeft != endInnerIsLeft;
+
+            for (int r = 0; r < frames.Length; r++)
+            {
+                var f = frames[r];
+                float s = f.ArcLength - route.StartFrame.ArcLength;
+
+                // 0 at the split, eases to 1 once the branches are separated…
+                float grow = TrackBlend.Evaluate(cfg.BlendCurve,
+                    (s - sGrow) / Mathf.Max(1f, cfg.SplitInnerWallFadeInLength));
+
+                // …and eases back to 0 approaching the merge throat.
+                float fade = TrackBlend.Evaluate(cfg.BlendCurve,
+                    (sFadeEnd - s) / Mathf.Max(1f, cfg.MergeInnerWallFadeOutLength));
+
+                if (crossing)
+                {
+                    SetSideSuppression(ref f, startInnerIsLeft, 1f - grow);
+                    SetSideSuppression(ref f, endInnerIsLeft, 1f - fade);
+                }
+                else
+                {
+                    SetSideSuppression(ref f, startInnerIsLeft, 1f - Mathf.Min(grow, fade));
+                }
+
+                frames[r] = f;
+            }
+
+            var sf = route.StartFrame;
+            sf.LeftWallSuppression = frames[0].LeftWallSuppression;
+            sf.RightWallSuppression = frames[0].RightWallSuppression;
+            route.StartFrame = sf;
+
+            var ef = route.EndFrame;
+            ef.LeftWallSuppression = frames[frames.Length - 1].LeftWallSuppression;
+            ef.RightWallSuppression = frames[frames.Length - 1].RightWallSuppression;
+            route.EndFrame = ef;
+        }
+
+        private static void SetSideSuppression(ref TrackConnectionFrame f, bool leftSide, float suppression)
+        {
+            suppression = Mathf.Clamp01(suppression);
+            if (leftSide) f.LeftWallSuppression = Mathf.Max(f.LeftWallSuppression, suppression);
+            else f.RightWallSuppression = Mathf.Max(f.RightWallSuppression, suppression);
+        }
 
         // ──────────────────────────── 5. Validation ────────────────────────────
 
@@ -1602,16 +2430,23 @@ namespace TrackGeneration.Macro
         /// </summary>
         private bool Validate(List<GeneratedTrackSection> sections, ResolvedTrackGenerationConfig cfg)
         {
+            // Sample the driving line every ~8 m of ARC (not every Nth frame — ring
+            // density varies wildly between section types, and index-based sampling
+            // both over-samples dense loops and makes the O(n²) check explode).
+            const float sampleStep = 8f;
             var pts = new List<Vector3>();
             var arcs = new List<float>();
+            float nextSampleArc = 0f;
 
             foreach (var sec in sections)
             {
                 if (sec.SubdivisionFrames == null) continue;
-                for (int i = 0; i < sec.SubdivisionFrames.Length; i += 3)
+                foreach (var f in sec.SubdivisionFrames)
                 {
-                    pts.Add(sec.SubdivisionFrames[i].Position);
-                    arcs.Add(sec.SubdivisionFrames[i].ArcLength);
+                    if (f.ArcLength < nextSampleArc) continue;
+                    pts.Add(f.Position);
+                    arcs.Add(f.ArcLength);
+                    nextSampleArc = f.ArcLength + sampleStep;
                 }
             }
 
@@ -1714,6 +2549,18 @@ namespace TrackGeneration.Macro
 
             if (totalRings > cfg.MaxTotalRings)
                 Debug.LogWarning($"[TrackSummary] WARNING: Total rings {totalRings} exceed the rulebook budget {cfg.MaxTotalRings} — consider larger MetersPerRing or a shorter track.");
+
+            // ── Open-boundary audit: air-gap boundaries must never carry closed geometry ──
+            foreach (var sec in sections)
+            {
+                var d = sec.Definition;
+                if (d.SectionType == TrackMacroSectionType.JumpRamp && (!sec.OpenEnd || sec.CapEnd))
+                    Debug.LogWarning($"[TrackSummary] WARNING: JumpRamp exit generated a blocking cap ('{d.DebugName}') — the launch lip must be an open edge.");
+                if (d.SectionType == TrackMacroSectionType.LandingRamp && (!sec.OpenStart || sec.CapStart))
+                    Debug.LogWarning($"[TrackSummary] WARNING: LandingRamp entry generated a blocking cap ('{d.DebugName}') — the landing mouth must be an open edge.");
+                if (d.SectionType == TrackMacroSectionType.AirGap && (sec.CapStart || sec.CapEnd || !sec.OpenStart || !sec.OpenEnd))
+                    Debug.LogWarning($"[TrackSummary] WARNING: AirGap boundary has closed geometry ('{d.DebugName}').");
+            }
 
             // ── Global half-pipe audit: any road section without the half-pipe profile is
             // a bug unless the generator is intentionally in legacy/debug mode. ──

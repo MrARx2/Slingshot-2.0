@@ -19,6 +19,7 @@ namespace TrackGeneration.Macro
         // ── Size ──
         public int TargetMacroSectionCount;
         public float TargetTrackLength;
+        public float MaxTrackLength;   // absolute rulebook cap — explicit TurnCount may grow the lap up to this
 
         // ── Road ──
         public float RoadWidth;
@@ -31,6 +32,17 @@ namespace TrackGeneration.Macro
         public float[] CornerAngleOptions;
         public float MaxBankAngle;
         public float BankTransitionLength;
+
+        // Explicit corner count (0 = automatic). Above 0 the layout plans MIXED
+        // left/right corners (mountain-pass style) whose signed sum closes the lap.
+        public int TargetTurnCount;
+
+        // Chance that a near-180° corner is realized as a half-loop + half-twist
+        // (Immelmann) instead of a flat hairpin. Requires loops AND corkscrews allowed.
+        public float HalfLoopTwistChance;
+
+        // Chance per corner gap of a full-revolution climbing/descending spiral.
+        public float SpiralChance;
 
         // ── Feature chances (pre-gated by TrackConfig Allowed Features) ──
         public float JumpChance;
@@ -139,10 +151,24 @@ namespace TrackGeneration.Macro
         public float PostMergeRecoveryLength;
         public float RouteLateralSeparation;
 
+        // ── Junction wall masks (split/merge open throats — inner half-pipe walls) ──
+        public float SplitInnerWallFadeOutLength;  // open-throat length after the split before the inner wall may regrow
+        public float SplitInnerWallFadeInLength;   // ease length of the inner wall regrowing after lateral separation
+        public float MergeInnerWallFadeOutLength;  // ease length of the inner wall fading before the merge
+        public float MergeInnerWallFadeInLength;   // open-throat length before the merge where the inner wall must be gone
+        public float WallMaskSafetyMargin;         // extra centerline separation (m) required before inner walls regrow
+
         // ── Mesh ──
         public float MeshMetersPerRing;
         public int MaxRingsPerSection;
         public int MaxTotalRings;
+
+        // Maximum bend angle between consecutive rings (degrees). Curved sections
+        // (loops, corkscrews, banked arcs) get extra rings until no facet exceeds
+        // this — the physical "bumpiness" of curved track is the facet angle, and
+        // at racing speed every degree of facet reads as ±3.5 m/s of phantom
+        // vertical velocity to the hover suspension.
+        public float MaxRingFacetAngle;
 
         // ── Debug labels (for the §7 summary output) ──
         public string DebugSpeedLabel;
@@ -166,6 +192,7 @@ namespace TrackGeneration.Macro
             // ══ 2. Track Length ══
             float[] lengthByPreset = { 1800f, 3200f, 5200f, 8000f };
             r.TargetTrackLength = Mathf.Clamp(lengthByPreset[(int)profile.Length], limits.MinTrackLength, limits.MaxTrackLength);
+            r.MaxTrackLength = limits.MaxTrackLength;
             r.TargetMacroSectionCount = Mathf.Clamp(Mathf.RoundToInt(r.TargetTrackLength / 200f), 8, 40);
 
             // ══ 5. Track Width ══
@@ -253,6 +280,19 @@ namespace TrackGeneration.Macro
             }
             r.CornerAngleOptions = filtered.Count > 0 ? filtered.ToArray() : new[] { 45f, 60f, 90f };
 
+            // Explicit designer turn count (0 = automatic circle-composition planner).
+            r.TargetTurnCount = Mathf.Clamp(profile.TurnCount, 0, 30);
+
+            // Immelmann (half loop + half twist) replaces some near-180° corners when
+            // both loops and corkscrews are legal; scaled by the loop frequency preset.
+            float[] halfLoopByFreq = { 0f, 0.25f, 0.4f, 0.6f };
+            r.HalfLoopTwistChance = limits.AllowLoops && limits.AllowCorkscrews ? halfLoopByFreq[loops] : 0f;
+
+            // Spirals (parking-garage helix) have their OWN designer control —
+            // independent of verticality, like loops and corkscrews.
+            float[] spiralByFreq = { 0f, 0.2f, 0.35f, 0.55f };
+            r.SpiralChance = spiralByFreq[(int)profile.SpiralFrequency];
+
             // ══ 8. Stunt density ══
             float[] jumpByDensity = { 0f, 0.2f, 0.4f, 0.65f };
             r.JumpChance = limits.AllowJumps ? jumpByDensity[stunts] : 0f;
@@ -284,19 +324,20 @@ namespace TrackGeneration.Macro
             r.CrestChance = crestByVert[vert];
             r.BridgeChance = limits.AllowOverpasses ? bridgeByVert[vert] : 0f;
             r.UnderpassChance = limits.AllowUnderpasses ? underByVert[vert] : 0f;
-            r.LayeredRouteChance = limits.AllowRouteSplits ? layeredByVert[vert] : 0f;
-            r.OverUnderCrossingChance = limits.AllowLayeredRouteCrossings ? crossingByVert[vert] : 0f;
+            // DECOUPLED: Branching alone decides IF the track splits; verticality only
+            // decides whether existing splits are height-separated / crossing.
+            r.LayeredRouteChance = 0f;
+            r.OverUnderCrossingChance = limits.AllowLayeredRouteCrossings && branch > 0 ? crossingByVert[vert] : 0f;
 
             int[] minMajorByVert = { 0, 1, 2, 3 };
             int[] maxMajorByVert = { 0, 3, 4, 6 };
             r.MinMajorElevationSections = Mathf.Min(minMajorByVert[vert], limits.MaxMajorElevationChangesPerTrack);
             r.MaxMajorElevationSections = Mathf.Min(maxMajorByVert[vert], limits.MaxMajorElevationChangesPerTrack);
 
-            r.ForceAtLeastOneLayeredRoute = vert >= 2 && limits.AllowRouteSplits;
-            r.ForceAtLeastOneOverpass = vert == 3 && limits.AllowLayeredRouteCrossings;
-
-            if (vert >= 2 && !limits.AllowRouteSplits)
-                Debug.LogWarning($"[Resolve] Verticality preset {profile.Verticality} wants layered route groups, but AllowRouteSplits is false in TrackConfig — only elevation changes will be generated.");
+            // DECOUPLED: verticality never forces splits into a track whose Branching
+            // preset is None — splits belong to Branching alone.
+            r.ForceAtLeastOneLayeredRoute = branch >= 2 && limits.AllowRouteSplits;
+            r.ForceAtLeastOneOverpass = vert == 3 && branch > 0 && limits.AllowLayeredRouteCrossings;
 
             // Step / hill / bridge magnitudes from the rulebook, scaled by preset intensity.
             float vertIntensity = vert switch { 0 => 0f, 1 => 0.45f, 2 => 0.75f, _ => 1f };
@@ -435,11 +476,34 @@ namespace TrackGeneration.Macro
             r.RouteLateralSeparation = Mathf.Clamp(r.RouteWidth * 0.5f + r.RoadWidth * 0.5f + 3f,
                 limits.MinRouteLateralSeparation, limits.MaxRouteLateralSeparation);
 
+            // ══ Junction wall masks: split/merge inner-wall open throats ══
+            // The split reads as a shared open throat first — the inner half-pipe walls stay
+            // suppressed until the branches are laterally separated, then regrow smoothly.
+            // Smoother presets get slightly longer eases; the throat lengths stay fixed.
+            r.SplitInnerWallFadeOutLength = 40f;
+            r.SplitInnerWallFadeInLength = Mathf.Lerp(60f, 100f, smoothT);
+            r.MergeInnerWallFadeOutLength = Mathf.Lerp(60f, 100f, smoothT);
+            r.MergeInnerWallFadeInLength = 40f;
+            r.WallMaskSafetyMargin = 3f;
+
+            // ══ Physical vertical clearance ══
+            // A road is not a flat line: its rideable half-pipe walls occupy SideHeight
+            // above the floor (up to 2× when bobsled-banked) plus the slab below.
+            // Any over/under crossing must clear ALL of that, not just the craft —
+            // otherwise "vertically separated" layouts still physically intersect.
+            float wallClearance = r.RoadProfile.SideHeight * 2f + 6f;
+            r.VerticalClearance = Mathf.Max(r.VerticalClearance, limits.MinVerticalClearance + wallClearance);
+            r.OverpassClearance = Mathf.Max(r.OverpassClearance, r.VerticalClearance);
+
             // ══ Mesh ══
             float[] ringSpacingBySpeed = { 2.5f, 2.5f, 2f, 3f };
             r.MeshMetersPerRing = Mathf.Clamp(ringSpacingBySpeed[speed], limits.MinMetersPerRing, limits.MaxMetersPerRing);
             r.MaxRingsPerSection = limits.MaxRingsPerMacroSection;
             r.MaxTotalRings = limits.MaxTotalTrackRings;
+
+            // Faster speed presets get finer curved-track facets (higher speed makes
+            // the same facet angle feel bumpier: phantom vertVel = v·Δθ/2).
+            r.MaxRingFacetAngle = speed >= 3 ? 1.2f : 1.5f;
 
             // §7 debug: resolved speed profile summary.
             Debug.Log($"[Resolve] Speed profile: {r.DebugSpeedLabel} | straights {r.MinStraightLength:F0}-{r.MaxStraightLength:F0}m | curve radius {r.MinCurveRadius:F0}-{r.MaxCurveRadius:F0}m | max bank {r.MaxBankAngle:F0}° | width {r.RoadWidth:F0}m\n" +

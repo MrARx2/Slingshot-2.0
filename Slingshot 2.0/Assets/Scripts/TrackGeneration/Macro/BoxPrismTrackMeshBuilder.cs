@@ -13,6 +13,11 @@ namespace TrackGeneration.Macro
     /// straights, banked curves, splits, bridges, jumps, loops, and corkscrews all
     /// use it. FlatWithWalls exists only as a legacy/debug fallback.
     ///
+    /// JUNCTION / AIR-GAP OPENINGS: per-frame wall multipliers (set by the layout's
+    /// wall-mask pass) suppress the INNER walls through split/merge throats so forked
+    /// half-pipes never cross through each other, and air-gap boundaries (jump lip,
+    /// landing mouth) are OPEN edges — no caps or geometry across the flight path.
+    ///
     /// Geometry stays clean prism/ring-based: each subdivision frame becomes one
     /// cross-section ring (curved top profile + safety lip + outer walls + bottom
     /// slab), and consecutive rings are stitched with quads. No n-gons, no messy
@@ -82,11 +87,14 @@ namespace TrackGeneration.Macro
         /// Up axis — the banked/pitched frame tilts the whole bowl, so banking is an
         /// additional transformation ON TOP of the global half-pipe shape.
         /// Heights are never negative: no hidden dips below the section baseline.
+        /// Per-side wall multipliers (split/merge open throats) scale each side's rise:
+        /// a suppressed inner wall flattens smoothly to the road baseline.
         /// </summary>
         private Vector3 TopPoint(TrackConnectionFrame f, float normalizedX)
         {
             float halfW = f.Width * 0.5f;
-            float h = _profile.HeightAt(normalizedX, halfW, SideHeightFor(f));
+            float sideMult = normalizedX < 0f ? f.LeftWallMultiplier : f.RightWallMultiplier;
+            float h = _profile.HeightAt(normalizedX, halfW, SideHeightFor(f)) * sideMult;
             return f.Position + f.Right * (normalizedX * halfW) + f.Up * h;
         }
 
@@ -138,10 +146,12 @@ namespace TrackGeneration.Macro
                     uvs.Add(new Vector2((xNorm + 1f) * 0.5f, v));
                 }
 
+                // Safety lips scale with the per-side wall multiplier: a suppressed inner
+                // wall (split/merge throat) has no lip fin poking out of the open surface.
                 Vector3 edgeTopL = TopPoint(f, -1f) - origin;
                 Vector3 edgeTopR = TopPoint(f, 1f) - origin;
-                Vector3 lipTopL = edgeTopL + f.Up * lip;
-                Vector3 lipTopR = edgeTopR + f.Up * lip;
+                Vector3 lipTopL = edgeTopL + f.Up * (lip * f.LeftWallMultiplier);
+                Vector3 lipTopR = edgeTopR + f.Up * (lip * f.RightWallMultiplier);
                 Vector3 lipTopOuterL = lipTopL - f.Right * LipThickness;
                 Vector3 lipTopOuterR = lipTopR + f.Right * LipThickness;
                 Vector3 botOuterL = f.Position - f.Right * (halfW + LipThickness) - f.Up * RoadThickness - origin;
@@ -199,15 +209,20 @@ namespace TrackGeneration.Macro
                 }
             }
 
-            // ── End caps where the road stops in mid-air (jump lip / landing peak) ──
-            if (section.Definition.SectionType == TrackMacroSectionType.JumpRamp)
-            {
+            // ── End caps — metadata-driven, and OPEN boundaries always win ──
+            // Air-gap boundaries (jump lip, landing mouth) are open edges: the road surface
+            // stops cleanly with NO geometry across the launch/landing path. Because the
+            // collider is this same mesh, an open boundary is open physically too — no
+            // invisible walls blocking a jump that looks open.
+            if (section.CapEnd && section.OpenEnd)
+                Debug.LogWarning($"[BoxPrismTrackMeshBuilder] WARNING: '{section.Definition.DebugName}' requested an end cap on an OPEN exit boundary — cap suppressed (air-gap boundaries must stay open).");
+            if (section.CapStart && section.OpenStart)
+                Debug.LogWarning($"[BoxPrismTrackMeshBuilder] WARNING: '{section.Definition.DebugName}' requested a start cap on an OPEN entry boundary — cap suppressed (air-gap boundaries must stay open).");
+
+            if (section.CapEnd && !section.OpenEnd)
                 AddCap(vertices, uvs, sideTris, frames[rings - 1], origin, facingForward: true);
-            }
-            else if (section.Definition.SectionType == TrackMacroSectionType.LandingRamp)
-            {
+            if (section.CapStart && !section.OpenStart)
                 AddCap(vertices, uvs, sideTris, frames[0], origin, facingForward: false);
-            }
 
             // ── Mesh ──
             // Fully qualified: "Mesh" alone would resolve to the TrackGeneration.Mesh NAMESPACE.
@@ -244,9 +259,11 @@ namespace TrackGeneration.Macro
         }
 
         /// <summary>
-        /// Cap closing the exposed cross-section at a jump lip (faces travel direction)
-        /// or a landing peak (faces against travel direction). Fans over the full
+        /// Cap closing the exposed cross-section of a boundary. Fans over the full
         /// half-pipe boundary from the bottom center, which sees every boundary point.
+        /// NEVER generated on open boundaries (jump lip / landing mouth / air-gap edges) —
+        /// those must stay clear of any geometry across the flight path. Driven purely by
+        /// the section's CapStart/CapEnd metadata.
         /// </summary>
         private void AddCap(List<Vector3> vertices, List<Vector2> uvs, List<int> tris, TrackConnectionFrame f, Vector3 origin, bool facingForward)
         {
@@ -254,8 +271,8 @@ namespace TrackGeneration.Macro
             float halfW = f.Width * 0.5f;
             float lip = LipHeight;
 
-            Vector3 lipTopL = TopPoint(f, -1f) + f.Up * lip - origin;
-            Vector3 lipTopR = TopPoint(f, 1f) + f.Up * lip - origin;
+            Vector3 lipTopL = TopPoint(f, -1f) + f.Up * (lip * f.LeftWallMultiplier) - origin;
+            Vector3 lipTopR = TopPoint(f, 1f) + f.Up * (lip * f.RightWallMultiplier) - origin;
             Vector3 lipTopOuterL = lipTopL - f.Right * LipThickness;
             Vector3 lipTopOuterR = lipTopR + f.Right * LipThickness;
             Vector3 botOuterL = f.Position - f.Right * (halfW + LipThickness) - f.Up * RoadThickness - origin;

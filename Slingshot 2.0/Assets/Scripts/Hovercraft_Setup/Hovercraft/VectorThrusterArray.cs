@@ -16,9 +16,6 @@ using UnityEngine.Serialization;
 /// This is a pure physics module — it does not read input directly.
 /// <see cref="CraftCore"/> calls <see cref="ApplyVectoring"/> once per FixedUpdate.
 /// </para>
-///
-/// <para>Ported from V1 <c>ThrusterHovercraftController.ApplyDifferentialStrafe</c>
-/// and <c>ApplyYawDamping</c>.</para>
 /// </summary>
 public class VectorThrusterArray : MonoBehaviour
 {
@@ -126,13 +123,7 @@ public class VectorThrusterArray : MonoBehaviour
     public void ApplyVectoring(CraftIntent intent, CraftTelemetry telemetry,
                                TractionState traction)
     {
-        ApplyVectoring(intent, telemetry, traction, EnergyState.Full);
-    }
-
-    public void ApplyVectoring(CraftIntent intent, CraftTelemetry telemetry,
-                               TractionState traction, EnergyState energy)
-    {
-        ApplyDifferentialStrafe(intent, telemetry, traction, energy);
+        ApplyDifferentialStrafe(intent, telemetry, traction);
         ApplyYawDamping(traction);
     }
 
@@ -145,7 +136,7 @@ public class VectorThrusterArray : MonoBehaviour
     /// apply anti-flip safety scaling, and route throttle values through the bus.
     /// </summary>
     private void ApplyDifferentialStrafe(CraftIntent intent, CraftTelemetry telemetry,
-                                         TractionState traction, EnergyState energy)
+                                         TractionState traction)
     {
         // Mouse X is the only steering source by default.
         // A/D remains edge-shift / body commitment through HoverStabilizerArray.

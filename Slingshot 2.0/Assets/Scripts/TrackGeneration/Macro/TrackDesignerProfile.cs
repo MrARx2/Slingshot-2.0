@@ -30,6 +30,9 @@ namespace TrackGeneration.Macro
     /// <summary>Controls how often corkscrews appear (only if TrackConfig allows corkscrews).</summary>
     public enum TrackCorkscrewFrequency { None, Rare, Occasional, Frequent }
 
+    /// <summary>Controls how often climbing spirals (parking-garage helixes) appear.</summary>
+    public enum TrackSpiralFrequency { None, Rare, Occasional, Frequent }
+
     /// <summary>
     /// The level designer's control panel: the ONLY parameters needed to define a track's
     /// personality. Everything else is derived internally (ResolvedTrackGenerationConfig)
@@ -66,5 +69,12 @@ namespace TrackGeneration.Macro
 
         [Tooltip("10. How often corkscrews appear. Only if the TrackConfig rulebook allows corkscrews.")]
         public TrackCorkscrewFrequency CorkscrewFrequency = TrackCorkscrewFrequency.Rare;
+
+        [Tooltip("11. Number of corners on the lap. 0 = automatic (derived from track length; classic same-direction circuit). Above 0, the planner mixes LEFT and RIGHT turns — including near-180° switchbacks — like a mountain pass, while the signed turn total still closes the lap. High counts need enough track length and small enough curve radii (TrackConfig).")]
+        [Range(0, 30)]
+        public int TurnCount = 0;
+
+        [Tooltip("12. How often climbing spirals (parking-garage helixes) appear. Independent of Verticality — the spiral's gained height is paid back on later straights.")]
+        public TrackSpiralFrequency SpiralFrequency = TrackSpiralFrequency.Rare;
     }
 }

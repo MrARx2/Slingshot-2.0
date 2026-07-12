@@ -27,7 +27,13 @@ namespace TrackGeneration.Macro
         Loop,
         Corkscrew,
         TunnelVariant,
-        BridgeVariant
+        BridgeVariant,
+
+        /// <summary>Full-revolution climbing/descending helix (parking-garage spiral). Exits directly above/below its entry.</summary>
+        Spiral,
+
+        /// <summary>Half loop up to inverted + half twist back upright (Immelmann). Reverses heading, exits at the loop top height.</summary>
+        HalfLoopTwist
     }
 
     /// <summary>Turn direction of a section (None for straight-family pieces).</summary>

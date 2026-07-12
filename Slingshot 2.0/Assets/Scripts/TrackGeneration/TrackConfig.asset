@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c2924fe363ec789498420f4e0941420d, type: 3}
   m_Name: TrackConfig
   m_EditorClassIdentifier: 
-  minTrackLength: 900
-  maxTrackLength: 12000
-  minRoadWidth: 15
-  maxRoadWidth: 40
-  minCurveRadius: 45
+  minTrackLength: 6000
+  maxTrackLength: 20000
+  minRoadWidth: 100
+  maxRoadWidth: 100
+  minCurveRadius: 600
   maxCurveRadius: 1200
   maxBankAngle: 75
   maxSlopeAngle: 40
@@ -67,14 +67,14 @@ MonoBehaviour:
   maxMajorElevationChangesPerTrack: 8
   maxLayeredSectionsPerTrack: 4
   maxRouteGroupsPerTrack: 4
-  minRouteSplitApproachLength: 100
-  minRouteSplitLength: 180
-  maxRouteSplitLength: 900
+  minRouteSplitApproachLength: 300
+  minRouteSplitLength: 800
+  maxRouteSplitLength: 4000
   minRouteMergeLength: 80
   minPostMergeRecoveryLength: 100
-  minLayeredRouteApproachLength: 120
-  minLayeredRouteLength: 300
-  maxLayeredRouteLength: 1200
+  minLayeredRouteApproachLength: 300
+  minLayeredRouteLength: 800
+  maxLayeredRouteLength: 4000
   minLayeredRouteMergeLength: 100
   minLayeredRouteRecoveryLength: 120
   minLayeredRouteHeightSeparation: 24
@@ -91,28 +91,58 @@ MonoBehaviour:
   maxInsaneSpeedStraightLength: 1000
   minTechnicalStraightLength: 60
   maxTechnicalStraightLength: 260
-  minLoopRadius: 35
-  maxLoopRadius: 130
-  minLoopApproachLength: 160
-  minLoopExitRecoveryLength: 120
+  minLoopRadius: 300
+  maxLoopRadius: 400
+  minLoopApproachLength: 300
+  minLoopExitRecoveryLength: 500
   maxLoopPitchRate: 3.5
-  loopSubdivisionDensity: 1.25
+  loopSubdivisionDensity: 0.5
   minLoopEntrySpeedStraightLength: 180
   minLoopVerticalClearance: 30
-  minCorkscrewLength: 120
-  maxCorkscrewLength: 450
-  minCorkscrewRadius: 20
-  maxCorkscrewRadius: 80
+  minCorkscrewLength: 2000
+  maxCorkscrewLength: 3000
+  minCorkscrewRadius: 300
+  maxCorkscrewRadius: 400
   maxCorkscrewRollDegrees: 720
   maxCorkscrewRollRate: 60
-  minCorkscrewApproachLength: 140
-  minCorkscrewExitRecoveryLength: 120
+  minCorkscrewApproachLength: 400
+  minCorkscrewExitRecoveryLength: 400
   corkscrewSubdivisionDensity: 1.25
   minCorkscrewEntrySpeedStraightLength: 160
   minCorkscrewVerticalClearance: 25
+  allowHalfPipeRoads: 1
+  minHalfPipeSideHeight: 30
+  maxHalfPipeSideHeight: 40
+  minHalfPipeCurveStrength: 0.45
+  maxHalfPipeCurveStrength: 2
+  minHalfPipeWallAngle: 90
+  maxHalfPipeWallAngle: 180
+  minHalfPipeCenterFlatWidthRatio: 0.2
+  maxHalfPipeCenterFlatWidthRatio: 0.3
+  minHalfPipeProfileResolution: 6
+  maxHalfPipeProfileResolution: 18
+  minTransitionBlendLength: 180
+  maxTransitionBlendLength: 260
+  minBankBlendLength: 100
+  maxBankBlendLength: 220
+  minPitchBlendLength: 120
+  maxPitchBlendLength: 240
+  minWidthBlendLength: 25
+  maxWidthBlendLength: 180
+  minCrossSectionBlendLength: 30
+  maxCrossSectionBlendLength: 200
+  maxBankRampAngle: 8
+  minLateralSeparationLength: 350
+  maxLateralSeparationLength: 900
+  minVerticalDivergenceDelay: 60
+  maxVerticalDivergenceDelay: 250
+  minVerticalDivergenceLength: 120
+  maxVerticalDivergenceLength: 500
+  minRouteLateralSeparation: 100
+  maxRouteLateralSeparation: 300
   minMetersPerRing: 0
-  maxMetersPerRing: 0.5
-  maxRingsPerMacroSection: 512
+  maxMetersPerRing: 0.1
+  maxRingsPerMacroSection: 2048
   maxTotalTrackRings: 150012
   trackRadius: 300
   controlPointCount: 20

@@ -10,8 +10,6 @@ using UnityEngine;
 /// <see cref="CraftCore"/> calls <see cref="ApplyDrive"/> once per FixedUpdate,
 /// passing the current <see cref="CraftIntent"/> and <see cref="CraftTelemetry"/>.
 /// </para>
-///
-/// <para>Ported from V1 <c>ThrusterHovercraftController.ApplyPropulsion</c>.</para>
 /// </summary>
 public class DriveCore : MonoBehaviour
 {
@@ -64,11 +62,6 @@ public class DriveCore : MonoBehaviour
     /// <param name="intent">Processed pilot intent for this frame.</param>
     /// <param name="telemetry">Current craft telemetry snapshot.</param>
     public void ApplyDrive(CraftIntent intent, CraftTelemetry telemetry)
-    {
-        ApplyDrive(intent, telemetry, EnergyState.Full);
-    }
-
-    public void ApplyDrive(CraftIntent intent, CraftTelemetry telemetry, EnergyState energy)
     {
         float dt = Time.fixedDeltaTime;
 

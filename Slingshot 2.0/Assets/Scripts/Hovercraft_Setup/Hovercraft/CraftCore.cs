@@ -186,9 +186,13 @@ public class CraftCore : MonoBehaviour
         telemetry.SampleTelemetry();
 
         // ── 3. Evaluate intent ───────────────────────────────────
+        // The locked overcharge target keeps the capture logic in sync with the
+        // charge OverchargeCore is actually running (changing held keys mid-charge
+        // must not un-capture the charging thruster group).
         vectoring.EvaluateIntent(
             pilotInput.CurrentCommand,
-            telemetry.CurrentTelemetry
+            telemetry.CurrentTelemetry,
+            overcharge != null ? overcharge.ChargingTarget : OverchargeTarget.None
         );
 
         // ── 4. Evaluate traction (optional) ──────────────────────

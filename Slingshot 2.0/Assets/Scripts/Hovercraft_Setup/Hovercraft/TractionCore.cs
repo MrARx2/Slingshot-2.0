@@ -18,9 +18,6 @@ using UnityEngine;
 /// This is a pure physics module — it does not read input directly.
 /// <see cref="CraftCore"/> calls both methods each FixedUpdate.
 /// </para>
-///
-/// <para>Ported from V1 <c>ThrusterHovercraftController.UpdateGripProfile</c>
-/// and <c>ApplyGripForces</c>.</para>
 /// </summary>
 public class TractionCore : MonoBehaviour
 {

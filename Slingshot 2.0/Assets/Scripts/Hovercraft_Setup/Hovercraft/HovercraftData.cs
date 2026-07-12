@@ -31,9 +31,6 @@ public struct PilotCommand
 
     public bool stabilizerTogglePressed;
     public bool gripBreakerHeld;
-
-    // Legacy compatibility only. Space is now Overcharge.
-    public bool jumpPressed;
 }
 
 public struct CraftTelemetry
@@ -96,9 +93,6 @@ public struct CraftIntent
     // True when the craft is inverted enough that manual roof thrusters are allowed
     // to help lift/recover even if the stabilizer is armed.
     public bool recoveryOverrideActive;
-
-    // Legacy compatibility only. Space is now Overcharge.
-    public bool wantsJump;
 }
 
 public struct TractionState

@@ -60,10 +60,15 @@ public class CraftHUD : MonoBehaviour
         TryAutoAssign();
     }
 
+    // FindAnyObjectByType scans the whole scene — retry at most once per second
+    // instead of every frame while no craft exists.
+    private float _nextAutoAssignTime;
+
     private void Update()
     {
-        if (craftCore == null && autoFindCraftCore)
+        if (craftCore == null && autoFindCraftCore && Time.unscaledTime >= _nextAutoAssignTime)
         {
+            _nextAutoAssignTime = Time.unscaledTime + 1f;
             TryAutoAssign();
         }
     }

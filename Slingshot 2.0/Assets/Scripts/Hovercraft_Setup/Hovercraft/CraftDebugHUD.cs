@@ -46,6 +46,10 @@ public class CraftDebugHUD : MonoBehaviour
 
     private InputAction _toggleHudAction;
 
+    // FindAnyObjectByType scans the whole scene — retry at most once per second
+    // instead of every frame while no craft exists.
+    private float _nextAutoAssignTime;
+
     private void Awake()
     {
         TryAutoAssign();
@@ -82,8 +86,9 @@ public class CraftDebugHUD : MonoBehaviour
             showHUD = !showHUD;
         }
 
-        if (craftCore == null)
+        if (craftCore == null && Time.unscaledTime >= _nextAutoAssignTime)
         {
+            _nextAutoAssignTime = Time.unscaledTime + 1f;
             TryAutoAssign();
         }
     }

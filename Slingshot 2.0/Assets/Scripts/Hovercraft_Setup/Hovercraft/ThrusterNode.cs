@@ -86,6 +86,9 @@ public class ThrusterNode : MonoBehaviour
     [Tooltip("How far this node can see the ground. This is only a probe range; actual hover lift is limited by HoverStabilizerArray hover cushion settings.")]
     public float groundDetectionRange = 4f;
 
+    [Tooltip("Layers the ground probe may hit. Trigger colliders (boost pads, pickups) are always ignored — they must never read as 'ground' to the hover system.")]
+    public LayerMask groundLayers = ~0;
+
     // ══════════════════════════════════════════════════════════════
     //  RUNTIME STATE
     // ══════════════════════════════════════════════════════════════
@@ -188,7 +191,11 @@ public class ThrusterNode : MonoBehaviour
         Vector3 origin = transform.position;
         Vector3 direction = GroundRayDirection; // raycast toward the ground/opposite thrust
 
-        if (Physics.Raycast(origin, direction, out RaycastHit hit, groundDetectionRange))
+        // Triggers are ignored so track gameplay volumes (boost pads, gravity zones)
+        // can never register as ground; a hit on the craft's own rigidbody is also
+        // discarded so hull colliders can't feed the hover controller.
+        if (Physics.Raycast(origin, direction, out RaycastHit hit, groundDetectionRange, groundLayers, QueryTriggerInteraction.Ignore)
+            && (hit.rigidbody == null || hit.rigidbody != _rb))
         {
             IsGrounded = true;
             GroundDistance = hit.distance;

@@ -74,7 +74,8 @@ public class TelemetryMainframe : MonoBehaviour
 
     /// <summary>
     /// Smoothed grounded factor. Transitions between 0 and 1 using
-    /// <see cref="Mathf.MoveTowards"/> at a rate of <c>8f</c> per second.
+    /// <see cref="Mathf.MoveTowards"/> at <see cref="groundedFactorRiseSpeed"/> /
+    /// <see cref="groundedFactorFallSpeed"/> per second.
     /// </summary>
     private float _groundedFactor;
 
@@ -95,8 +96,9 @@ public class TelemetryMainframe : MonoBehaviour
     /// <summary>
     /// Sample the craft's physical state and build a new <see cref="CraftTelemetry"/>.
     /// <para>
-    /// Called once per <c>FixedUpdate()</c> from <see cref="CraftCore"/>, after
-    /// <c>ThrusterBus.BeginFrame()</c> has cast ground rays.
+    /// Called once per <c>FixedUpdate()</c> from <see cref="CraftCore"/>. Casts the
+    /// ground rays itself (via <c>ThrusterBus.CastAllGroundRays</c>) so every system
+    /// downstream reads this frame's contact data.
     /// </para>
     /// </summary>
     public void SampleTelemetry()

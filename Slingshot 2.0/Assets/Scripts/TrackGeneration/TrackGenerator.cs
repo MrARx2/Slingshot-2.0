@@ -8,6 +8,7 @@ using TrackGeneration.Mesh;
 using TrackGeneration.Stunts;
 using TrackGeneration.Gravity;
 using TrackGeneration.Macro;
+using TrackGeneration.Race;
 
 namespace TrackGeneration
 {
@@ -50,8 +51,18 @@ namespace TrackGeneration
         [Header("Generation Output")]
         [SerializeField] private Transform trackRoot;
 
+        [Header("Race Course (macro mode)")]
+        [Tooltip("Build a start/finish line and checkpoints onto the generated track for time attack.")]
+        [SerializeField] private bool buildRaceCourse = true;
+        [Tooltip("Checkpoints the craft must cross IN ORDER for a lap to count as valid.")]
+        [SerializeField, Range(1, 16)] private int checkpointCount = 8;
+        [Tooltip("Arc distance from the spawn frame to the start/finish line — the lap clock starts on the first crossing, not at spawn.")]
+        [SerializeField, Min(5f)] private float startLineArcOffset = 20f;
+
         [Header("Runtime Start")]
         [SerializeField] private bool generateOnStart = true;
+        [Tooltip("When entering play mode with a track already generated in the editor, KEEP it and skip regeneration — generate layouts in the editor until you like one, then press Play and ride exactly that track.")]
+        [SerializeField] private bool keepEditorTrackOnPlay = true;
         [SerializeField] private bool placeHovercraftOnStart = true;
         [SerializeField] private Transform hovercraft;
         [SerializeField, Min(0f)] private float startLineForwardOffset = 0f;
@@ -68,11 +79,18 @@ namespace TrackGeneration
         /// <summary>Macro mode output: the generated section list (null in legacy mode).</summary>
         public List<GeneratedTrackSection> CurrentMacroSections { get; private set; }
 
+        /// <summary>Root transform the generated track (and its section frames) are local to.</summary>
+        public Transform TrackRoot => trackRoot;
+
         public int GeneratedMeshCount => generatedMeshCount;
         public int GeneratedVertexCount => generatedVertexCount;
         public int GeneratedTriangleCount => generatedTriangleCount;
 
         private TrackSeedManager _seedManager;
+
+        // Legacy-mode circuit recovered from an editor-generated track on play (macro mode
+        // recovers its sections from the serialized debug visualizer instead).
+        private SplineContainer _adoptedLegacyCircuit;
 
         private void Awake()
         {
@@ -81,7 +99,13 @@ namespace TrackGeneration
 
         private void Start()
         {
-            if (generateOnStart)
+            // A track generated in the editor survives entering play mode (the root object
+            // and its meshes are scene state), but the non-serialized runtime references
+            // (CurrentMacroSections / CurrentTrackData) do not. Adopt the existing track
+            // instead of regenerating so Play rides exactly the layout picked in the editor.
+            bool adoptedExisting = keepEditorTrackOnPlay && TryAdoptExistingTrack();
+
+            if (generateOnStart && !adoptedExisting)
             {
                 GenerateTrack();
             }
@@ -135,6 +159,7 @@ namespace TrackGeneration
 
             CurrentTrackData = null;
             CurrentMacroSections = null;
+            _adoptedLegacyCircuit = null;
             ClearGeneratedMeshStats();
 
             GameObject rootObj = new GameObject("GeneratedTrack_" + seed.BaseSeed);
@@ -196,6 +221,50 @@ namespace TrackGeneration
             Debug.Log($"[TrackGenerator] Generated Track! Seed: {seed.BaseSeed}, Main Length: {mainLength:F1}m, Shortcuts: {shortcuts.Count}, Stunts: {stuntCount}, Boost Pads: {padCount}, Gravity Zones: {gravityPlacements.Count}");
         }
 
+        /// <summary>
+        /// Adopts a track that was generated in the editor before play mode was entered,
+        /// restoring the non-serialized runtime references from the persisted scene objects.
+        /// Returns false when no usable existing track is found (e.g. the scene was reloaded
+        /// from disk, which loses the procedural meshes) — the caller regenerates then.
+        /// </summary>
+        private bool TryAdoptExistingTrack()
+        {
+            if (trackRoot == null) return false;
+
+            // A scene reload from disk keeps the root object but loses the procedural
+            // meshes — a root without any usable mesh is a stale husk, not a track.
+            bool hasMesh = false;
+            foreach (MeshFilter filter in trackRoot.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (filter.sharedMesh != null) { hasMesh = true; break; }
+            }
+            if (!hasMesh) return false;
+
+            // Macro mode: the debug visualizer on the track root serializes the full
+            // section list, so the runtime references restore losslessly.
+            var visualizer = trackRoot.GetComponent<MacroTrackDebugVisualizer>();
+            if (visualizer != null && visualizer.Sections != null && visualizer.Sections.Count > 0)
+            {
+                CurrentMacroSections = visualizer.Sections;
+                UpdateGeneratedMeshStats();
+                Debug.Log($"[TrackGenerator] Keeping editor-generated track (seed {visualizer.Seed}, {visualizer.Sections.Count} sections) — regeneration on play skipped.");
+                return true;
+            }
+
+            // Legacy spline mode: the spline containers persist in the scene, and the
+            // hovercraft start frame only needs the main circuit.
+            var circuit = trackRoot.GetComponentInChildren<SplineContainer>(true);
+            if (circuit != null)
+            {
+                _adoptedLegacyCircuit = circuit;
+                UpdateGeneratedMeshStats();
+                Debug.Log("[TrackGenerator] Keeping editor-generated legacy track — regeneration on play skipped.");
+                return true;
+            }
+
+            return false;
+        }
+
         [ContextMenu("Place Hovercraft At Track Start")]
         public void PlaceHovercraftAtTrackStart()
         {
@@ -235,6 +304,13 @@ namespace TrackGeneration
             }
 
             ResetHovercraftCamera(craft, rb);
+
+            // A teleport is never a lap: abandon the lap in progress and re-arm the gates.
+            if (trackRoot != null)
+            {
+                RaceCourse course = trackRoot.GetComponentInChildren<RaceCourse>(true);
+                if (course != null) course.NotifyRespawn();
+            }
         }
 
         /// <summary>
@@ -259,6 +335,12 @@ namespace TrackGeneration
 
             var visualizer = rootObj.AddComponent<MacroTrackDebugVisualizer>();
             visualizer.Initialize(seed.BaseSeed, sections, resolved.RoadProfile);
+
+            // Race course: start/finish line + in-order checkpoints for time attack.
+            if (buildRaceCourse)
+            {
+                RaceCourseBuilder.Build(trackRoot, sections, resolved.RoadProfile, checkpointCount, startLineArcOffset);
+            }
 
             CurrentMacroSections = sections;
             CurrentTrackData = null; // legacy data does not apply in macro mode
@@ -315,10 +397,14 @@ namespace TrackGeneration
                 return true;
             }
 
-            if (CurrentTrackData != null && CurrentTrackData.MainCircuit != null)
+            // Legacy mode: the live generated data, or the circuit adopted from an
+            // editor-generated track when entering play mode.
+            SplineContainer legacyCircuit = CurrentTrackData != null ? CurrentTrackData.MainCircuit : _adoptedLegacyCircuit;
+
+            if (legacyCircuit != null)
             {
                 SplineUtilities.EvaluateSplineFrameBanked(
-                    CurrentTrackData.MainCircuit,
+                    legacyCircuit,
                     0f,
                     Config != null ? Config.BankingMultiplier : 0f,
                     Config != null ? Config.MaxBankAngle : 0f,

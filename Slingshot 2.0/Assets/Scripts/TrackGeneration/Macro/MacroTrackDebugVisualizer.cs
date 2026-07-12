@@ -38,6 +38,12 @@ namespace TrackGeneration.Macro
         [Tooltip("Label the staged route split zones (lateral separation, vertical divergence, ...).")]
         public bool ShowRouteZones = true;
 
+        [Tooltip("Draw per-side wall multipliers along split routes and highlight suppressed inner-wall (open throat) zones.")]
+        public bool ShowWallMasks = true;
+
+        [Tooltip("Mark OPEN boundaries: jump lip, landing mouth, and air-gap edges where no cap/wall may cross the flight path.")]
+        public bool ShowOpenEdges = true;
+
         [Header("Colors")]
         public Color FrameForwardColor = Color.blue;
         public Color FrameRightColor = Color.red;
@@ -48,6 +54,9 @@ namespace TrackGeneration.Macro
         public Color CrossSectionColor = new Color(0.3f, 1f, 0.5f, 0.9f);
         public Color BlendZoneColor = new Color(1f, 0.6f, 0.1f, 0.9f);
         public Color RouteZoneColor = new Color(0.9f, 0.3f, 1f, 1f);
+        public Color WallFullColor = new Color(0.2f, 0.9f, 0.2f, 0.9f);
+        public Color WallSuppressedColor = new Color(1f, 0.15f, 0.15f, 0.9f);
+        public Color OpenEdgeColor = new Color(0.2f, 0.9f, 1f, 1f);
 
         /// <summary>Called by the generator after a successful macro generation.</summary>
         public void Initialize(int seed, List<GeneratedTrackSection> sections, TrackRoadProfileSettings roadProfile = null)
@@ -137,6 +146,39 @@ namespace TrackGeneration.Macro
                     }
                 }
 
+                if (ShowWallMasks && section.SubdivisionFrames != null &&
+                    section.Definition.SectionType == TrackMacroSectionType.SplitRoute)
+                {
+                    // Per-side wall multiplier bars at each road edge: green = full wall,
+                    // red = suppressed (open throat). Bar height tracks the multiplier, so
+                    // the fade in/out of the inner wall is directly visible in the scene.
+                    for (int f = 0; f < section.SubdivisionFrames.Length; f += 4)
+                    {
+                        var fr = section.SubdivisionFrames[f];
+                        float halfW = fr.Width * 0.5f;
+
+                        DrawWallMaskBar(fr, toWorld, -halfW, fr.LeftWallMultiplier);
+                        DrawWallMaskBar(fr, toWorld, halfW, fr.RightWallMultiplier);
+                    }
+                }
+
+                if (ShowOpenEdges)
+                {
+                    // Open boundaries: a bright crossbar at the boundary marks "nothing may
+                    // block this direction" — jump lip (exit), landing mouth (entry), air gap.
+                    Gizmos.color = OpenEdgeColor;
+                    if (section.OpenEnd && section.SubdivisionFrames != null && section.SubdivisionFrames.Length > 0)
+                        DrawOpenEdge(section.SubdivisionFrames[section.SubdivisionFrames.Length - 1], toWorld, forwardSign: 1f);
+                    if (section.OpenStart && section.SubdivisionFrames != null && section.SubdivisionFrames.Length > 0)
+                        DrawOpenEdge(section.SubdivisionFrames[0], toWorld, forwardSign: -1f);
+                    if (section.IsEmptySpace)
+                    {
+                        // Air gap: mark both open faces of the empty space.
+                        DrawOpenEdge(section.StartFrame, toWorld, forwardSign: 1f);
+                        DrawOpenEdge(section.EndFrame, toWorld, forwardSign: -1f);
+                    }
+                }
+
 #if UNITY_EDITOR
                 if (ShowRouteZones && section.Definition.SectionType == TrackMacroSectionType.SplitRoute &&
                     section.Definition.RouteZoneBoundaries != null &&
@@ -201,20 +243,61 @@ namespace TrackGeneration.Macro
             for (int i = 0; i < n; i++)
             {
                 float xNorm = -1f + 2f * i / (n - 1);
-                float h = RoadProfile.HeightAt(xNorm, halfW, sideH);
+                // Per-side wall multipliers: suppressed inner walls (split/merge throats)
+                // draw flattened, exactly matching the generated mesh.
+                float mult = xNorm < 0f ? frame.LeftWallMultiplier : frame.RightWallMultiplier;
+                float h = RoadProfile.HeightAt(xNorm, halfW, sideH) * mult;
                 Vector3 p = toWorld.MultiplyPoint3x4(frame.Position + frame.Right * (xNorm * halfW) + frame.Up * h);
                 if (i > 0) Gizmos.DrawLine(prev, p);
                 prev = p;
             }
 
-            // Safety lip markers at the top edges.
+            // Safety lip markers at the top edges (scaled per side like the mesh).
             float hEdge = RoadProfile.HeightAt(1f, halfW, sideH);
-            Vector3 lipL = toWorld.MultiplyPoint3x4(frame.Position - frame.Right * halfW + frame.Up * (hEdge + RoadProfile.SafetyLipHeight));
-            Vector3 lipR = toWorld.MultiplyPoint3x4(frame.Position + frame.Right * halfW + frame.Up * (hEdge + RoadProfile.SafetyLipHeight));
-            Vector3 edgeL = toWorld.MultiplyPoint3x4(frame.Position - frame.Right * halfW + frame.Up * hEdge);
-            Vector3 edgeR = toWorld.MultiplyPoint3x4(frame.Position + frame.Right * halfW + frame.Up * hEdge);
+            float hEdgeL = hEdge * frame.LeftWallMultiplier;
+            float hEdgeR = hEdge * frame.RightWallMultiplier;
+            Vector3 lipL = toWorld.MultiplyPoint3x4(frame.Position - frame.Right * halfW + frame.Up * (hEdgeL + RoadProfile.SafetyLipHeight * frame.LeftWallMultiplier));
+            Vector3 lipR = toWorld.MultiplyPoint3x4(frame.Position + frame.Right * halfW + frame.Up * (hEdgeR + RoadProfile.SafetyLipHeight * frame.RightWallMultiplier));
+            Vector3 edgeL = toWorld.MultiplyPoint3x4(frame.Position - frame.Right * halfW + frame.Up * hEdgeL);
+            Vector3 edgeR = toWorld.MultiplyPoint3x4(frame.Position + frame.Right * halfW + frame.Up * hEdgeR);
             Gizmos.DrawLine(edgeL, lipL);
             Gizmos.DrawLine(edgeR, lipR);
+        }
+
+        /// <summary>
+        /// One wall-mask bar at a road edge: full-height green bar = full wall (multiplier 1),
+        /// short red bar = suppressed wall (open throat). Lerped in between.
+        /// </summary>
+        private void DrawWallMaskBar(TrackConnectionFrame frame, Matrix4x4 toWorld, float lateralOffset, float multiplier)
+        {
+            Vector3 basePos = toWorld.MultiplyPoint3x4(frame.Position + frame.Right * lateralOffset);
+            Vector3 up = toWorld.MultiplyVector(frame.Up);
+
+            Gizmos.color = Color.Lerp(WallSuppressedColor, WallFullColor, multiplier);
+            Gizmos.DrawLine(basePos, basePos + up * Mathf.Max(0.3f, 3f * multiplier));
+
+            // Suppressed zones get an extra baseline dot so the open throat reads at a glance.
+            if (multiplier < 0.5f)
+                Gizmos.DrawSphere(basePos, 0.25f);
+        }
+
+        /// <summary>
+        /// Crossbar + direction chevron marking an OPEN boundary (jump lip, landing mouth,
+        /// air-gap face): no cap or wall may cross the flight path here.
+        /// </summary>
+        private void DrawOpenEdge(TrackConnectionFrame frame, Matrix4x4 toWorld, float forwardSign)
+        {
+            float halfW = frame.Width * 0.5f;
+            Vector3 l = toWorld.MultiplyPoint3x4(frame.Position - frame.Right * halfW + frame.Up * 0.5f);
+            Vector3 r = toWorld.MultiplyPoint3x4(frame.Position + frame.Right * halfW + frame.Up * 0.5f);
+            Vector3 mid = (l + r) * 0.5f;
+            Vector3 fwd = toWorld.MultiplyVector(frame.Forward) * forwardSign;
+
+            Gizmos.color = OpenEdgeColor;
+            Gizmos.DrawLine(l, r);
+            Gizmos.DrawLine(mid, mid + fwd * 4f);
+            Gizmos.DrawLine(mid + fwd * 4f, mid + fwd * 2.5f + toWorld.MultiplyVector(frame.Right) * 0.8f);
+            Gizmos.DrawLine(mid + fwd * 4f, mid + fwd * 2.5f - toWorld.MultiplyVector(frame.Right) * 0.8f);
         }
 
         private void DrawFrame(TrackConnectionFrame frame, Matrix4x4 toWorld, float size)
