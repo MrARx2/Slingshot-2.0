@@ -33,8 +33,11 @@ namespace TrackGeneration.Macro
         [Tooltip("Pitch angle in degrees. Positive = nose up.")]
         public float PitchAngle;
 
-        [Tooltip("Accumulated arc length from track start (meters). Keeps UVs continuous across sections.")]
+        [Tooltip("Accumulated arc length from track start (meters). Keeps UVs continuous across sections. Inside a branch route this is the ROUTE distance — physical distance along that route.")]
         public float ArcLength;
+
+        [Tooltip("Logical race progress 0..1. Both branch routes share the same progress at their entry and merge gates regardless of physical length; monotonic within a route.")]
+        public float LapProgress;
 
         [Tooltip("Half-pipe side height at this frame (meters). Set by the cross-section blend pass; the mesh builder reads it so depth changes blend smoothly.")]
         public float SideHeight;

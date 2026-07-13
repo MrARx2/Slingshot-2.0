@@ -1,13 +1,13 @@
 using UnityEngine;
-using TrackGeneration.Splines;
+using TrackGeneration.Macro;
 
 namespace TrackGeneration.Stunts
 {
     /// <summary>
     /// A boost pad lying flush on the road surface. Driving over it applies a forward
     /// impulse along the pad's facing direction (the road tangent at placement).
-    /// Placed by <see cref="StuntPlacer"/> on straights leading into corners or jumps —
-    /// the "Boost Straight" piece from the Track Tuning Context.
+    /// Reusable gameplay actor: place it on any generated section's connection frame
+    /// (boost straights advertise themselves via AllowsBoost on their definitions).
     /// </summary>
     [AddComponentMenu("Track Generation/Stunts/Boost Pad Actor")]
     public class BoostPadActor : MonoBehaviour
@@ -78,7 +78,7 @@ namespace TrackGeneration.Stunts
         /// <summary>
         /// Procedurally generates the pad mesh and trigger, oriented to the given road frame.
         /// </summary>
-        public void Generate(SplineFrame trackFrame, float roadWidth, int targetLane, float boostStrength)
+        public void Generate(TrackConnectionFrame trackFrame, float roadWidth, int targetLane, float boostStrength)
         {
             Lane = targetLane;
             BoostStrength = boostStrength;
@@ -96,7 +96,7 @@ namespace TrackGeneration.Stunts
 
             // Orient with the road: +Z = travel direction, up = banked road normal.
             transform.position = trackFrame.Position;
-            transform.rotation = Quaternion.LookRotation(trackFrame.Tangent, trackFrame.Up);
+            transform.rotation = Quaternion.LookRotation(trackFrame.Forward, trackFrame.Up);
 
             // Mesh — a thin glowing slab slightly above the road surface.
             GameObject padObj = new GameObject("BoostPadMesh");

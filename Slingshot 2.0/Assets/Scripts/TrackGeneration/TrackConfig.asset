@@ -12,15 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c2924fe363ec789498420f4e0941420d, type: 3}
   m_Name: TrackConfig
   m_EditorClassIdentifier: 
-  minTrackLength: 6000
-  maxTrackLength: 20000
+  minTrackLength: 12000
+  maxTrackLength: 60000
   minRoadWidth: 100
   maxRoadWidth: 100
   minCurveRadius: 600
   maxCurveRadius: 1200
   maxBankAngle: 75
   maxSlopeAngle: 40
-  maxElevationChange: 220
+  maxElevationChange: 300
   allowJumps: 1
   allowLoops: 1
   allowCorkscrews: 1
@@ -46,8 +46,8 @@ MonoBehaviour:
   maxCurveAngle: 180
   minBankTransitionLength: 12
   maxBankTransitionLength: 100
-  minElevationStep: 12
-  maxElevationStep: 80
+  minElevationStep: 0
+  maxElevationStep: 300
   minRollingHillHeight: 8
   maxRollingHillHeight: 35
   minLayeredHeightOffset: 24
@@ -120,7 +120,7 @@ MonoBehaviour:
   minHalfPipeCenterFlatWidthRatio: 0.2
   maxHalfPipeCenterFlatWidthRatio: 0.3
   minHalfPipeProfileResolution: 6
-  maxHalfPipeProfileResolution: 18
+  maxHalfPipeProfileResolution: 96
   minTransitionBlendLength: 180
   maxTransitionBlendLength: 260
   minBankBlendLength: 100
@@ -140,10 +140,10 @@ MonoBehaviour:
   maxVerticalDivergenceLength: 500
   minRouteLateralSeparation: 100
   maxRouteLateralSeparation: 300
-  minMetersPerRing: 0
-  maxMetersPerRing: 0.1
-  maxRingsPerMacroSection: 2048
-  maxTotalTrackRings: 150012
+  minMetersPerRing: 0.5
+  maxMetersPerRing: 8
+  maxRingsPerMacroSection: 16384
+  maxTotalTrackRings: 150000
   trackRadius: 300
   controlPointCount: 20
   elevationFrequency: 0.3

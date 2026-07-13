@@ -10,75 +10,87 @@ namespace TrackGeneration.Race
     {
         public int LapNumber;
         public float TimeSeconds;
-        [Tooltip("True only when every checkpoint was crossed in order before the finish line.")]
+        [Tooltip("True only when every logical checkpoint was crossed in order before the finish line.")]
         public bool Valid;
         [Tooltip("Average speed over the lap in km/h (lap length / lap time).")]
         public float AverageSpeedKmh;
     }
 
     /// <summary>
-    /// The race course built onto a generated track: the start/finish gate, the ordered
-    /// checkpoint gates, and the time-attack session state (current lap, lap history,
-    /// session best).
+    /// One LOGICAL checkpoint: one or more alternative gates (one per branch route).
+    /// Crossing ANY gate of the group advances the lap — a player is never required
+    /// to drive both branch routes.
+    /// </summary>
+    [Serializable]
+    public class CheckpointGroup
+    {
+        public List<RaceGate> Gates = new List<RaceGate>();
+    }
+
+    /// <summary>
+    /// The race course built onto a generated track: the start/finish gate, ordered
+    /// LOGICAL checkpoint groups (branch-aware), and the time-attack session state.
     /// <para>
-    /// Crossing detection runs in FixedUpdate as a plane-crossing test per gate: the craft's
-    /// gate-local Z flips from negative to positive inside the gate's detection window.
-    /// This is tunnel-proof at any speed (the craft moves ~2.8 m per tick at 1000 km/h) and
-    /// the crossing instant is interpolated between ticks for sub-tick lap timing.
+    /// Crossing detection runs in FixedUpdate as a plane-crossing test per gate —
+    /// tunnel-proof at any speed (the craft covers ~2.8 m per tick at 1000 km/h), with
+    /// the crossing instant interpolated for sub-tick lap timing.
     /// </para>
     /// <para>
-    /// A lap is VALID only when all checkpoints were crossed in order (1..N) before the
-    /// finish line. Out-of-order or repeated checkpoint crossings are ignored.
-    /// The session (history + best lap) lives with the course, so regenerating the track
-    /// starts a fresh session — times from different layouts never mix.
+    /// The craft is discovered through <see cref="TrackGeneration.ITrackRaceCraft"/> —
+    /// this assembly never references concrete craft types.
     /// </para>
     /// </summary>
     public class RaceCourse : MonoBehaviour
     {
         [Header("Course (built by the track generator)")]
         public RaceGate StartFinishGate;
-        public List<RaceGate> Checkpoints = new List<RaceGate>();
+
+        [Tooltip("Ordered logical checkpoint groups. Each group holds one gate per available route.")]
+        public List<CheckpointGroup> CheckpointGroups = new List<CheckpointGroup>();
 
         [Tooltip("Lap length in meters — used for average speed.")]
         public float TrackLength;
 
         [Header("Detection")]
         [Tooltip("A per-tick world-space jump larger than this is a teleport/respawn, never a legitimate crossing.")]
-        public float TeleportDistance = 50f;
+        public float TeleportDistance = 150f;
 
         /// <summary>Fired when a lap completes (valid or not).</summary>
         public event Action<LapRecord> LapCompleted;
 
-        /// <summary>Fired when the next in-order checkpoint is crossed (0-based index).</summary>
+        /// <summary>Fired when the next in-order logical checkpoint is crossed (0-based index).</summary>
         public event Action<int> CheckpointPassed;
 
-        /// <summary>True once the craft has crossed the start line and the clock is running.</summary>
         public bool LapInProgress { get; private set; }
-
-        /// <summary>1-based number of the lap currently being driven.</summary>
         public int CurrentLapNumber { get; private set; }
 
-        /// <summary>Index of the next checkpoint that must be crossed (== Checkpoints.Count when all are collected).</summary>
+        /// <summary>Index of the next LOGICAL checkpoint that must be crossed.</summary>
         public int NextCheckpointIndex { get; private set; }
 
-        /// <summary>All completed laps this session, oldest first.</summary>
+        /// <summary>Branch group the player most recently entered via a route gate (-1 = main line).</summary>
+        public int CurrentBranchGroupId { get; private set; } = -1;
+
+        /// <summary>Route the player chose in the current branch group (0 = A, 1 = B, -1 = unknown).</summary>
+        public int CurrentRouteId { get; private set; } = -1;
+
+        /// <summary>The last gate crossed in order — the respawn anchor (null before the first crossing).</summary>
+        public RaceGate LastValidGate { get; private set; }
+
         public IReadOnlyList<LapRecord> Laps => _laps;
-
-        /// <summary>Fastest VALID lap of the session, or null.</summary>
         public LapRecord BestLap { get; private set; }
-
-        /// <summary>Elapsed time of the lap in progress, in seconds.</summary>
         public float CurrentLapTime => LapInProgress ? (float)(Time.timeAsDouble - _lapStartTime) : 0f;
+
+        /// <summary>Total logical checkpoints per lap.</summary>
+        public int CheckpointCount => CheckpointGroups.Count;
 
         private readonly List<LapRecord> _laps = new List<LapRecord>();
         private double _lapStartTime;
 
-        private global::CraftCore _craft;
+        private TrackGeneration.ITrackRaceCraft _craft;
         private Rigidbody _craftBody;
         private float _nextCraftSearchTime;
 
-        // Per-gate craft position in gate-local space from the previous tick.
-        // Index 0 = start/finish, 1..N = checkpoints. Invalid until _tracking is set.
+        private readonly List<RaceGate> _allGates = new List<RaceGate>();
         private Vector3[] _prevLocal;
         private Vector3 _prevWorld;
         private bool _tracking;
@@ -91,10 +103,6 @@ namespace TrackGeneration.Race
             }
         }
 
-        /// <summary>
-        /// The HUD survives track regeneration (it lives on the camera), so only the first
-        /// generated course actually creates it.
-        /// </summary>
         private void EnsureHud()
         {
             if (FindAnyObjectByType<RaceHUD>() != null) return;
@@ -105,30 +113,53 @@ namespace TrackGeneration.Race
         }
 
         /// <summary>
-        /// Call after the craft is teleported (spawn, Backspace reset): abandons the lap in
-        /// progress and re-arms detection. Session history and best lap are kept.
+        /// Call after the craft is teleported: abandons the lap in progress and re-arms
+        /// detection. Session history and best lap are kept.
         /// </summary>
         public void NotifyRespawn()
         {
             LapInProgress = false;
             NextCheckpointIndex = 0;
+            CurrentBranchGroupId = -1;
+            CurrentRouteId = -1;
+            LastValidGate = null;
             _tracking = false;
+        }
+
+        /// <summary>
+        /// Respawn pose on the player's chosen route: the last valid gate's frame (or
+        /// the start/finish line before any crossing).
+        /// </summary>
+        public bool TryGetRespawnPose(out Vector3 position, out Quaternion rotation)
+        {
+            RaceGate anchor = LastValidGate != null ? LastValidGate : StartFinishGate;
+            if (anchor == null)
+            {
+                position = Vector3.zero;
+                rotation = Quaternion.identity;
+                return false;
+            }
+
+            position = anchor.transform.position;
+            rotation = anchor.transform.rotation;
+            return true;
         }
 
         private void FixedUpdate()
         {
             if (StartFinishGate == null || !AcquireCraft()) return;
 
-            int gateCount = 1 + Checkpoints.Count;
+            RebuildGateCache();
+
+            int gateCount = _allGates.Count;
             if (_prevLocal == null || _prevLocal.Length != gateCount)
             {
                 _prevLocal = new Vector3[gateCount];
                 _tracking = false;
             }
 
-            Vector3 worldPos = _craftBody != null ? _craftBody.position : _craft.transform.position;
+            Vector3 worldPos = _craftBody != null ? _craftBody.position : _craft.CraftTransform.position;
 
-            // Teleport guard (backup for resets that don't call NotifyRespawn).
             if (_tracking && (worldPos - _prevWorld).sqrMagnitude > TeleportDistance * TeleportDistance)
             {
                 NotifyRespawn();
@@ -136,7 +167,7 @@ namespace TrackGeneration.Race
 
             for (int i = 0; i < gateCount; i++)
             {
-                RaceGate gate = i == 0 ? StartFinishGate : Checkpoints[i - 1];
+                RaceGate gate = _allGates[i];
                 if (gate == null) continue;
 
                 Vector3 local = gate.transform.InverseTransformPoint(worldPos);
@@ -146,7 +177,6 @@ namespace TrackGeneration.Race
                     Vector3 prev = _prevLocal[i];
                     if (prev.z < 0f && local.z >= 0f)
                     {
-                        // Interpolate the exact crossing point and instant within the tick.
                         float f = prev.z / (prev.z - local.z);
                         Vector3 at = Vector3.Lerp(prev, local, f);
                         if (gate.IsInsideWindow(at))
@@ -164,6 +194,21 @@ namespace TrackGeneration.Race
             _tracking = true;
         }
 
+        private void RebuildGateCache()
+        {
+            int expected = 1;
+            foreach (var g in CheckpointGroups) expected += g?.Gates?.Count ?? 0;
+            if (_allGates.Count == expected) return;
+
+            _allGates.Clear();
+            _allGates.Add(StartFinishGate);
+            foreach (var g in CheckpointGroups)
+            {
+                if (g?.Gates == null) continue;
+                foreach (var gate in g.Gates) _allGates.Add(gate);
+            }
+        }
+
         private void HandleCrossing(RaceGate gate, double crossTime)
         {
             if (gate.IsStartFinish)
@@ -173,29 +218,35 @@ namespace TrackGeneration.Race
                     CompleteLap(crossTime);
                 }
 
-                // First crossing arms the clock; every later crossing rolls straight into the next lap.
                 LapInProgress = true;
                 CurrentLapNumber = _laps.Count + 1;
                 NextCheckpointIndex = 0;
+                CurrentBranchGroupId = -1;
+                CurrentRouteId = -1;
+                LastValidGate = gate;
                 _lapStartTime = crossTime;
                 return;
             }
 
             if (!LapInProgress) return;
 
+            // Any gate of the NEXT logical group advances the lap — either branch route counts.
             if (gate.CheckpointIndex == NextCheckpointIndex)
             {
                 NextCheckpointIndex++;
+                LastValidGate = gate;
+                CurrentBranchGroupId = gate.BranchGroupId;
+                CurrentRouteId = gate.RouteId;
                 CheckpointPassed?.Invoke(gate.CheckpointIndex);
             }
             // Out-of-order or repeat crossings are ignored — the lap simply
-            // finishes invalid if any checkpoint was skipped.
+            // finishes invalid if any logical checkpoint was skipped.
         }
 
         private void CompleteLap(double crossTime)
         {
             float lapTime = Mathf.Max(0.001f, (float)(crossTime - _lapStartTime));
-            bool valid = NextCheckpointIndex >= Checkpoints.Count;
+            bool valid = NextCheckpointIndex >= CheckpointGroups.Count;
 
             var record = new LapRecord
             {
@@ -220,10 +271,10 @@ namespace TrackGeneration.Race
             if (Time.unscaledTime < _nextCraftSearchTime) return false;
 
             _nextCraftSearchTime = Time.unscaledTime + 1f;
-            _craft = FindAnyObjectByType<global::CraftCore>();
+            _craft = TrackGeneration.TrackCraftLocator.FindCraft();
             if (_craft == null) return false;
 
-            _craftBody = _craft.GetComponent<Rigidbody>();
+            _craftBody = _craft.CraftRigidbody;
             _tracking = false;
             return true;
         }

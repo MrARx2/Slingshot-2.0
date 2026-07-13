@@ -44,6 +44,28 @@ namespace TrackGeneration.Macro
         [Tooltip("Mark OPEN boundaries: jump lip, landing mouth, and air-gap edges where no cap/wall may cross the flight path.")]
         public bool ShowOpenEdges = true;
 
+        [Header("Branch / Pattern / Progress Debug")]
+        [Tooltip("Label feature-pattern groups (Loop→Corkscrew, HalfLoopToCorkscrew, …).")]
+        public bool ShowPatternLabels = true;
+
+        [Tooltip("Label branch groups and draw their entry/merge gates.")]
+        public bool ShowBranchGates = true;
+
+        [Tooltip("Color branch route centerlines per route (A cyan / B orange).")]
+        public bool ShowRouteColors = true;
+
+        [Tooltip("Display the estimated route-time table of each branch group.")]
+        public bool ShowRouteTimes = true;
+
+        [Tooltip("Mark logical lap progress every 10% along the driving line.")]
+        public bool ShowLapProgress = false;
+
+        [Tooltip("Highlight closure-reserve sections (adjustable straights the closure solver used).")]
+        public bool ShowClosureSections = false;
+
+        [Tooltip("Estimated route-time tables per branch group (filled by the generator).")]
+        public List<TrackGeneration.Branching.BranchBalanceMetrics> BranchBalances = new List<TrackGeneration.Branching.BranchBalanceMetrics>();
+
         [Header("Colors")]
         public Color FrameForwardColor = Color.blue;
         public Color FrameRightColor = Color.red;
@@ -64,6 +86,29 @@ namespace TrackGeneration.Macro
             Seed = seed;
             Sections = sections;
             RoadProfile = roadProfile;
+        }
+
+        /// <summary>Stores branch balance tables from the authoritative layout for scene display.</summary>
+        public void SetLayout(TrackGeneration.Planning.GeneratedTrackLayout layout)
+        {
+            BranchBalances.Clear();
+            if (layout == null) return;
+            foreach (var group in layout.BranchGroups)
+                if (group.Balance != null) BranchBalances.Add(group.Balance);
+        }
+
+        /// <summary>
+        /// Gizmo stride in RING INDICES for a target arc distance. Strides must be
+        /// arc-based, never fixed indices: ring density is a mesh-quality setting, and a
+        /// fixed index stride multiplies the gizmo line count (and tanks editor FPS on
+        /// big tracks) every time the density is raised.
+        /// </summary>
+        private static int StrideFor(GeneratedTrackSection sec, float meters)
+        {
+            int rings = sec.SubdivisionFrames?.Length ?? 0;
+            if (rings < 2) return 1;
+            float ds = (sec.EndFrame.ArcLength - sec.StartFrame.ArcLength) / (rings - 1);
+            return Mathf.Max(1, Mathf.RoundToInt(meters / Mathf.Max(0.1f, ds)));
         }
 
         private void OnDrawGizmos()
@@ -110,7 +155,7 @@ namespace TrackGeneration.Macro
                 if (ShowBanking && section.SubdivisionFrames != null)
                 {
                     Gizmos.color = BankingColor;
-                    for (int f = 0; f < section.SubdivisionFrames.Length; f += 8)
+                    for (int f = 0; f < section.SubdivisionFrames.Length; f += StrideFor(section, 20f))
                     {
                         var fr = section.SubdivisionFrames[f];
                         if (Mathf.Abs(fr.BankAngle) < 2f) continue;
@@ -124,7 +169,7 @@ namespace TrackGeneration.Macro
                 {
                     // Half-pipe cross-section polylines: center baseline + rising side walls.
                     Gizmos.color = CrossSectionColor;
-                    for (int f = 0; f < section.SubdivisionFrames.Length; f += 12)
+                    for (int f = 0; f < section.SubdivisionFrames.Length; f += StrideFor(section, 80f))
                     {
                         DrawCrossSection(section.SubdivisionFrames[f], toWorld);
                     }
@@ -134,7 +179,7 @@ namespace TrackGeneration.Macro
                 {
                     // Bank angle (orange) and half-pipe depth (green) over distance — makes
                     // blend zones and any abrupt transitions immediately visible.
-                    for (int f = 0; f < section.SubdivisionFrames.Length; f += 4)
+                    for (int f = 0; f < section.SubdivisionFrames.Length; f += StrideFor(section, 12f))
                     {
                         var fr = section.SubdivisionFrames[f];
                         Vector3 p = toWorld.MultiplyPoint3x4(fr.Position);
@@ -152,7 +197,7 @@ namespace TrackGeneration.Macro
                     // Per-side wall multiplier bars at each road edge: green = full wall,
                     // red = suppressed (open throat). Bar height tracks the multiplier, so
                     // the fade in/out of the inner wall is directly visible in the scene.
-                    for (int f = 0; f < section.SubdivisionFrames.Length; f += 4)
+                    for (int f = 0; f < section.SubdivisionFrames.Length; f += StrideFor(section, 12f))
                     {
                         var fr = section.SubdivisionFrames[f];
                         float halfW = fr.Width * 0.5f;
@@ -178,6 +223,87 @@ namespace TrackGeneration.Macro
                         DrawOpenEdge(section.EndFrame, toWorld, forwardSign: -1f);
                     }
                 }
+
+                if (ShowRouteColors && section.RouteId >= 0 && section.SubdivisionFrames != null && section.SubdivisionFrames.Length > 1)
+                {
+                    // Distinct route colors: A cyan, B orange.
+                    Gizmos.color = section.RouteId == 0 ? new Color(0.2f, 0.9f, 1f) : new Color(1f, 0.6f, 0.15f);
+                    int routeStride = StrideFor(section, 10f);
+                    for (int f = routeStride; f < section.SubdivisionFrames.Length; f += routeStride)
+                    {
+                        Gizmos.DrawLine(
+                            toWorld.MultiplyPoint3x4(section.SubdivisionFrames[f - routeStride].Position + section.SubdivisionFrames[f - routeStride].Up),
+                            toWorld.MultiplyPoint3x4(section.SubdivisionFrames[f].Position + section.SubdivisionFrames[f].Up));
+                    }
+                }
+
+                if (ShowClosureSections && section.Definition.IsClosure && section.SubdivisionFrames != null)
+                {
+                    Gizmos.color = Color.yellow;
+                    int closureStride = StrideFor(section, 10f);
+                    for (int f = closureStride; f < section.SubdivisionFrames.Length; f += closureStride)
+                    {
+                        Gizmos.DrawLine(
+                            toWorld.MultiplyPoint3x4(section.SubdivisionFrames[f - closureStride].Position + Vector3.up * 2f),
+                            toWorld.MultiplyPoint3x4(section.SubdivisionFrames[f].Position + Vector3.up * 2f));
+                    }
+                }
+
+                if (ShowLapProgress && section.SubdivisionFrames != null)
+                {
+                    Gizmos.color = new Color(1f, 1f, 1f, 0.8f);
+                    for (int f = 1; f < section.SubdivisionFrames.Length; f++)
+                    {
+                        float p0 = section.SubdivisionFrames[f - 1].LapProgress;
+                        float p1 = section.SubdivisionFrames[f].LapProgress;
+                        int tick0 = Mathf.FloorToInt(p0 * 10f);
+                        int tick1 = Mathf.FloorToInt(p1 * 10f);
+                        if (tick1 > tick0 && tick1 <= 10)
+                        {
+                            Vector3 p = toWorld.MultiplyPoint3x4(section.SubdivisionFrames[f].Position);
+                            Gizmos.DrawWireSphere(p + Vector3.up * 2f, 1.2f);
+#if UNITY_EDITOR
+                            UnityEditor.Handles.Label(p + Vector3.up * 4f, $"{tick1 * 10}%");
+#endif
+                        }
+                    }
+                }
+
+#if UNITY_EDITOR
+                if (ShowBranchGates && section.RouteId == 0 && section.BranchGroupId >= 0)
+                {
+                    Gizmos.color = new Color(0.4f, 1f, 0.4f);
+                    Gizmos.DrawWireSphere(startPos + Vector3.up * 2f, 2.5f);
+                    Gizmos.DrawWireSphere(endPos + Vector3.up * 2f, 2.5f);
+                    UnityEditor.Handles.Label(startPos + Vector3.up * 8f, $"Branch {section.BranchGroupId} ENTRY GATE");
+                    UnityEditor.Handles.Label(endPos + Vector3.up * 8f, $"Branch {section.BranchGroupId} MERGE GATE");
+
+                    if (ShowRouteTimes && BranchBalances != null)
+                    {
+                        foreach (var balance in BranchBalances)
+                        {
+                            if (balance.BranchGroupId != section.BranchGroupId) continue;
+                            UnityEditor.Handles.Label(startPos + Vector3.up * 12f, balance.ToString());
+                            break;
+                        }
+                    }
+                }
+
+                if (ShowPatternLabels && !string.IsNullOrEmpty(section.Definition.PatternId) &&
+                    section.SubdivisionFrames != null && section.SubdivisionFrames.Length > 2)
+                {
+                    // Label once per pattern: only on the first section of the group.
+                    bool firstOfPattern = i == 0 || Sections[i - 1]?.Definition == null ||
+                                          Sections[i - 1].Definition.PatternId != section.Definition.PatternId;
+                    if (firstOfPattern)
+                    {
+                        var mid = section.SubdivisionFrames[section.SubdivisionFrames.Length / 2];
+                        UnityEditor.Handles.Label(
+                            toWorld.MultiplyPoint3x4(mid.Position) + Vector3.up * 10f,
+                            $"◆ {section.Definition.PatternId}");
+                    }
+                }
+#endif
 
 #if UNITY_EDITOR
                 if (ShowRouteZones && section.Definition.SectionType == TrackMacroSectionType.SplitRoute &&
@@ -242,7 +368,7 @@ namespace TrackGeneration.Macro
             Vector3 prev = Vector3.zero;
             for (int i = 0; i < n; i++)
             {
-                float xNorm = -1f + 2f * i / (n - 1);
+                float xNorm = RoadProfile.ProfileXAt(i, n);
                 // Per-side wall multipliers: suppressed inner walls (split/merge throats)
                 // draw flattened, exactly matching the generated mesh.
                 float mult = xNorm < 0f ? frame.LeftWallMultiplier : frame.RightWallMultiplier;

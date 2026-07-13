@@ -1,31 +1,31 @@
 using System.Collections.Generic;
 using UnityEngine;
 using TrackGeneration.Macro;
+using TrackGeneration.Planning;
 
 namespace TrackGeneration.Race
 {
     /// <summary>
-    /// Builds the race course onto a generated macro track: a start/finish arch (checkered)
-    /// at a small arc offset past the spawn point, and N numbered checkpoint gates evenly
-    /// spaced around the lap. Gate visuals are pure decoration — no colliders, so a wide or
-    /// airborne line never clips a pillar. Detection is handled by <see cref="RaceCourse"/>.
+    /// Builds the race course onto a generated track: a start/finish arch at a small arc
+    /// offset past the spawn point, and N LOGICAL checkpoint groups evenly spaced around
+    /// the lap. Checkpoints falling inside a branch group get one gate PER ROUTE sharing
+    /// the same logical index — crossing either advances the lap, so a player is never
+    /// required to drive both routes. Gate visuals are decoration (no colliders);
+    /// detection is handled by <see cref="RaceCourse"/>.
     /// </summary>
     public static class RaceCourseBuilder
     {
-        private const float MinGateSeparation = 10f;
+        private const float MinGateSeparation = 60f;
 
-        /// <summary>
-        /// Builds the course under the track root. <paramref name="startLineArcOffset"/> pushes
-        /// the start/finish line ahead of the spawn frame so the first crossing (not the spawn
-        /// itself) starts the clock. Returns null when the section list can't host a course.
-        /// </summary>
+        /// <summary>Builds the branch-aware course under the track root. Returns null on failure.</summary>
         public static RaceCourse Build(
             Transform trackRoot,
-            List<GeneratedTrackSection> sections,
+            GeneratedTrackLayout layout,
             TrackRoadProfileSettings roadProfile,
             int checkpointCount,
             float startLineArcOffset)
         {
+            var sections = layout.Sections;
             float total = MacroTrackSampler.GetTotalLength(sections);
             if (trackRoot == null || total <= MinGateSeparation * (checkpointCount + 1))
             {
@@ -41,50 +41,117 @@ namespace TrackGeneration.Race
 
             Materials mats = CreateMaterials();
 
-            // Start/finish sits a little way down the track from the spawn frame.
             float startArc = Mathf.Min(startLineArcOffset, total * 0.25f);
             if (!MacroTrackSampler.TrySampleFrame(sections, startArc, out TrackConnectionFrame startFrame))
             {
                 Debug.LogWarning("[RaceCourseBuilder] Could not sample the start line frame — skipped.");
-                if (Application.isPlaying) Object.Destroy(courseObj);
-                else Object.DestroyImmediate(courseObj);
+                DestroyObject(courseObj);
                 return null;
             }
-            course.StartFinishGate = BuildGate(courseObj.transform, startFrame, roadProfile, isStartFinish: true, index: -1, mats);
+            course.StartFinishGate = BuildGate(courseObj.transform, startFrame, roadProfile, isStartFinish: true,
+                logicalIndex: -1, branchGroupId: -1, routeId: -1, mats);
 
-            // Checkpoints: evenly spaced boundaries between start line and finish line.
-            // Frames landing in an air gap get nudged forward by the sampler, so re-sort by
-            // distance from the start line and drop any that collapsed onto a neighbour.
+            // Logical checkpoints: evenly spaced arcs; branch spans emit one gate per route.
             float spacing = total / (checkpointCount + 1);
-            var frames = new List<TrackConnectionFrame>();
+            float lastArc = 0f;
+            int logicalIndex = 0;
+
             for (int i = 0; i < checkpointCount; i++)
             {
                 float arc = Mathf.Repeat(startArc + spacing * (i + 1), total);
-                if (MacroTrackSampler.TrySampleFrame(sections, arc, out TrackConnectionFrame f))
+
+                float rel = Mathf.Repeat(arc - startArc, total);
+                if (rel < lastArc + MinGateSeparation || rel > total - MinGateSeparation) continue;
+                lastArc = rel;
+
+                var group = new CheckpointGroup();
+
+                GeneratedTrackSection branchA = FindBranchRouteAt(sections, arc, routeId: 0);
+                if (branchA != null)
                 {
-                    frames.Add(f);
+                    // Route A gate at the arc, route B gate at the matching progress.
+                    var frameA = SampleSectionFrame(branchA, arc);
+                    var gateA = BuildGate(courseObj.transform, frameA, roadProfile, false, logicalIndex,
+                        branchA.BranchGroupId, 0, mats);
+                    group.Gates.Add(gateA);
+
+                    GeneratedTrackSection branchB = FindBranchSibling(sections, branchA);
+                    if (branchB != null)
+                    {
+                        float t = Mathf.InverseLerp(branchA.StartFrame.ArcLength, branchA.EndFrame.ArcLength, arc);
+                        var frameB = SampleSectionFrameNormalized(branchB, t);
+                        var gateB = BuildGate(courseObj.transform, frameB, roadProfile, false, logicalIndex,
+                            branchB.BranchGroupId, 1, mats);
+                        group.Gates.Add(gateB);
+                    }
+                }
+                else
+                {
+                    if (!MacroTrackSampler.TrySampleFrame(sections, arc, out TrackConnectionFrame f)) continue;
+                    group.Gates.Add(BuildGate(courseObj.transform, f, roadProfile, false, logicalIndex, -1, -1, mats));
+                }
+
+                if (group.Gates.Count > 0)
+                {
+                    course.CheckpointGroups.Add(group);
+                    logicalIndex++;
                 }
             }
-            frames.Sort((a, b) =>
-                Mathf.Repeat(a.ArcLength - startArc, total).CompareTo(Mathf.Repeat(b.ArcLength - startArc, total)));
 
-            float lastRel = 0f;
-            foreach (TrackConnectionFrame f in frames)
+            if (course.CheckpointGroups.Count == 0)
             {
-                float rel = Mathf.Repeat(f.ArcLength - startArc, total);
-                if (rel < lastRel + MinGateSeparation || rel > total - MinGateSeparation) continue;
-                lastRel = rel;
-
-                RaceGate gate = BuildGate(courseObj.transform, f, roadProfile, isStartFinish: false, index: course.Checkpoints.Count, mats);
-                course.Checkpoints.Add(gate);
+                Debug.LogWarning("[RaceCourseBuilder] No checkpoints could be placed — course rejected.");
+                DestroyObject(courseObj);
+                return null;
             }
 
-            if (course.Checkpoints.Count < checkpointCount)
-            {
-                Debug.LogWarning($"[RaceCourseBuilder] Placed {course.Checkpoints.Count}/{checkpointCount} checkpoints — some sample points fell in air gaps too close to a neighbour.");
-            }
+            if (course.CheckpointGroups.Count < checkpointCount)
+                Debug.LogWarning($"[RaceCourseBuilder] Placed {course.CheckpointGroups.Count}/{checkpointCount} logical checkpoints — some sample points fell too close to a neighbour.");
 
             return course;
+        }
+
+        private static void DestroyObject(GameObject obj)
+        {
+            if (Application.isPlaying) Object.Destroy(obj);
+            else Object.DestroyImmediate(obj);
+        }
+
+        // ─────────────────────────── Branch-aware sampling ───────────────────────────
+
+        private static GeneratedTrackSection FindBranchRouteAt(List<GeneratedTrackSection> sections, float arc, int routeId)
+        {
+            foreach (var s in sections)
+            {
+                if (s.BranchGroupId < 0 || s.RouteId != routeId) continue;
+                if (arc >= s.StartFrame.ArcLength + 1f && arc <= s.EndFrame.ArcLength - 1f)
+                    return s;
+            }
+            return null;
+        }
+
+        private static GeneratedTrackSection FindBranchSibling(List<GeneratedTrackSection> sections, GeneratedTrackSection route)
+        {
+            foreach (var s in sections)
+            {
+                if (s.BranchGroupId == route.BranchGroupId && s.RouteId == 1 - route.RouteId)
+                    return s;
+            }
+            return null;
+        }
+
+        private static TrackConnectionFrame SampleSectionFrame(GeneratedTrackSection section, float arc)
+        {
+            float t = Mathf.InverseLerp(section.StartFrame.ArcLength, section.EndFrame.ArcLength, arc);
+            return SampleSectionFrameNormalized(section, t);
+        }
+
+        private static TrackConnectionFrame SampleSectionFrameNormalized(GeneratedTrackSection section, float t)
+        {
+            var frames = section.SubdivisionFrames;
+            if (frames == null || frames.Length == 0) return section.StartFrame;
+            int idx = Mathf.Clamp(Mathf.RoundToInt(t * (frames.Length - 1)), 0, frames.Length - 1);
+            return frames[idx];
         }
 
         // ─────────────────────────────── Gates ───────────────────────────────
@@ -94,27 +161,32 @@ namespace TrackGeneration.Race
             TrackConnectionFrame frame,
             TrackRoadProfileSettings roadProfile,
             bool isStartFinish,
-            int index,
+            int logicalIndex,
+            int branchGroupId,
+            int routeId,
             Materials mats)
         {
-            GameObject go = new GameObject(isStartFinish ? "StartFinishLine" : $"Checkpoint_{index + 1}");
+            string routeSuffix = routeId == 0 ? "A" : routeId == 1 ? "B" : "";
+            GameObject go = new GameObject(isStartFinish ? "StartFinishLine" : $"Checkpoint_{logicalIndex + 1}{routeSuffix}");
             go.transform.SetParent(parent, false);
             go.transform.localPosition = frame.Position;
             go.transform.localRotation = Quaternion.LookRotation(frame.Forward, frame.Up);
 
             RaceGate gate = go.AddComponent<RaceGate>();
             gate.IsStartFinish = isStartFinish;
-            gate.CheckpointIndex = index;
+            gate.CheckpointIndex = logicalIndex;
             gate.ArcLength = frame.ArcLength;
+            gate.BranchGroupId = branchGroupId;
+            gate.RouteId = routeId;
             gate.DetectionHalfWidth = frame.Width * 0.75f;
             gate.DetectionBottom = -6f;
-            gate.DetectionTop = 45f;
+            gate.DetectionTop = 60f;
 
             float sideHeight = frame.SideHeight > 0.01f
                 ? frame.SideHeight
                 : (roadProfile != null ? roadProfile.SideHeight : 3.5f);
 
-            BuildGateVisuals(go.transform, frame.Width, sideHeight, isStartFinish, index, mats);
+            BuildGateVisuals(go.transform, frame.Width, sideHeight, isStartFinish, logicalIndex, mats);
             return gate;
         }
 
@@ -126,21 +198,18 @@ namespace TrackGeneration.Race
             Material pillarMat = isStartFinish ? mats.Pillar : mats.Checkpoint;
             Material beamMat = isStartFinish ? mats.Checker : mats.Checkpoint;
 
-            // Pillars just outside the half-pipe edges.
             float pillarX = halfWidth + pillarThickness;
             CreatePart(gate, "Pillar_L", new Vector3(-pillarX, pillarHeight * 0.5f, 0f),
                 new Vector3(pillarThickness, pillarHeight, pillarThickness), pillarMat);
             CreatePart(gate, "Pillar_R", new Vector3(pillarX, pillarHeight * 0.5f, 0f),
                 new Vector3(pillarThickness, pillarHeight, pillarThickness), pillarMat);
 
-            // Overhead beam spanning the road.
             float beamHeight = isStartFinish ? 1.6f : 0.8f;
             CreatePart(gate, "Beam", new Vector3(0f, pillarHeight - beamHeight * 0.5f, 0f),
                 new Vector3(pillarX * 2f + pillarThickness, beamHeight, pillarThickness * 0.6f), beamMat);
 
             if (isStartFinish)
             {
-                // Checkered stripe across the road surface (sinks into the rising half-pipe sides).
                 CreatePart(gate, "FloorStripe", new Vector3(0f, 0.04f, 0f),
                     new Vector3(roadWidth * 0.95f, 0.06f, 3f), mats.Checker);
             }
@@ -170,27 +239,25 @@ namespace TrackGeneration.Race
         }
 
         // ─────────────────────────── Number labels ───────────────────────────
-        // Seven-segment digits built from cubes: real depth-tested geometry, unlike
-        // TextMesh whose GUI font shader draws through everything (ZTest Always).
+        // Seven-segment digits built from cubes: real depth-tested geometry.
 
         private const float DigitHeight = 3.2f;
         private const float DigitWidth = 1.8f;
         private const float DigitStroke = 0.4f;
         private const float DigitDepth = 0.25f;
 
-        // Segment bit order: A(top) B(top-right) C(bottom-right) D(bottom) E(bottom-left) F(top-left) G(middle)
         private static readonly byte[] DigitSegments =
         {
-            0b0111111, // 0: ABCDEF
-            0b0000110, // 1: BC
-            0b1011011, // 2: ABDEG
-            0b1001111, // 3: ABCDG
-            0b1100110, // 4: BCFG
-            0b1101101, // 5: ACDFG
-            0b1111101, // 6: ACDEFG
-            0b0000111, // 7: ABC
-            0b1111111, // 8: all
-            0b1101111  // 9: ABCDFG
+            0b0111111, // 0
+            0b0000110, // 1
+            0b1011011, // 2
+            0b1001111, // 3
+            0b1100110, // 4
+            0b1101101, // 5
+            0b1111101, // 6
+            0b0000111, // 7
+            0b1111111, // 8
+            0b1101111  // 9
         };
 
         private static void CreateNumberLabel(Transform gate, int number, float height, Material mat)

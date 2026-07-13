@@ -1,119 +1,154 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using TrackGeneration.Core;
+using TrackGeneration.Design;
 
 namespace TrackGeneration.Macro
 {
+    /// <summary>Severity of one resolution issue.</summary>
+    public enum ResolvedIssueSeverity
+    {
+        Info,
+        Warning,
+        Error
+    }
+
+    /// <summary>One clamping/validation note produced while resolving designer settings.</summary>
+    [Serializable]
+    public class ResolvedConfigIssue
+    {
+        public ResolvedIssueSeverity Severity;
+        public string Field;
+        public string Message;
+
+        public override string ToString() => $"[{Severity}] {Field}: {Message}";
+    }
+
+    /// <summary>A resolved feature rule: counts clamped by the rulebook and allow flags.</summary>
+    [Serializable]
+    public class ResolvedFeatureRule
+    {
+        public bool Enabled;
+        public int MinimumCount;
+        public int MaximumCount;
+        public float OptionalWeight;
+        public float MinimumSpacingMeters; // -1 = use default dangerous spacing
+        public bool AllowInCompoundPatterns;
+
+        public static ResolvedFeatureRule From(TrackFeatureRule rule, bool allowed, float speedMps, float defaultSpacing)
+        {
+            bool enabled = rule != null && rule.Enabled && allowed;
+            return new ResolvedFeatureRule
+            {
+                Enabled = enabled,
+                MinimumCount = enabled ? rule.EffectiveMinimum : 0,
+                MaximumCount = enabled ? rule.EffectiveMaximum : 0,
+                OptionalWeight = enabled ? rule.OptionalWeight : 0f,
+                MinimumSpacingMeters = rule != null && rule.MinimumSpacingOverrideSeconds > 0f
+                    ? rule.MinimumSpacingOverrideSeconds * speedMps
+                    : defaultSpacing,
+                AllowInCompoundPatterns = rule != null && rule.AllowInCompoundPatterns && enabled
+            };
+        }
+    }
+
     /// <summary>
-    /// Internal generation values derived from the 10 designer parameters
-    /// (<see cref="TrackDesignerProfile"/>) clamped by the TrackConfig rulebook.
+    /// A pure, validated snapshot of every final numerical value generation uses:
+    /// designer values clamped against the <see cref="TrackConfig"/> rulebook, with
+    /// time-based values already converted to meters via the design speed.
     ///
-    ///     TrackConfig limits + designer parameters = ResolvedTrackGenerationConfig
-    ///
-    /// The macro generator uses ONLY this class internally. Resolution is a pure
-    /// function of (limits, profile) — no randomness, determinism stays intact.
-    /// When designer intent is disallowed by the rulebook, Resolve() logs loudly
-    /// instead of failing silently.
+    /// It contains no preset switches and no hidden randomness — resolution is a
+    /// deterministic function of (rulebook, settings). Impossible combinations are
+    /// recorded in <see cref="Issues"/>; hard errors make the request invalid.
     /// </summary>
     public class ResolvedTrackGenerationConfig
     {
-        // ── Size ──
-        public int TargetMacroSectionCount;
-        public float TargetTrackLength;
-        public float MaxTrackLength;   // absolute rulebook cap — explicit TurnCount may grow the lap up to this
+        // ── Provenance ──
+        public List<ResolvedConfigIssue> Issues = new List<ResolvedConfigIssue>();
+        public bool HasHardErrors { get { foreach (var i in Issues) if (i.Severity == ResolvedIssueSeverity.Error) return true; return false; } }
 
-        // ── Road ──
-        public float RoadWidth;
+        // ── Speed & scale ──
+        public float DesignSpeedKph;
+        public float DesignSpeedMps;
+        public float TargetLapTimeSeconds;
+        public float TargetTrackLength;     // design speed × lap time (may grow)
+        public float MaxTrackLength;        // designer cap clamped by rulebook
+        public float PacingVariation;
+
+        // ── Layout rhythm ──
+        public int MinTurnCount;
+        public int MaxTurnCount;
+        public TurnDirectionPattern DirectionPattern;
         public float MinStraightLength;
         public float MaxStraightLength;
+        public float CornerSequenceChance;
 
-        // ── Corners ──
+        // ── Corners & banking ──
         public float MinCurveRadius;
         public float MaxCurveRadius;
-        public float[] CornerAngleOptions;
+        public TurnFamilyWeights TurnWeights;
+        public float BankingStrength;
         public float MaxBankAngle;
+        public float FloorTiltFraction;   // fraction of the bank realized as geometric floor tilt (capped at 18°)
+
+        // ── Transitions (meters) ──
+        public TrackBlendCurve BlendCurve;
+        public float GenericTransitionLength;
         public float BankTransitionLength;
+        public float PitchTransitionLength;
+        public float RollTransitionLength;
+        public float WidthTransitionLength;
+        public float CrossSectionTransitionLength;
+        public float MaxBankRampAngle;
 
-        // Explicit corner count (0 = automatic). Above 0 the layout plans MIXED
-        // left/right corners (mountain-pass style) whose signed sum closes the lap.
-        public int TargetTurnCount;
+        // ── Safety & readability (meters) ──
+        public float DefaultApproachLength;
+        public float DefaultRecoveryLength;
+        public float DangerousSpacingLength;
+        public float VisualPreviewLength;
+        public float PostMergeRecoveryLength;
 
-        // Chance that a near-180° corner is realized as a half-loop + half-twist
-        // (Immelmann) instead of a flat hairpin. Requires loops AND corkscrews allowed.
-        public float HalfLoopTwistChance;
-
-        // Chance per corner gap of a full-revolution climbing/descending spiral.
-        public float SpiralChance;
-
-        // ── Feature chances (pre-gated by TrackConfig Allowed Features) ──
-        public float JumpChance;
-        public float BoostChance;
-        public float RouteSplitChance;
-        public float ChicaneChance;
-        public float HairpinChance;
-        public float SCurveChance;
-        public float LoopChance;
-        public float CorkscrewChance;
-
-        // ── Verticality ──
+        // ── Elevation ──
         public float TargetElevationAmplitude;
-        public float ElevationSectionChance;
-        public float ClimbChance;
-        public float DropChance;
-        public float CrestChance;
-        public float BridgeChance;
-        public float UnderpassChance;
-        public float LayeredRouteChance;
-        public float OverUnderCrossingChance;
-
         public int MinMajorElevationSections;
         public int MaxMajorElevationSections;
-        public int MinLayeredRouteGroups;
-        public int MaxLayeredRouteGroups;
-
-        public bool ForceAtLeastOneOverpass;
-        public bool ForceAtLeastOneLayeredRoute;
-
-        public float MinElevationStep;
-        public float MaxElevationStep;
-        public float MinRollingHillHeight;
-        public float MaxRollingHillHeight;
-        public float MinBridgeHeight;
-        public float MaxBridgeHeight;
-        public float MinUnderpassDepth;
-        public float MaxUnderpassDepth;
-        public float MinClimbLength;
-        public float MaxClimbLength;
-        public float MaxClimbAngle;   // degrees, comfortable or aggressive by difficulty/verticality
+        public float MaxClimbAngle;
         public float MaxDropAngle;
+        public ResolvedFeatureRule Crests;
+        public ResolvedFeatureRule Bridges;
+        public ResolvedFeatureRule Underpasses;
+        public TrackGroundLevelPolicy GroundLevelPolicy;
+        public float MaxElevationRange;
 
-        // ── Layered route groups ──
-        public float RouteWidth;
-        public float LayeredRouteApproachLength;
-        public float MinLayeredRouteLength;
-        public float MaxLayeredRouteLength;
-        public float LayeredRouteRecoveryLength;
-        public float LayeredHeightSeparation;
-        public float OverpassClearance;
-
-        // ── Jumps ──
-        public float MaxJumpHeight;
-        public float JumpApproachLength;
-        public float JumpRecoveryLength;
-
-        // ── Boost straights ──
-        public float MinBoostStraightLength;
-        public float MaxBoostStraightLength;
-
-        // ── Safety ──
-        public float RecoveryLength;
-        public float VerticalClearance;
+        // ── Features ──
+        public ResolvedFeatureRule Jumps;
+        public ResolvedFeatureRule Loops;
+        public ResolvedFeatureRule Corkscrews;
+        public ResolvedFeatureRule Spirals;
+        public ResolvedFeatureRule HalfLoops;
+        public ResolvedFeatureRule Chicanes;
+        public ResolvedFeatureRule SCurves;
+        public ResolvedFeatureRule Hairpins;
+        public int MinFeatureGroups;
+        public int MaxFeatureGroups;
+        public float CompoundFeatureChance;
+        public int MaxCompoundElements;
+        public List<RequiredPatternEntry> RequiredPatterns = new List<RequiredPatternEntry>();
 
         // ── Loops ──
         public float MinLoopRadius;
         public float MaxLoopRadius;
         public float LoopApproachLength;
         public float LoopRecoveryLength;
-        public float LoopMetersPerRing;
+        public float LoopClearance;
+
+        // ── Half-loops ──
+        public float MinHalfLoopRadius;
+        public float MaxHalfLoopRadius;
+        public float HalfLoopRolloutLength;
+        public float HalfLoopApproachLength;
+        public float HalfLoopRecoveryLength;
 
         // ── Corkscrews ──
         public float MinCorkscrewLength;
@@ -121,397 +156,545 @@ namespace TrackGeneration.Macro
         public float MinCorkscrewRadius;
         public float MaxCorkscrewRadius;
         public float CorkscrewRollDegrees;
+        public float MaxRollRateDegPerMeter;   // rulebook °/s converted at design speed
         public float CorkscrewApproachLength;
         public float CorkscrewRecoveryLength;
-        public float CorkscrewMetersPerRing;
+        public float CorkscrewClearance;
 
-        // ── Global half-pipe road cross-section ──
-        // Half-pipe is the GLOBAL road shape, not a feature: every generated road
-        // section uses it. FlatWithWalls only appears when the rulebook disallows it.
-        public bool HalfPipeEnabled;
-        public TrackRoadProfileSettings RoadProfile;
+        // ── Spirals ──
+        public float MinSpiralRadius;
+        public float MaxSpiralRadius;
+        public int MinSpiralRevolutions;
+        public int MaxSpiralRevolutions;
+        public float MinSpiralClimbPerRevolution;
+        public float MaxSpiralClimbPerRevolution;
+        public float SpiralApproachLength;
+        public float SpiralRecoveryLength;
+        public float SpiralClearance;
 
-        // ── Section transition blending ──
-        public TrackTransitionSmoothness TransitionSmoothness;
-        public TrackBlendCurve BlendCurve;
-        public float TransitionBlendLength;
-        public float BankBlendLength;
-        public float PitchBlendLength;
-        public float WidthBlendLength;
-        public float CrossSectionBlendLength;
-        public float MaxBankRampAngle; // degrees — bank blends auto-expand to respect this
+        // ── Jumps (ballistic model) ──
+        public float Gravity;
+        public float JumpApproachLength;
+        public float MinLaunchTransitionLength;
+        public float MaxLaunchTransitionLength;
+        public float MinJumpAirtimeSeconds;
+        public float MaxJumpAirtimeSeconds;
+        public float MinLandingTransitionLength;
+        public float MaxLandingTransitionLength;
+        public float JumpRecoveryLength;
+        public float MinJumpHeight;
+        public float MaxJumpHeight;
+        public float JumpLandingTolerance;
 
-        // ── Route split structure (sideways FIRST, then up/down) ──
-        public float RouteSplitApproachLength;
-        public float LateralSeparationLength;
+        // ── Branches ──
+        public int MinBranchGroups;
+        public int MaxBranchGroups;
+        public float MinRouteLength;
+        public float MaxRouteLength;
+        public BranchPairingMode PairingMode;
+        public BranchInteractionWeights InteractionWeights;
+        public BranchRouteSettings RouteASettings;
+        public BranchRouteSettings RouteBSettings;
+        public float DecisionPreviewLength;
+        public float TimeBalanceTolerance;
+        public float SpecializationTarget;
+        public float MinLateralSeparation;      // dynamically raised for road envelope
+        public float MaxLateralSeparation;
+        public float MinRouteVerticalSeparation; // dynamically raised for wall/slab envelope
+        public float MaxRouteVerticalSeparation;
+        public int MaxCrossovers;
+        public float SplitLength;
         public float VerticalDivergenceDelay;
         public float VerticalDivergenceLength;
-        public float VerticalConvergenceLength;
-        public float LateralMergeLength;
-        public float PostMergeRecoveryLength;
-        public float RouteLateralSeparation;
+        public float MergeLength;
 
-        // ── Junction wall masks (split/merge open throats — inner half-pipe walls) ──
-        public float SplitInnerWallFadeOutLength;  // open-throat length after the split before the inner wall may regrow
-        public float SplitInnerWallFadeInLength;   // ease length of the inner wall regrowing after lateral separation
-        public float MergeInnerWallFadeOutLength;  // ease length of the inner wall fading before the merge
-        public float MergeInnerWallFadeInLength;   // open-throat length before the merge where the inner wall must be gone
-        public float WallMaskSafetyMargin;         // extra centerline separation (m) required before inner walls regrow
+        // ── Junction wall masks (split/merge open throats) ──
+        public float SplitInnerWallFadeOutLength;
+        public float SplitInnerWallFadeInLength;
+        public float MergeInnerWallFadeOutLength;
+        public float MergeInnerWallFadeInLength;
+        public float WallMaskSafetyMargin;
+
+        // ── Road & half-pipe ──
+        public float RoadWidth;
+        public TrackRoadProfileSettings RoadProfile;
+
+        // ── Clearance (wall-aware) ──
+        public float VerticalClearance;         // rulebook clearance + wall/slab envelope
 
         // ── Mesh ──
         public float MeshMetersPerRing;
+        public float FeatureMetersPerRing;
+        public float MaxRingFacetAngle;
         public int MaxRingsPerSection;
         public int MaxTotalRings;
+        public int RenderRingBudget;   // designer performance budget — retopology spreads it over huge tracks
 
-        // Maximum bend angle between consecutive rings (degrees). Curved sections
-        // (loops, corkscrews, banked arcs) get extra rings until no facet exceeds
-        // this — the physical "bumpiness" of curved track is the facet angle, and
-        // at racing speed every degree of facet reads as ±3.5 m/s of phantom
-        // vertical velocity to the hover suspension.
-        public float MaxRingFacetAngle;
+        // ── Closure ──
+        public float ClosureReserveFraction;
+        public float ClosurePositionTolerance;
+        public float ClosureForwardTolerance;
+        public float ClosureUpTolerance;
+        public float ClosureWidthTolerance;
+        public float ClosureBankTolerance;
+        public float ClosurePitchTolerance;
 
-        // ── Debug labels (for the §7 summary output) ──
-        public string DebugSpeedLabel;
-        public string DebugVerticalityLabel;
+        // ── Generation behavior ──
+        public int MaxAttempts;
+        public CandidateSelectionMode SelectionMode;
+        public int CandidatesToScore;
+        public GenerationFailurePolicy FailurePolicy;
 
-        public static ResolvedTrackGenerationConfig Resolve(TrackConfig limits, TrackDesignerProfile profile)
+        // ── Reference performance model ──
+        public float ReferenceTopSpeedMps;
+        public float ReferenceAcceleration;
+        public float ReferenceBraking;
+        public float ReferenceLateralAcceleration;
+        public float ReferenceRollStability;
+        public float ReferenceLandingRecovery;
+
+        /// <summary>Converts seconds at design speed into meters.</summary>
+        public float SecondsToDistance(float seconds) => DesignSpeedMps * seconds;
+
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Resolves designer settings against the rulebook into the final numbers
+        /// generation consumes. Deterministic; never throws — impossible combinations
+        /// are reported as Error issues and the caller checks <see cref="HasHardErrors"/>.
+        /// </summary>
+        public static ResolvedTrackGenerationConfig Resolve(TrackConfig limits, TrackDesignerSettings settings)
         {
             var r = new ResolvedTrackGenerationConfig();
 
-            int diff = (int)profile.Difficulty;
-            int speed = (int)profile.SpeedProfile;
-            int stunts = (int)profile.StuntDensity;
-            int vert = (int)profile.Verticality;
-            int branch = (int)profile.Branching;
-            int loops = (int)profile.LoopFrequency;
-            int corks = (int)profile.CorkscrewFrequency;
-
-            r.DebugSpeedLabel = profile.SpeedProfile.ToString();
-            r.DebugVerticalityLabel = profile.Verticality.ToString();
-
-            // ══ 2. Track Length ══
-            float[] lengthByPreset = { 1800f, 3200f, 5200f, 8000f };
-            r.TargetTrackLength = Mathf.Clamp(lengthByPreset[(int)profile.Length], limits.MinTrackLength, limits.MaxTrackLength);
-            r.MaxTrackLength = limits.MaxTrackLength;
-            r.TargetMacroSectionCount = Mathf.Clamp(Mathf.RoundToInt(r.TargetTrackLength / 200f), 8, 40);
-
-            // ══ 5. Track Width ══
-            float[] widthByPreset = { 9f, 14f, 20f, 28f };
-            float width = widthByPreset[(int)profile.Width];
-            if (speed == 3) width *= 1.2f; // InsaneSpeed: wider roads
-            r.RoadWidth = Mathf.Clamp(width, limits.MinRoadWidth, limits.MaxRoadWidth);
-
-            // ══ 4. Speed Profile — uses the rulebook's dedicated support ranges ══
-            switch (speed)
+            if (limits == null)
             {
-                case 0: // Flowing: long straights, huge banked sweepers, few interruptions
-                    r.MinStraightLength = Mathf.Lerp(limits.MinStraightLength, limits.MaxStraightLength, 0.2f);
-                    r.MaxStraightLength = Mathf.Lerp(limits.MinStraightLength, limits.MaxStraightLength, 0.6f);
-                    r.MinCurveRadius = limits.MinFlowingCurveRadius;
-                    r.MaxCurveRadius = limits.MaxFlowingCurveRadius;
-                    r.BoostChance = 0.3f;
-                    break;
-                case 1: // Balanced: mid band between technical and flowing
-                    r.MinStraightLength = Mathf.Lerp(limits.MinTechnicalStraightLength, limits.MinInsaneSpeedStraightLength, 0.35f);
-                    r.MaxStraightLength = Mathf.Lerp(limits.MaxTechnicalStraightLength, limits.MaxInsaneSpeedStraightLength, 0.3f);
-                    r.MinCurveRadius = Mathf.Lerp(limits.MinTechnicalCurveRadius, limits.MinFlowingCurveRadius, 0.5f);
-                    r.MaxCurveRadius = Mathf.Lerp(limits.MaxTechnicalCurveRadius, limits.MaxFlowingCurveRadius, 0.4f);
-                    r.BoostChance = 0.35f;
-                    break;
-                case 2: // Technical: tight but readable
-                    r.MinStraightLength = limits.MinTechnicalStraightLength;
-                    r.MaxStraightLength = limits.MaxTechnicalStraightLength;
-                    r.MinCurveRadius = limits.MinTechnicalCurveRadius;
-                    r.MaxCurveRadius = limits.MaxTechnicalCurveRadius;
-                    r.BoostChance = 0.2f;
-                    break;
-                default: // InsaneSpeed: enormous straights and sweepers
-                    r.MinStraightLength = limits.MinInsaneSpeedStraightLength;
-                    r.MaxStraightLength = limits.MaxInsaneSpeedStraightLength;
-                    r.MinCurveRadius = Mathf.Lerp(limits.MinFlowingCurveRadius, limits.MaxFlowingCurveRadius, 0.25f);
-                    r.MaxCurveRadius = limits.MaxFlowingCurveRadius;
-                    r.BoostChance = 0.6f;
-                    break;
+                r.Issue(ResolvedIssueSeverity.Error, "TrackConfig", "No TrackConfig rulebook assigned.");
+                return r;
+            }
+            if (settings == null)
+            {
+                r.Issue(ResolvedIssueSeverity.Error, "DesignerSettings", "No designer settings provided.");
+                return r;
             }
 
-            // Global rulebook clamps on top of the profile ranges.
-            r.MinStraightLength = Mathf.Clamp(r.MinStraightLength, limits.MinStraightLength, limits.MaxStraightLength);
-            r.MaxStraightLength = Mathf.Clamp(r.MaxStraightLength, r.MinStraightLength, limits.MaxStraightLength);
-            r.MinCurveRadius = Mathf.Clamp(r.MinCurveRadius, limits.MinCurveRadius, limits.MaxCurveRadius);
-            r.MaxCurveRadius = Mathf.Clamp(r.MaxCurveRadius, r.MinCurveRadius, limits.MaxCurveRadius);
+            settings.Sanitize();
 
-            float[] bankTransBySpeed = { 45f, 28f, 16f, 60f };
-            r.BankTransitionLength = Mathf.Clamp(bankTransBySpeed[speed], limits.MinBankTransitionLength, limits.MaxBankTransitionLength);
+            // ══ Speed & scale ══
+            r.DesignSpeedKph = r.ClampReport(settings.Scale.DesignSpeedKph, limits.MinDesignSpeedKph, limits.MaxDesignSpeedKph, "Scale.DesignSpeedKph");
+            r.DesignSpeedMps = r.DesignSpeedKph / 3.6f;
+            r.TargetLapTimeSeconds = r.ClampReport(settings.Scale.TargetLapTimeSeconds, limits.MinTargetLapTime, limits.MaxTargetLapTime, "Scale.TargetLapTime");
+            r.TargetTrackLength = Mathf.Clamp(r.DesignSpeedMps * r.TargetLapTimeSeconds, limits.MinTrackLength, limits.MaxTrackLength);
+            r.MaxTrackLength = r.ClampReport(settings.Scale.MaxTrackLengthMeters, Mathf.Max(limits.MinTrackLength, r.TargetTrackLength * 0.75f), limits.MaxTrackLength, "Scale.MaxTrackLength");
+            r.PacingVariation = Mathf.Clamp01(settings.Scale.PacingVariation);
 
-            // ══ 3. Difficulty ══
-            float[] hairpinByDiff = { 0f, 0.15f, 0.3f, 0.45f };
-            float[] chicaneByDiff = { 0.05f, 0.15f, 0.3f, 0.4f };
-            float[] sCurveByDiff = { 0.15f, 0.2f, 0.3f, 0.35f };
-            float[] bankScaleByDiff = { 0.5f, 0.65f, 0.85f, 1f };
-            float[] recoveryByDiff = { 130f, 100f, 85f, 75f };
-            float[] jumpHeightByDiff = { 3f, 4f, 5f, 6f };
+            float S(float seconds) => r.DesignSpeedMps * seconds;
 
-            float chicaneSpeedScale = speed == 2 ? 1.5f : (speed == 0 ? 0.5f : (speed == 3 ? 0.4f : 1f));
-            float hairpinSpeedScale = speed == 0 || speed == 3 ? 0.4f : 1f;
-            float sCurveSpeedScale = speed == 0 ? 1.3f : 1f;
+            // ══ Layout rhythm ══
+            r.MinTurnCount = settings.Layout.MinTurnCount;
+            r.MaxTurnCount = settings.Layout.MaxTurnCount;
+            r.DirectionPattern = settings.Layout.DirectionPattern;
+            r.MinStraightLength = S(r.ClampReport(settings.Layout.MinStraightSeconds, limits.MinStraightSeconds, limits.MaxStraightSeconds, "Layout.MinStraightSeconds"));
+            r.MaxStraightLength = S(r.ClampReport(settings.Layout.MaxStraightSeconds, limits.MinStraightSeconds, limits.MaxStraightSeconds, "Layout.MaxStraightSeconds"));
+            if (r.MaxStraightLength < r.MinStraightLength) r.MaxStraightLength = r.MinStraightLength;
+            r.CornerSequenceChance = Mathf.Clamp01(settings.Layout.CornerSequenceChance);
 
-            r.HairpinChance = Mathf.Clamp01(hairpinByDiff[diff] * hairpinSpeedScale);
-            r.ChicaneChance = Mathf.Clamp01(chicaneByDiff[diff] * chicaneSpeedScale);
-            r.SCurveChance = Mathf.Clamp01(sCurveByDiff[diff] * sCurveSpeedScale);
-            r.MaxBankAngle = limits.MaxBankAngle * bankScaleByDiff[diff] * (speed == 3 ? 1f / Mathf.Max(0.01f, bankScaleByDiff[diff]) : 1f);
-            r.MaxBankAngle = Mathf.Min(r.MaxBankAngle, limits.MaxBankAngle); // InsaneSpeed banks at the legal max
-            r.RecoveryLength = Mathf.Clamp(Mathf.Max(limits.MinRecoveryLength, recoveryByDiff[diff]),
-                                           limits.MinRecoveryStraightLength, limits.MaxRecoveryStraightLength);
-            r.MaxJumpHeight = jumpHeightByDiff[diff];
+            // ══ Corners & banking ══
+            r.MinCurveRadius = r.ClampReport(settings.Corners.MinCurveRadius, limits.MinCurveRadius, limits.MaxCurveRadius, "Corners.MinCurveRadius");
+            r.MaxCurveRadius = Mathf.Clamp(settings.Corners.MaxCurveRadius, r.MinCurveRadius, limits.MaxCurveRadius);
+            r.TurnWeights = settings.Corners.TurnWeights.Clone();
+            r.BankingStrength = Mathf.Clamp01(settings.Corners.BankingStrength);
+            r.MaxBankAngle = r.ClampReport(settings.Corners.MaxBankAngle, 0f, limits.MaxBankAngle, "Corners.MaxBankAngle");
+            r.FloorTiltFraction = Mathf.Clamp01(settings.Corners.FloorTiltStrength);
 
-            // Corner menu, filtered by the rulebook's legal angle window. 45/60/90 keep the
-            // 360° plan composable; the layout falls back safely if the filter breaks that.
-            float[][] anglesByDiff =
-            {
-                new[] { 45f, 60f, 90f },
-                new[] { 45f, 60f, 90f, 120f },
-                new[] { 45f, 60f, 90f, 120f, 135f },
-                new[] { 45f, 60f, 90f, 120f, 180f }
-            };
-            var filtered = new System.Collections.Generic.List<float>();
-            foreach (float a in anglesByDiff[diff])
-            {
-                if (a >= limits.MinCurveAngle && a <= limits.MaxCurveAngle) filtered.Add(a);
-            }
-            r.CornerAngleOptions = filtered.Count > 0 ? filtered.ToArray() : new[] { 45f, 60f, 90f };
-
-            // Explicit designer turn count (0 = automatic circle-composition planner).
-            r.TargetTurnCount = Mathf.Clamp(profile.TurnCount, 0, 30);
-
-            // Immelmann (half loop + half twist) replaces some near-180° corners when
-            // both loops and corkscrews are legal; scaled by the loop frequency preset.
-            float[] halfLoopByFreq = { 0f, 0.25f, 0.4f, 0.6f };
-            r.HalfLoopTwistChance = limits.AllowLoops && limits.AllowCorkscrews ? halfLoopByFreq[loops] : 0f;
-
-            // Spirals (parking-garage helix) have their OWN designer control —
-            // independent of verticality, like loops and corkscrews.
-            float[] spiralByFreq = { 0f, 0.2f, 0.35f, 0.55f };
-            r.SpiralChance = spiralByFreq[(int)profile.SpiralFrequency];
-
-            // ══ 8. Stunt density ══
-            float[] jumpByDensity = { 0f, 0.2f, 0.4f, 0.65f };
-            r.JumpChance = limits.AllowJumps ? jumpByDensity[stunts] : 0f;
-            if (stunts > 0 && !limits.AllowJumps)
-                Debug.LogWarning("[Resolve] Jump density requested, but AllowJumps is false in TrackConfig — no jumps will be generated.");
-            if (stunts == 0) r.BoostChance = 0f;
-            r.JumpApproachLength = limits.MinJumpApproachLength;
-            r.JumpRecoveryLength = Mathf.Max(limits.MinJumpExitRecoveryLength, r.RecoveryLength);
-            r.MinBoostStraightLength = limits.MinBoostStraightLength;
-            r.MaxBoostStraightLength = limits.MaxBoostStraightLength;
-
-            // ══ 6. Verticality ══
-            // Amplitudes per preset target the spec's expected height ranges:
-            // Flat 0-5m, Rolling 15-45m, Layered 50-120m, RainbowRoad 100-220m.
-            float[] amplitudeByVert = { 0f, 35f, 95f, 170f };
-            r.TargetElevationAmplitude = Mathf.Min(amplitudeByVert[vert], limits.MaxElevationChange);
-
-            float[] elevSectionByVert = { 0f, 0.45f, 0.6f, 0.75f };
-            float[] climbByVert = { 0f, 0.35f, 0.55f, 0.7f };
-            float[] crestByVert = { 0f, 0.45f, 0.3f, 0.35f };
-            float[] bridgeByVert = { 0f, 0f, 0.5f, 0.7f };
-            float[] underByVert = { 0f, 0f, 0.4f, 0.6f };
-            float[] layeredByVert = { 0f, 0f, 0.6f, 0.85f };
-            float[] crossingByVert = { 0f, 0f, 0.5f, 0.8f };
-
-            r.ElevationSectionChance = elevSectionByVert[vert];
-            r.ClimbChance = climbByVert[vert];
-            r.DropChance = climbByVert[vert];
-            r.CrestChance = crestByVert[vert];
-            r.BridgeChance = limits.AllowOverpasses ? bridgeByVert[vert] : 0f;
-            r.UnderpassChance = limits.AllowUnderpasses ? underByVert[vert] : 0f;
-            // DECOUPLED: Branching alone decides IF the track splits; verticality only
-            // decides whether existing splits are height-separated / crossing.
-            r.LayeredRouteChance = 0f;
-            r.OverUnderCrossingChance = limits.AllowLayeredRouteCrossings && branch > 0 ? crossingByVert[vert] : 0f;
-
-            int[] minMajorByVert = { 0, 1, 2, 3 };
-            int[] maxMajorByVert = { 0, 3, 4, 6 };
-            r.MinMajorElevationSections = Mathf.Min(minMajorByVert[vert], limits.MaxMajorElevationChangesPerTrack);
-            r.MaxMajorElevationSections = Mathf.Min(maxMajorByVert[vert], limits.MaxMajorElevationChangesPerTrack);
-
-            // DECOUPLED: verticality never forces splits into a track whose Branching
-            // preset is None — splits belong to Branching alone.
-            r.ForceAtLeastOneLayeredRoute = branch >= 2 && limits.AllowRouteSplits;
-            r.ForceAtLeastOneOverpass = vert == 3 && branch > 0 && limits.AllowLayeredRouteCrossings;
-
-            // Step / hill / bridge magnitudes from the rulebook, scaled by preset intensity.
-            float vertIntensity = vert switch { 0 => 0f, 1 => 0.45f, 2 => 0.75f, _ => 1f };
-            r.MinElevationStep = limits.MinElevationStep;
-            r.MaxElevationStep = Mathf.Lerp(limits.MinElevationStep, limits.MaxElevationStep, vertIntensity);
-            r.MinRollingHillHeight = limits.MinRollingHillHeight;
-            r.MaxRollingHillHeight = Mathf.Lerp(limits.MinRollingHillHeight, limits.MaxRollingHillHeight, Mathf.Max(0.4f, vertIntensity));
-            r.MinBridgeHeight = limits.MinBridgeHeight;
-            r.MaxBridgeHeight = Mathf.Lerp(limits.MinBridgeHeight, limits.MaxBridgeHeight, vertIntensity);
-            r.MinUnderpassDepth = limits.MinUnderpassDepth;
-            r.MaxUnderpassDepth = Mathf.Lerp(limits.MinUnderpassDepth, limits.MaxUnderpassDepth, vertIntensity);
-            r.MinClimbLength = limits.MinClimbLength;
-            r.MaxClimbLength = limits.MaxClimbLength;
-
-            bool aggressive = diff >= 2 || vert == 3;
-            r.MaxClimbAngle = Mathf.Min(aggressive ? limits.MaxAggressiveClimbAngle : limits.MaxComfortableClimbAngle, limits.MaxSlopeAngle);
-            r.MaxDropAngle = Mathf.Min(aggressive ? limits.MaxAggressiveDropAngle : limits.MaxComfortableDropAngle, limits.MaxSlopeAngle);
-
-            // ══ 7. Branching ══
-            float[] splitByPreset = { 0f, 0.2f, 0.4f, 0.6f };
-            r.RouteSplitChance = limits.AllowRouteSplits ? splitByPreset[branch] : 0f;
-            if (branch > 0 && !limits.AllowRouteSplits)
-                Debug.LogWarning("[Resolve] Branching requested, but AllowRouteSplits is false in TrackConfig — no route splits will be generated.");
-
-            int[] minGroupsByBranch = { 0, 0, 1, 1 };
-            int[] maxGroupsByBranch = { 0, 1, 2, 3 };
-            int groupCap = Mathf.Min(limits.MaxRouteGroupsPerTrack, limits.MaxLayeredSectionsPerTrack);
-            r.MinLayeredRouteGroups = limits.AllowRouteSplits ? Mathf.Min(Mathf.Max(minGroupsByBranch[branch], r.ForceAtLeastOneLayeredRoute ? 1 : 0), groupCap) : 0;
-            r.MaxLayeredRouteGroups = limits.AllowRouteSplits ? Mathf.Clamp(Mathf.Max(maxGroupsByBranch[branch], r.MinLayeredRouteGroups), 0, groupCap) : 0;
-
-            // Layered group geometry.
-            r.RouteWidth = Mathf.Max(limits.MinRoadWidth, r.RoadWidth * 0.75f);
-            r.LayeredRouteApproachLength = Mathf.Max(limits.MinLayeredRouteApproachLength, limits.MinRouteSplitApproachLength);
-            r.MinLayeredRouteLength = Mathf.Max(limits.MinLayeredRouteLength, limits.MinRouteSplitLength);
-            r.MaxLayeredRouteLength = Mathf.Min(limits.MaxLayeredRouteLength, limits.MaxRouteSplitLength);
-            r.MaxLayeredRouteLength = Mathf.Max(r.MaxLayeredRouteLength, r.MinLayeredRouteLength);
-            r.LayeredRouteRecoveryLength = Mathf.Max(limits.MinLayeredRouteRecoveryLength, limits.MinPostMergeRecoveryLength);
-
-            float sepT = vert == 3 ? 0.7f : 0.35f;
-            r.OverpassClearance = Mathf.Max(limits.MinOverpassClearance, limits.MinUnderpassClearance);
-            r.LayeredHeightSeparation = Mathf.Clamp(
-                Mathf.Lerp(limits.MinLayeredRouteHeightSeparation, limits.MaxLayeredRouteHeightSeparation, sepT),
-                Mathf.Max(limits.MinLayeredRouteHeightSeparation, r.OverpassClearance + 4f),
-                Mathf.Min(limits.MaxLayeredRouteHeightSeparation, limits.MaxRouteElevationOffset));
-
-            r.VerticalClearance = limits.MinVerticalClearance;
-
-            // ══ 9. Loops ══
-            float[] loopByFreq = { 0f, 0.12f, 0.3f, 0.55f };
-            r.LoopChance = limits.AllowLoops ? loopByFreq[loops] : 0f;
-            if (loops > 0 && !limits.AllowLoops)
-                Debug.LogWarning("[Resolve] Loop frequency requested, but AllowLoops is false in TrackConfig — no loops will be generated.");
-
-            float pitchRateMinRadius = 360f / (2f * Mathf.PI * Mathf.Max(0.5f, limits.MaxLoopPitchRate));
-            r.MinLoopRadius = Mathf.Max(limits.MinLoopRadius, pitchRateMinRadius);
-            r.MaxLoopRadius = Mathf.Max(r.MinLoopRadius, limits.MaxLoopRadius);
-            r.LoopApproachLength = Mathf.Max(limits.MinLoopApproachLength, limits.MinLoopEntrySpeedStraightLength);
-            r.LoopRecoveryLength = Mathf.Max(limits.MinLoopExitRecoveryLength, r.RecoveryLength);
-            r.LoopMetersPerRing = limits.LoopSubdivisionDensity;
-
-            // ══ 10. Corkscrews ══
-            float[] corkByFreq = { 0f, 0.12f, 0.3f, 0.5f };
-            r.CorkscrewChance = limits.AllowCorkscrews ? corkByFreq[corks] : 0f;
-            if (corks > 0 && !limits.AllowCorkscrews)
-                Debug.LogWarning("[Resolve] Corkscrew frequency requested, but AllowCorkscrews is false in TrackConfig — no corkscrews will be generated.");
-
-            r.CorkscrewRollDegrees = Mathf.Min(360f, limits.MaxCorkscrewRollDegrees); // V1: one full roll
-
-            // Roll rate is per 10 m; smoothstepped roll peaks at 1.5× average.
-            float rollRateMinLength = r.CorkscrewRollDegrees / Mathf.Max(1f, limits.MaxCorkscrewRollRate) * 10f * 1.5f;
-            r.MinCorkscrewLength = Mathf.Max(limits.MinCorkscrewLength, rollRateMinLength);
-            r.MaxCorkscrewLength = Mathf.Max(r.MinCorkscrewLength, limits.MaxCorkscrewLength);
-            r.MinCorkscrewRadius = Mathf.Max(limits.MinCorkscrewRadius, r.RoadWidth * 0.6f);
-            r.MaxCorkscrewRadius = Mathf.Max(r.MinCorkscrewRadius, limits.MaxCorkscrewRadius);
-            r.CorkscrewApproachLength = Mathf.Max(limits.MinCorkscrewApproachLength, limits.MinCorkscrewEntrySpeedStraightLength);
-            r.CorkscrewRecoveryLength = Mathf.Max(limits.MinCorkscrewExitRecoveryLength, r.RecoveryLength);
-            r.CorkscrewMetersPerRing = limits.CorkscrewSubdivisionDensity;
-
-            // ══ Global half-pipe road cross-section ══
-            // The WHOLE track uses the half-pipe / water-slide shape by default.
-            // Any section without it is a bug unless the rulebook disabled half-pipe roads.
-            r.HalfPipeEnabled = limits.AllowHalfPipeRoads;
-            if (!limits.AllowHalfPipeRoads)
-                Debug.LogWarning("[Resolve] AllowHalfPipeRoads is false in TrackConfig — falling back to legacy FlatWithWalls roads. This is a debug/legacy mode, not the intended hovercraft track shape.");
-
-            // Depth scales with difficulty + verticality; width and speed shape the bowl.
-            float depthT = Mathf.Clamp01(0.35f + diff * 0.12f + vert * 0.08f);
-            float wallT = Mathf.Clamp01(0.4f + diff * 0.15f);
-            float flatT = speed == 3 ? 0.7f : (speed == 2 ? 0.3f : 0.5f); // insane speed = wider stable center
-
-            r.RoadProfile = new TrackRoadProfileSettings
-            {
-                Shape = r.HalfPipeEnabled ? RoadCrossSectionShape.HalfPipe : RoadCrossSectionShape.FlatWithWalls,
-                SideHeight = Mathf.Lerp(limits.MinHalfPipeSideHeight, limits.MaxHalfPipeSideHeight, depthT),
-                CurveStrength = Mathf.Lerp(limits.MinHalfPipeCurveStrength, limits.MaxHalfPipeCurveStrength, 0.35f),
-                WallAngle = Mathf.Lerp(limits.MinHalfPipeWallAngle, limits.MaxHalfPipeWallAngle, wallT),
-                CenterFlatWidthRatio = Mathf.Lerp(limits.MinHalfPipeCenterFlatWidthRatio, limits.MaxHalfPipeCenterFlatWidthRatio, flatT),
-                ProfileResolution = Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(limits.MinHalfPipeProfileResolution, limits.MaxHalfPipeProfileResolution, r.RoadWidth / Mathf.Max(1f, limits.MaxRoadWidth))), limits.MinHalfPipeProfileResolution, limits.MaxHalfPipeProfileResolution),
-                SafetyLipHeight = 1.0f
-            };
-
-            // ══ Section transition blending ══
-            // Smoothness is folded into Speed Profile (no extra designer control):
-            // Flowing = Smooth, Balanced = Smooth, Technical = Normal, InsaneSpeed = VerySmooth.
-            r.TransitionSmoothness = speed switch
-            {
-                2 => TrackTransitionSmoothness.Normal,
-                3 => TrackTransitionSmoothness.VerySmooth,
-                _ => TrackTransitionSmoothness.Smooth
-            };
-            r.BlendCurve = TrackBlendCurve.SmootherStep;
-
-            float smoothT = r.TransitionSmoothness switch
-            {
-                TrackTransitionSmoothness.Snappy => 0.1f,
-                TrackTransitionSmoothness.Normal => 0.35f,
-                TrackTransitionSmoothness.Smooth => 0.6f,
-                _ => 0.85f
-            };
-            r.TransitionBlendLength = Mathf.Lerp(limits.MinTransitionBlendLength, limits.MaxTransitionBlendLength, smoothT);
-            r.BankBlendLength = Mathf.Lerp(limits.MinBankBlendLength, limits.MaxBankBlendLength, smoothT);
-            r.PitchBlendLength = Mathf.Lerp(limits.MinPitchBlendLength, limits.MaxPitchBlendLength, smoothT);
-            r.WidthBlendLength = Mathf.Lerp(limits.MinWidthBlendLength, limits.MaxWidthBlendLength, smoothT);
-            r.CrossSectionBlendLength = Mathf.Lerp(limits.MinCrossSectionBlendLength, limits.MaxCrossSectionBlendLength, smoothT);
+            // ══ Transitions ══
+            r.BlendCurve = settings.Transitions.BlendCurve;
+            r.GenericTransitionLength = S(r.ClampReport(settings.Transitions.GenericTransitionSeconds, limits.MinGenericTransitionSeconds, limits.MaxGenericTransitionSeconds, "Transitions.Generic"));
+            r.BankTransitionLength = S(r.ClampReport(settings.Transitions.BankTransitionSeconds, limits.MinBankTransitionSeconds, limits.MaxBankTransitionSeconds, "Transitions.Bank"));
+            r.PitchTransitionLength = S(r.ClampReport(settings.Transitions.PitchTransitionSeconds, limits.MinPitchTransitionSeconds, limits.MaxPitchTransitionSeconds, "Transitions.Pitch"));
+            r.RollTransitionLength = S(r.ClampReport(settings.Transitions.RollTransitionSeconds, limits.MinRollTransitionSeconds, limits.MaxRollTransitionSeconds, "Transitions.Roll"));
+            r.WidthTransitionLength = S(r.ClampReport(settings.Transitions.WidthTransitionSeconds, limits.MinWidthTransitionSeconds, limits.MaxWidthTransitionSeconds, "Transitions.Width"));
+            r.CrossSectionTransitionLength = S(r.ClampReport(settings.Transitions.CrossSectionTransitionSeconds, limits.MinCrossSectionTransitionSeconds, limits.MaxCrossSectionTransitionSeconds, "Transitions.CrossSection"));
             r.MaxBankRampAngle = limits.MaxBankRampAngle;
 
-            // ══ Route split structure: sideways first, then up/down ══
-            float splitT = Mathf.Clamp01(0.3f + branch * 0.15f + vert * 0.1f);
-            r.RouteSplitApproachLength = Mathf.Max(limits.MinRouteSplitApproachLength, limits.MinLayeredRouteApproachLength);
-            r.LateralSeparationLength = Mathf.Lerp(limits.MinLateralSeparationLength, limits.MaxLateralSeparationLength, smoothT);
-            r.VerticalDivergenceDelay = Mathf.Lerp(limits.MinVerticalDivergenceDelay, limits.MaxVerticalDivergenceDelay, smoothT * 0.6f);
-            r.VerticalDivergenceLength = Mathf.Lerp(limits.MinVerticalDivergenceLength, limits.MaxVerticalDivergenceLength, splitT);
-            r.VerticalConvergenceLength = r.VerticalDivergenceLength;
-            r.LateralMergeLength = r.LateralSeparationLength;
-            r.PostMergeRecoveryLength = Mathf.Max(limits.MinPostMergeRecoveryLength, limits.MinLayeredRouteRecoveryLength);
-            r.RouteLateralSeparation = Mathf.Clamp(r.RouteWidth * 0.5f + r.RoadWidth * 0.5f + 3f,
-                limits.MinRouteLateralSeparation, limits.MaxRouteLateralSeparation);
+            // ══ Safety & readability ══
+            r.DefaultApproachLength = S(r.ClampReport(settings.Transitions.DefaultApproachSeconds, limits.MinApproachSeconds, limits.MaxApproachSeconds, "Transitions.DefaultApproach"));
+            r.DefaultRecoveryLength = S(r.ClampReport(settings.Transitions.DefaultRecoverySeconds, limits.MinRecoverySeconds, limits.MaxRecoverySeconds, "Transitions.DefaultRecovery"));
+            r.DangerousSpacingLength = S(r.ClampReport(settings.Transitions.DangerousSpacingSeconds, limits.MinDangerousSpacingSeconds, limits.MaxDangerousSpacingSeconds, "Transitions.DangerousSpacing"));
+            r.VisualPreviewLength = S(r.ClampReport(settings.Transitions.VisualPreviewSeconds, limits.MinVisualPreviewSeconds, limits.MaxVisualPreviewSeconds, "Transitions.VisualPreview"));
+            r.PostMergeRecoveryLength = S(r.ClampReport(settings.Transitions.PostMergeRecoverySeconds, limits.MinPostMergeRecoverySeconds, limits.MaxPostMergeRecoverySeconds, "Transitions.PostMergeRecovery"));
 
-            // ══ Junction wall masks: split/merge inner-wall open throats ══
-            // The split reads as a shared open throat first — the inner half-pipe walls stay
-            // suppressed until the branches are laterally separated, then regrow smoothly.
-            // Smoother presets get slightly longer eases; the throat lengths stay fixed.
-            r.SplitInnerWallFadeOutLength = 40f;
-            r.SplitInnerWallFadeInLength = Mathf.Lerp(60f, 100f, smoothT);
-            r.MergeInnerWallFadeOutLength = Mathf.Lerp(60f, 100f, smoothT);
-            r.MergeInnerWallFadeInLength = 40f;
+            // ══ Road & half-pipe ══
+            r.RoadWidth = r.ClampReport(settings.Road.RoadWidth, limits.MinRoadWidth, limits.MaxRoadWidth, "Road.RoadWidth");
+            r.RoadProfile = new TrackRoadProfileSettings
+            {
+                Shape = RoadCrossSectionShape.HalfPipe,
+                SideHeight = r.ClampReport(settings.Road.HalfPipeSideHeight, limits.MinHalfPipeSideHeight, limits.MaxHalfPipeSideHeight, "Road.HalfPipeSideHeight"),
+                CurveStrength = r.ClampReport(settings.Road.WallCurveStrength, limits.MinHalfPipeCurveStrength, limits.MaxHalfPipeCurveStrength, "Road.WallCurveStrength"),
+                WallAngle = r.ClampReport(settings.Road.MaxWallAngle, limits.MinHalfPipeWallAngle, limits.MaxHalfPipeWallAngle, "Road.MaxWallAngle"),
+                CenterFlatWidthRatio = r.ClampReport(settings.Road.CenterFlatWidthRatio, limits.MinHalfPipeCenterFlatRatio, limits.MaxHalfPipeCenterFlatRatio, "Road.CenterFlatWidthRatio"),
+                ProfileResolution = Mathf.Clamp(settings.Road.ProfileResolution, limits.MinHalfPipeProfileResolution, limits.MaxHalfPipeProfileResolution),
+                SafetyLipHeight = r.ClampReport(settings.Road.SafetyLipHeight, limits.MinSafetyLipHeight, limits.MaxSafetyLipHeight, "Road.SafetyLipHeight")
+            };
+
+            // Wall-aware clearance: a road's rideable walls occupy SideHeight above the
+            // floor (up to ~1.5× when bank-boosted) plus the slab below — over/under
+            // crossings must clear all of it, not just the craft.
+            float wallEnvelope = r.RoadProfile.SideHeight * 1.5f + 6f;
+            r.VerticalClearance = limits.MinVerticalClearance + wallEnvelope;
+
+            // ══ Elevation ══
+            r.MaxElevationRange = limits.MaxElevationRange;
+            r.TargetElevationAmplitude = r.ClampReport(settings.Elevation.TargetElevationAmplitude, 0f, limits.MaxElevationRange, "Elevation.TargetAmplitude");
+            r.MinMajorElevationSections = settings.Elevation.MinMajorElevationSections;
+            r.MaxMajorElevationSections = settings.Elevation.MaxMajorElevationSections;
+            r.MaxClimbAngle = r.ClampReport(settings.Elevation.MaxClimbAngle, 1f, limits.MaxClimbAngle, "Elevation.MaxClimbAngle");
+            r.MaxDropAngle = r.ClampReport(settings.Elevation.MaxDropAngle, 1f, limits.MaxDropAngle, "Elevation.MaxDropAngle");
+            r.GroundLevelPolicy = settings.Elevation.GroundLevelPolicy;
+
+            bool allowUnder = limits.AllowUnderpasses && settings.Elevation.GroundLevelPolicy == TrackGroundLevelPolicy.FreeFloating;
+            if (settings.Elevation.Underpasses.Enabled && settings.Elevation.Underpasses.EffectiveMinimum > 0 && !allowUnder)
+                r.Issue(ResolvedIssueSeverity.Warning, "Elevation.Underpasses",
+                    "Underpasses require the FreeFloating ground policy (they dip below the start elevation) — disabled.");
+            r.Crests = ResolvedFeatureRule.From(settings.Elevation.Crests, true, r.DesignSpeedMps, r.DangerousSpacingLength);
+            r.Bridges = ResolvedFeatureRule.From(settings.Elevation.Bridges, limits.AllowBridges, r.DesignSpeedMps, r.DangerousSpacingLength);
+            r.Underpasses = ResolvedFeatureRule.From(settings.Elevation.Underpasses, allowUnder, r.DesignSpeedMps, r.DangerousSpacingLength);
+
+            // ══ Feature rules (allow-flag gated, with loud reporting) ══
+            r.Jumps = r.GateRule(settings.Features.Jumps, limits.AllowJumps, "Features.Jumps");
+            r.Loops = r.GateRule(settings.Features.Loops, limits.AllowLoops, "Features.Loops");
+            r.Corkscrews = r.GateRule(settings.Features.Corkscrews, limits.AllowCorkscrews, "Features.Corkscrews");
+            r.Spirals = r.GateRule(settings.Features.Spirals, limits.AllowSpirals, "Features.Spirals");
+            r.HalfLoops = r.GateRule(settings.Features.HalfLoops, limits.AllowHalfLoops && limits.AllowLoops, "Features.HalfLoops");
+            r.Chicanes = ResolvedFeatureRule.From(settings.Features.Chicanes, true, r.DesignSpeedMps, r.DangerousSpacingLength);
+            r.SCurves = ResolvedFeatureRule.From(settings.Features.SCurves, true, r.DesignSpeedMps, r.DangerousSpacingLength);
+            r.Hairpins = ResolvedFeatureRule.From(settings.Features.Hairpins, true, r.DesignSpeedMps, r.DangerousSpacingLength);
+            r.MinFeatureGroups = settings.Features.MinFeatureGroups;
+            r.MaxFeatureGroups = settings.Features.MaxFeatureGroups;
+            r.CompoundFeatureChance = Mathf.Clamp01(settings.Features.CompoundFeatureChance);
+            r.MaxCompoundElements = settings.Features.MaxCompoundElements;
+
+            foreach (var p in settings.Features.RequiredPatterns)
+            {
+                if (p == null) continue;
+                if (!r.PatternAllowed(p.Pattern, limits, out string why))
+                {
+                    r.Issue(ResolvedIssueSeverity.Error, "Features.RequiredPatterns",
+                        $"Required pattern {p.Pattern} needs {why}, which the TrackConfig rulebook disallows.");
+                    continue;
+                }
+                r.RequiredPatterns.Add(new RequiredPatternEntry { Pattern = p.Pattern, Count = p.Count });
+            }
+
+            // ══ Loops ══
+            r.MinLoopRadius = limits.MinLoopRadius;
+            r.MaxLoopRadius = limits.MaxLoopRadius;
+            r.LoopApproachLength = Mathf.Max(r.DefaultApproachLength, S(limits.MinLoopApproachSeconds));
+            r.LoopRecoveryLength = Mathf.Max(r.DefaultRecoveryLength, S(limits.MinLoopRecoverySeconds));
+            r.LoopClearance = limits.MinLoopClearance;
+
+            // ══ Half-loops ══
+            r.MinHalfLoopRadius = limits.MinHalfLoopRadius;
+            r.MaxHalfLoopRadius = limits.MaxHalfLoopRadius;
+            // Preset default ≈ 2.2 s rollout, clamped to the rulebook window.
+            r.HalfLoopRolloutLength = S(Mathf.Clamp(2.2f, limits.MinHalfLoopRolloutSeconds, limits.MaxHalfLoopRolloutSeconds));
+            r.HalfLoopApproachLength = Mathf.Max(r.DefaultApproachLength, S(limits.MinHalfLoopApproachSeconds));
+            r.HalfLoopRecoveryLength = Mathf.Max(r.DefaultRecoveryLength, S(limits.MinHalfLoopRecoverySeconds));
+
+            // ══ Corkscrews ══
+            r.MinCorkscrewLength = S(limits.MinCorkscrewSeconds);
+            r.MaxCorkscrewLength = S(limits.MaxCorkscrewSeconds);
+            r.MinCorkscrewRadius = Mathf.Max(limits.MinCorkscrewRadius, r.RoadWidth * 0.6f);
+            r.MaxCorkscrewRadius = Mathf.Max(r.MinCorkscrewRadius, limits.MaxCorkscrewRadius);
+            r.CorkscrewRollDegrees = Mathf.Clamp(360f, limits.MinCorkscrewRollDegrees, limits.MaxCorkscrewRollDegrees);
+            r.MaxRollRateDegPerMeter = limits.MaxRollRateDegreesPerSecond / Mathf.Max(1f, r.DesignSpeedMps);
+            r.CorkscrewApproachLength = Mathf.Max(r.DefaultApproachLength, S(limits.MinCorkscrewApproachSeconds));
+            r.CorkscrewRecoveryLength = Mathf.Max(r.DefaultRecoveryLength, S(limits.MinCorkscrewRecoverySeconds));
+            r.CorkscrewClearance = limits.MinCorkscrewClearance;
+
+            // Roll-rate feasibility: the smoothstepped roll peaks at 1.5× the average
+            // rate, so a corkscrew needs at least this length for its total roll.
+            float minLenByRollRate = r.CorkscrewRollDegrees * 1.5f / Mathf.Max(0.01f, r.MaxRollRateDegPerMeter);
+            if (minLenByRollRate > r.MaxCorkscrewLength)
+                r.Issue(ResolvedIssueSeverity.Error, "Corkscrews",
+                    $"A {r.CorkscrewRollDegrees:F0}° corkscrew needs {minLenByRollRate:F0}m at the legal roll rate, but the maximum corkscrew length is {r.MaxCorkscrewLength:F0}m.");
+            else
+                r.MinCorkscrewLength = Mathf.Max(r.MinCorkscrewLength, minLenByRollRate);
+
+            // ══ Spirals ══
+            r.MinSpiralRadius = limits.MinSpiralRadius;
+            r.MaxSpiralRadius = limits.MaxSpiralRadius;
+            r.MinSpiralRevolutions = limits.MinSpiralRevolutions;
+            r.MaxSpiralRevolutions = limits.MaxSpiralRevolutions;
+            r.MinSpiralClimbPerRevolution = Mathf.Max(limits.MinSpiralClimbPerRevolution, r.VerticalClearance + 5f);
+            r.MaxSpiralClimbPerRevolution = Mathf.Max(r.MinSpiralClimbPerRevolution, limits.MaxSpiralClimbPerRevolution);
+            if (r.MinSpiralClimbPerRevolution > limits.MaxSpiralClimbPerRevolution)
+                r.Issue(ResolvedIssueSeverity.Warning, "Spirals",
+                    $"Coil clearance ({r.VerticalClearance:F0}m walls included) forces {r.MinSpiralClimbPerRevolution:F0}m climb per revolution, above the rulebook's {limits.MaxSpiralClimbPerRevolution:F0}m.");
+            r.SpiralApproachLength = Mathf.Max(r.DefaultApproachLength, S(limits.MinSpiralApproachSeconds));
+            r.SpiralRecoveryLength = Mathf.Max(r.DefaultRecoveryLength, S(limits.MinSpiralRecoverySeconds));
+            r.SpiralClearance = limits.MinSpiralClearance;
+
+            // ══ Jumps (ballistic) ══
+            r.Gravity = limits.ReferenceGravity;
+            r.JumpApproachLength = Mathf.Max(r.DefaultApproachLength, S(limits.MinJumpApproachSeconds));
+            r.MinLaunchTransitionLength = S(limits.MinLaunchTransitionSeconds);
+            r.MaxLaunchTransitionLength = S(limits.MaxLaunchTransitionSeconds);
+            r.MinJumpAirtimeSeconds = limits.MinJumpAirtimeSeconds;
+            r.MaxJumpAirtimeSeconds = limits.MaxJumpAirtimeSeconds;
+            r.MinLandingTransitionLength = S(limits.MinLandingTransitionSeconds);
+            r.MaxLandingTransitionLength = S(limits.MaxLandingTransitionSeconds);
+            r.JumpRecoveryLength = Mathf.Max(r.DefaultRecoveryLength, S(limits.MinJumpRecoverySeconds));
+            r.MinJumpHeight = limits.MinJumpHeight;
+            r.MaxJumpHeight = limits.MaxJumpHeight;
+            r.JumpLandingTolerance = limits.JumpLandingTolerance;
+
+            // ══ Branches ══
+            bool branchesAllowed = limits.AllowBranches;
+            int wantedMin = settings.Branches.MinBranchGroups;
+            r.MaxBranchGroups = branchesAllowed ? Mathf.Min(settings.Branches.MaxBranchGroups, limits.MaxBranchGroupsPerTrack) : 0;
+            r.MinBranchGroups = Mathf.Min(wantedMin, r.MaxBranchGroups);
+            if (wantedMin > 0 && !branchesAllowed)
+                r.Issue(ResolvedIssueSeverity.Error, "Branches",
+                    "Branch groups are required by the designer settings, but AllowBranches is false in the TrackConfig rulebook.");
+            else if (wantedMin > r.MaxBranchGroups)
+                r.Issue(ResolvedIssueSeverity.Warning, "Branches",
+                    $"Requested minimum {wantedMin} branch groups exceeds the rulebook cap {limits.MaxBranchGroupsPerTrack} — clamped.");
+
+            r.MinRouteLength = S(r.ClampReport(settings.Branches.MinRouteDurationSeconds, limits.MinBranchRouteSeconds, limits.MaxBranchRouteSeconds, "Branches.MinRouteDuration"));
+            r.MaxRouteLength = S(r.ClampReport(settings.Branches.MaxRouteDurationSeconds, limits.MinBranchRouteSeconds, limits.MaxBranchRouteSeconds, "Branches.MaxRouteDuration"));
+            if (r.MaxRouteLength < r.MinRouteLength) r.MaxRouteLength = r.MinRouteLength;
+            r.PairingMode = settings.Branches.PairingMode;
+            r.InteractionWeights = settings.Branches.InteractionWeights.Clone();
+            r.RouteASettings = settings.Branches.RouteA.Clone();
+            r.RouteBSettings = settings.Branches.RouteB.Clone();
+            r.DecisionPreviewLength = S(r.ClampReport(settings.Branches.DecisionPreviewSeconds, limits.MinDecisionPreviewSeconds, limits.MaxDecisionPreviewSeconds, "Branches.DecisionPreview"));
+            r.TimeBalanceTolerance = r.ClampReport(settings.Branches.TimeBalanceTolerance, limits.MinTimeBalanceTolerance, limits.MaxTimeBalanceTolerance, "Branches.TimeBalanceTolerance");
+            r.SpecializationTarget = r.ClampReport(settings.Branches.SpecializationTarget, limits.MinSpecializationAdvantage, limits.MaxSpecializationAdvantage, "Branches.SpecializationTarget");
+
+            // Dynamic separation floor: half-widths + half-pipe walls + lips + slab +
+            // craft envelope + safety margin — routes must never share wall space.
+            float dynamicLateralFloor = r.RoadWidth                    // both half-widths
+                                      + r.RoadProfile.SideHeight * 2f  // rising walls
+                                      + r.RoadProfile.SafetyLipHeight * 2f
+                                      + 1.2f                           // slab thickness
+                                      + 8f                             // craft envelope
+                                      + 5f;                            // safety margin
+            r.MinLateralSeparation = Mathf.Max(
+                Mathf.Clamp(settings.Branches.LateralSeparationRange.x, limits.MinRouteCenterlineSeparation, limits.MaxRouteCenterlineSeparation),
+                dynamicLateralFloor);
+            r.MaxLateralSeparation = Mathf.Clamp(
+                Mathf.Max(settings.Branches.LateralSeparationRange.y, r.MinLateralSeparation),
+                r.MinLateralSeparation, limits.MaxRouteCenterlineSeparation);
+
+            r.MinRouteVerticalSeparation = Mathf.Max(
+                Mathf.Clamp(settings.Branches.VerticalSeparationRange.x, limits.MinRouteVerticalSeparation, limits.MaxRouteVerticalSeparation),
+                r.VerticalClearance);
+            r.MaxRouteVerticalSeparation = Mathf.Clamp(
+                Mathf.Max(settings.Branches.VerticalSeparationRange.y, r.MinRouteVerticalSeparation),
+                r.MinRouteVerticalSeparation, limits.MaxRouteVerticalSeparation);
+
+            r.MaxCrossovers = Mathf.Min(settings.Branches.MaxCrossovers, limits.MaxPairedRouteInteractions);
+            r.SplitLength = S(r.ClampReport(settings.Branches.SplitDurationSeconds, limits.MinLateralSplitSeconds, limits.MaxLateralSplitSeconds, "Branches.SplitDuration"));
+            r.VerticalDivergenceDelay = S(r.ClampReport(settings.Branches.VerticalDivergenceDelaySeconds, limits.MinVerticalDivergenceDelaySeconds, limits.MaxVerticalDivergenceDelaySeconds, "Branches.VerticalDivergenceDelay"));
+            r.VerticalDivergenceLength = S(r.ClampReport(settings.Branches.VerticalDivergenceSeconds, limits.MinVerticalDivergenceSeconds, limits.MaxVerticalDivergenceSeconds, "Branches.VerticalDivergence"));
+            r.MergeLength = S(r.ClampReport(settings.Branches.MergeDurationSeconds, limits.MinMergeSeconds, limits.MaxMergeSeconds, "Branches.MergeDuration"));
+
+            // Junction wall-mask throats scale with speed (short fixed meters would be
+            // sub-frame at 361 m/s).
+            r.SplitInnerWallFadeOutLength = S(0.25f);
+            r.SplitInnerWallFadeInLength = S(0.4f);
+            r.MergeInnerWallFadeOutLength = S(0.4f);
+            r.MergeInnerWallFadeInLength = S(0.25f);
             r.WallMaskSafetyMargin = 3f;
 
-            // ══ Physical vertical clearance ══
-            // A road is not a flat line: its rideable half-pipe walls occupy SideHeight
-            // above the floor (up to 2× when bobsled-banked) plus the slab below.
-            // Any over/under crossing must clear ALL of that, not just the craft —
-            // otherwise "vertically separated" layouts still physically intersect.
-            float wallClearance = r.RoadProfile.SideHeight * 2f + 6f;
-            r.VerticalClearance = Mathf.Max(r.VerticalClearance, limits.MinVerticalClearance + wallClearance);
-            r.OverpassClearance = Mathf.Max(r.OverpassClearance, r.VerticalClearance);
-
             // ══ Mesh ══
-            float[] ringSpacingBySpeed = { 2.5f, 2.5f, 2f, 3f };
-            r.MeshMetersPerRing = Mathf.Clamp(ringSpacingBySpeed[speed], limits.MinMetersPerRing, limits.MaxMetersPerRing);
+            r.MeshMetersPerRing = Mathf.Clamp(settings.Generation.MetersPerRing, limits.MinMetersPerRing, limits.MaxMetersPerRing);
+            r.FeatureMetersPerRing = Mathf.Clamp(settings.Generation.MetersPerRing * 0.6f, limits.MinFeatureMetersPerRing, limits.MaxFeatureMetersPerRing);
+            r.MaxRingFacetAngle = Mathf.Clamp(settings.Generation.MaxFacetAngleDegrees, limits.MinFacetAngle, limits.MaxFacetAngle);
             r.MaxRingsPerSection = limits.MaxRingsPerMacroSection;
             r.MaxTotalRings = limits.MaxTotalTrackRings;
+            r.RenderRingBudget = Mathf.Clamp(settings.Generation.TargetTotalRings, 2000, limits.MaxTotalTrackRings);
 
-            // Faster speed presets get finer curved-track facets (higher speed makes
-            // the same facet angle feel bumpier: phantom vertVel = v·Δθ/2).
-            r.MaxRingFacetAngle = speed >= 3 ? 1.2f : 1.5f;
+            // ══ Closure ══
+            r.ClosureReserveFraction = settings.Generation.ClosureReserveFraction;
+            r.ClosurePositionTolerance = limits.ClosurePositionTolerance;
+            r.ClosureForwardTolerance = limits.ClosureForwardTolerance;
+            r.ClosureUpTolerance = limits.ClosureUpTolerance;
+            r.ClosureWidthTolerance = limits.ClosureWidthTolerance;
+            r.ClosureBankTolerance = limits.ClosureBankTolerance;
+            r.ClosurePitchTolerance = limits.ClosurePitchTolerance;
 
-            // §7 debug: resolved speed profile summary.
-            Debug.Log($"[Resolve] Speed profile: {r.DebugSpeedLabel} | straights {r.MinStraightLength:F0}-{r.MaxStraightLength:F0}m | curve radius {r.MinCurveRadius:F0}-{r.MaxCurveRadius:F0}m | max bank {r.MaxBankAngle:F0}° | width {r.RoadWidth:F0}m\n" +
-                      $"[Resolve] Verticality: {r.DebugVerticalityLabel} | target amplitude {r.TargetElevationAmplitude:F0}m | major sections {r.MinMajorElevationSections}-{r.MaxMajorElevationSections} | layered groups {r.MinLayeredRouteGroups}-{r.MaxLayeredRouteGroups} | force layered: {r.ForceAtLeastOneLayeredRoute} | force crossing: {r.ForceAtLeastOneOverpass}\n" +
-                      $"[Resolve] Road shape: {r.RoadProfile.Shape} | side height {r.RoadProfile.SideHeight:F1}m | wall angle {r.RoadProfile.WallAngle:F0}° | flat center {r.RoadProfile.CenterFlatWidthRatio:P0} | resolution {r.RoadProfile.ProfileResolution}/side\n" +
-                      $"[Resolve] Transitions: {r.TransitionSmoothness} ({r.BlendCurve}) | bank blend {r.BankBlendLength:F0}m | pitch {r.PitchBlendLength:F0}m | width {r.WidthBlendLength:F0}m | cross-section {r.CrossSectionBlendLength:F0}m | max bank ramp {r.MaxBankRampAngle:F0}°");
+            // ══ Generation behavior ══
+            r.MaxAttempts = settings.Generation.MaxAttempts;
+            r.SelectionMode = settings.Generation.SelectionMode;
+            r.CandidatesToScore = settings.Generation.CandidatesToScore;
+            r.FailurePolicy = settings.Generation.FailurePolicy;
+
+            // ══ Reference performance model ══
+            r.ReferenceTopSpeedMps = limits.ReferenceTopSpeedMps;
+            r.ReferenceAcceleration = limits.ReferenceAcceleration;
+            r.ReferenceBraking = limits.ReferenceBraking;
+            r.ReferenceLateralAcceleration = limits.ReferenceLateralAcceleration;
+            r.ReferenceRollStability = limits.ReferenceRollStability;
+            r.ReferenceLandingRecovery = limits.ReferenceLandingRecovery;
+
+            r.ValidateBudgets();
 
             return r;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>Rough length one instance of a feature needs (approach + body + recovery).</summary>
+        public float EstimateFeatureFootprint(TrackPatternType pattern)
+        {
+            switch (pattern)
+            {
+                case TrackPatternType.FullLoop:
+                    return LoopApproachLength + 2f * Mathf.PI * (MinLoopRadius + MaxLoopRadius) * 0.5f * 1.25f + LoopRecoveryLength;
+                case TrackPatternType.Corkscrew:
+                    return CorkscrewApproachLength + (MinCorkscrewLength + MaxCorkscrewLength) * 0.5f + CorkscrewRecoveryLength;
+                case TrackPatternType.Spiral:
+                    return SpiralApproachLength + 2f * Mathf.PI * (MinSpiralRadius + MaxSpiralRadius) * 0.5f + SpiralRecoveryLength;
+                case TrackPatternType.HalfLoopRollout:
+                {
+                    float rollout = Mathf.Max(HalfLoopRolloutLength, 180f * 1.5f / Mathf.Max(0.001f, MaxRollRateDegPerMeter));
+                    return HalfLoopApproachLength + Mathf.PI * (MinHalfLoopRadius + MaxHalfLoopRadius) * 0.5f + rollout + HalfLoopRecoveryLength;
+                }
+                case TrackPatternType.JumpGap:
+                case TrackPatternType.JumpToBankedLanding:
+                    return JumpApproachLength + MaxLaunchTransitionLength + DesignSpeedMps * MaxJumpAirtimeSeconds + MaxLandingTransitionLength + JumpRecoveryLength;
+                case TrackPatternType.HalfLoopToCorkscrew:
+                {
+                    float rollout = Mathf.Max(HalfLoopRolloutLength, 540f * 1.5f / Mathf.Max(0.001f, MaxRollRateDegPerMeter));
+                    return HalfLoopApproachLength + Mathf.PI * (MinHalfLoopRadius + MaxHalfLoopRadius) * 0.5f + rollout + HalfLoopRecoveryLength;
+                }
+                case TrackPatternType.SpiralToCorkscrew:
+                    return SpiralApproachLength + 2f * Mathf.PI * MinSpiralRadius + MinCorkscrewLength + CorkscrewRecoveryLength;
+                case TrackPatternType.LoopToCorkscrew:
+                    return LoopApproachLength + 2f * Mathf.PI * MinLoopRadius * 1.25f + MinCorkscrewLength + CorkscrewRecoveryLength;
+                case TrackPatternType.DoubleCorkscrew:
+                    return CorkscrewApproachLength + 2f * MinCorkscrewLength + GenericTransitionLength + CorkscrewRecoveryLength;
+                case TrackPatternType.Hairpin:
+                case TrackPatternType.SweeperIntoHairpin:
+                    return Mathf.PI * MinCurveRadius + MinStraightLength;
+                case TrackPatternType.Chicane:
+                case TrackPatternType.SCurve:
+                case TrackPatternType.DoubleApex:
+                case TrackPatternType.TighteningCorner:
+                case TrackPatternType.OpeningCorner:
+                case TrackPatternType.AlternatingRadiusSequence:
+                    return MinCurveRadius * 2.5f;
+                default:
+                    return DefaultApproachLength + DefaultRecoveryLength + MinStraightLength;
+            }
+        }
+
+        /// <summary>Whether a pattern's underlying features are allowed by the rulebook flags.</summary>
+        private bool PatternAllowed(TrackPatternType pattern, TrackConfig limits, out string requirement)
+        {
+            requirement = "";
+            switch (pattern)
+            {
+                case TrackPatternType.FullLoop: requirement = "loops"; return limits.AllowLoops;
+                case TrackPatternType.Corkscrew:
+                case TrackPatternType.DoubleCorkscrew: requirement = "corkscrews"; return limits.AllowCorkscrews;
+                case TrackPatternType.Spiral: requirement = "spirals"; return limits.AllowSpirals;
+                case TrackPatternType.HalfLoopRollout: requirement = "half-loops"; return limits.AllowHalfLoops && limits.AllowLoops;
+                case TrackPatternType.HalfLoopToCorkscrew: requirement = "half-loops and corkscrews"; return limits.AllowHalfLoops && limits.AllowLoops && limits.AllowCorkscrews;
+                case TrackPatternType.SpiralToCorkscrew: requirement = "spirals and corkscrews"; return limits.AllowSpirals && limits.AllowCorkscrews;
+                case TrackPatternType.LoopToCorkscrew: requirement = "loops and corkscrews"; return limits.AllowLoops && limits.AllowCorkscrews;
+                case TrackPatternType.JumpGap:
+                case TrackPatternType.JumpToBankedLanding: requirement = "jumps"; return limits.AllowJumps;
+                default: return true; // corner patterns are always buildable
+            }
+        }
+
+        /// <summary>
+        /// Budget feasibility checks: required content must fit the maximum length,
+        /// branch minimums must fit the lap, elevation must fit the range.
+        /// </summary>
+        private void ValidateBudgets()
+        {
+            // Required feature length vs maximum lap length.
+            float requiredLength = 0f;
+            void AddRule(ResolvedFeatureRule rule, TrackPatternType type)
+            {
+                if (rule.Enabled && rule.MinimumCount > 0)
+                    requiredLength += rule.MinimumCount * (EstimateFeatureFootprint(type) + DangerousSpacingLength);
+            }
+            AddRule(Jumps, TrackPatternType.JumpGap);
+            AddRule(Loops, TrackPatternType.FullLoop);
+            AddRule(Corkscrews, TrackPatternType.Corkscrew);
+            AddRule(Spirals, TrackPatternType.Spiral);
+            AddRule(HalfLoops, TrackPatternType.HalfLoopRollout);
+            AddRule(Hairpins, TrackPatternType.Hairpin);
+            AddRule(Chicanes, TrackPatternType.Chicane);
+            AddRule(SCurves, TrackPatternType.SCurve);
+            foreach (var p in RequiredPatterns)
+                requiredLength += p.Count * (EstimateFeatureFootprint(p.Pattern) + DangerousSpacingLength);
+
+            // Corners and closure reserve need room too (eased arcs run longer than circular).
+            float minCornerArc = MinTurnCount * (60f * Mathf.Deg2Rad * MinCurveRadius
+                / (1f - Planning.SectionFrameBuilders.ArcCurvatureEaseFraction));
+            float closureReserve = TargetTrackLength * ClosureReserveFraction;
+            float totalRequired = requiredLength + minCornerArc + closureReserve;
+
+            if (totalRequired > MaxTrackLength)
+                Issue(ResolvedIssueSeverity.Error, "Budget",
+                    $"Required content needs ≈{totalRequired / 1000f:F1}km (features {requiredLength / 1000f:F1}km + corners {minCornerArc / 1000f:F1}km + closure reserve {closureReserve / 1000f:F1}km), but Maximum Track Length is {MaxTrackLength / 1000f:F1}km.");
+            else if (totalRequired > TargetTrackLength)
+                Issue(ResolvedIssueSeverity.Info, "Budget",
+                    $"Required content (≈{totalRequired / 1000f:F1}km) exceeds the target lap ({TargetTrackLength / 1000f:F1}km) — the lap will grow, up to the {MaxTrackLength / 1000f:F1}km cap.");
+
+            // Branch route durations vs lap time.
+            if (MinBranchGroups > 0)
+            {
+                float branchTime = MinBranchGroups * (MinRouteLength / Mathf.Max(1f, DesignSpeedMps) + 3f);
+                if (branchTime > TargetLapTimeSeconds * 0.8f)
+                    Issue(ResolvedIssueSeverity.Error, "Branches",
+                        $"{MinBranchGroups} branch groups with ≥{MinRouteLength / DesignSpeedMps:F1}s routes need ≈{branchTime:F0}s, which cannot fit inside a {TargetLapTimeSeconds:F0}s target lap.");
+            }
+
+            // Elevation amplitude must be reachable within the climb angle over the lap.
+            if (TargetElevationAmplitude > 1f)
+            {
+                float climbCapacity = TargetTrackLength * 0.35f * Mathf.Tan(MaxClimbAngle * Mathf.Deg2Rad);
+                if (TargetElevationAmplitude > climbCapacity)
+                    Issue(ResolvedIssueSeverity.Warning, "Elevation",
+                        $"Target amplitude {TargetElevationAmplitude:F0}m likely unreachable: at {MaxClimbAngle:F0}° max climb the lap can carry ≈{climbCapacity:F0}m.");
+            }
+
+            // Ring budget sanity.
+            float expectedRings = TargetTrackLength / Mathf.Max(0.5f, MeshMetersPerRing) * 1.6f;
+            if (expectedRings > MaxTotalRings)
+                Issue(ResolvedIssueSeverity.Warning, "Mesh",
+                    $"Expected ring count ≈{expectedRings:F0} exceeds the rulebook budget {MaxTotalRings} — increase MetersPerRing or shorten the lap.");
+        }
+
+        private ResolvedFeatureRule GateRule(TrackFeatureRule rule, bool allowed, string field)
+        {
+            if (rule != null && rule.Enabled && rule.EffectiveMinimum > 0 && !allowed)
+                Issue(ResolvedIssueSeverity.Error, field,
+                    "Required by the designer settings, but disallowed by the TrackConfig rulebook.");
+            else if (rule != null && rule.Enabled && !allowed)
+                Issue(ResolvedIssueSeverity.Warning, field,
+                    "Enabled in the designer settings, but disallowed by the TrackConfig rulebook — none will be generated.");
+            return ResolvedFeatureRule.From(rule, allowed, DesignSpeedMps, DangerousSpacingLength);
+        }
+
+        private float ClampReport(float value, float min, float max, string field)
+        {
+            float clamped = Mathf.Clamp(value, min, max);
+            if (!Mathf.Approximately(clamped, value))
+                Issue(ResolvedIssueSeverity.Warning, field, $"Clamped from {value:G5} to {clamped:G5} by the rulebook.");
+            return clamped;
+        }
+
+        private void Issue(ResolvedIssueSeverity severity, string field, string message)
+        {
+            Issues.Add(new ResolvedConfigIssue { Severity = severity, Field = field, Message = message });
         }
     }
 }

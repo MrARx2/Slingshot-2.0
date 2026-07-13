@@ -1,96 +1,86 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.Splines;
 using TrackGeneration.Core;
-using TrackGeneration.Splines;
-using TrackGeneration.Mesh;
-using TrackGeneration.Stunts;
-using TrackGeneration.Gravity;
+using TrackGeneration.Design;
 using TrackGeneration.Macro;
+using TrackGeneration.Planning;
 using TrackGeneration.Race;
 
 namespace TrackGeneration
 {
-    /// <summary>Which generation brain builds the track.</summary>
-    public enum GenerationMode
-    {
-        /// <summary>New V1 brain: readable macro race sections first, box/prism geometry second.</summary>
-        MacroSections,
-
-        /// <summary>Old brain: spline shape decides the track. Kept until the macro system is stable.</summary>
-        SplineLegacy
-    }
-
     /// <summary>
-    /// Master orchestrator for generating the entire track.
-    /// Macro mode: Seed -> Macro layout -> Section frames -> Prism meshes -> Debug view.
-    /// Legacy mode: Seed -> Splines -> Mesh -> Stunts -> Gravity.
+    /// Orchestrator for the macro track-generation pipeline. Contains NO generation
+    /// grammar — it wires:
+    ///
+    ///   Seed → designer settings → rulebook validation → resolved request →
+    ///   candidate pipeline (plan / build / validate / score) → temporary mesh build →
+    ///   race course → transactional swap → report.
+    ///
+    /// A failed generation NEVER destroys the previous valid track, and no fallback is
+    /// ever presented as a success — the report says exactly what happened.
     /// </summary>
     [AddComponentMenu("Track Generation/Track Generator")]
     [RequireComponent(typeof(TrackSeedManager))]
     public class TrackGenerator : MonoBehaviour
     {
-        [Header("Mode")]
-        [Tooltip("MacroSections = new macro race-section generator. SplineLegacy = previous spline-first generator.")]
-        public GenerationMode Mode = GenerationMode.MacroSections;
+        [Header("Track Design (the actual request)")]
+        [Tooltip("Every value generation uses. Style presets INITIALIZE these fields; nothing switches behavior on a preset name at runtime.")]
+        public TrackDesignerSettings Designer = TrackStylePresetLibrary.Create(TrackStylePresetLibrary.Balanced);
 
-        [Header("Track Design — the designer's 10 controls")]
-        [Tooltip("The personality of THIS track. Seed (control #1) lives on the Track Seed Manager.")]
-        public TrackDesignerProfile Designer = new TrackDesignerProfile();
-
-        [Header("Rulebook (advanced technical asset)")]
-        [Tooltip("Defines what is POSSIBLE (limits, allowed features, safety). Not a designer control panel.")]
+        [Header("Rulebook (hard technical limits)")]
+        [Tooltip("Absolute legal limits, safety constraints, mesh budgets and validation tolerances. Never the personality of a specific track.")]
         public TrackConfig Config;
 
         [Header("Materials")]
         public Material MainRoadMaterial;
-        public Material ShortcutRoadMaterial;
         public Material WallMaterial;
 
         [Header("Generation Output")]
         [SerializeField] private Transform trackRoot;
 
-        [Header("Race Course (macro mode)")]
-        [Tooltip("Build a start/finish line and checkpoints onto the generated track for time attack.")]
+        [Header("Race Course")]
+        [Tooltip("Build a start/finish line and checkpoint groups (branch-aware) for time attack.")]
         [SerializeField] private bool buildRaceCourse = true;
-        [Tooltip("Checkpoints the craft must cross IN ORDER for a lap to count as valid.")]
+        [Tooltip("Logical checkpoints per lap. Checkpoints inside a branch get one gate per route — crossing either advances the lap.")]
         [SerializeField, Range(1, 16)] private int checkpointCount = 8;
-        [Tooltip("Arc distance from the spawn frame to the start/finish line — the lap clock starts on the first crossing, not at spawn.")]
+        [Tooltip("Arc distance from the spawn frame to the start/finish line.")]
         [SerializeField, Min(5f)] private float startLineArcOffset = 20f;
 
         [Header("Runtime Start")]
         [SerializeField] private bool generateOnStart = true;
-        [Tooltip("When entering play mode with a track already generated in the editor, KEEP it and skip regeneration — generate layouts in the editor until you like one, then press Play and ride exactly that track.")]
+        [Tooltip("Keep an editor-generated track when entering Play Mode instead of regenerating.")]
         [SerializeField] private bool keepEditorTrackOnPlay = true;
         [SerializeField] private bool placeHovercraftOnStart = true;
-        [SerializeField] private Transform hovercraft;
         [SerializeField, Min(0f)] private float startLineForwardOffset = 0f;
-        [SerializeField, Min(0f)] private float fallbackRideHeight = 2.05f;
         [SerializeField] private bool resetHovercraftWithBackspace = true;
+
+        [Header("Last Generation Report (read-only)")]
+        [SerializeField] private TrackGenerationReport lastReport = new TrackGenerationReport();
+        [SerializeField] private TrackGenerationMetrics lastMetrics = new TrackGenerationMetrics();
 
         [SerializeField, HideInInspector] private int generatedMeshCount;
         [SerializeField, HideInInspector] private int generatedVertexCount;
         [SerializeField, HideInInspector] private int generatedTriangleCount;
 
-        // Current generated data
-        public TrackData CurrentTrackData { get; private set; }
-
-        /// <summary>Macro mode output: the generated section list (null in legacy mode).</summary>
+        /// <summary>Flattened generated section list (branch routes appear as consecutive pairs).</summary>
         public List<GeneratedTrackSection> CurrentMacroSections { get; private set; }
 
-        /// <summary>Root transform the generated track (and its section frames) are local to.</summary>
+        /// <summary>The authoritative layout of the current track (null after scene reload — sections persist via the visualizer).</summary>
+        public GeneratedTrackLayout CurrentLayout { get; private set; }
+
+        /// <summary>Root transform the generated track is local to.</summary>
         public Transform TrackRoot => trackRoot;
+
+        public TrackGenerationReport LastReport => lastReport;
+        public TrackGenerationMetrics LastMetrics => lastMetrics;
 
         public int GeneratedMeshCount => generatedMeshCount;
         public int GeneratedVertexCount => generatedVertexCount;
         public int GeneratedTriangleCount => generatedTriangleCount;
 
         private TrackSeedManager _seedManager;
-
-        // Legacy-mode circuit recovered from an editor-generated track on play (macro mode
-        // recovers its sections from the serialized debug visualizer instead).
-        private SplineContainer _adoptedLegacyCircuit;
+        private ITrackRaceCraft _craft;
 
         private void Awake()
         {
@@ -99,10 +89,6 @@ namespace TrackGeneration
 
         private void Start()
         {
-            // A track generated in the editor survives entering play mode (the root object
-            // and its meshes are scene state), but the non-serialized runtime references
-            // (CurrentMacroSections / CurrentTrackData) do not. Adopt the existing track
-            // instead of regenerating so Play rides exactly the layout picked in the editor.
             bool adoptedExisting = keepEditorTrackOnPlay && TryAdoptExistingTrack();
 
             if (generateOnStart && !adoptedExisting)
@@ -127,112 +113,279 @@ namespace TrackGeneration
             }
         }
 
+        // ─────────────────────────── Generation ───────────────────────────
+
         [ContextMenu("Generate Track")]
         public void GenerateTrack()
         {
             if (Config == null)
             {
-                Debug.LogError("[TrackGenerator] TrackConfig is missing!");
+                Debug.LogError("[TrackGenerator] TrackConfig rulebook is missing.");
                 return;
             }
 
-            // 1. Setup Seed
             if (_seedManager == null) _seedManager = GetComponent<TrackSeedManager>();
             TrackSeed seed = _seedManager.InitializeSeed();
-            
-            // Subsystem RNGs
-            Unity.Mathematics.Random splineRng = seed.CreateSubsystemRandom("Splines");
-            Unity.Mathematics.Random branchRng = seed.CreateSubsystemRandom("Branches");
-            Unity.Mathematics.Random stuntRng = seed.CreateSubsystemRandom("Stunts");
-            Unity.Mathematics.Random gravityRng = seed.CreateSubsystemRandom("Gravity");
 
-            // 2. Clear previous track
-            if (trackRoot != null)
+            Designer ??= TrackStylePresetLibrary.Create(TrackStylePresetLibrary.Balanced);
+            Designer.Sanitize();
+
+            TrackGenerationResult result = RunPipelineWithPolicy(seed);
+
+            lastReport = result.Report;
+            lastMetrics = result.Layout?.Metrics ?? new TrackGenerationMetrics();
+
+            if (!result.Success)
             {
-                if (Application.isPlaying)
-                {
-                    trackRoot.gameObject.SetActive(false);
-                    Destroy(trackRoot.gameObject);
-                }
-                else DestroyImmediate(trackRoot.gameObject);
+                LogFailure(result);
+                return; // previous valid track stays untouched
             }
 
-            CurrentTrackData = null;
-            CurrentMacroSections = null;
-            _adoptedLegacyCircuit = null;
-            ClearGeneratedMeshStats();
-
-            GameObject rootObj = new GameObject("GeneratedTrack_" + seed.BaseSeed);
-            rootObj.transform.SetParent(this.transform, false);
-            trackRoot = rootObj.transform;
-
-            // ── Macro mode: readable race sections first, prism geometry second ──
-            if (Mode == GenerationMode.MacroSections)
+            if (!TryBuildTransactional(seed, result))
             {
-                GenerateMacroTrack(rootObj, seed);
+                LogFailure(result);
                 return;
             }
 
-            // ── Legacy spline mode below (kept until the macro system is stable) ──
-
-            // 3. Generate Splines
-            SplinePathGenerator splineGen = new SplinePathGenerator();
-            SplineContainer mainCircuit = splineGen.GenerateMainCircuit(rootObj, Config, splineRng);
-            float mainLength = SplineUtilities.GetSplineLength(mainCircuit);
-
-            BranchPathGenerator branchGen = new BranchPathGenerator();
-            List<TrackBranch> shortcuts = branchGen.GenerateBranches(rootObj, mainCircuit, Config, ref branchRng);
-
-            List<float> shortcutLengths = new List<float>();
-            foreach (var sc in shortcuts) shortcutLengths.Add(sc.Length);
-
-            // 4. Determine Placements
-            StuntPlacer stuntPlacer = new StuntPlacer();
-            List<StuntPlacement> stuntPlacements = stuntPlacer.PlaceStunts(Config, ref stuntRng, mainCircuit, shortcuts);
-
-            GravityZonePlacer gravityPlacer = new GravityZonePlacer();
-            List<GravityZonePlacement> gravityPlacements = gravityPlacer.PlaceGravityZones(Config, ref gravityRng, mainLength, shortcutLengths, shortcuts);
-
-            // 5. Generate Meshes
-            TrackMeshBuilder meshBuilder = new TrackMeshBuilder();
-            meshBuilder.BuildTrackMesh(mainCircuit, Config.MainRoadWidth, Config, MainRoadMaterial, WallMaterial, trackRoot, "MainCircuitMesh", shortcuts);
-
-            for (int i = 0; i < shortcuts.Count; i++)
-            {
-                meshBuilder.BuildTrackMesh(shortcuts[i].Spline, Config.ShortcutRoadWidth, Config, ShortcutRoadMaterial, WallMaterial, shortcuts[i].Spline.transform, $"ShortcutMesh_{i+1}", null, shortcuts[i], mainCircuit);
-            }
-
-            // 6. Build Stunt Actors
-            BuildStunts(stuntPlacements, mainCircuit, shortcuts);
-
-            // 7. Build Gravity Zones
-            BuildGravityZones(gravityPlacements, mainCircuit, shortcuts);
-
-            // Store Data
-            CurrentTrackData = new TrackData(seed, mainCircuit, mainLength, shortcuts, stuntPlacements, gravityPlacements);
-            UpdateGeneratedMeshStats();
-
-            int stuntCount = 0, padCount = 0;
-            foreach (var p in stuntPlacements)
-            {
-                if (p.Type == StuntType.BoostPad) padCount++;
-                else stuntCount++;
-            }
-            Debug.Log($"[TrackGenerator] Generated Track! Seed: {seed.BaseSeed}, Main Length: {mainLength:F1}m, Shortcuts: {shortcuts.Count}, Stunts: {stuntCount}, Boost Pads: {padCount}, Gravity Zones: {gravityPlacements.Count}");
+            LogSuccess(result);
         }
 
+        /// <summary>Runs the pipeline, applying the configured failure policy when no valid candidate exists.</summary>
+        private TrackGenerationResult RunPipelineWithPolicy(TrackSeed seed)
+        {
+            var pipeline = new TrackGenerationPipeline();
+
+            ResolvedTrackGenerationConfig resolved = ResolvedTrackGenerationConfig.Resolve(Config, Designer);
+            TrackGenerationResult result = pipeline.Run(resolved, seed);
+            if (result.Success) return result;
+
+            switch (Designer.Generation.FailurePolicy)
+            {
+                case GenerationFailurePolicy.RelaxOptionalSettings:
+                {
+                    TrackDesignerSettings relaxed = Designer.Clone();
+                    var records = RelaxOptionalSettings(relaxed);
+                    var relaxedResolved = ResolvedTrackGenerationConfig.Resolve(Config, relaxed);
+                    TrackGenerationResult retry = pipeline.Run(relaxedResolved, seed);
+
+                    // Merge failure history so the report shows the whole story.
+                    retry.Report.Failures.InsertRange(0, result.Report.Failures);
+                    retry.Report.RelaxedSettings.AddRange(records);
+                    retry.Report.AttemptsEvaluated += result.Report.AttemptsEvaluated;
+                    return retry;
+                }
+
+                case GenerationFailurePolicy.UseSimpleTemplate:
+                {
+                    TrackDesignerSettings template = BuildTemplateSettings();
+                    var templateResolved = ResolvedTrackGenerationConfig.Resolve(Config, template);
+                    TrackGenerationResult retry = pipeline.Run(templateResolved, seed);
+
+                    retry.Report.Failures.InsertRange(0, result.Report.Failures);
+                    retry.Report.AttemptsEvaluated += result.Report.AttemptsEvaluated;
+                    if (retry.Success)
+                    {
+                        retry.UsedFallback = true;
+                        retry.Report.UsedFallback = true;
+                        retry.Report.FallbackDescription =
+                            "Simple validated template — the requested settings could NOT be satisfied. This track does not match the request.";
+                    }
+                    return retry;
+                }
+
+                default:
+                    // KeepPreviousValidTrack / FailAndReport: nothing is built either way;
+                    // the previous track is never destroyed before a successful swap.
+                    return result;
+            }
+        }
+
+        /// <summary>Relaxes optional weights/preferences ONLY — required counts and patterns are untouched.</summary>
+        private static List<RelaxedSettingRecord> RelaxOptionalSettings(TrackDesignerSettings s)
+        {
+            var records = new List<RelaxedSettingRecord>();
+
+            void Relax(string name, ref float value, float relaxedValue)
+            {
+                if (Mathf.Approximately(value, relaxedValue)) return;
+                records.Add(new RelaxedSettingRecord { SettingName = name, OriginalValue = value, RelaxedValue = relaxedValue });
+                value = relaxedValue;
+            }
+
+            Relax("Features.CompoundFeatureChance", ref s.Features.CompoundFeatureChance, 0f);
+            Relax("Layout.CornerSequenceChance", ref s.Layout.CornerSequenceChance, s.Layout.CornerSequenceChance * 0.5f);
+            Relax("Scale.PacingVariation", ref s.Scale.PacingVariation, Mathf.Min(s.Scale.PacingVariation, 0.4f));
+
+            void RelaxRule(string name, TrackFeatureRule rule)
+            {
+                if (rule == null || !rule.Enabled) return;
+                if (rule.MaximumCount > rule.MinimumCount)
+                {
+                    records.Add(new RelaxedSettingRecord
+                    {
+                        SettingName = $"{name}.MaximumCount",
+                        OriginalValue = rule.MaximumCount,
+                        RelaxedValue = Mathf.Max(rule.MinimumCount, rule.MinimumCount)
+                    });
+                    rule.MaximumCount = Mathf.Max(rule.MinimumCount, rule.MinimumCount);
+                }
+                if (rule.MinimumCount == 0 && rule.OptionalWeight > 0f)
+                {
+                    records.Add(new RelaxedSettingRecord
+                    {
+                        SettingName = $"{name}.OptionalWeight",
+                        OriginalValue = rule.OptionalWeight,
+                        RelaxedValue = 0f
+                    });
+                    rule.OptionalWeight = 0f;
+                }
+            }
+
+            RelaxRule("Features.Loops", s.Features.Loops);
+            RelaxRule("Features.Corkscrews", s.Features.Corkscrews);
+            RelaxRule("Features.Spirals", s.Features.Spirals);
+            RelaxRule("Features.Jumps", s.Features.Jumps);
+            RelaxRule("Features.HalfLoops", s.Features.HalfLoops);
+            RelaxRule("Features.Chicanes", s.Features.Chicanes);
+            RelaxRule("Features.SCurves", s.Features.SCurves);
+
+            if (s.Branches.MaxBranchGroups > s.Branches.MinBranchGroups)
+            {
+                records.Add(new RelaxedSettingRecord
+                {
+                    SettingName = "Branches.MaxBranchGroups",
+                    OriginalValue = s.Branches.MaxBranchGroups,
+                    RelaxedValue = s.Branches.MinBranchGroups
+                });
+                s.Branches.MaxBranchGroups = s.Branches.MinBranchGroups;
+            }
+
+            s.Sanitize();
+            return records;
+        }
+
+        /// <summary>A minimal circuit request that still respects the rulebook's allowed features (no features, no branches).</summary>
+        private TrackDesignerSettings BuildTemplateSettings()
+        {
+            TrackDesignerSettings t = Designer.Clone();
+            t.Layout.MinTurnCount = 6;
+            t.Layout.MaxTurnCount = 8;
+            t.Layout.DirectionPattern = TurnDirectionPattern.Mixed;
+            t.Layout.CornerSequenceChance = 0f;
+            t.Features.Loops = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.Corkscrews = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.Spirals = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.Jumps = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.HalfLoops = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.Chicanes = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.SCurves = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.Hairpins = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.MinFeatureGroups = 0;
+            t.Features.MaxFeatureGroups = 0;
+            t.Features.RequiredPatterns.Clear();
+            t.Branches.MinBranchGroups = 0;
+            t.Branches.MaxBranchGroups = 0;
+            t.Elevation.TargetElevationAmplitude = Mathf.Min(t.Elevation.TargetElevationAmplitude, 80f);
+            t.Elevation.MinMajorElevationSections = 0;
+            t.Elevation.MaxMajorElevationSections = 3;
+            t.Sanitize();
+            return t;
+        }
+
+        // ─────────────────────────── Transactional build ───────────────────────────
+
         /// <summary>
-        /// Adopts a track that was generated in the editor before play mode was entered,
-        /// restoring the non-serialized runtime references from the persisted scene objects.
-        /// Returns false when no usable existing track is found (e.g. the scene was reloaded
-        /// from disk, which loses the procedural meshes) — the caller regenerates then.
+        /// Builds meshes and the race course under a TEMPORARY root; only when everything
+        /// succeeds is the previous track destroyed and the new root swapped in.
+        /// </summary>
+        private bool TryBuildTransactional(TrackSeed seed, TrackGenerationResult result)
+        {
+            GeneratedTrackLayout layout = result.Layout;
+            var tempRootObj = new GameObject($"GeneratedTrack_{seed.BaseSeed}_pending");
+            tempRootObj.transform.SetParent(transform, false);
+
+            try
+            {
+                ResolvedTrackGenerationConfig resolved = ResolvedTrackGenerationConfig.Resolve(Config, Designer);
+
+                var prismBuilder = new BoxPrismTrackMeshBuilder(resolved.RoadProfile);
+                prismBuilder.Build(layout.Sections, MainRoadMaterial, WallMaterial, tempRootObj.transform);
+
+                // Validate the built objects before committing.
+                int meshCount = 0;
+                foreach (MeshFilter f in tempRootObj.GetComponentsInChildren<MeshFilter>(true))
+                    if (f.sharedMesh != null && f.sharedMesh.vertexCount > 0) meshCount++;
+
+                if (meshCount == 0)
+                {
+                    result.Report.AddFailure(-1, GenerationFailureReason.MeshBuildFailure, "MeshBuild",
+                        "Mesh build produced no valid meshes.");
+                    result.Success = false;
+                    DestroyObject(tempRootObj);
+                    return false;
+                }
+
+                var visualizer = tempRootObj.AddComponent<MacroTrackDebugVisualizer>();
+                visualizer.Initialize(seed.BaseSeed, layout.Sections, resolved.RoadProfile);
+                visualizer.SetLayout(layout);
+
+                if (buildRaceCourse)
+                {
+                    RaceCourse course = RaceCourseBuilder.Build(tempRootObj.transform, layout, resolved.RoadProfile,
+                        checkpointCount, startLineArcOffset);
+                    if (course == null)
+                    {
+                        result.Report.AddFailure(-1, GenerationFailureReason.RaceCourseBuildFailure, "RaceCourse",
+                            "Race course build failed — track rejected (transactional).");
+                        result.Success = false;
+                        DestroyObject(tempRootObj);
+                        return false;
+                    }
+                }
+
+                // Commit: destroy the previous track and promote the temporary root.
+                if (trackRoot != null) DestroyObject(trackRoot.gameObject);
+
+                tempRootObj.name = $"GeneratedTrack_{seed.BaseSeed}";
+                trackRoot = tempRootObj.transform;
+
+                CurrentMacroSections = layout.Sections;
+                CurrentLayout = layout;
+                UpdateGeneratedMeshStats();
+                return true;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogException(e);
+                result.Report.AddFailure(-1, GenerationFailureReason.MeshBuildFailure, "MeshBuild",
+                    $"Exception during build: {e.Message}");
+                result.Success = false;
+                DestroyObject(tempRootObj);
+                return false;
+            }
+        }
+
+        private static void DestroyObject(GameObject obj)
+        {
+            if (obj == null) return;
+            if (Application.isPlaying)
+            {
+                obj.SetActive(false);
+                Destroy(obj);
+            }
+            else DestroyImmediate(obj);
+        }
+
+        // ─────────────────────────── Adoption / spawn ───────────────────────────
+
+        /// <summary>
+        /// Adopts a track generated in the editor before play mode (the section list is
+        /// serialized on the debug visualizer, so runtime references restore losslessly).
         /// </summary>
         private bool TryAdoptExistingTrack()
         {
             if (trackRoot == null) return false;
 
-            // A scene reload from disk keeps the root object but loses the procedural
-            // meshes — a root without any usable mesh is a stale husk, not a track.
             bool hasMesh = false;
             foreach (MeshFilter filter in trackRoot.GetComponentsInChildren<MeshFilter>(true))
             {
@@ -240,25 +393,12 @@ namespace TrackGeneration
             }
             if (!hasMesh) return false;
 
-            // Macro mode: the debug visualizer on the track root serializes the full
-            // section list, so the runtime references restore losslessly.
             var visualizer = trackRoot.GetComponent<MacroTrackDebugVisualizer>();
             if (visualizer != null && visualizer.Sections != null && visualizer.Sections.Count > 0)
             {
                 CurrentMacroSections = visualizer.Sections;
                 UpdateGeneratedMeshStats();
-                Debug.Log($"[TrackGenerator] Keeping editor-generated track (seed {visualizer.Seed}, {visualizer.Sections.Count} sections) — regeneration on play skipped.");
-                return true;
-            }
-
-            // Legacy spline mode: the spline containers persist in the scene, and the
-            // hovercraft start frame only needs the main circuit.
-            var circuit = trackRoot.GetComponentInChildren<SplineContainer>(true);
-            if (circuit != null)
-            {
-                _adoptedLegacyCircuit = circuit;
-                UpdateGeneratedMeshStats();
-                Debug.Log("[TrackGenerator] Keeping editor-generated legacy track — regeneration on play skipped.");
+                Debug.Log($"[TrackGenerator] Keeping editor-generated track (seed {visualizer.Seed}, {visualizer.Sections.Count} sections).");
                 return true;
             }
 
@@ -268,10 +408,10 @@ namespace TrackGeneration
         [ContextMenu("Place Hovercraft At Track Start")]
         public void PlaceHovercraftAtTrackStart()
         {
-            Transform craft = ResolveHovercraft();
-            if (craft == null)
+            _craft ??= TrackCraftLocator.FindCraft();
+            if (_craft == null || _craft.CraftTransform == null)
             {
-                Debug.LogWarning("[TrackGenerator] Could not place hovercraft: no CraftCore or HovercraftRoot object found.");
+                Debug.LogWarning("[TrackGenerator] Could not place hovercraft: no ITrackRaceCraft found in the scene.");
                 return;
             }
 
@@ -285,11 +425,10 @@ namespace TrackGeneration
             forward = Vector3.ProjectOnPlane(forward, up);
             forward = forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward;
 
-            float rideHeight = GetRideHeight(craft);
-            Vector3 spawnPosition = position + forward * startLineForwardOffset + up * rideHeight;
+            Vector3 spawnPosition = position + forward * startLineForwardOffset + up * _craft.SpawnRideHeight;
             Quaternion spawnRotation = Quaternion.LookRotation(forward, up);
 
-            Rigidbody rb = craft.GetComponent<Rigidbody>();
+            Rigidbody rb = _craft.CraftRigidbody;
             if (rb != null)
             {
                 rb.position = spawnPosition;
@@ -300,10 +439,10 @@ namespace TrackGeneration
             }
             else
             {
-                craft.SetPositionAndRotation(spawnPosition, spawnRotation);
+                _craft.CraftTransform.SetPositionAndRotation(spawnPosition, spawnRotation);
             }
 
-            ResetHovercraftCamera(craft, rb);
+            _craft.OnPlacedAtTrackStart();
 
             // A teleport is never a lap: abandon the lap in progress and re-arm the gates.
             if (trackRoot != null)
@@ -313,110 +452,16 @@ namespace TrackGeneration
             }
         }
 
-        /// <summary>
-        /// Macro-section pipeline: layout brain chooses readable race sections and lays out
-        /// connection frames; the prism builder turns each section into its own clean mesh.
-        /// Stunt actors / gravity / shortcuts reconnect to this pipeline in a later pass.
-        /// </summary>
-        private void GenerateMacroTrack(GameObject rootObj, TrackSeed seed)
-        {
-            Unity.Mathematics.Random layoutRng = seed.CreateSubsystemRandom("MacroLayout");
-
-            // Rulebook limits + designer intent → the internal values the generator consumes.
-            ResolvedTrackGenerationConfig resolved = ResolvedTrackGenerationConfig.Resolve(Config, Designer);
-
-            var layoutGenerator = new MacroTrackLayoutGenerator();
-            List<GeneratedTrackSection> sections = layoutGenerator.Generate(resolved, ref layoutRng);
-
-            // Global half-pipe rule: the resolved road profile is handed to the mesh
-            // builder so EVERY section gets the rideable water-slide cross-section.
-            var prismBuilder = new BoxPrismTrackMeshBuilder(resolved.RoadProfile);
-            prismBuilder.Build(sections, MainRoadMaterial, WallMaterial, trackRoot);
-
-            var visualizer = rootObj.AddComponent<MacroTrackDebugVisualizer>();
-            visualizer.Initialize(seed.BaseSeed, sections, resolved.RoadProfile);
-
-            // Race course: start/finish line + in-order checkpoints for time attack.
-            if (buildRaceCourse)
-            {
-                RaceCourseBuilder.Build(trackRoot, sections, resolved.RoadProfile, checkpointCount, startLineArcOffset);
-            }
-
-            CurrentMacroSections = sections;
-            CurrentTrackData = null; // legacy data does not apply in macro mode
-            UpdateGeneratedMeshStats();
-
-            float length = sections.Count > 0 ? sections[sections.Count - 1].EndFrame.ArcLength : 0f;
-            Debug.Log($"[TrackGenerator] Generated MACRO track! Seed: {seed.BaseSeed}, Sections: {sections.Count}, Length: {length:F1}m.");
-        }
-
-        private void ClearGeneratedMeshStats()
-        {
-            generatedMeshCount = 0;
-            generatedVertexCount = 0;
-            generatedTriangleCount = 0;
-        }
-
-        private void UpdateGeneratedMeshStats()
-        {
-            ClearGeneratedMeshStats();
-
-            if (trackRoot == null)
-                return;
-
-            MeshFilter[] filters = trackRoot.GetComponentsInChildren<MeshFilter>(true);
-            foreach (MeshFilter filter in filters)
-            {
-                UnityEngine.Mesh mesh = filter.sharedMesh;
-                if (mesh == null)
-                    continue;
-
-                generatedMeshCount++;
-                generatedVertexCount += mesh.vertexCount;
-
-                for (int i = 0; i < mesh.subMeshCount; i++)
-                {
-                    if (mesh.GetTopology(i) == MeshTopology.Triangles)
-                    {
-                        generatedTriangleCount += (int)(mesh.GetIndexCount(i) / 3);
-                    }
-                }
-            }
-        }
-
         private bool TryGetTrackStartFrame(out Vector3 position, out Vector3 forward, out Vector3 up)
         {
             Transform root = trackRoot != null ? trackRoot : transform;
 
-            if (Mode == GenerationMode.MacroSections && CurrentMacroSections != null && CurrentMacroSections.Count > 0)
+            if (CurrentMacroSections != null && CurrentMacroSections.Count > 0)
             {
                 TrackConnectionFrame start = CurrentMacroSections[0].StartFrame;
                 position = root.TransformPoint(start.Position);
                 forward = root.TransformDirection(start.Forward);
                 up = root.TransformDirection(start.Up);
-                return true;
-            }
-
-            // Legacy mode: the live generated data, or the circuit adopted from an
-            // editor-generated track when entering play mode.
-            SplineContainer legacyCircuit = CurrentTrackData != null ? CurrentTrackData.MainCircuit : _adoptedLegacyCircuit;
-
-            if (legacyCircuit != null)
-            {
-                SplineUtilities.EvaluateSplineFrameBanked(
-                    legacyCircuit,
-                    0f,
-                    Config != null ? Config.BankingMultiplier : 0f,
-                    Config != null ? Config.MaxBankAngle : 0f,
-                    Config != null ? Config.MeshSegmentLength : 5f,
-                    out Unity.Mathematics.float3 splinePosition,
-                    out Unity.Mathematics.float3 splineForward,
-                    out Unity.Mathematics.float3 splineUp,
-                    out _);
-
-                position = new Vector3(splinePosition.x, splinePosition.y, splinePosition.z);
-                forward = new Vector3(splineForward.x, splineForward.y, splineForward.z);
-                up = new Vector3(splineUp.x, splineUp.y, splineUp.z);
                 return true;
             }
 
@@ -426,167 +471,65 @@ namespace TrackGeneration
             return false;
         }
 
-        private Transform ResolveHovercraft()
+        // ─────────────────────────── Stats / logging ───────────────────────────
+
+        private void UpdateGeneratedMeshStats()
         {
-            if (hovercraft != null) return hovercraft;
+            generatedMeshCount = 0;
+            generatedVertexCount = 0;
+            generatedTriangleCount = 0;
 
-            var core = UnityEngine.Object.FindAnyObjectByType<global::CraftCore>();
-            if (core != null)
+            if (trackRoot == null) return;
+
+            foreach (MeshFilter filter in trackRoot.GetComponentsInChildren<MeshFilter>(true))
             {
-                hovercraft = core.transform;
-                return hovercraft;
-            }
+                UnityEngine.Mesh mesh = filter.sharedMesh;
+                if (mesh == null) continue;
 
-            GameObject namedCraft = GameObject.Find("HovercraftRootV2") ?? GameObject.Find("HovercraftRoot");
-            if (namedCraft != null)
-            {
-                hovercraft = namedCraft.transform;
-            }
+                generatedMeshCount++;
+                generatedVertexCount += mesh.vertexCount;
 
-            return hovercraft;
-        }
-
-        private float GetRideHeight(Transform craft)
-        {
-            var hoverArray = craft.GetComponent<global::HoverStabilizerArray>();
-            if (hoverArray != null)
-            {
-                return Mathf.Max(0f, hoverArray.hoverHeight + 0.05f);
-            }
-
-            return fallbackRideHeight;
-        }
-
-        private static void ResetHovercraftCamera(Transform craft, Rigidbody rb)
-        {
-            var hovercraftCamera = UnityEngine.Object.FindAnyObjectByType<global::HovercraftCamera>();
-            if (hovercraftCamera == null) return;
-
-            hovercraftCamera.target = craft;
-            hovercraftCamera.targetRigidbody = rb != null ? rb : craft.GetComponent<Rigidbody>();
-            hovercraftCamera.craftCore = craft.GetComponent<global::CraftCore>();
-            hovercraftCamera.ResetCameraImmediate();
-        }
-
-        private void BuildStunts(List<StuntPlacement> placements, SplineContainer mainCircuit, List<TrackBranch> shortcuts)
-        {
-            GameObject stuntsRoot = new GameObject("Stunts");
-            stuntsRoot.transform.SetParent(trackRoot, false);
-
-            foreach (var placement in placements)
-            {
-                SplineContainer targetSpline = placement.SplineIndex == 0 ? mainCircuit : shortcuts[placement.SplineIndex - 1].Spline;
-                float roadWidth = placement.SplineIndex == 0 ? Config.MainRoadWidth : Config.ShortcutRoadWidth;
-
-                // Banked frame: ramps and pads must sit flush on the banked road surface.
-                SplineUtilities.EvaluateSplineFrameBanked(targetSpline, placement.T, Config.BankingMultiplier, Config.MaxBankAngle, Config.MeshSegmentLength,
-                    out Unity.Mathematics.float3 pos, out Unity.Mathematics.float3 tan, out Unity.Mathematics.float3 up, out Unity.Mathematics.float3 right);
-
-                SplineFrame frame = new SplineFrame {
-                    T = placement.T,
-                    Position = pos,
-                    Tangent = tan,
-                    Up = up,
-                    Right = right
-                };
-
-                if (placement.Type == StuntType.Ramp)
+                for (int i = 0; i < mesh.subMeshCount; i++)
                 {
-                    // Full chain from the tuning file: Jump Ramp → Air Gap → Landing Ramp.
-                    // (The recovery straight is guaranteed by the placer's site validation.)
-                    GameObject chainObj = new GameObject($"JumpGap_{placement.SplineIndex}_{placement.T:F2}");
-                    chainObj.transform.SetParent(stuntsRoot.transform, true);
-
-                    // Launch half.
-                    GameObject launchObj = new GameObject("LaunchRamp");
-                    launchObj.transform.SetParent(chainObj.transform, true);
-                    RampActor launch = launchObj.AddComponent<RampActor>();
-                    launch.Mode = RampMode.Launch;
-                    launch.RampLength = placement.Length;
-                    launch.RampHeight = placement.Height;
-                    launch.Generate(frame, roadWidth, placement.Lane);
-
-                    // Landing half — placed arc-accurately down the road (t is NOT arc-uniform).
-                    float landingT = SplineUtilities.GetTAtDistance(targetSpline, placement.T, placement.Length + placement.AirGapLength);
-                    SplineUtilities.EvaluateSplineFrameBanked(targetSpline, landingT, Config.BankingMultiplier, Config.MaxBankAngle, Config.MeshSegmentLength,
-                        out pos, out tan, out up, out right);
-                    SplineFrame landingFrame = new SplineFrame {
-                        T = landingT,
-                        Position = pos,
-                        Tangent = tan,
-                        Up = up,
-                        Right = right
-                    };
-
-                    GameObject landingObj = new GameObject("LandingRamp");
-                    landingObj.transform.SetParent(chainObj.transform, true);
-                    RampActor landing = landingObj.AddComponent<RampActor>();
-                    landing.Mode = RampMode.Landing;
-                    landing.RampLength = placement.LandingLength;
-                    // Slightly lower than the launch lip: the craft arrives descending and the
-                    // catch surface eases it down instead of slamming the nose.
-                    landing.RampHeight = placement.Height * 0.85f;
-                    landing.Generate(landingFrame, roadWidth, placement.Lane);
-                }
-                else if (placement.Type == StuntType.BoostPad)
-                {
-                    GameObject padObj = new GameObject($"BoostPad_{placement.SplineIndex}_{placement.T:F2}");
-                    padObj.transform.SetParent(stuntsRoot.transform, true);
-                    BoostPadActor pad = padObj.AddComponent<BoostPadActor>();
-                    pad.PadLength = placement.Length;
-                    pad.Generate(frame, roadWidth, placement.Lane, Config.BoostPadStrength);
-                }
-                else if (placement.Type == StuntType.WallRide)
-                {
-                    GameObject wallRideObj = new GameObject($"WallRide_{placement.SplineIndex}_{placement.T:F2}");
-                    wallRideObj.transform.SetParent(stuntsRoot.transform, true);
-                    WallRideActor wallRide = wallRideObj.AddComponent<WallRideActor>();
-                    wallRide.SectionLength = placement.Length;
-                    
-                    // Sample frames along the wall ride length
-                    int numFrames = 20;
-                    SplineFrame[] frames = new SplineFrame[numFrames];
-                    float tStep = (placement.Length / SplineUtilities.GetSplineLength(targetSpline)) / numFrames;
-                    for(int i = 0; i < numFrames; i++)
-                    {
-                        float currentT = placement.T + i * tStep;
-                        SplineUtilities.EvaluateSplineFrame(targetSpline, currentT, out pos, out tan, out up, out right);
-                        frames[i] = new SplineFrame { T = currentT, Position = pos, Tangent = tan, Up = up, Right = right };
-                    }
-
-                    wallRide.Generate(frames, roadWidth);
+                    if (mesh.GetTopology(i) == MeshTopology.Triangles)
+                        generatedTriangleCount += (int)(mesh.GetIndexCount(i) / 3);
                 }
             }
         }
 
-        private void BuildGravityZones(List<GravityZonePlacement> placements, SplineContainer mainCircuit, List<TrackBranch> shortcuts)
+        private void LogSuccess(TrackGenerationResult result)
         {
-            GameObject gravityRoot = new GameObject("GravityZones");
-            gravityRoot.transform.SetParent(trackRoot, false);
+            var m = result.Layout.Metrics;
+            string fallback = result.UsedFallback ? " [TEMPLATE FALLBACK — request NOT satisfied]" : "";
+            Debug.Log(
+                $"[TrackGenerator] Generated track{fallback}. Seed {result.RequestedSeed}, " +
+                $"attempts {result.AttemptsEvaluated}, candidates {result.ValidCandidateCount}, score {result.Report.SelectedCandidateScore:F1}.\n" +
+                $"  Lap {m.LapLengthMeters / 1000f:F2}km, est. {m.EstimatedNeutralLapTimeSeconds:F1}s | turns {m.TurnCount} | " +
+                $"loops {m.LoopCount}, corkscrews {m.CorkscrewCount}, spirals {m.SpiralCount}, half-loops {m.HalfLoopCount}, jumps {m.JumpCount} | " +
+                $"branches {m.BranchGroupCount} | elevation {m.MinElevation:F0}..{m.MaxElevation:F0}m | rings {m.TotalRings}.");
 
-            foreach (var placement in placements)
+            foreach (var b in result.Report.BranchBalance)
+                Debug.Log($"[TrackGenerator] {b}");
+
+            foreach (var w in result.Report.Warnings)
+                Debug.LogWarning($"[TrackGenerator] {w}");
+        }
+
+        private void LogFailure(TrackGenerationResult result)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"[TrackGenerator] Generation FAILED (seed {result.RequestedSeed}, {result.AttemptsEvaluated} attempts, {result.ValidCandidateCount} valid candidates). Previous track kept.");
+            foreach (var (reason, count) in result.Report.FailureCountsByReason())
+                sb.AppendLine($"  {reason}: ×{count}");
+
+            int shown = 0;
+            foreach (var f in result.Report.Failures)
             {
-                SplineContainer targetSpline = placement.SplineIndex == 0 ? mainCircuit : shortcuts[placement.SplineIndex - 1].Spline;
-                float roadWidth = placement.SplineIndex == 0 ? Config.MainRoadWidth : Config.ShortcutRoadWidth;
-
-                GameObject zoneObj = new GameObject($"GravityZone_{placement.SplineIndex}_{placement.T:F2}");
-                zoneObj.transform.SetParent(gravityRoot.transform, false);
-                GravityZone zone = zoneObj.AddComponent<GravityZone>();
-
-                // Sample frames
-                int numFrames = 10;
-                SplineFrame[] frames = new SplineFrame[numFrames];
-                float tStep = (placement.Length / SplineUtilities.GetSplineLength(targetSpline)) / numFrames;
-                for(int i = 0; i < numFrames; i++)
-                {
-                    float currentT = placement.T + i * tStep;
-                    SplineUtilities.EvaluateSplineFrame(targetSpline, currentT, out Unity.Mathematics.float3 pos, out Unity.Mathematics.float3 tan, out Unity.Mathematics.float3 up, out Unity.Mathematics.float3 right);
-                    frames[i] = new SplineFrame { T = currentT, Position = pos, Tangent = tan, Up = up, Right = right };
-                }
-
-                zoneObj.transform.position = frames[numFrames / 2].Position;
-                zone.Generate(frames, roadWidth, placement.Strength, placement.Radius);
+                if (shown++ >= 6) { sb.AppendLine("  … (full list in the Last Generation Report)"); break; }
+                sb.AppendLine($"  {f}");
             }
+
+            Debug.LogError(sb.ToString().TrimEnd());
         }
     }
 }

@@ -94,6 +94,7 @@ namespace TrackGeneration.Race
                 BankAngle = Mathf.LerpAngle(a.BankAngle, b.BankAngle, t),
                 PitchAngle = Mathf.LerpAngle(a.PitchAngle, b.PitchAngle, t),
                 ArcLength = arc,
+                LapProgress = Mathf.Lerp(a.LapProgress, b.LapProgress, t),
                 SideHeight = Mathf.Lerp(a.SideHeight, b.SideHeight, t)
             };
         }

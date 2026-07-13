@@ -1,6 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
-using TrackGeneration.Splines;
+using TrackGeneration.Macro;
 
 namespace TrackGeneration.Gravity
 {
@@ -133,11 +133,11 @@ namespace TrackGeneration.Gravity
         /// Procedurally generates this gravity zone's emitters and triggers along the given track frames.
         /// Called by the track generator during procedural track building.
         /// </summary>
-        /// <param name="trackFrames">Sampled spline frames covering this zone's extent.</param>
+        /// <param name="trackFrames">Sampled track frames covering this zone's extent.</param>
         /// <param name="roadWidth">Width of the road at this section (meters).</param>
         /// <param name="strength">Gravity field strength to apply.</param>
         /// <param name="radius">Gravity field radius for each emitter.</param>
-        public void Generate(SplineFrame[] trackFrames, float roadWidth, float strength, float radius)
+        public void Generate(TrackConnectionFrame[] trackFrames, float roadWidth, float strength, float radius)
         {
             if (trackFrames == null || trackFrames.Length < 2)
             {
@@ -146,10 +146,10 @@ namespace TrackGeneration.Gravity
             }
 
             // Use the midpoint frame for emitter placement
-            SplineFrame midFrame = trackFrames[trackFrames.Length / 2];
+            TrackConnectionFrame midFrame = trackFrames[trackFrames.Length / 2];
             Vector3 center = midFrame.Position;
-            Vector3 right = (Vector3)midFrame.Right;
-            Vector3 forward = (Vector3)midFrame.Tangent;
+            Vector3 right = midFrame.Right;
+            Vector3 forward = midFrame.Forward;
 
             switch (zoneType)
             {
@@ -209,10 +209,10 @@ namespace TrackGeneration.Gravity
                 new Color(1f, 0.5f, 0f, 1f));
         }
 
-        private void GenerateTriggers(SplineFrame[] trackFrames, float roadWidth)
+        private void GenerateTriggers(TrackConnectionFrame[] trackFrames, float roadWidth)
         {
             // Entry trigger at the first frame
-            SplineFrame entryFrame = trackFrames[0];
+            TrackConnectionFrame entryFrame = trackFrames[0];
             if (entryTrigger == null)
             {
                 var entryGO = new GameObject("EntryTrigger");
@@ -224,10 +224,10 @@ namespace TrackGeneration.Gravity
             }
             entryTrigger.transform.position = entryFrame.Position;
             entryTrigger.transform.rotation = Quaternion.LookRotation(
-                (Vector3)entryFrame.Tangent, (Vector3)entryFrame.Up);
+                entryFrame.Forward, entryFrame.Up);
 
             // Exit trigger at the last frame
-            SplineFrame exitFrame = trackFrames[trackFrames.Length - 1];
+            TrackConnectionFrame exitFrame = trackFrames[trackFrames.Length - 1];
             if (exitTrigger == null)
             {
                 var exitGO = new GameObject("ExitTrigger");
@@ -239,7 +239,7 @@ namespace TrackGeneration.Gravity
             }
             exitTrigger.transform.position = exitFrame.Position;
             exitTrigger.transform.rotation = Quaternion.LookRotation(
-                (Vector3)exitFrame.Tangent, (Vector3)exitFrame.Up);
+                exitFrame.Forward, exitFrame.Up);
         }
 
         // ──────────────────────────────────────────────

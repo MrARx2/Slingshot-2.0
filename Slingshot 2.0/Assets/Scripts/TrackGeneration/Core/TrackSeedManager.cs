@@ -164,25 +164,6 @@ namespace TrackGeneration.Core
             Debug.Log($"[TrackSeedManager] Imported seed '{activeSeed.DisplayName}'.");
         }
 
-        /// <summary>
-        /// Appends a <see cref="TrackModification"/> to the active seed's
-        /// modification list.
-        /// </summary>
-        /// <param name="mod">The modification to append.</param>
-        public void AddModification(TrackModification mod)
-        {
-            if (activeSeed == null)
-            {
-                Debug.LogWarning("[TrackSeedManager] Cannot add modification — no active seed.");
-                return;
-            }
-
-            activeSeed.Modifications.Add(mod);
-            lastGeneratedHash = activeSeed.ComputeHash();
-
-            Debug.Log($"[TrackSeedManager] Added modification {mod.Type} (target: {mod.TargetIndex}). Total mods: {activeSeed.Modifications.Count}.");
-        }
-
         /// <summary>Returns the currently active <see cref="TrackSeed"/>.</summary>
         /// <returns>The active seed, or <c>null</c> if none has been initialized.</returns>
         public TrackSeed GetActiveSeed()

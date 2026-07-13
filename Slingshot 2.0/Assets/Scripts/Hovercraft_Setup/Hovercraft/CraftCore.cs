@@ -35,8 +35,31 @@ using UnityEngine;
 /// </summary>
 [RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(ThrusterBus))]
-public class CraftCore : MonoBehaviour
+public class CraftCore : MonoBehaviour, TrackGeneration.ITrackRaceCraft
 {
+    // ══════════════════════════════════════════════════════════════
+    //  ITrackRaceCraft — contract used by the track-generation assembly
+    //  (keeps the track code free of concrete craft/camera references)
+    // ══════════════════════════════════════════════════════════════
+
+    Transform TrackGeneration.ITrackRaceCraft.CraftTransform => transform;
+
+    Rigidbody TrackGeneration.ITrackRaceCraft.CraftRigidbody => _rb != null ? _rb : GetComponent<Rigidbody>();
+
+    float TrackGeneration.ITrackRaceCraft.SpawnRideHeight
+        => hoverArray != null ? Mathf.Max(0f, hoverArray.hoverHeight + 0.05f) : 2.05f;
+
+    void TrackGeneration.ITrackRaceCraft.OnPlacedAtTrackStart()
+    {
+        var hovercraftCamera = FindAnyObjectByType<HovercraftCamera>();
+        if (hovercraftCamera == null) return;
+
+        hovercraftCamera.target = transform;
+        hovercraftCamera.targetRigidbody = _rb != null ? _rb : GetComponent<Rigidbody>();
+        hovercraftCamera.craftCore = this;
+        hovercraftCamera.ResetCameraImmediate();
+    }
+
     // ══════════════════════════════════════════════════════════════
     //  V2 SUBSYSTEM REFERENCES
     // ══════════════════════════════════════════════════════════════

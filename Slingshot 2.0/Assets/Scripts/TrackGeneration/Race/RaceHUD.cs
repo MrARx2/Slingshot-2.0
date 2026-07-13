@@ -121,7 +121,7 @@ namespace TrackGeneration.Race
             rowY += 34f * uiScale;
 
             // Checkpoint progress
-            int cpTotal = course.Checkpoints.Count;
+            int cpTotal = course.CheckpointCount;
             int cpDone = Mathf.Min(course.NextCheckpointIndex, cpTotal);
             Color cpColor = !course.LapInProgress ? mutedColor : cpDone >= cpTotal ? greenColor : yellowColor;
             DrawKeyValue(new Rect(x + pad, rowY, innerWidth, 20f * uiScale), "CHECKPOINTS", $"{cpDone}/{cpTotal}", cpColor);

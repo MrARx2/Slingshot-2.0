@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
@@ -7,24 +6,17 @@ using UnityEngine;
 namespace TrackGeneration.Core
 {
     /// <summary>
-    /// Encapsulates a base seed value together with an ordered list of
-    /// <see cref="TrackModification"/> records.  Two <see cref="TrackSeed"/>
-    /// instances with identical data will always produce the same track.
+    /// A base seed value plus deterministic subsystem RNG derivation. Two
+    /// <see cref="TrackSeed"/> instances with the same base seed always produce the
+    /// same subsystem random streams — and therefore the same track for the same
+    /// designer settings and rulebook.
     /// </summary>
     [Serializable]
     public class TrackSeed
     {
-        // ──────────────────────────────────────────────
-        //  Serialized Fields
-        // ──────────────────────────────────────────────
-
         /// <summary>Base integer seed used by every subsystem RNG.</summary>
         [Tooltip("Base integer seed for deterministic generation.")]
         public int BaseSeed;
-
-        /// <summary>Ordered list of user or procedural modifications applied on top of the base seed.</summary>
-        [Tooltip("Ordered list of modifications applied after initial generation.")]
-        public List<TrackModification> Modifications = new List<TrackModification>();
 
         /// <summary>Human-readable name shown in UI (auto-generated or user-set).</summary>
         [Tooltip("Display name for the UI.")]
@@ -34,13 +26,6 @@ namespace TrackGeneration.Core
         [Tooltip("Creation timestamp.")]
         [SerializeField] private string createdAtTicks;
 
-        // ──────────────────────────────────────────────
-        //  Properties
-        // ──────────────────────────────────────────────
-
-        /// <summary>Whether any modifications have been applied to this seed.</summary>
-        public bool HasModifications => Modifications != null && Modifications.Count > 0;
-
         /// <summary>Creation date/time of this seed.</summary>
         public DateTime CreatedAt
         {
@@ -48,154 +33,74 @@ namespace TrackGeneration.Core
             set => createdAtTicks = value.Ticks.ToString();
         }
 
-        // ──────────────────────────────────────────────
-        //  Deterministic Hashing
-        // ──────────────────────────────────────────────
-
-        /// <summary>
-        /// Computes a deterministic SHA-256 hash string from <see cref="BaseSeed"/>
-        /// and every <see cref="TrackModification"/> in order.
-        /// </summary>
-        /// <returns>Lowercase hexadecimal hash string.</returns>
+        /// <summary>Deterministic SHA-256 hash of the seed (for change detection / sharing).</summary>
         public string ComputeHash()
         {
             using SHA256 sha = SHA256.Create();
-
-            StringBuilder sb = new StringBuilder();
-            sb.Append(BaseSeed);
-
-            if (Modifications != null)
-            {
-                foreach (TrackModification mod in Modifications)
-                {
-                    sb.Append('|');
-                    sb.Append((int)mod.Type);
-                    sb.Append(',');
-                    sb.Append(mod.TargetIndex);
-                    sb.Append(',');
-                    sb.Append(mod.Delta.x.ToString("R"));
-                    sb.Append(',');
-                    sb.Append(mod.Delta.y.ToString("R"));
-                    sb.Append(',');
-                    sb.Append(mod.Delta.z.ToString("R"));
-                    sb.Append(',');
-                    sb.Append(mod.SerializedData ?? string.Empty);
-                }
-            }
-
-            byte[] bytes = Encoding.UTF8.GetBytes(sb.ToString());
+            byte[] bytes = Encoding.UTF8.GetBytes(BaseSeed.ToString());
             byte[] hash = sha.ComputeHash(bytes);
 
             StringBuilder hex = new StringBuilder(hash.Length * 2);
-            foreach (byte b in hash)
-            {
-                hex.Append(b.ToString("x2"));
-            }
-
+            foreach (byte b in hash) hex.Append(b.ToString("x2"));
             return hex.ToString();
         }
 
-        // ──────────────────────────────────────────────
-        //  Subsystem RNG
-        // ──────────────────────────────────────────────
-
         /// <summary>
-        /// Creates a deterministic <see cref="Unity.Mathematics.Random"/> instance
-        /// whose seed is derived from <see cref="BaseSeed"/> combined with a
-        /// subsystem-specific key.  The returned RNG is guaranteed to have a
-        /// non-zero seed.
+        /// Creates a deterministic RNG whose seed derives from <see cref="BaseSeed"/>
+        /// combined with a subsystem key. Distinct keys give independent streams —
+        /// changing one subsystem's draw count never perturbs another subsystem.
         /// </summary>
-        /// <param name="subsystemKey">
-        /// Unique string identifier for the calling subsystem
-        /// (e.g. "Elevation", "Branching", "Stunts").
-        /// </param>
-        /// <returns>A ready-to-use <see cref="Unity.Mathematics.Random"/>.</returns>
         public Unity.Mathematics.Random CreateSubsystemRandom(string subsystemKey)
         {
-            int combined = CombineHash(BaseSeed, subsystemKey.GetHashCode());
+            int combined = CombineHash(BaseSeed, StableStringHash(subsystemKey));
             uint derived = (uint)combined;
-
-            // Unity.Mathematics.Random requires a non-zero seed.
-            if (derived == 0u)
-            {
-                derived = 1u;
-            }
-
+            if (derived == 0u) derived = 1u;
             return new Unity.Mathematics.Random(derived);
         }
 
-        // ──────────────────────────────────────────────
-        //  Cloning
-        // ──────────────────────────────────────────────
-
-        /// <summary>
-        /// Returns a deep copy of this <see cref="TrackSeed"/>,
-        /// duplicating the modifications list.
-        /// </summary>
+        /// <summary>Returns a copy of this seed.</summary>
         public TrackSeed Clone()
         {
-            TrackSeed clone = new TrackSeed
+            return new TrackSeed
             {
                 BaseSeed = BaseSeed,
                 DisplayName = DisplayName,
-                createdAtTicks = createdAtTicks,
-                Modifications = Modifications != null
-                    ? new List<TrackModification>(Modifications)
-                    : new List<TrackModification>()
+                createdAtTicks = createdAtTicks
             };
-
-            return clone;
         }
 
-        // ──────────────────────────────────────────────
-        //  Factory
-        // ──────────────────────────────────────────────
-
-        /// <summary>
-        /// Creates a brand-new <see cref="TrackSeed"/> with the given base seed,
-        /// an empty modification list, and the current UTC time.
-        /// </summary>
-        /// <param name="seed">The base seed value.</param>
-        /// <returns>A freshly initialised <see cref="TrackSeed"/>.</returns>
+        /// <summary>Creates a new seed with the current UTC time.</summary>
         public static TrackSeed CreateNew(int seed)
         {
-            TrackSeed ts = new TrackSeed
+            var ts = new TrackSeed
             {
                 BaseSeed = seed,
-                Modifications = new List<TrackModification>(),
                 DisplayName = "Seed_" + seed
             };
-
             ts.CreatedAt = DateTime.UtcNow;
             return ts;
         }
 
-        // ──────────────────────────────────────────────
-        //  Serialization
-        // ──────────────────────────────────────────────
+        /// <summary>Serializes this seed to JSON.</summary>
+        public string Serialize() => JsonUtility.ToJson(this, prettyPrint: true);
 
-        /// <summary>Serializes this seed to a JSON string via <see cref="JsonUtility"/>.</summary>
-        public string Serialize()
-        {
-            return JsonUtility.ToJson(this, prettyPrint: true);
-        }
-
-        /// <summary>Deserializes a JSON string produced by <see cref="Serialize"/> back into a <see cref="TrackSeed"/>.</summary>
-        /// <param name="json">JSON string.</param>
-        /// <returns>The deserialized <see cref="TrackSeed"/>.</returns>
-        public static TrackSeed Deserialize(string json)
-        {
-            return JsonUtility.FromJson<TrackSeed>(json);
-        }
-
-        // ──────────────────────────────────────────────
-        //  Private Helpers
-        // ──────────────────────────────────────────────
+        /// <summary>Deserializes a seed produced by <see cref="Serialize"/>.</summary>
+        public static TrackSeed Deserialize(string json) => JsonUtility.FromJson<TrackSeed>(json);
 
         /// <summary>
-        /// Simple hash-combining helper (similar to System.HashCode.Combine
-        /// but available in all runtimes).
+        /// Platform-stable string hash (string.GetHashCode is randomized per process on
+        /// some runtimes, which would silently break cross-session determinism).
         /// </summary>
+        private static int StableStringHash(string s)
+        {
+            unchecked
+            {
+                int hash = 23;
+                foreach (char c in s) hash = hash * 31 + c;
+                return hash;
+            }
+        }
+
         private static int CombineHash(int h1, int h2)
         {
             unchecked

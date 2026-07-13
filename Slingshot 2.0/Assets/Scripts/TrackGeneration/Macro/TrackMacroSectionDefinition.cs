@@ -63,8 +63,45 @@ namespace TrackGeneration.Macro
     }
 
     /// <summary>
+    /// Readable orientation tag for connection-contract validation. The actual frames
+    /// and quaternions are the source of truth; tags make grammar checks understandable.
+    /// </summary>
+    public enum TrackOrientationTag
+    {
+        Upright,
+        Inverted,
+        VerticalAscending,
+        VerticalDescending,
+        RollRecoveryRequired,
+        Any
+    }
+
+    /// <summary>Connection contract of one section: what it needs at entry, what it delivers at exit.</summary>
+    [Serializable]
+    public struct SectionConnectionContract
+    {
+        public TrackOrientationTag RequiredEntryOrientation;
+        public TrackOrientationTag ExitOrientation;
+
+        public float HeadingDeltaDegrees;
+        public float PitchDeltaDegrees;
+        public float RollDeltaDegrees;
+        public float ElevationDelta;
+
+        public bool ClosureCompatible;
+
+        public static SectionConnectionContract Level(float headingDelta = 0f) => new SectionConnectionContract
+        {
+            RequiredEntryOrientation = TrackOrientationTag.Upright,
+            ExitOrientation = TrackOrientationTag.Upright,
+            HeadingDeltaDegrees = headingDelta,
+            ClosureCompatible = true
+        };
+    }
+
+    /// <summary>
     /// Data definition for one readable gameplay section — the plan, not the geometry.
-    /// Produced by <see cref="MacroTrackLayoutGenerator"/>, consumed by the frame layout
+    /// Produced by the topology planner and feature patterns, consumed by the frame layout
     /// and <see cref="BoxPrismTrackMeshBuilder"/>.
     /// </summary>
     [Serializable]
@@ -135,6 +172,27 @@ namespace TrackGeneration.Macro
 
         [Tooltip("SplitRoute only: normalized zone breakpoints set by the layout — [lateralSepEnd, vertDivStart, vertDivEnd, vertConvStart, vertConvEnd, lateralMergeStart]. Used by debug visualization.")]
         public float[] RouteZoneBoundaries;
+
+        [Tooltip("Feature pattern instance this section belongs to (empty for plain sections). Sections sharing a PatternId form one atomic group that bypasses ordinary spacing internally.")]
+        public string PatternId;
+
+        [Tooltip("Jump chain only: ballistic airtime of the gap in seconds (AirGap) — the gap distance is derived from the trajectory, never random.")]
+        public float AirtimeSeconds;
+
+        [Tooltip("Jump ramps only: the steeper mid-ramp climb/descent pitch (degrees). PitchChange holds the launch/arrival pitch at the open lip.")]
+        public float SecondaryPitchDeg;
+
+        [Tooltip("Horizontal (plan-view) run of this section along its entry heading, for pitched sections whose arc length exceeds their footprint (ramps, air gaps). 0 = same as Length.")]
+        public float PlanHorizontalLength;
+
+        [Tooltip("True for sections created by the closure solver (adjustable straights, closure curves).")]
+        public bool IsClosure;
+
+        [Tooltip("Orientation/heading contract of this section, used by the sequence-grammar validator.")]
+        public SectionConnectionContract Contract;
+
+        /// <summary>Horizontal plan-view run (falls back to Length for flat sections).</summary>
+        public float HorizontalRun => PlanHorizontalLength > 0.001f ? PlanHorizontalLength : Length;
 
         /// <summary>True for pieces whose driving line is a straight line (incl. tunnel/bridge variants).</summary>
         public bool IsStraightFamily =>

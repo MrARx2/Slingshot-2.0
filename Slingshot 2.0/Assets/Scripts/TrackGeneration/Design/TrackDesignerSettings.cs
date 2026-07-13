@@ -1,0 +1,725 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using TrackGeneration.Macro;
+
+namespace TrackGeneration.Design
+{
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Enums shared by the designer settings and the generator
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>Horizontal turn-direction character of the lap.</summary>
+    public enum TurnDirectionPattern
+    {
+        [Tooltip("Predominantly turns in one direction — classic oval/circuit feel.")]
+        Circuit,
+        [Tooltip("Balanced left and right usage.")]
+        Mixed,
+        [Tooltip("Strong preference for changing direction every corner.")]
+        Alternating,
+        [Tooltip("Frequent reversals and 120–180° corners — mountain-pass switchbacks.")]
+        Switchback,
+        [Tooltip("Minimal directional bias — anything goes.")]
+        Freeform
+    }
+
+    /// <summary>How the generator picks among valid candidates.</summary>
+    public enum CandidateSelectionMode
+    {
+        [Tooltip("Stop at the first candidate that passes all validation.")]
+        FirstValid,
+        [Tooltip("Evaluate several valid candidates and pick the best-scoring one (default).")]
+        BestValid
+    }
+
+    /// <summary>What happens when no valid candidate can be generated.</summary>
+    public enum GenerationFailurePolicy
+    {
+        [Tooltip("Keep the previous valid track untouched and report the failure.")]
+        KeepPreviousValidTrack,
+        [Tooltip("Report the failure and produce nothing.")]
+        FailAndReport,
+        [Tooltip("Relax OPTIONAL weights/preferences and retry. Required minimum counts and required patterns are never removed.")]
+        RelaxOptionalSettings,
+        [Tooltip("Build a simple validated template that respects allowed-feature rules. Clearly reported as a fallback, never as a success.")]
+        UseSimpleTemplate
+    }
+
+    /// <summary>How the track is allowed to relate to its start elevation.</summary>
+    public enum TrackGroundLevelPolicy
+    {
+        [Tooltip("The track may climb above AND dip below its start elevation (track root position defines world placement).")]
+        FreeFloating,
+        [Tooltip("The track never dips below its start elevation (useful when the world has a ground plane at the start height).")]
+        KeepAboveStart
+    }
+
+    /// <summary>
+    /// Feature/corner pattern identifiers. A pattern is an ATOMIC group: approach,
+    /// internal elements and recovery are planned and validated as one unit.
+    /// </summary>
+    public enum TrackPatternType
+    {
+        // Single features
+        JumpGap,
+        FullLoop,
+        Corkscrew,
+        Spiral,
+        HalfLoopRollout,
+
+        // Compound features (intentionally constructed, never coincidental)
+        HalfLoopToCorkscrew,
+        SpiralToCorkscrew,
+        LoopToCorkscrew,
+        DoubleCorkscrew,
+        JumpToBankedLanding,
+
+        // Corner patterns
+        SCurve,
+        Chicane,
+        DoubleApex,
+        TighteningCorner,
+        OpeningCorner,
+        SweeperIntoHairpin,
+        Hairpin,
+        AlternatingRadiusSequence
+    }
+
+    /// <summary>One required pattern request: this pattern must appear exactly/at least Count times.</summary>
+    [Serializable]
+    public class RequiredPatternEntry
+    {
+        [Tooltip("The atomic pattern that MUST appear on the track.")]
+        public TrackPatternType Pattern = TrackPatternType.HalfLoopToCorkscrew;
+
+        [Tooltip("How many instances are required. Generation fails with a report when they cannot fit.")]
+        [Min(1)] public int Count = 1;
+    }
+
+    /// <summary>
+    /// Relative selection weights for the horizontal corner families.
+    /// Weights are relative to each other, not percentages.
+    /// </summary>
+    [Serializable]
+    public class TurnFamilyWeights
+    {
+        [Tooltip("≈20–45° corners: barely-lift kinks and gentle direction adjustments.")]
+        [Min(0f)] public float GentleBend = 2f;
+
+        [Tooltip("≈45–80° corners: long committed sweepers.")]
+        [Min(0f)] public float Sweeper = 4f;
+
+        [Tooltip("≈80–120° corners: classic 90°-family corners.")]
+        [Min(0f)] public float StandardCorner = 3f;
+
+        [Tooltip("≈120–150° corners: heavy direction changes.")]
+        [Min(0f)] public float SharpCorner = 1f;
+
+        [Tooltip("≈150–180° corners: full reversals.")]
+        [Min(0f)] public float Hairpin = 0.5f;
+
+        public float Total => Mathf.Max(0.0001f, GentleBend + Sweeper + StandardCorner + SharpCorner + Hairpin);
+
+        public TurnFamilyWeights Clone() => (TurnFamilyWeights)MemberwiseClone();
+
+        public void Sanitize()
+        {
+            GentleBend = Mathf.Max(0f, GentleBend);
+            Sweeper = Mathf.Max(0f, Sweeper);
+            StandardCorner = Mathf.Max(0f, StandardCorner);
+            SharpCorner = Mathf.Max(0f, SharpCorner);
+            Hairpin = Mathf.Max(0f, Hairpin);
+            if (Total <= 0.001f) { GentleBend = 1f; Sweeper = 1f; StandardCorner = 1f; }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Setting groups
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>Overall scale of the track: speed, lap time, length cap, pacing.</summary>
+    [Serializable]
+    public class TrackScaleSettings
+    {
+        [Tooltip("Expected craft speed the track is SCALED for (km/h). Does NOT change the craft's physics — it converts every time-based setting into meters. 1300 km/h ≈ 361 m/s.")]
+        [Range(400f, 2000f)] public float DesignSpeedKph = 1300f;
+
+        [Tooltip("Approximate desired lap duration at design speed (seconds). Requested track length ≈ design speed × lap time. The lap may grow when required features need more room, but never beyond Maximum Track Length.")]
+        [Range(20f, 180f)] public float TargetLapTimeSeconds = 60f;
+
+        [Tooltip("Hard upper limit for THIS track's lap length (meters), clamped by the TrackConfig rulebook. Generation fails with a report instead of exceeding it.")]
+        [Min(1000f)] public float MaxTrackLengthMeters = 45000f;
+
+        [Tooltip("0 = perfectly even rhythm, 1 = strong alternation between short dense areas and large open sections.")]
+        [Range(0f, 1f)] public float PacingVariation = 0.6f;
+
+        /// <summary>Design speed in meters per second.</summary>
+        public float DesignSpeedMps => DesignSpeedKph / 3.6f;
+
+        /// <summary>Converts a designer-facing duration into meters at design speed.</summary>
+        public float SecondsToDistance(float seconds) => DesignSpeedMps * seconds;
+
+        public void Sanitize()
+        {
+            DesignSpeedKph = Mathf.Clamp(DesignSpeedKph, 100f, 4000f);
+            TargetLapTimeSeconds = Mathf.Max(5f, TargetLapTimeSeconds);
+            MaxTrackLengthMeters = Mathf.Max(1000f, MaxTrackLengthMeters);
+            PacingVariation = Mathf.Clamp01(PacingVariation);
+        }
+    }
+
+    /// <summary>Lap rhythm: how many turns, in what directional character, with what straights between them.</summary>
+    [Serializable]
+    public class TrackLayoutSettings
+    {
+        [Tooltip("Minimum number of meaningful horizontal turns on the lap.")]
+        [Range(3, 40)] public int MinTurnCount = 10;
+
+        [Tooltip("Maximum number of meaningful horizontal turns on the lap.")]
+        [Range(3, 40)] public int MaxTurnCount = 15;
+
+        [Tooltip("Directional character of the corner plan: Circuit (one direction), Mixed, Alternating, Switchback (reversal-heavy), Freeform.")]
+        public TurnDirectionPattern DirectionPattern = TurnDirectionPattern.Mixed;
+
+        [Tooltip("Shortest ordinary straight, in SECONDS at design speed (0.6 s ≈ 217 m at 1300 km/h).")]
+        [Range(0.3f, 8f)] public float MinStraightSeconds = 0.6f;
+
+        [Tooltip("Longest ordinary straight, in SECONDS at design speed (2.4 s ≈ 867 m at 1300 km/h).")]
+        [Range(0.3f, 8f)] public float MaxStraightSeconds = 2.4f;
+
+        [Tooltip("Chance that compatible neighboring corners are assembled into an INTENTIONAL corner pattern (S-curve, double apex, sweeper-into-hairpin, …) instead of placed independently.")]
+        [Range(0f, 1f)] public float CornerSequenceChance = 0.4f;
+
+        public void Sanitize()
+        {
+            MinTurnCount = Mathf.Clamp(MinTurnCount, 3, 60);
+            MaxTurnCount = Mathf.Clamp(MaxTurnCount, MinTurnCount, 60);
+            MinStraightSeconds = Mathf.Max(0.1f, MinStraightSeconds);
+            MaxStraightSeconds = Mathf.Max(MinStraightSeconds, MaxStraightSeconds);
+            CornerSequenceChance = Mathf.Clamp01(CornerSequenceChance);
+        }
+    }
+
+    /// <summary>Corner geometry: radii, turn-family weights and banking.</summary>
+    [Serializable]
+    public class TrackCornerSettings
+    {
+        [Tooltip("Smallest ordinary curve radius (meters). At 1300 km/h even 'tight' corners are hundreds of meters.")]
+        [Min(50f)] public float MinCurveRadius = 400f;
+
+        [Tooltip("Largest ordinary curve radius (meters).")]
+        [Min(50f)] public float MaxCurveRadius = 1600f;
+
+        [Tooltip("Relative weights of the corner families (gentle bend → hairpin). Weights are relative, not percentages.")]
+        public TurnFamilyWeights TurnWeights = new TurnFamilyWeights();
+
+        [Header("Banking")]
+        [Tooltip("0 = flat corners, 1 = corners banked at the full physically recommended angle for their speed/radius (clamped by Max Bank Angle).")]
+        [Range(0f, 1f)] public float BankingStrength = 0.8f;
+
+        [Tooltip("Hard maximum bank angle for THIS track (degrees), clamped by the TrackConfig rulebook.")]
+        [Range(0f, 85f)] public float MaxBankAngle = 72f;
+
+        [Tooltip("How much of a corner's bank GEOMETRICALLY tilts the road floor (the rest is expressed through the raised outside wall). 0 = perfectly level floor, 1 = strong visible tilt. The tilt eases in/out with the bank and is capped at 18° so wide roads never become ramps.")]
+        [Range(0f, 1f)] public float FloorTiltStrength = 0.2f;
+
+        public void Sanitize()
+        {
+            MinCurveRadius = Mathf.Max(10f, MinCurveRadius);
+            MaxCurveRadius = Mathf.Max(MinCurveRadius, MaxCurveRadius);
+            BankingStrength = Mathf.Clamp01(BankingStrength);
+            MaxBankAngle = Mathf.Clamp(MaxBankAngle, 0f, 85f);
+            FloorTiltStrength = Mathf.Clamp01(FloorTiltStrength);
+            TurnWeights ??= new TurnFamilyWeights();
+            TurnWeights.Sanitize();
+        }
+    }
+
+    /// <summary>The global half-pipe road cross-section.</summary>
+    [Serializable]
+    public class TrackRoadSettings
+    {
+        [Tooltip("Road width in meters (the drivable half-pipe floor + rising sides).")]
+        [Range(8f, 80f)] public float RoadWidth = 26f;
+
+        [Tooltip("How high the half-pipe sides rise above the center floor (meters). Sides rise FROM the stable center baseline — they never dip below it.")]
+        [Range(1f, 20f)] public float HalfPipeSideHeight = 6f;
+
+        [Tooltip("Ratio of the road width kept flat in the center for stable driving.")]
+        [Range(0.1f, 0.7f)] public float CenterFlatWidthRatio = 0.35f;
+
+        [Tooltip("How aggressively the sides curve upward (higher = flatter center, steeper late rise).")]
+        [Range(0.2f, 2f)] public float WallCurveStrength = 0.75f;
+
+        [Tooltip("Maximum side wall tilt angle in degrees. Side height is clamped so the profile never exceeds this slope.")]
+        [Range(20f, 85f)] public float MaxWallAngle = 60f;
+
+        [Tooltip("Height of the solid safety lip at the very top edge of the half-pipe (meters).")]
+        [Range(0f, 4f)] public float SafetyLipHeight = 1f;
+
+        [Tooltip("Cross-section sample points per SIDE (total profile points = 2×resolution + 1). Higher = smoother bowl, more vertices. Points concentrate on the curved walls automatically.")]
+        [Range(4, 96)] public int ProfileResolution = 32;
+
+        public void Sanitize()
+        {
+            RoadWidth = Mathf.Max(4f, RoadWidth);
+            HalfPipeSideHeight = Mathf.Max(0.5f, HalfPipeSideHeight);
+            CenterFlatWidthRatio = Mathf.Clamp(CenterFlatWidthRatio, 0.05f, 0.9f);
+            WallCurveStrength = Mathf.Clamp(WallCurveStrength, 0.1f, 3f);
+            MaxWallAngle = Mathf.Clamp(MaxWallAngle, 10f, 85f);
+            SafetyLipHeight = Mathf.Max(0f, SafetyLipHeight);
+            ProfileResolution = Mathf.Clamp(ProfileResolution, 3, 96);
+        }
+    }
+
+    /// <summary>Transition durations and safety/readability spacing. All in seconds at design speed.</summary>
+    [Serializable]
+    public class TrackTransitionSettings
+    {
+        [Tooltip("Generic blend time between sections (width/shape changes without a dedicated field), seconds.")]
+        [Range(0.2f, 3.5f)] public float GenericTransitionSeconds = 0.9f;
+
+        [Tooltip("Time spent easing bank in/out of corners, seconds. Too-short bank blends become launch ramps — the generator auto-expands them when room exists.")]
+        [Range(0.35f, 3f)] public float BankTransitionSeconds = 0.9f;
+
+        [Tooltip("Time spent easing pitch (climbs, drops, crests), seconds.")]
+        [Range(0.45f, 3.5f)] public float PitchTransitionSeconds = 1.0f;
+
+        [Tooltip("Time spent easing FREE ROLL (corkscrews, inversion recovery). Separate from banking: banking supports a horizontal turn; roll changes the craft's orientation.")]
+        [Range(0.6f, 4f)] public float RollTransitionSeconds = 1.3f;
+
+        [Tooltip("Time over which road-width changes blend, seconds.")]
+        [Range(0.35f, 2.5f)] public float WidthTransitionSeconds = 0.7f;
+
+        [Tooltip("Time over which half-pipe depth/shape changes blend, seconds.")]
+        [Range(0.45f, 3f)] public float CrossSectionTransitionSeconds = 0.8f;
+
+        [Tooltip("Easing curve used by all blends.")]
+        public TrackBlendCurve BlendCurve = TrackBlendCurve.SmootherStep;
+
+        [Header("Safety & Readability")]
+        [Tooltip("Default readable approach BEFORE a major feature, seconds (1.4 s ≈ 506 m at 1300 km/h). Feature-specific approaches override via max(), never sum.")]
+        [Range(0.8f, 4f)] public float DefaultApproachSeconds = 1.4f;
+
+        [Tooltip("Default recovery AFTER a major feature, seconds.")]
+        [Range(0.7f, 3f)] public float DefaultRecoverySeconds = 1.0f;
+
+        [Tooltip("Minimum spacing between UNRELATED dangerous features, seconds. Compound patterns bypass this internally — they are validated as one atomic group.")]
+        [Range(1.2f, 5f)] public float DangerousSpacingSeconds = 1.8f;
+
+        [Tooltip("How long a major feature should be visible before the craft reaches it, seconds.")]
+        [Range(1.2f, 4f)] public float VisualPreviewSeconds = 1.6f;
+
+        [Tooltip("Recovery time after a branch merge, seconds.")]
+        [Range(1f, 3f)] public float PostMergeRecoverySeconds = 1.2f;
+
+        public void Sanitize()
+        {
+            GenericTransitionSeconds = Mathf.Max(0.1f, GenericTransitionSeconds);
+            BankTransitionSeconds = Mathf.Max(0.1f, BankTransitionSeconds);
+            PitchTransitionSeconds = Mathf.Max(0.1f, PitchTransitionSeconds);
+            RollTransitionSeconds = Mathf.Max(0.1f, RollTransitionSeconds);
+            WidthTransitionSeconds = Mathf.Max(0.1f, WidthTransitionSeconds);
+            CrossSectionTransitionSeconds = Mathf.Max(0.1f, CrossSectionTransitionSeconds);
+            DefaultApproachSeconds = Mathf.Max(0.2f, DefaultApproachSeconds);
+            DefaultRecoverySeconds = Mathf.Max(0.2f, DefaultRecoverySeconds);
+            DangerousSpacingSeconds = Mathf.Max(0.2f, DangerousSpacingSeconds);
+            VisualPreviewSeconds = Mathf.Max(0.2f, VisualPreviewSeconds);
+            PostMergeRecoverySeconds = Mathf.Max(0.2f, PostMergeRecoverySeconds);
+        }
+    }
+
+    /// <summary>Vertical content: amplitude, major elevation sections, crests, bridges, underpasses.</summary>
+    [Serializable]
+    public class TrackElevationSettings
+    {
+        [Tooltip("Target height range of the lap (meters). The generator plans climbs/drops so the actual range approaches this value.")]
+        [Range(0f, 1200f)] public float TargetElevationAmplitude = 180f;
+
+        [Tooltip("Minimum number of MAJOR elevation sections (dedicated climbs/drops).")]
+        [Range(0, 16)] public int MinMajorElevationSections = 3;
+
+        [Tooltip("Maximum number of MAJOR elevation sections.")]
+        [Range(0, 16)] public int MaxMajorElevationSections = 6;
+
+        [Tooltip("Maximum sustained climb angle for THIS track (degrees), clamped by the rulebook.")]
+        [Range(2f, 45f)] public float MaxClimbAngle = 30f;
+
+        [Tooltip("Maximum sustained drop angle for THIS track (degrees), clamped by the rulebook.")]
+        [Range(2f, 45f)] public float MaxDropAngle = 32f;
+
+        [Tooltip("Net-zero crests/dips placed on straights (hill up-and-over or dip down-and-back).")]
+        public TrackFeatureRule Crests = new TrackFeatureRule(true, 0, 4, 1f);
+
+        [Tooltip("Elevated bridge sections (net-zero raised straights).")]
+        public TrackFeatureRule Bridges = new TrackFeatureRule(true, 0, 2, 0.7f);
+
+        [Tooltip("Lowered underpass sections (net-zero dipped straights). Ignored when Ground Level Policy forbids dipping below the start elevation.")]
+        public TrackFeatureRule Underpasses = new TrackFeatureRule(true, 0, 2, 0.6f);
+
+        [Tooltip("Whether the lap may dip below its start elevation. Track root position defines world placement — the generator does not force world Y = 0.")]
+        public TrackGroundLevelPolicy GroundLevelPolicy = TrackGroundLevelPolicy.KeepAboveStart;
+
+        public void Sanitize()
+        {
+            TargetElevationAmplitude = Mathf.Max(0f, TargetElevationAmplitude);
+            MinMajorElevationSections = Mathf.Max(0, MinMajorElevationSections);
+            MaxMajorElevationSections = Mathf.Max(MinMajorElevationSections, MaxMajorElevationSections);
+            MaxClimbAngle = Mathf.Clamp(MaxClimbAngle, 1f, 60f);
+            MaxDropAngle = Mathf.Clamp(MaxDropAngle, 1f, 60f);
+            (Crests ??= new TrackFeatureRule()).Sanitize();
+            (Bridges ??= new TrackFeatureRule()).Sanitize();
+            (Underpasses ??= new TrackFeatureRule()).Sanitize();
+        }
+    }
+
+    /// <summary>Feature rules and required patterns.</summary>
+    [Serializable]
+    public class TrackFeatureSettings
+    {
+        [Tooltip("Jump groups: approach → launch → air gap → landing → recovery. Air-gap distance is derived from the ballistic trajectory at design speed.")]
+        public TrackFeatureRule Jumps = new TrackFeatureRule(true, 0, 2, 1f);
+
+        [Tooltip("Full vertical loops (eased clothoid-style curvature).")]
+        public TrackFeatureRule Loops = new TrackFeatureRule(true, 0, 1, 0.8f);
+
+        [Tooltip("Corkscrews: the road rolls a full revolution around the travel axis.")]
+        public TrackFeatureRule Corkscrews = new TrackFeatureRule(true, 0, 1, 0.8f);
+
+        [Tooltip("Climbing/descending helix spirals (parking-garage style).")]
+        public TrackFeatureRule Spirals = new TrackFeatureRule(true, 0, 1, 0.7f);
+
+        [Tooltip("Half-loop patterns: half loop up to inverted, then a gradual 180° rollout — reverses heading vertically.")]
+        public TrackFeatureRule HalfLoops = new TrackFeatureRule(true, 0, 1, 0.5f);
+
+        [Header("Corner patterns")]
+        [Tooltip("Chicane patterns (left-right-left flicks) placed as intentional corner patterns.")]
+        public TrackFeatureRule Chicanes = new TrackFeatureRule(true, 0, 2, 1f);
+
+        [Tooltip("S-curve patterns (two opposed sweepers).")]
+        public TrackFeatureRule SCurves = new TrackFeatureRule(true, 0, 2, 1f);
+
+        [Tooltip("Hairpin corner patterns (150–180° reversals).")]
+        public TrackFeatureRule Hairpins = new TrackFeatureRule(true, 0, 1, 0.5f);
+
+        [Header("Grouping")]
+        [Tooltip("Minimum number of feature groups (single features or compound patterns) on the lap.")]
+        [Range(0, 12)] public int MinFeatureGroups = 2;
+
+        [Tooltip("Maximum number of feature groups on the lap.")]
+        [Range(0, 12)] public int MaxFeatureGroups = 5;
+
+        [Tooltip("Chance that an optional feature slot becomes a COMPOUND pattern (e.g. loop → corkscrew) instead of a single feature.")]
+        [Range(0f, 1f)] public float CompoundFeatureChance = 0.35f;
+
+        [Tooltip("Maximum elements chained inside one compound pattern.")]
+        [Range(1, 4)] public int MaxCompoundElements = 2;
+
+        [Tooltip("Patterns that MUST appear on the track (validated; generation fails with a report when they cannot fit).")]
+        public List<RequiredPatternEntry> RequiredPatterns = new List<RequiredPatternEntry>();
+
+        public void Sanitize()
+        {
+            (Jumps ??= new TrackFeatureRule()).Sanitize();
+            (Loops ??= new TrackFeatureRule()).Sanitize();
+            (Corkscrews ??= new TrackFeatureRule()).Sanitize();
+            (Spirals ??= new TrackFeatureRule()).Sanitize();
+            (HalfLoops ??= new TrackFeatureRule()).Sanitize();
+            (Chicanes ??= new TrackFeatureRule()).Sanitize();
+            (SCurves ??= new TrackFeatureRule()).Sanitize();
+            (Hairpins ??= new TrackFeatureRule()).Sanitize();
+            MinFeatureGroups = Mathf.Max(0, MinFeatureGroups);
+            MaxFeatureGroups = Mathf.Max(MinFeatureGroups, MaxFeatureGroups);
+            CompoundFeatureChance = Mathf.Clamp01(CompoundFeatureChance);
+            MaxCompoundElements = Mathf.Clamp(MaxCompoundElements, 1, 4);
+            RequiredPatterns ??= new List<RequiredPatternEntry>();
+            foreach (var p in RequiredPatterns)
+                if (p != null) p.Count = Mathf.Max(1, p.Count);
+        }
+    }
+
+    // ── Branch settings ──────────────────────────────────────────────────────
+
+    /// <summary>How the two routes of a branch group relate in character.</summary>
+    public enum BranchPairingMode
+    {
+        [Tooltip("Deliberately different characters, e.g. Flowing vs Technical.")]
+        Contrasting,
+        [Tooltip("Similar characters with small variations.")]
+        Similar,
+        [Tooltip("Mirror-image routes.")]
+        Mirrored,
+        [Tooltip("Corresponding corners alternate which route holds the inside advantage.")]
+        AlternatingAdvantage,
+        [Tooltip("One conservative route vs one demanding route with a small theoretical advantage.")]
+        SafeVersusRisky,
+        [Tooltip("One route carries a feature (e.g. corkscrew twist); the other stays grounded.")]
+        FeatureVersusGround,
+        [Tooltip("Route A/B styles are taken verbatim from the per-route settings.")]
+        Custom
+    }
+
+    /// <summary>How the two routes relate spatially (independent of their personalities).</summary>
+    public enum BranchInteractionPattern
+    {
+        [Tooltip("Routes diverge into fully separate corridors.")]
+        Separated,
+        [Tooltip("Routes run side by side at close, safe distance.")]
+        Parallel,
+        [Tooltip("Routes drift apart then converge gradually toward the merge.")]
+        Converging,
+        [Tooltip("Routes exchange horizontal sides once or more with controlled vertical separation.")]
+        AlternatingCrossover,
+        [Tooltip("Multiple interleaved crossovers.")]
+        Braided,
+        [Tooltip("Both routes wind around a shared central axis (twin corkscrew / double helix).")]
+        SharedAxis,
+        [Tooltip("The routes' geometry is owned by one paired feature (dueling loops, orbit pattern, …).")]
+        PairedFeature
+    }
+
+    /// <summary>Route personality used to initialize one branch route.</summary>
+    public enum BranchRouteStyle
+    {
+        [Tooltip("Inherit the main track's character.")]
+        InheritTrack,
+        [Tooltip("Broad, fast, momentum-focused route.")]
+        Flowing,
+        [Tooltip("Tighter, weaving, precision route.")]
+        Technical,
+        [Tooltip("Enormous-radius maximum-speed route.")]
+        Velocity,
+        [Tooltip("High line with vertical spectacle.")]
+        HighFeature,
+        [Tooltip("Grounded low line.")]
+        LowGround,
+        [Tooltip("Conservative, wide, forgiving route.")]
+        Safe,
+        [Tooltip("Demanding route with a small theoretical time advantage.")]
+        Risky
+    }
+
+    /// <summary>Relative selection weights for branch spatial interaction patterns.</summary>
+    [Serializable]
+    public class BranchInteractionWeights
+    {
+        [Min(0f)] public float Separated = 1f;
+        [Min(0f)] public float Parallel = 1f;
+        [Min(0f)] public float Converging = 1f;
+        [Min(0f)] public float AlternatingCrossover = 1f;
+        [Min(0f)] public float Braided = 0.5f;
+        [Min(0f)] public float SharedAxis = 0.5f;
+        [Min(0f)] public float PairedFeature = 0.5f;
+
+        public float Total => Mathf.Max(0.0001f,
+            Separated + Parallel + Converging + AlternatingCrossover + Braided + SharedAxis + PairedFeature);
+
+        public BranchInteractionWeights Clone() => (BranchInteractionWeights)MemberwiseClone();
+    }
+
+    /// <summary>Per-route settings for one side of a branch group.</summary>
+    [Serializable]
+    public class BranchRouteSettings
+    {
+        [Tooltip("Personality this route is initialized from.")]
+        public BranchRouteStyle Style = BranchRouteStyle.InheritTrack;
+
+        [Tooltip("Road width multiplier relative to the main road (0.6–1.4).")]
+        [Range(0.6f, 1.4f)] public float WidthScale = 1f;
+
+        [Tooltip("How strongly the route weaves/turns inside its corridor. 0 = near straight, 1 = constant direction changes.")]
+        [Range(0f, 1f)] public float WeaveIntensity = 0.5f;
+
+        [Tooltip("Vertical bias: -1 = prefers the low line, +1 = prefers the high line.")]
+        [Range(-1f, 1f)] public float ElevationBias = 0f;
+
+        [Tooltip("Whether this route may carry a roll feature (corkscrew twist) when the pairing calls for one.")]
+        public bool AllowRollFeature = true;
+
+        [Tooltip("Risk character used by the balance estimator: 0 = safe, 1 = maximum demanded precision.")]
+        [Range(0f, 1f)] public float RiskTarget = 0.5f;
+
+        public BranchRouteSettings Clone() => (BranchRouteSettings)MemberwiseClone();
+    }
+
+    /// <summary>Branch (two-route race) settings.</summary>
+    [Serializable]
+    public class TrackBranchSettings
+    {
+        [Tooltip("Minimum branch groups on the lap. Each group is a temporary two-route race: shared approach → fork → independent routes → controlled merge → recovery.")]
+        [Range(0, 5)] public int MinBranchGroups = 1;
+
+        [Tooltip("Maximum branch groups on the lap.")]
+        [Range(0, 5)] public int MaxBranchGroups = 3;
+
+        [Tooltip("Shortest route duration from fork to merge, seconds at design speed.")]
+        [Range(4f, 18f)] public float MinRouteDurationSeconds = 5f;
+
+        [Tooltip("Longest route duration from fork to merge, seconds at design speed.")]
+        [Range(4f, 18f)] public float MaxRouteDurationSeconds = 9f;
+
+        [Tooltip("How the two routes relate in character.")]
+        public BranchPairingMode PairingMode = BranchPairingMode.Contrasting;
+
+        [Tooltip("Relative weights for the spatial interaction patterns.")]
+        public BranchInteractionWeights InteractionWeights = new BranchInteractionWeights();
+
+        [Tooltip("Route A settings (used directly in Custom pairing; used as a base otherwise).")]
+        public BranchRouteSettings RouteA = new BranchRouteSettings();
+
+        [Tooltip("Route B settings (used directly in Custom pairing; used as a base otherwise).")]
+        public BranchRouteSettings RouteB = new BranchRouteSettings();
+
+        [Tooltip("How long the fork should be visible before the decision point, seconds.")]
+        [Range(1.5f, 4f)] public float DecisionPreviewSeconds = 2f;
+
+        [Tooltip("Maximum allowed NEUTRAL-craft time difference between the routes (fraction, 0.03 = 3%). Branches outside this tolerance are rejected.")]
+        [Range(0.01f, 0.06f)] public float TimeBalanceTolerance = 0.03f;
+
+        [Tooltip("Target advantage a specialized craft archetype should gain on its preferred route (fraction).")]
+        [Range(0.01f, 0.1f)] public float SpecializationTarget = 0.04f;
+
+        [Tooltip("Lateral centerline separation range between the routes (meters). Dynamically increased for road widths, wall heights, banking and safety margins.")]
+        public Vector2 LateralSeparationRange = new Vector2(60f, 150f);
+
+        [Tooltip("Vertical centerline separation range for stacked/crossing patterns (meters).")]
+        public Vector2 VerticalSeparationRange = new Vector2(40f, 120f);
+
+        [Tooltip("How many times the routes may exchange sides (crossover patterns).")]
+        [Range(0, 5)] public int MaxCrossovers = 2;
+
+        [Tooltip("Duration of the lateral split at the fork, seconds.")]
+        [Range(0.8f, 3f)] public float SplitDurationSeconds = 1.5f;
+
+        [Tooltip("Delay after the fork before any vertical divergence starts, seconds. Splits must read as left/right choices FIRST.")]
+        [Range(0.3f, 1.5f)] public float VerticalDivergenceDelaySeconds = 0.6f;
+
+        [Tooltip("Duration of the vertical divergence climb/drop, seconds.")]
+        [Range(0.8f, 3.5f)] public float VerticalDivergenceSeconds = 1.5f;
+
+        [Tooltip("Duration of the merge (adjacent lanes → shared open throat → normal road), seconds.")]
+        [Range(0.8f, 3f)] public float MergeDurationSeconds = 1.5f;
+
+        public void Sanitize()
+        {
+            MinBranchGroups = Mathf.Max(0, MinBranchGroups);
+            MaxBranchGroups = Mathf.Max(MinBranchGroups, MaxBranchGroups);
+            MinRouteDurationSeconds = Mathf.Max(1f, MinRouteDurationSeconds);
+            MaxRouteDurationSeconds = Mathf.Max(MinRouteDurationSeconds, MaxRouteDurationSeconds);
+            TimeBalanceTolerance = Mathf.Clamp(TimeBalanceTolerance, 0.005f, 0.2f);
+            SpecializationTarget = Mathf.Clamp(SpecializationTarget, 0.005f, 0.2f);
+            LateralSeparationRange = new Vector2(
+                Mathf.Max(10f, Mathf.Min(LateralSeparationRange.x, LateralSeparationRange.y)),
+                Mathf.Max(10f, Mathf.Max(LateralSeparationRange.x, LateralSeparationRange.y)));
+            VerticalSeparationRange = new Vector2(
+                Mathf.Max(0f, Mathf.Min(VerticalSeparationRange.x, VerticalSeparationRange.y)),
+                Mathf.Max(0f, Mathf.Max(VerticalSeparationRange.x, VerticalSeparationRange.y)));
+            InteractionWeights ??= new BranchInteractionWeights();
+            RouteA ??= new BranchRouteSettings();
+            RouteB ??= new BranchRouteSettings();
+        }
+    }
+
+    /// <summary>Generation behavior: attempts, selection, failure policy, mesh density.</summary>
+    [Serializable]
+    public class TrackGenerationBehaviorSettings
+    {
+        [Tooltip("Maximum layout attempts before the failure policy applies. Attempts are layout-math only (no meshes) — searching deep is cheap.")]
+        [Range(4, 512)] public int MaxAttempts = 48;
+
+        [Tooltip("FirstValid = stop at the first passing candidate. BestValid = score several valid candidates and pick the best (default).")]
+        public CandidateSelectionMode SelectionMode = CandidateSelectionMode.BestValid;
+
+        [Tooltip("In BestValid mode: stop searching once this many valid candidates have been scored.")]
+        [Range(1, 16)] public int CandidatesToScore = 4;
+
+        [Tooltip("What happens when NO valid candidate exists. The generic base layout is never silently returned.")]
+        public GenerationFailurePolicy FailurePolicy = GenerationFailurePolicy.KeepPreviousValidTrack;
+
+        [Tooltip("Fraction of the lap reserved for the closure system (legal straights/curves that weld the loop shut without warping feature geometry).")]
+        [Range(0.1f, 0.35f)] public float ClosureReserveFraction = 0.2f;
+
+        [Header("Mesh Quality (advanced)")]
+        [Tooltip("Target meters between mesh rings — the global retopology pass spreads rings at this spacing over the whole track (tightened automatically where features demand it).")]
+        [Range(0.5f, 8f)] public float MetersPerRing = 1.5f;
+
+        [Tooltip("Maximum facet-angle change between consecutive rings (degrees). At 1300 km/h every degree of facet reads as phantom vertical velocity to the hover suspension — 0.5° recommended.")]
+        [Range(0.25f, 1f)] public float MaxFacetAngleDegrees = 0.5f;
+
+        [Tooltip("Performance budget: total rings for the WHOLE track. Small tracks keep the full Meters Per Ring density; huge tracks (long Rollercoaster laps) automatically spread this budget instead of exploding the vertex count.")]
+        [Range(8000, 100000)] public int TargetTotalRings = 20000;
+
+        public void Sanitize()
+        {
+            MaxAttempts = Mathf.Clamp(MaxAttempts, 1, 512);
+            CandidatesToScore = Mathf.Clamp(CandidatesToScore, 1, 32);
+            ClosureReserveFraction = Mathf.Clamp(ClosureReserveFraction, 0.05f, 0.4f);
+            MetersPerRing = Mathf.Clamp(MetersPerRing, 0.5f, 16f);
+            MaxFacetAngleDegrees = Mathf.Clamp(MaxFacetAngleDegrees, 0.1f, 2f);
+            TargetTotalRings = Mathf.Clamp(TargetTotalRings, 2000, 150000);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Root settings object
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The level designer's actual track request: every value generation uses, grouped
+    /// logically. Style presets INITIALIZE these values; nothing at runtime switches
+    /// behavior on a preset or difficulty enum — the fields below are the whole story.
+    /// </summary>
+    [Serializable]
+    public class TrackDesignerSettings
+    {
+        [Tooltip("Name of the style preset these settings were initialized from (display only).")]
+        public string AppliedPresetName = "";
+
+        [Tooltip("Set when any field was edited after the preset was applied — displayed as 'Custom — based on <preset>'.")]
+        public bool ModifiedSincePreset;
+
+        [Tooltip("Snapshot of the settings as they were right after the preset was applied (for Reset/Compare). Managed by the inspector.")]
+        [SerializeField, HideInInspector] private string appliedPresetSnapshotJson = "";
+
+        public TrackScaleSettings Scale = new TrackScaleSettings();
+        public TrackLayoutSettings Layout = new TrackLayoutSettings();
+        public TrackCornerSettings Corners = new TrackCornerSettings();
+        public TrackRoadSettings Road = new TrackRoadSettings();
+        public TrackTransitionSettings Transitions = new TrackTransitionSettings();
+        public TrackElevationSettings Elevation = new TrackElevationSettings();
+        public TrackFeatureSettings Features = new TrackFeatureSettings();
+        public TrackBranchSettings Branches = new TrackBranchSettings();
+        public TrackGenerationBehaviorSettings Generation = new TrackGenerationBehaviorSettings();
+
+        /// <summary>JSON snapshot taken when a preset was applied (empty when none).</summary>
+        public string AppliedPresetSnapshotJson
+        {
+            get => appliedPresetSnapshotJson;
+            set => appliedPresetSnapshotJson = value;
+        }
+
+        /// <summary>Ensures every group exists and is internally consistent.</summary>
+        public void Sanitize()
+        {
+            (Scale ??= new TrackScaleSettings()).Sanitize();
+            (Layout ??= new TrackLayoutSettings()).Sanitize();
+            (Corners ??= new TrackCornerSettings()).Sanitize();
+            (Road ??= new TrackRoadSettings()).Sanitize();
+            (Transitions ??= new TrackTransitionSettings()).Sanitize();
+            (Elevation ??= new TrackElevationSettings()).Sanitize();
+            (Features ??= new TrackFeatureSettings()).Sanitize();
+            (Branches ??= new TrackBranchSettings()).Sanitize();
+            (Generation ??= new TrackGenerationBehaviorSettings()).Sanitize();
+        }
+
+        /// <summary>Deep copy via JSON round-trip (all groups are plain serializable data).</summary>
+        public TrackDesignerSettings Clone()
+        {
+            return JsonUtility.FromJson<TrackDesignerSettings>(JsonUtility.ToJson(this));
+        }
+
+        /// <summary>Serializes the full settings for snapshots/comparison.</summary>
+        public string ToJson() => JsonUtility.ToJson(this, prettyPrint: false);
+    }
+}

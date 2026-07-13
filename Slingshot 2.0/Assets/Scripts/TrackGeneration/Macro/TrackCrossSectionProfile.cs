@@ -92,8 +92,8 @@ namespace TrackGeneration.Macro
         [Tooltip("Ratio of the road width that stays flat in the center for stable driving.")]
         public float CenterFlatWidthRatio = 0.35f;
 
-        [Tooltip("Number of cross-section sample points per SIDE (total profile points = 2*resolution + 1).")]
-        public int ProfileResolution = 8;
+        [Tooltip("Number of cross-section sample points per SIDE (total profile points = 2*resolution + 1). Points are distributed toward the curved walls, where the resolution is actually visible.")]
+        public int ProfileResolution = 32;
 
         [Tooltip("Height of the optional outer safety lip at the very top edge (meters). 0 = none.")]
         public float SafetyLipHeight = 1.0f;
@@ -146,6 +146,30 @@ namespace TrackGeneration.Macro
         }
 
         /// <summary>Total top-surface profile point count across the road width.</summary>
-        public int ProfilePointCount => IsHalfPipe ? Mathf.Clamp(ProfileResolution, 3, 24) * 2 + 1 : 2;
+        public int ProfilePointCount => IsHalfPipe ? Mathf.Clamp(ProfileResolution, 3, 96) * 2 + 1 : 2;
+
+        /// <summary>
+        /// Normalized cross position of profile point <paramref name="i"/> of
+        /// <paramref name="count"/>: a WARPED distribution instead of uniform. The flat
+        /// center is flat — it needs almost no points — so its samples are thinned and
+        /// the budget concentrates on the rising walls, densest near the top where the
+        /// profile curves hardest (h = t^p rises steepest at t = 1). Same vertex budget,
+        /// roughly twice the effective wall smoothness. Symmetric; endpoints exact.
+        /// </summary>
+        public float ProfileXAt(int i, int count)
+        {
+            if (count <= 1) return 0f;
+            float u = -1f + 2f * i / (count - 1);
+            if (!IsHalfPipe) return u;
+
+            float flat = Mathf.Clamp01(CenterFlatWidthRatio);
+            float uFlat = flat * 0.5f; // the flat center gets half its proportional sample share
+            float au = Mathf.Abs(u);
+
+            float x = au <= uFlat
+                ? flat * (au / Mathf.Max(0.0001f, uFlat))
+                : flat + (1f - flat) * Mathf.Pow((au - uFlat) / (1f - uFlat), 0.6f);
+            return Mathf.Sign(u) * Mathf.Min(x, 1f);
+        }
     }
 }

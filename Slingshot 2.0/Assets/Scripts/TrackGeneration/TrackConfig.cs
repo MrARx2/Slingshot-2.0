@@ -3,621 +3,406 @@ using UnityEngine;
 namespace TrackGeneration.Core
 {
     /// <summary>
-    /// ScriptableObject containing the technical rulebook for procedural track generation.
+    /// The hard TECHNICAL RULEBOOK for procedural track generation: absolute legal
+    /// limits, physical safety constraints, mesh/collider budgets, clearances,
+    /// maximum counts, supported features, validation tolerances and the reference
+    /// physics assumptions used for generation estimates.
     ///
-    /// IMPORTANT:
-    /// TrackConfig defines what is possible and safe.
-    /// It should not define the personality of a specific generated track.
-    ///
-    /// Track personality should live on TrackGenerator / TrackDesignerProfile.
-    /// ResolvedTrackGenerationConfig should translate designer intent + this rulebook
-    /// into internal generation values.
+    /// It never describes the personality of a particular track — that lives in
+    /// <see cref="TrackGeneration.Design.TrackDesignerSettings"/> on the generator.
+    /// Time-based limits are in seconds and convert to meters via the requested
+    /// design speed (1300 km/h ≈ 361 m/s → 1 s ≈ 361 m).
     /// </summary>
     [CreateAssetMenu(fileName = "TrackConfig", menuName = "Track/Generation Config")]
     public class TrackConfig : ScriptableObject
     {
-        // ══════════════════════════════════════════════
-        //  TrackConfig = RULEBOOK / SANDBOX LIMITS
-        // ══════════════════════════════════════════════
+        // ══════════════════ Global technical limits ══════════════════
 
-        [Header("Technical Constraints")]
+        [Header("Global Technical Limits")]
 
-        [Tooltip("Minimum total lap length the generator may produce (meters).")]
-        [SerializeField] private float minTrackLength = 900f;
+        [Tooltip("Lowest design speed the generator supports (km/h).")]
+        [SerializeField] private float minDesignSpeedKph = 400f;
 
-        [Tooltip("Maximum total lap length the generator may produce (meters).")]
-        [SerializeField] private float maxTrackLength = 12000f;
+        [Tooltip("Highest design speed the generator supports (km/h).")]
+        [SerializeField] private float maxDesignSpeedKph = 2000f;
 
-        [Tooltip("Minimum allowed road width (meters).")]
-        [SerializeField] private float minRoadWidth = 7f;
+        [Tooltip("Shortest target lap time (seconds).")]
+        [SerializeField] private float minTargetLapTime = 20f;
 
-        [Tooltip("Maximum allowed road width (meters).")]
-        [SerializeField] private float maxRoadWidth = 40f;
+        [Tooltip("Longest target lap time (seconds).")]
+        [SerializeField] private float maxTargetLapTime = 180f;
 
-        [Tooltip("Smallest safe curve radius (meters).")]
-        [SerializeField] private float minCurveRadius = 45f;
+        [Tooltip("Minimum total lap length (meters).")]
+        [SerializeField] private float minTrackLength = 6000f;
 
-        [Tooltip("Largest allowed curve radius (meters). Allows huge high-speed sweepers.")]
-        [SerializeField] private float maxCurveRadius = 1200f;
+        [Tooltip("Absolute maximum lap length (meters).")]
+        [SerializeField] private float maxTrackLength = 60000f;
 
-        [Tooltip("Maximum allowed banking angle in degrees. High values support NASCAR / futuristic high-speed banks.")]
-        [Range(0f, 80f)]
-        [SerializeField] private float maxBankAngle = 75f;
+        [Tooltip("Minimum road width (meters).")]
+        [SerializeField] private float minRoadWidth = 12f;
 
-        [Tooltip("Maximum road incline angle in degrees.")]
+        [Tooltip("Maximum road width (meters).")]
+        [SerializeField] private float maxRoadWidth = 60f;
+
+        [Tooltip("Absolute minimum curve radius (meters). Rulebook lower bound — presets use safer values.")]
+        [SerializeField] private float minCurveRadius = 180f;
+
+        [Tooltip("Absolute maximum curve radius (meters).")]
+        [SerializeField] private float maxCurveRadius = 6000f;
+
+        [Tooltip("Maximum bank angle (degrees).")]
+        [Range(0f, 85f)]
+        [SerializeField] private float maxBankAngle = 82f;
+
+        [Tooltip("Maximum ordinary climb angle (degrees).")]
         [Range(5f, 60f)]
-        [SerializeField] private float maxSlopeAngle = 40f;
+        [SerializeField] private float maxClimbAngle = 45f;
 
-        [Tooltip("Maximum vertical elevation change the generator may use (meters). Needed for Layered / Rainbow Road tracks.")]
-        [Range(10f, 300f)]
-        [SerializeField] private float maxElevationChange = 220f;
+        [Tooltip("Maximum ordinary drop angle (degrees).")]
+        [Range(5f, 60f)]
+        [SerializeField] private float maxDropAngle = 45f;
 
-        [Header("Allowed Features")]
+        [Tooltip("Maximum total elevation range of the lap (meters).")]
+        [SerializeField] private float maxElevationRange = 1200f;
 
-        [Tooltip("Whether jump sections may be generated.")]
+        [Tooltip("Minimum vertical clearance wherever unrelated track passes over track (meters). Wall heights and slab thickness are added on top during validation.")]
+        [SerializeField] private float minVerticalClearance = 35f;
+
+        // ══════════════════ Allowed features ══════════════════
+
+        [Header("Allowed Features (project build support)")]
+
         [SerializeField] private bool allowJumps = true;
-
-        [Tooltip("Whether vertical loops may be generated.")]
         [SerializeField] private bool allowLoops = true;
-
-        [Tooltip("Whether corkscrews may be generated.")]
         [SerializeField] private bool allowCorkscrews = true;
-
-        [Tooltip("Whether two-route split groups may be generated.")]
-        [SerializeField] private bool allowRouteSplits = true;
-
-        [Tooltip("Whether one route may pass over another or over the main track.")]
-        [SerializeField] private bool allowOverpasses = true;
-
-        [Tooltip("Whether one route may pass under another or under the main track.")]
+        [SerializeField] private bool allowSpirals = true;
+        [SerializeField] private bool allowHalfLoops = true;
+        [SerializeField] private bool allowBranches = true;
+        [SerializeField] private bool allowBridges = true;
         [SerializeField] private bool allowUnderpasses = true;
 
-        [Tooltip("Whether layered routes may cross above/below each other.")]
-        [SerializeField] private bool allowLayeredRouteCrossings = true;
+        // ══════════════════ Straight & pacing limits (seconds) ══════════════════
 
-        [Tooltip("Whether wall-ride sections may be generated.")]
-        [SerializeField] private bool allowWallRides = true;
+        [Header("Straight & Pacing Limits (seconds at design speed)")]
 
-        [Tooltip("Whether gravity zones may be generated.")]
-        [SerializeField] private bool allowGravityZones = true;
+        [Tooltip("Ordinary straight duration window (seconds). 0.30 s ≈ 108 m, 8 s ≈ 2889 m at 1300 km/h.")]
+        [SerializeField] private float minStraightSeconds = 0.30f;
+        [SerializeField] private float maxStraightSeconds = 8.0f;
 
-        [Tooltip("Whether shortcuts / branches may be generated. Legacy spline mode may still use this.")]
-        [SerializeField] private bool allowShortcuts = true;
+        [Tooltip("Boost straight duration window (seconds).")]
+        [SerializeField] private float minBoostStraightSeconds = 0.80f;
+        [SerializeField] private float maxBoostStraightSeconds = 6.0f;
 
-        [Header("Safety Limits")]
+        [Tooltip("Recovery duration window after dangerous features (seconds).")]
+        [SerializeField] private float minRecoverySeconds = 0.70f;
+        [SerializeField] private float maxRecoverySeconds = 3.0f;
 
-        [Tooltip("Minimum vertical clearance when one route passes above another (meters).")]
-        [SerializeField] private float minVerticalClearance = 20f;
+        [Tooltip("Generic feature approach window (seconds).")]
+        [SerializeField] private float minApproachSeconds = 0.80f;
+        [SerializeField] private float maxApproachSeconds = 4.0f;
 
-        [Tooltip("Minimum recovery straight length after dangerous sections (meters).")]
-        [SerializeField] private float minRecoveryLength = 70f;
+        [Tooltip("Spacing between unrelated dangerous features (seconds).")]
+        [SerializeField] private float minDangerousSpacingSeconds = 1.20f;
+        [SerializeField] private float maxDangerousSpacingSeconds = 5.0f;
 
-        [Tooltip("Minimum readable approach length before a jump section (meters).")]
-        [SerializeField] private float minJumpApproachLength = 100f;
+        [Tooltip("Major-feature visual preview window (seconds).")]
+        [SerializeField] private float minVisualPreviewSeconds = 1.20f;
+        [SerializeField] private float maxVisualPreviewSeconds = 4.0f;
 
-        [Tooltip("Minimum recovery length after a jump landing (meters).")]
-        [SerializeField] private float minJumpExitRecoveryLength = 100f;
+        // ══════════════════ Transition limits (seconds) ══════════════════
 
-        [Tooltip("Minimum spacing between dangerous macro sections such as jumps, loops, corkscrews, hairpins, and route merges (meters).")]
-        [SerializeField] private float minDangerousSectionSpacing = 160f;
+        [Header("Transition Limits (seconds at design speed)")]
 
-        [Header("Macro Section Limits")]
+        [SerializeField] private float minGenericTransitionSeconds = 0.20f;
+        [SerializeField] private float maxGenericTransitionSeconds = 3.5f;
 
-        [Tooltip("Minimum length for a normal straight macro section (meters).")]
-        [SerializeField] private float minStraightLength = 60f;
+        [SerializeField] private float minBankTransitionSeconds = 0.35f;
+        [SerializeField] private float maxBankTransitionSeconds = 3.0f;
 
-        [Tooltip("Maximum length for a normal straight macro section (meters).")]
-        [SerializeField] private float maxStraightLength = 900f;
+        [SerializeField] private float minPitchTransitionSeconds = 0.45f;
+        [SerializeField] private float maxPitchTransitionSeconds = 3.5f;
 
-        [Tooltip("Minimum length for a boost straight macro section (meters).")]
-        [SerializeField] private float minBoostStraightLength = 100f;
+        [SerializeField] private float minRollTransitionSeconds = 0.60f;
+        [SerializeField] private float maxRollTransitionSeconds = 4.0f;
 
-        [Tooltip("Maximum length for a boost straight macro section (meters).")]
-        [SerializeField] private float maxBoostStraightLength = 1000f;
+        [SerializeField] private float minWidthTransitionSeconds = 0.35f;
+        [SerializeField] private float maxWidthTransitionSeconds = 2.5f;
 
-        [Tooltip("Minimum length for a recovery straight macro section (meters).")]
-        [SerializeField] private float minRecoveryStraightLength = 60f;
+        [SerializeField] private float minCrossSectionTransitionSeconds = 0.45f;
+        [SerializeField] private float maxCrossSectionTransitionSeconds = 3.0f;
 
-        [Tooltip("Maximum length for a recovery straight macro section (meters).")]
-        [SerializeField] private float maxRecoveryStraightLength = 300f;
+        [Tooltip("Maximum effective ramp angle a bank transition may create (degrees). Transitions auto-expand to respect this; otherwise the candidate is rejected with a transition-rate failure.")]
+        [Range(2f, 15f)]
+        [SerializeField] private float maxBankRampAngle = 6f;
 
-        [Tooltip("Minimum turn angle for a curve macro section (degrees).")]
-        [SerializeField] private float minCurveAngle = 25f;
-
-        [Tooltip("Maximum turn angle for a curve macro section (degrees).")]
-        [SerializeField] private float maxCurveAngle = 180f;
-
-        [Tooltip("Minimum distance over which banking eases in/out (meters).")]
-        [SerializeField] private float minBankTransitionLength = 12f;
-
-        [Tooltip("Maximum distance over which banking eases in/out (meters).")]
-        [SerializeField] private float maxBankTransitionLength = 100f;
-
-        [Header("Verticality Limits")]
-
-        [Tooltip("Minimum meaningful elevation step for non-flat verticality presets (meters).")]
-        [SerializeField] private float minElevationStep = 12f;
-
-        [Tooltip("Maximum single elevation step for non-flat verticality presets (meters).")]
-        [SerializeField] private float maxElevationStep = 80f;
-
-        [Tooltip("Minimum height for rolling hills (meters).")]
-        [SerializeField] private float minRollingHillHeight = 8f;
-
-        [Tooltip("Maximum height for rolling hills (meters).")]
-        [SerializeField] private float maxRollingHillHeight = 35f;
-
-        [Tooltip("Minimum height offset for layered route groups (meters).")]
-        [SerializeField] private float minLayeredHeightOffset = 24f;
-
-        [Tooltip("Maximum height offset for layered route groups (meters).")]
-        [SerializeField] private float maxLayeredHeightOffset = 140f;
-
-        [Tooltip("Minimum bridge / overpass height (meters).")]
-        [SerializeField] private float minBridgeHeight = 24f;
-
-        [Tooltip("Maximum bridge / overpass height (meters).")]
-        [SerializeField] private float maxBridgeHeight = 120f;
-
-        [Tooltip("Minimum underpass depth below the main route level (meters).")]
-        [SerializeField] private float minUnderpassDepth = 18f;
-
-        [Tooltip("Maximum underpass depth below the main route level (meters).")]
-        [SerializeField] private float maxUnderpassDepth = 80f;
-
-        [Tooltip("Minimum length used to climb into a higher route / elevated section (meters).")]
-        [SerializeField] private float minClimbLength = 100f;
-
-        [Tooltip("Maximum length used to climb into a higher route / elevated section (meters).")]
-        [SerializeField] private float maxClimbLength = 500f;
-
-        [Tooltip("Minimum length used to drop into a lower route / underpass (meters).")]
-        [SerializeField] private float minDropLength = 80f;
-
-        [Tooltip("Maximum length used to drop into a lower route / underpass (meters).")]
-        [SerializeField] private float maxDropLength = 450f;
-
-        [Tooltip("Comfortable maximum climb angle for normal flowing tracks (degrees).")]
-        [Range(1f, 45f)]
-        [SerializeField] private float maxComfortableClimbAngle = 18f;
-
-        [Tooltip("Aggressive maximum climb angle for hard / Rainbow Road tracks (degrees).")]
-        [Range(1f, 60f)]
-        [SerializeField] private float maxAggressiveClimbAngle = 32f;
-
-        [Tooltip("Comfortable maximum drop angle for normal flowing tracks (degrees).")]
-        [Range(1f, 45f)]
-        [SerializeField] private float maxComfortableDropAngle = 20f;
-
-        [Tooltip("Aggressive maximum drop angle for hard / Rainbow Road tracks (degrees).")]
-        [Range(1f, 60f)]
-        [SerializeField] private float maxAggressiveDropAngle = 38f;
-
-        [Tooltip("Maximum number of major elevation changes allowed per track.")]
-        [SerializeField] private int maxMajorElevationChangesPerTrack = 8;
-
-        [Tooltip("Maximum number of layered vertical sections allowed per track.")]
-        [SerializeField] private int maxLayeredSectionsPerTrack = 4;
-
-        [Header("Route Split / Layered Track Limits")]
-
-        [Tooltip("Maximum number of two-route groups allowed per track.")]
-        [SerializeField] private int maxRouteGroupsPerTrack = 4;
-
-        [Tooltip("Minimum straight/readable approach length before a route split (meters).")]
-        [SerializeField] private float minRouteSplitApproachLength = 100f;
-
-        [Tooltip("Minimum length of an alternate route group from split to merge (meters).")]
-        [SerializeField] private float minRouteSplitLength = 180f;
-
-        [Tooltip("Maximum length of an alternate route group from split to merge (meters).")]
-        [SerializeField] private float maxRouteSplitLength = 900f;
-
-        [Tooltip("Minimum length used to merge routes back together (meters).")]
-        [SerializeField] private float minRouteMergeLength = 80f;
-
-        [Tooltip("Minimum recovery length after routes merge (meters).")]
-        [SerializeField] private float minPostMergeRecoveryLength = 100f;
-
-        [Tooltip("Minimum approach length before a layered route group (meters).")]
-        [SerializeField] private float minLayeredRouteApproachLength = 120f;
-
-        [Tooltip("Minimum layered route group length (meters).")]
-        [SerializeField] private float minLayeredRouteLength = 300f;
-
-        [Tooltip("Maximum layered route group length (meters).")]
-        [SerializeField] private float maxLayeredRouteLength = 1200f;
-
-        [Tooltip("Minimum merge length for layered route groups (meters).")]
-        [SerializeField] private float minLayeredRouteMergeLength = 100f;
-
-        [Tooltip("Minimum recovery length after a layered route group (meters).")]
-        [SerializeField] private float minLayeredRouteRecoveryLength = 120f;
-
-        [Tooltip("Minimum vertical separation between high and low routes (meters).")]
-        [SerializeField] private float minLayeredRouteHeightSeparation = 24f;
-
-        [Tooltip("Maximum vertical separation between high and low routes (meters).")]
-        [SerializeField] private float maxLayeredRouteHeightSeparation = 140f;
-
-        [Tooltip("Maximum height offset a split route may use from the base route level (meters).")]
-        [SerializeField] private float maxRouteElevationOffset = 160f;
-
-        [Tooltip("Maximum over/under crossings allowed per track.")]
-        [SerializeField] private int maxOverUnderCrossingsPerTrack = 4;
-
-        [Tooltip("Minimum clear air gap for an overpass (meters).")]
-        [SerializeField] private float minOverpassClearance = 20f;
-
-        [Tooltip("Minimum clear air gap for an underpass (meters).")]
-        [SerializeField] private float minUnderpassClearance = 20f;
-
-        [Header("Speed Profile Support Limits")]
-
-        [Tooltip("Minimum curve radius used by flowing speed profiles (meters).")]
-        [SerializeField] private float minFlowingCurveRadius = 250f;
-
-        [Tooltip("Maximum curve radius used by flowing speed profiles (meters).")]
-        [SerializeField] private float maxFlowingCurveRadius = 1200f;
-
-        [Tooltip("Minimum curve radius used by technical speed profiles (meters).")]
-        [SerializeField] private float minTechnicalCurveRadius = 45f;
-
-        [Tooltip("Maximum curve radius used by technical speed profiles (meters).")]
-        [SerializeField] private float maxTechnicalCurveRadius = 220f;
-
-        [Tooltip("Minimum straight length used by insane-speed profiles (meters).")]
-        [SerializeField] private float minInsaneSpeedStraightLength = 250f;
-
-        [Tooltip("Maximum straight length used by insane-speed profiles (meters).")]
-        [SerializeField] private float maxInsaneSpeedStraightLength = 1000f;
-
-        [Tooltip("Minimum straight length used by technical profiles (meters).")]
-        [SerializeField] private float minTechnicalStraightLength = 60f;
-
-        [Tooltip("Maximum straight length used by technical profiles (meters).")]
-        [SerializeField] private float maxTechnicalStraightLength = 260f;
+        // ══════════════════ Loop limits ══════════════════
 
         [Header("Loop Limits")]
 
-        [Tooltip("Minimum vertical loop radius (meters).")]
-        [SerializeField] private float minLoopRadius = 35f;
+        [Tooltip("Full-loop mid-arc radius window (meters).")]
+        [SerializeField] private float minLoopRadius = 160f;
+        [SerializeField] private float maxLoopRadius = 420f;
 
-        [Tooltip("Maximum vertical loop radius (meters).")]
-        [SerializeField] private float maxLoopRadius = 130f;
+        [Tooltip("Loop approach window (seconds).")]
+        [SerializeField] private float minLoopApproachSeconds = 1.5f;
+        [SerializeField] private float maxLoopApproachSeconds = 3.0f;
 
-        [Tooltip("Minimum straight approach length before a loop (meters).")]
-        [SerializeField] private float minLoopApproachLength = 160f;
+        [Tooltip("Loop recovery window (seconds).")]
+        [SerializeField] private float minLoopRecoverySeconds = 1.0f;
+        [SerializeField] private float maxLoopRecoverySeconds = 2.5f;
 
-        [Tooltip("Minimum recovery straight length after a loop (meters).")]
-        [SerializeField] private float minLoopExitRecoveryLength = 120f;
+        [Tooltip("Minimum clear space around a loop volume (meters).")]
+        [SerializeField] private float minLoopClearance = 45f;
 
-        [Tooltip("Maximum pitch change per meter of track inside a loop (degrees/m).")]
-        [SerializeField] private float maxLoopPitchRate = 3.5f;
+        // ══════════════════ Half-loop limits ══════════════════
 
-        [Tooltip("Meters per prism subdivision ring inside loops (lower = smoother).")]
-        [Range(0.5f, 5f)]
-        [SerializeField] private float loopSubdivisionDensity = 1.25f;
+        [Header("Half-Loop Limits")]
 
-        [Tooltip("Minimum straight length before a loop to allow speed build-up (meters).")]
-        [SerializeField] private float minLoopEntrySpeedStraightLength = 180f;
+        [SerializeField] private float minHalfLoopRadius = 180f;
+        [SerializeField] private float maxHalfLoopRadius = 420f;
 
-        [Tooltip("Minimum vertical clearance around a loop volume (meters).")]
-        [SerializeField] private float minLoopVerticalClearance = 30f;
+        [Tooltip("Half-loop rollout duration window (seconds). Default preset value ≈ 2.2 s ≈ 794 m at 1300 km/h.")]
+        [SerializeField] private float minHalfLoopRolloutSeconds = 1.5f;
+        [SerializeField] private float maxHalfLoopRolloutSeconds = 3.5f;
+
+        [SerializeField] private float minHalfLoopApproachSeconds = 1.5f;
+        [SerializeField] private float maxHalfLoopApproachSeconds = 3.0f;
+        [SerializeField] private float minHalfLoopRecoverySeconds = 1.0f;
+        [SerializeField] private float maxHalfLoopRecoverySeconds = 2.5f;
+
+        // ══════════════════ Corkscrew limits ══════════════════
 
         [Header("Corkscrew Limits")]
 
-        [Tooltip("Minimum corkscrew length along the track axis (meters).")]
-        [SerializeField] private float minCorkscrewLength = 120f;
+        [Tooltip("Corkscrew duration window (seconds). 1.5 s ≈ 542 m, 5.5 s ≈ 1986 m at 1300 km/h.")]
+        [SerializeField] private float minCorkscrewSeconds = 1.5f;
+        [SerializeField] private float maxCorkscrewSeconds = 5.5f;
 
-        [Tooltip("Maximum corkscrew length along the track axis (meters).")]
-        [SerializeField] private float maxCorkscrewLength = 450f;
+        [Tooltip("Corkscrew helix radius window (meters).")]
+        [SerializeField] private float minCorkscrewRadius = 60f;
+        [SerializeField] private float maxCorkscrewRadius = 260f;
 
-        [Tooltip("Minimum helix radius of the corkscrew centerline (meters).")]
-        [SerializeField] private float minCorkscrewRadius = 20f;
-
-        [Tooltip("Maximum helix radius of the corkscrew centerline (meters).")]
-        [SerializeField] private float maxCorkscrewRadius = 80f;
-
-        [Tooltip("Maximum total roll rotation through a corkscrew (degrees).")]
-        [Range(90f, 720f)]
+        [Tooltip("Allowed total roll through a corkscrew (degrees).")]
+        [SerializeField] private float minCorkscrewRollDegrees = 180f;
         [SerializeField] private float maxCorkscrewRollDegrees = 720f;
 
-        [Tooltip("Maximum roll change per 10 meters of track (degrees).")]
-        [SerializeField] private float maxCorkscrewRollRate = 60f;
+        [Tooltip("Maximum roll rate anywhere on the track (degrees per second at design speed).")]
+        [SerializeField] private float maxRollRateDegreesPerSecond = 220f;
 
-        [Tooltip("Minimum straight approach length before a corkscrew (meters).")]
-        [SerializeField] private float minCorkscrewApproachLength = 140f;
+        [SerializeField] private float minCorkscrewApproachSeconds = 1.3f;
+        [SerializeField] private float maxCorkscrewApproachSeconds = 3.0f;
+        [SerializeField] private float minCorkscrewRecoverySeconds = 1.0f;
+        [SerializeField] private float maxCorkscrewRecoverySeconds = 2.5f;
 
-        [Tooltip("Minimum recovery straight length after a corkscrew (meters).")]
-        [SerializeField] private float minCorkscrewExitRecoveryLength = 120f;
+        [Tooltip("Minimum clear space around a corkscrew volume (meters).")]
+        [SerializeField] private float minCorkscrewClearance = 40f;
 
-        [Tooltip("Meters per prism subdivision ring inside corkscrews (lower = smoother).")]
-        [Range(0.5f, 5f)]
-        [SerializeField] private float corkscrewSubdivisionDensity = 1.25f;
+        // ══════════════════ Spiral limits ══════════════════
 
-        [Tooltip("Minimum straight length before a corkscrew to allow speed build-up (meters).")]
-        [SerializeField] private float minCorkscrewEntrySpeedStraightLength = 160f;
+        [Header("Spiral Limits")]
 
-        [Tooltip("Minimum vertical clearance around a corkscrew volume (meters).")]
-        [SerializeField] private float minCorkscrewVerticalClearance = 25f;
+        [Tooltip("Spiral helix radius window (meters) — dedicated rulebook values, never derived from road width alone.")]
+        [SerializeField] private float minSpiralRadius = 120f;
+        [SerializeField] private float maxSpiralRadius = 700f;
 
-        [Header("Half-Pipe Road Cross-Section Limits")]
+        [Tooltip("Full revolutions a spiral may make.")]
+        [SerializeField] private int minSpiralRevolutions = 1;
+        [SerializeField] private int maxSpiralRevolutions = 3;
 
-        [Tooltip("Whether the global half-pipe / water-slide road cross-section is allowed. When false the generator falls back to legacy flat-with-walls roads.")]
-        [SerializeField] private bool allowHalfPipeRoads = true;
+        [Tooltip("Climb (or descent) per revolution (meters).")]
+        [SerializeField] private float minSpiralClimbPerRevolution = 35f;
+        [SerializeField] private float maxSpiralClimbPerRevolution = 140f;
 
-        [Tooltip("Minimum half-pipe side height above the center floor (meters).")]
-        [SerializeField] private float minHalfPipeSideHeight = 1.5f;
+        [SerializeField] private float minSpiralApproachSeconds = 1.2f;
+        [SerializeField] private float maxSpiralApproachSeconds = 3.0f;
+        [SerializeField] private float minSpiralRecoverySeconds = 1.0f;
+        [SerializeField] private float maxSpiralRecoverySeconds = 2.5f;
 
-        [Tooltip("Maximum half-pipe side height above the center floor (meters).")]
-        [SerializeField] private float maxHalfPipeSideHeight = 7f;
+        [Tooltip("Minimum clearance between spiral coils and to external geometry (meters).")]
+        [SerializeField] private float minSpiralClearance = 40f;
 
-        [Tooltip("Minimum half-pipe curve strength (how smoothly the road curves upward).")]
-        [SerializeField] private float minHalfPipeCurveStrength = 0.35f;
+        // ══════════════════ Jump limits (ballistic model) ══════════════════
 
-        [Tooltip("Maximum half-pipe curve strength (how aggressively the road curves upward).")]
-        [SerializeField] private float maxHalfPipeCurveStrength = 1.5f;
+        [Header("Jump Limits (ballistic design model)")]
 
-        [Tooltip("Minimum side wall tilt angle in degrees.")]
+        [SerializeField] private float minJumpApproachSeconds = 1.3f;
+        [SerializeField] private float maxJumpApproachSeconds = 3.0f;
+
+        [Tooltip("Launch transition duration window (seconds) — the pitch-up ramp itself.")]
+        [SerializeField] private float minLaunchTransitionSeconds = 0.35f;
+        [SerializeField] private float maxLaunchTransitionSeconds = 1.2f;
+
+        [Tooltip("Target airtime window (seconds). Air-gap distance is derived from the ballistic trajectory at design speed, never chosen randomly.")]
+        [SerializeField] private float minJumpAirtimeSeconds = 0.25f;
+        [SerializeField] private float maxJumpAirtimeSeconds = 1.2f;
+
+        [Tooltip("Landing transition duration window (seconds).")]
+        [SerializeField] private float minLandingTransitionSeconds = 0.50f;
+        [SerializeField] private float maxLandingTransitionSeconds = 1.8f;
+
+        [SerializeField] private float minJumpRecoverySeconds = 1.0f;
+        [SerializeField] private float maxJumpRecoverySeconds = 2.5f;
+
+        [Tooltip("Launch lip height window (meters).")]
+        [SerializeField] private float minJumpHeight = 3f;
+        [SerializeField] private float maxJumpHeight = 80f;
+
+        [Tooltip("Tolerance between the predicted ballistic arrival and the landing surface (meters).")]
+        [SerializeField] private float jumpLandingTolerance = 4f;
+
+        // ══════════════════ Branch limits ══════════════════
+
+        [Header("Branch Limits")]
+
+        [Tooltip("Maximum branch groups per track.")]
+        [SerializeField] private int maxBranchGroupsPerTrack = 5;
+
+        [SerializeField] private float minDecisionPreviewSeconds = 1.5f;
+        [SerializeField] private float maxDecisionPreviewSeconds = 4.0f;
+
+        [Tooltip("Branch route duration window from fork to merge (seconds).")]
+        [SerializeField] private float minBranchRouteSeconds = 4.0f;
+        [SerializeField] private float maxBranchRouteSeconds = 18.0f;
+
+        [SerializeField] private float minLateralSplitSeconds = 0.8f;
+        [SerializeField] private float maxLateralSplitSeconds = 3.0f;
+
+        [SerializeField] private float minVerticalDivergenceDelaySeconds = 0.3f;
+        [SerializeField] private float maxVerticalDivergenceDelaySeconds = 1.5f;
+
+        [SerializeField] private float minVerticalDivergenceSeconds = 0.8f;
+        [SerializeField] private float maxVerticalDivergenceSeconds = 3.5f;
+
+        [SerializeField] private float minMergeSeconds = 0.8f;
+        [SerializeField] private float maxMergeSeconds = 3.0f;
+
+        [SerializeField] private float minPostMergeRecoverySeconds = 1.0f;
+        [SerializeField] private float maxPostMergeRecoverySeconds = 3.0f;
+
+        [Tooltip("Route centerline separation window (meters). Dynamically increased for road half-widths, wall heights, banking, lips, slab thickness, craft envelope and safety margin.")]
+        [SerializeField] private float minRouteCenterlineSeparation = 40f;
+        [SerializeField] private float maxRouteCenterlineSeparation = 300f;
+
+        [Tooltip("Route vertical separation window for stacked/crossing patterns (meters).")]
+        [SerializeField] private float minRouteVerticalSeparation = 35f;
+        [SerializeField] private float maxRouteVerticalSeparation = 300f;
+
+        [Tooltip("Neutral-craft route time balance tolerance window (fraction).")]
+        [SerializeField] private float minTimeBalanceTolerance = 0.01f;
+        [SerializeField] private float maxTimeBalanceTolerance = 0.06f;
+
+        [Tooltip("Specialization advantage target window (fraction).")]
+        [SerializeField] private float minSpecializationAdvantage = 0.01f;
+        [SerializeField] private float maxSpecializationAdvantage = 0.10f;
+
+        [Tooltip("Maximum paired-route interactions (crossovers, exchanges) per branch group.")]
+        [SerializeField] private int maxPairedRouteInteractions = 5;
+
+        // ══════════════════ Half-pipe limits ══════════════════
+
+        [Header("Half-Pipe Cross-Section Limits")]
+
+        [SerializeField] private float minHalfPipeSideHeight = 3f;
+        [SerializeField] private float maxHalfPipeSideHeight = 14f;
+
+        [SerializeField] private float minHalfPipeCurveStrength = 0.30f;
+        [SerializeField] private float maxHalfPipeCurveStrength = 1.80f;
+
         [SerializeField] private float minHalfPipeWallAngle = 35f;
+        [SerializeField] private float maxHalfPipeWallAngle = 82f;
 
-        [Tooltip("Maximum side wall tilt angle in degrees.")]
-        [SerializeField] private float maxHalfPipeWallAngle = 75f;
+        [SerializeField] private float minHalfPipeCenterFlatRatio = 0.15f;
+        [SerializeField] private float maxHalfPipeCenterFlatRatio = 0.65f;
 
-        [Tooltip("Minimum ratio of the road width kept flat in the center.")]
-        [SerializeField] private float minHalfPipeCenterFlatWidthRatio = 0.15f;
+        [SerializeField] private int minHalfPipeProfileResolution = 8;
+        [SerializeField] private int maxHalfPipeProfileResolution = 96;
 
-        [Tooltip("Maximum ratio of the road width kept flat in the center.")]
-        [SerializeField] private float maxHalfPipeCenterFlatWidthRatio = 0.55f;
+        [SerializeField] private float minSafetyLipHeight = 0.5f;
+        [SerializeField] private float maxSafetyLipHeight = 2.5f;
 
-        [Tooltip("Minimum cross-section sample points per side of the half-pipe profile.")]
-        [SerializeField] private int minHalfPipeProfileResolution = 6;
+        // ══════════════════ Mesh & collision limits ══════════════════
 
-        [Tooltip("Maximum cross-section sample points per side of the half-pipe profile.")]
-        [SerializeField] private int maxHalfPipeProfileResolution = 18;
+        [Header("Mesh & Collision Limits")]
 
-        [Header("Section Transition Blend Limits")]
+        [Tooltip("Ring spacing window for ordinary sections (meters per ring).")]
+        [SerializeField] private float minMetersPerRing = 0.5f;
+        [SerializeField] private float maxMetersPerRing = 8.0f;
 
-        [Tooltip("Minimum generic transition blend length between macro sections (meters).")]
-        [SerializeField] private float minTransitionBlendLength = 20f;
+        [Tooltip("Ring spacing window inside special features (meters per ring).")]
+        [SerializeField] private float minFeatureMetersPerRing = 0.75f;
+        [SerializeField] private float maxFeatureMetersPerRing = 4.0f;
 
-        [Tooltip("Maximum generic transition blend length between macro sections (meters).")]
-        [SerializeField] private float maxTransitionBlendLength = 180f;
+        [Tooltip("Maximum facet-angle change between consecutive rings (degrees). 0.5° recommended at 1300 km/h.")]
+        [SerializeField] private float minFacetAngle = 0.25f;
+        [SerializeField] private float maxFacetAngle = 1.0f;
 
-        [Tooltip("Minimum distance over which bank angle eases in/out (meters).")]
-        [SerializeField] private float minBankBlendLength = 30f;
+        [Tooltip("Maximum rings inside one macro section.")]
+        [SerializeField] private int maxRingsPerMacroSection = 16384;
 
-        [Tooltip("Maximum distance over which bank angle eases in/out (meters).")]
-        [SerializeField] private float maxBankBlendLength = 220f;
+        [Tooltip("Maximum rings for the whole track.")]
+        [SerializeField] private int maxTotalTrackRings = 150000;
 
-        [Tooltip("Minimum distance over which pitch/elevation changes blend (meters).")]
-        [SerializeField] private float minPitchBlendLength = 40f;
+        // ══════════════════ Validation tolerances ══════════════════
 
-        [Tooltip("Maximum distance over which pitch/elevation changes blend (meters).")]
-        [SerializeField] private float maxPitchBlendLength = 240f;
+        [Header("Closure Validation Tolerances")]
 
-        [Tooltip("Minimum distance over which road width changes blend (meters).")]
-        [SerializeField] private float minWidthBlendLength = 25f;
+        [Tooltip("Maximum allowed closure position error (meters).")]
+        [SerializeField] private float closurePositionTolerance = 0.05f;
 
-        [Tooltip("Maximum distance over which road width changes blend (meters).")]
-        [SerializeField] private float maxWidthBlendLength = 180f;
+        [Tooltip("Maximum allowed closure forward-angle error (degrees).")]
+        [SerializeField] private float closureForwardTolerance = 0.05f;
 
-        [Tooltip("Minimum distance over which half-pipe depth/shape changes blend (meters).")]
-        [SerializeField] private float minCrossSectionBlendLength = 30f;
+        [Tooltip("Maximum allowed closure up-angle error (degrees).")]
+        [SerializeField] private float closureUpTolerance = 0.05f;
 
-        [Tooltip("Maximum distance over which half-pipe depth/shape changes blend (meters).")]
-        [SerializeField] private float maxCrossSectionBlendLength = 200f;
+        [Tooltip("Maximum allowed closure width error (meters).")]
+        [SerializeField] private float closureWidthTolerance = 0.01f;
 
-        [Tooltip("Maximum effective ramp angle a bank-in/bank-out transition may create (degrees). Blends auto-expand to respect this — prevents bank transitions becoming launch ramps.")]
-        [Range(2f, 30f)]
-        [SerializeField] private float maxBankRampAngle = 8f;
+        [Tooltip("Maximum allowed closure bank error (degrees).")]
+        [SerializeField] private float closureBankTolerance = 0.05f;
 
-        [Header("Route Split Structure Limits")]
+        [Tooltip("Maximum allowed closure pitch error (degrees).")]
+        [SerializeField] private float closurePitchTolerance = 0.05f;
 
-        [Tooltip("Minimum length of the lateral separation zone where routes move sideways apart (meters).")]
-        [SerializeField] private float minLateralSeparationLength = 80f;
+        // ══════════════════ Reference performance model ══════════════════
 
-        [Tooltip("Maximum length of the lateral separation zone (meters).")]
-        [SerializeField] private float maxLateralSeparationLength = 300f;
+        [Header("Reference Performance Model (generation estimates only — NOT craft physics)")]
 
-        [Tooltip("Minimum distance after the split before any vertical divergence may start (meters). Splits must read as left/right choices FIRST.")]
-        [SerializeField] private float minVerticalDivergenceDelay = 60f;
+        [Tooltip("Gravity used by ballistic jump design and speed estimates (m/s²).")]
+        [SerializeField] private float referenceGravity = 9.81f;
 
-        [Tooltip("Maximum vertical divergence delay (meters).")]
-        [SerializeField] private float maxVerticalDivergenceDelay = 250f;
+        [Tooltip("Neutral reference top speed (km/h).")]
+        [SerializeField] private float referenceTopSpeedKph = 1300f;
 
-        [Tooltip("Minimum length over which a route climbs/drops to its layer height (meters).")]
-        [SerializeField] private float minVerticalDivergenceLength = 120f;
+        [Tooltip("Reference longitudinal acceleration (m/s²).")]
+        [SerializeField] private float referenceAcceleration = 45f;
 
-        [Tooltip("Maximum vertical divergence length (meters).")]
-        [SerializeField] private float maxVerticalDivergenceLength = 500f;
+        [Tooltip("Reference braking deceleration (m/s²).")]
+        [SerializeField] private float referenceBraking = 70f;
 
-        [Tooltip("Minimum lateral separation between the two route centerlines (meters).")]
-        [SerializeField] private float minRouteLateralSeparation = 12f;
+        [Tooltip("Reference lateral acceleration capability on a FLAT road (m/s²). Banking multiplies effective capability.")]
+        [SerializeField] private float referenceLateralAcceleration = 120f;
 
-        [Tooltip("Maximum lateral separation between the two route centerlines (meters).")]
-        [SerializeField] private float maxRouteLateralSeparation = 80f;
+        [Tooltip("Reference roll stability: fraction of speed retained through heavy roll sections.")]
+        [Range(0.5f, 1f)]
+        [SerializeField] private float referenceRollStability = 0.9f;
 
-        [Header("Mesh / Collision Limits")]
+        [Tooltip("Reference landing recovery: fraction of speed retained through a jump landing.")]
+        [Range(0.5f, 1f)]
+        [SerializeField] private float referenceLandingRecovery = 0.92f;
 
-        [Tooltip("Smallest allowed ring spacing (meters). Guards against runaway vertex counts.")]
-        [SerializeField] private float minMetersPerRing = 0.75f;
+        [Header("Race")]
 
-        [Tooltip("Largest allowed ring spacing (meters). Guards against faceted collision surfaces.")]
-        [SerializeField] private float maxMetersPerRing = 5f;
-
-        [Tooltip("Maximum subdivision rings allowed inside a single macro section.")]
-        [SerializeField] private int maxRingsPerMacroSection = 512;
-
-        [Tooltip("Maximum subdivision rings allowed for the entire generated track.")]
-        [SerializeField] private int maxTotalTrackRings = 12000;
-
-        // ══════════════════════════════════════════════
-        //  LEGACY SPLINE MODE — KEPT FOR BACKWARDS COMPATIBILITY
-        //  New macro generator should not use these as personality controls.
-        // ══════════════════════════════════════════════
-
-        [Header("Legacy — Circuit Shape (Spline Mode)")]
-
-        [Tooltip("Approximate radius of the main circuit loop in meters.")]
-        [Range(100f, 1000f)]
-        [SerializeField] private float trackRadius = 300f;
-
-        [Tooltip("Number of control points that define the circuit spline.")]
-        [Range(8, 40)]
-        [SerializeField] private int controlPointCount = 20;
-
-        [Tooltip("Frequency multiplier for elevation noise — legacy spline mode only.")]
-        [Range(0.05f, 1f)]
-        [SerializeField] private float elevationFrequency = 0.3f;
-
-        [Tooltip("Multiplier applied to automatic banking on curves — legacy spline mode only.")]
-        [Range(0f, 3f)]
-        [SerializeField] private float bankingMultiplier = 1.5f;
-
-        [Tooltip("Probability (per eligible segment) that a vertical loop is placed — legacy spline mode only.")]
-        [Range(0f, 0.5f)]
-        [SerializeField] private float loopProbability = 0.1f;
-
-        [Tooltip("Probability (per eligible segment) that a corkscrew is placed — legacy spline mode only.")]
-        [Range(0f, 0.3f)]
-        [SerializeField] private float corkscrewProbability = 0.05f;
-
-        [Tooltip("Probability (per eligible segment) that a steep climb/drop is exaggerated — legacy spline mode only.")]
-        [Range(0f, 0.5f)]
-        [SerializeField] private float steepSectionProbability = 0.08f;
-
-        [Tooltip("Number of smoothing passes on elevation — legacy spline mode only.")]
-        [Range(0, 5)]
-        [SerializeField] private int elevationSmoothingPasses = 2;
-
-        [Tooltip("Minimum number of F1-style straight sections on the main circuit — legacy spline mode only.")]
-        [Range(0, 4)]
-        [SerializeField] private int minStraightSections = 2;
-
-        [Tooltip("Maximum number of F1-style straight sections on the main circuit — legacy spline mode only.")]
-        [Range(0, 6)]
-        [SerializeField] private int maxStraightSections = 3;
-
-        [Tooltip("Distance in meters over which banking eases in/out of corners — legacy spline mode only.")]
-        [Range(0f, 60f)]
-        [SerializeField] private float bankTransitionLength = 18f;
-
-        [Header("Legacy — Road Dimensions (Spline Mode)")]
-
-        [Tooltip("Width of a single lane in meters.")]
-        [Range(3f, 30f)]
-        [SerializeField] private float laneWidth = 4f;
-
-        [Tooltip("Number of lanes on the main road.")]
-        [Range(1, 4)]
-        [SerializeField] private int mainRoadLanes = 2;
-
-        [Tooltip("Number of lanes on shortcut roads.")]
-        [Range(1, 2)]
-        [SerializeField] private int shortcutRoadLanes = 1;
-
-        [Tooltip("Height of the barrier walls in meters.")]
-        [Range(0.5f, 5f)]
-        [SerializeField] private float wallHeight = 1.5f;
-
-        [Header("Legacy — Branching / Shortcuts (Spline Mode)")]
-
-        [Tooltip("Minimum number of shortcuts generated per track.")]
-        [Range(0, 5)]
-        [SerializeField] private int minShortcuts = 2;
-
-        [Tooltip("Maximum number of shortcuts generated per track.")]
-        [Range(1, 6)]
-        [SerializeField] private int maxShortcuts = 3;
-
-        [Tooltip("Target shortcut length as a ratio of the bypassed main-road distance.")]
-        [Range(0.3f, 0.9f)]
-        [SerializeField] private float shortcutLengthRatio = 0.6f;
-
-        [Tooltip("Bias toward placing shortcuts on harder sections.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float shortcutDifficultyBias = 0.7f;
-
-        [Tooltip("Distance in meters for the shortcut merge zone.")]
-        [Range(10f, 60f)]
-        [SerializeField] private float shortcutMergeDistance = 30f;
-
-        [Header("Legacy — Stunts (Spline Mode)")]
-
-        [Tooltip("Minimum number of stunt actors per track.")]
-        [Range(0, 4)]
-        [SerializeField] private int minStunts = 1;
-
-        [Tooltip("Maximum number of stunt actors per track.")]
-        [Range(1, 4)]
-        [SerializeField] private int maxStunts = 4;
-
-        [Tooltip("Minimum arc distance in meters between two stunts on the same road.")]
-        [Range(50f, 500f)]
-        [SerializeField] private float minStuntSpacing = 150f;
-
-        [Tooltip("Relative selection weight for wall-ride candidates.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float wallRideProbability = 0.5f;
-
-        [Tooltip("Relative selection weight for ramp candidates.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float rampProbabilityPerSegment = 0.5f;
-
-        [Tooltip("Maximum height of ramps in meters.")]
-        [Range(2f, 20f)]
-        [SerializeField] private float rampMaxHeight = 8f;
-
-        [Header("Legacy — Boost Pads (Spline Mode)")]
-
-        [Tooltip("Minimum number of boost pads per track.")]
-        [Range(0, 8)]
-        [SerializeField] private int minBoostPads = 2;
-
-        [Tooltip("Maximum number of boost pads per track.")]
-        [Range(0, 10)]
-        [SerializeField] private int maxBoostPads = 4;
-
-        [Tooltip("Forward impulse strength applied by boost pads.")]
-        [Range(5f, 100f)]
-        [SerializeField] private float boostPadStrength = 30f;
-
-        [Header("Legacy — Gravity Zones (Spline Mode)")]
-
-        [Tooltip("Probability of a gravity zone appearing per eligible segment.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float gravityZoneProbability = 0.1f;
-
-        [Tooltip("Gravitational field strength inside gravity zones.")]
-        [Range(10f, 200f)]
-        [SerializeField] private float gravityFieldStrength = 50f;
-
-        [Tooltip("Radius of effect for gravity zones in meters.")]
-        [Range(5f, 100f)]
-        [SerializeField] private float gravityFieldRadius = 30f;
-
-        [Header("Race Settings")]
-
-        [Tooltip("Default number of laps for a race on this track.")]
+        [Tooltip("Default lap count for a race on generated tracks.")]
         [Range(1, 10)]
         [SerializeField] private int defaultLapCount = 3;
 
-        [Header("Legacy — Mesh Quality (Spline Mode)")]
+        // ══════════════════ Accessors ══════════════════
 
-        [Tooltip("Minimum number of subdivisions when sampling the spline for mesh generation.")]
-        [Range(16, 512)]
-        [SerializeField] private int splineSubdivisions = 128;
-
-        [Tooltip("Target distance between mesh cross-sections in meters.")]
-        [Range(1f, 10f)]
-        [SerializeField] private float meshSegmentLength = 2.5f;
-
-        [Tooltip("Spline curve tension.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float curveSmoothingTension = 0.5f;
-
+        public float MinDesignSpeedKph => minDesignSpeedKph;
+        public float MaxDesignSpeedKph => maxDesignSpeedKph;
+        public float MinTargetLapTime => minTargetLapTime;
+        public float MaxTargetLapTime => maxTargetLapTime;
         public float MinTrackLength => minTrackLength;
         public float MaxTrackLength => maxTrackLength;
         public float MinRoadWidth => minRoadWidth;
@@ -625,270 +410,266 @@ namespace TrackGeneration.Core
         public float MinCurveRadius => minCurveRadius;
         public float MaxCurveRadius => maxCurveRadius;
         public float MaxBankAngle => maxBankAngle;
-        public float MaxSlopeAngle => maxSlopeAngle;
-        public float MaxElevationChange => maxElevationChange;
+        public float MaxClimbAngle => maxClimbAngle;
+        public float MaxDropAngle => maxDropAngle;
+        public float MaxElevationRange => maxElevationRange;
+        public float MinVerticalClearance => minVerticalClearance;
 
         public bool AllowJumps => allowJumps;
         public bool AllowLoops => allowLoops;
         public bool AllowCorkscrews => allowCorkscrews;
-        public bool AllowRouteSplits => allowRouteSplits;
-        public bool AllowOverpasses => allowOverpasses;
+        public bool AllowSpirals => allowSpirals;
+        public bool AllowHalfLoops => allowHalfLoops;
+        public bool AllowBranches => allowBranches;
+        public bool AllowBridges => allowBridges;
         public bool AllowUnderpasses => allowUnderpasses;
-        public bool AllowLayeredRouteCrossings => allowLayeredRouteCrossings;
-        public bool AllowWallRides => allowWallRides;
-        public bool AllowGravityZones => allowGravityZones;
-        public bool AllowShortcuts => allowShortcuts;
 
-        public float MinVerticalClearance => minVerticalClearance;
-        public float MinRecoveryLength => minRecoveryLength;
-        public float MinJumpApproachLength => minJumpApproachLength;
-        public float MinJumpExitRecoveryLength => minJumpExitRecoveryLength;
-        public float MinDangerousSectionSpacing => minDangerousSectionSpacing;
+        public float MinStraightSeconds => minStraightSeconds;
+        public float MaxStraightSeconds => maxStraightSeconds;
+        public float MinBoostStraightSeconds => minBoostStraightSeconds;
+        public float MaxBoostStraightSeconds => maxBoostStraightSeconds;
+        public float MinRecoverySeconds => minRecoverySeconds;
+        public float MaxRecoverySeconds => maxRecoverySeconds;
+        public float MinApproachSeconds => minApproachSeconds;
+        public float MaxApproachSeconds => maxApproachSeconds;
+        public float MinDangerousSpacingSeconds => minDangerousSpacingSeconds;
+        public float MaxDangerousSpacingSeconds => maxDangerousSpacingSeconds;
+        public float MinVisualPreviewSeconds => minVisualPreviewSeconds;
+        public float MaxVisualPreviewSeconds => maxVisualPreviewSeconds;
 
-        public float MinStraightLength => minStraightLength;
-        public float MaxStraightLength => maxStraightLength;
-        public float MinBoostStraightLength => minBoostStraightLength;
-        public float MaxBoostStraightLength => maxBoostStraightLength;
-        public float MinRecoveryStraightLength => minRecoveryStraightLength;
-        public float MaxRecoveryStraightLength => maxRecoveryStraightLength;
-        public float MinCurveAngle => minCurveAngle;
-        public float MaxCurveAngle => maxCurveAngle;
-        public float MinBankTransitionLength => minBankTransitionLength;
-        public float MaxBankTransitionLength => maxBankTransitionLength;
-
-        public float MinElevationStep => minElevationStep;
-        public float MaxElevationStep => maxElevationStep;
-        public float MinRollingHillHeight => minRollingHillHeight;
-        public float MaxRollingHillHeight => maxRollingHillHeight;
-        public float MinLayeredHeightOffset => minLayeredHeightOffset;
-        public float MaxLayeredHeightOffset => maxLayeredHeightOffset;
-        public float MinBridgeHeight => minBridgeHeight;
-        public float MaxBridgeHeight => maxBridgeHeight;
-        public float MinUnderpassDepth => minUnderpassDepth;
-        public float MaxUnderpassDepth => maxUnderpassDepth;
-        public float MinClimbLength => minClimbLength;
-        public float MaxClimbLength => maxClimbLength;
-        public float MinDropLength => minDropLength;
-        public float MaxDropLength => maxDropLength;
-        public float MaxComfortableClimbAngle => maxComfortableClimbAngle;
-        public float MaxAggressiveClimbAngle => maxAggressiveClimbAngle;
-        public float MaxComfortableDropAngle => maxComfortableDropAngle;
-        public float MaxAggressiveDropAngle => maxAggressiveDropAngle;
-        public int MaxMajorElevationChangesPerTrack => maxMajorElevationChangesPerTrack;
-        public int MaxLayeredSectionsPerTrack => maxLayeredSectionsPerTrack;
-
-        public int MaxRouteGroupsPerTrack => maxRouteGroupsPerTrack;
-        public float MinRouteSplitApproachLength => minRouteSplitApproachLength;
-        public float MinRouteSplitLength => minRouteSplitLength;
-        public float MaxRouteSplitLength => maxRouteSplitLength;
-        public float MinRouteMergeLength => minRouteMergeLength;
-        public float MinPostMergeRecoveryLength => minPostMergeRecoveryLength;
-        public float MinLayeredRouteApproachLength => minLayeredRouteApproachLength;
-        public float MinLayeredRouteLength => minLayeredRouteLength;
-        public float MaxLayeredRouteLength => maxLayeredRouteLength;
-        public float MinLayeredRouteMergeLength => minLayeredRouteMergeLength;
-        public float MinLayeredRouteRecoveryLength => minLayeredRouteRecoveryLength;
-        public float MinLayeredRouteHeightSeparation => minLayeredRouteHeightSeparation;
-        public float MaxLayeredRouteHeightSeparation => maxLayeredRouteHeightSeparation;
-        public float MaxRouteElevationOffset => maxRouteElevationOffset;
-        public int MaxOverUnderCrossingsPerTrack => maxOverUnderCrossingsPerTrack;
-        public float MinOverpassClearance => minOverpassClearance;
-        public float MinUnderpassClearance => minUnderpassClearance;
-
-        public float MinFlowingCurveRadius => minFlowingCurveRadius;
-        public float MaxFlowingCurveRadius => maxFlowingCurveRadius;
-        public float MinTechnicalCurveRadius => minTechnicalCurveRadius;
-        public float MaxTechnicalCurveRadius => maxTechnicalCurveRadius;
-        public float MinInsaneSpeedStraightLength => minInsaneSpeedStraightLength;
-        public float MaxInsaneSpeedStraightLength => maxInsaneSpeedStraightLength;
-        public float MinTechnicalStraightLength => minTechnicalStraightLength;
-        public float MaxTechnicalStraightLength => maxTechnicalStraightLength;
+        public float MinGenericTransitionSeconds => minGenericTransitionSeconds;
+        public float MaxGenericTransitionSeconds => maxGenericTransitionSeconds;
+        public float MinBankTransitionSeconds => minBankTransitionSeconds;
+        public float MaxBankTransitionSeconds => maxBankTransitionSeconds;
+        public float MinPitchTransitionSeconds => minPitchTransitionSeconds;
+        public float MaxPitchTransitionSeconds => maxPitchTransitionSeconds;
+        public float MinRollTransitionSeconds => minRollTransitionSeconds;
+        public float MaxRollTransitionSeconds => maxRollTransitionSeconds;
+        public float MinWidthTransitionSeconds => minWidthTransitionSeconds;
+        public float MaxWidthTransitionSeconds => maxWidthTransitionSeconds;
+        public float MinCrossSectionTransitionSeconds => minCrossSectionTransitionSeconds;
+        public float MaxCrossSectionTransitionSeconds => maxCrossSectionTransitionSeconds;
+        public float MaxBankRampAngle => maxBankRampAngle;
 
         public float MinLoopRadius => minLoopRadius;
         public float MaxLoopRadius => maxLoopRadius;
-        public float MinLoopApproachLength => minLoopApproachLength;
-        public float MinLoopExitRecoveryLength => minLoopExitRecoveryLength;
-        public float MaxLoopPitchRate => maxLoopPitchRate;
-        public float LoopSubdivisionDensity => loopSubdivisionDensity;
-        public float MinLoopEntrySpeedStraightLength => minLoopEntrySpeedStraightLength;
-        public float MinLoopVerticalClearance => minLoopVerticalClearance;
+        public float MinLoopApproachSeconds => minLoopApproachSeconds;
+        public float MaxLoopApproachSeconds => maxLoopApproachSeconds;
+        public float MinLoopRecoverySeconds => minLoopRecoverySeconds;
+        public float MaxLoopRecoverySeconds => maxLoopRecoverySeconds;
+        public float MinLoopClearance => minLoopClearance;
 
-        public float MinCorkscrewLength => minCorkscrewLength;
-        public float MaxCorkscrewLength => maxCorkscrewLength;
+        public float MinHalfLoopRadius => minHalfLoopRadius;
+        public float MaxHalfLoopRadius => maxHalfLoopRadius;
+        public float MinHalfLoopRolloutSeconds => minHalfLoopRolloutSeconds;
+        public float MaxHalfLoopRolloutSeconds => maxHalfLoopRolloutSeconds;
+        public float MinHalfLoopApproachSeconds => minHalfLoopApproachSeconds;
+        public float MaxHalfLoopApproachSeconds => maxHalfLoopApproachSeconds;
+        public float MinHalfLoopRecoverySeconds => minHalfLoopRecoverySeconds;
+        public float MaxHalfLoopRecoverySeconds => maxHalfLoopRecoverySeconds;
+
+        public float MinCorkscrewSeconds => minCorkscrewSeconds;
+        public float MaxCorkscrewSeconds => maxCorkscrewSeconds;
         public float MinCorkscrewRadius => minCorkscrewRadius;
         public float MaxCorkscrewRadius => maxCorkscrewRadius;
+        public float MinCorkscrewRollDegrees => minCorkscrewRollDegrees;
         public float MaxCorkscrewRollDegrees => maxCorkscrewRollDegrees;
-        public float MaxCorkscrewRollRate => maxCorkscrewRollRate;
-        public float MinCorkscrewApproachLength => minCorkscrewApproachLength;
-        public float MinCorkscrewExitRecoveryLength => minCorkscrewExitRecoveryLength;
-        public float CorkscrewSubdivisionDensity => corkscrewSubdivisionDensity;
-        public float MinCorkscrewEntrySpeedStraightLength => minCorkscrewEntrySpeedStraightLength;
-        public float MinCorkscrewVerticalClearance => minCorkscrewVerticalClearance;
+        public float MaxRollRateDegreesPerSecond => maxRollRateDegreesPerSecond;
+        public float MinCorkscrewApproachSeconds => minCorkscrewApproachSeconds;
+        public float MaxCorkscrewApproachSeconds => maxCorkscrewApproachSeconds;
+        public float MinCorkscrewRecoverySeconds => minCorkscrewRecoverySeconds;
+        public float MaxCorkscrewRecoverySeconds => maxCorkscrewRecoverySeconds;
+        public float MinCorkscrewClearance => minCorkscrewClearance;
 
-        public bool AllowHalfPipeRoads => allowHalfPipeRoads;
+        public float MinSpiralRadius => minSpiralRadius;
+        public float MaxSpiralRadius => maxSpiralRadius;
+        public int MinSpiralRevolutions => minSpiralRevolutions;
+        public int MaxSpiralRevolutions => maxSpiralRevolutions;
+        public float MinSpiralClimbPerRevolution => minSpiralClimbPerRevolution;
+        public float MaxSpiralClimbPerRevolution => maxSpiralClimbPerRevolution;
+        public float MinSpiralApproachSeconds => minSpiralApproachSeconds;
+        public float MaxSpiralApproachSeconds => maxSpiralApproachSeconds;
+        public float MinSpiralRecoverySeconds => minSpiralRecoverySeconds;
+        public float MaxSpiralRecoverySeconds => maxSpiralRecoverySeconds;
+        public float MinSpiralClearance => minSpiralClearance;
+
+        public float MinJumpApproachSeconds => minJumpApproachSeconds;
+        public float MaxJumpApproachSeconds => maxJumpApproachSeconds;
+        public float MinLaunchTransitionSeconds => minLaunchTransitionSeconds;
+        public float MaxLaunchTransitionSeconds => maxLaunchTransitionSeconds;
+        public float MinJumpAirtimeSeconds => minJumpAirtimeSeconds;
+        public float MaxJumpAirtimeSeconds => maxJumpAirtimeSeconds;
+        public float MinLandingTransitionSeconds => minLandingTransitionSeconds;
+        public float MaxLandingTransitionSeconds => maxLandingTransitionSeconds;
+        public float MinJumpRecoverySeconds => minJumpRecoverySeconds;
+        public float MaxJumpRecoverySeconds => maxJumpRecoverySeconds;
+        public float MinJumpHeight => minJumpHeight;
+        public float MaxJumpHeight => maxJumpHeight;
+        public float JumpLandingTolerance => jumpLandingTolerance;
+
+        public int MaxBranchGroupsPerTrack => maxBranchGroupsPerTrack;
+        public float MinDecisionPreviewSeconds => minDecisionPreviewSeconds;
+        public float MaxDecisionPreviewSeconds => maxDecisionPreviewSeconds;
+        public float MinBranchRouteSeconds => minBranchRouteSeconds;
+        public float MaxBranchRouteSeconds => maxBranchRouteSeconds;
+        public float MinLateralSplitSeconds => minLateralSplitSeconds;
+        public float MaxLateralSplitSeconds => maxLateralSplitSeconds;
+        public float MinVerticalDivergenceDelaySeconds => minVerticalDivergenceDelaySeconds;
+        public float MaxVerticalDivergenceDelaySeconds => maxVerticalDivergenceDelaySeconds;
+        public float MinVerticalDivergenceSeconds => minVerticalDivergenceSeconds;
+        public float MaxVerticalDivergenceSeconds => maxVerticalDivergenceSeconds;
+        public float MinMergeSeconds => minMergeSeconds;
+        public float MaxMergeSeconds => maxMergeSeconds;
+        public float MinPostMergeRecoverySeconds => minPostMergeRecoverySeconds;
+        public float MaxPostMergeRecoverySeconds => maxPostMergeRecoverySeconds;
+        public float MinRouteCenterlineSeparation => minRouteCenterlineSeparation;
+        public float MaxRouteCenterlineSeparation => maxRouteCenterlineSeparation;
+        public float MinRouteVerticalSeparation => minRouteVerticalSeparation;
+        public float MaxRouteVerticalSeparation => maxRouteVerticalSeparation;
+        public float MinTimeBalanceTolerance => minTimeBalanceTolerance;
+        public float MaxTimeBalanceTolerance => maxTimeBalanceTolerance;
+        public float MinSpecializationAdvantage => minSpecializationAdvantage;
+        public float MaxSpecializationAdvantage => maxSpecializationAdvantage;
+        public int MaxPairedRouteInteractions => maxPairedRouteInteractions;
+
         public float MinHalfPipeSideHeight => minHalfPipeSideHeight;
         public float MaxHalfPipeSideHeight => maxHalfPipeSideHeight;
         public float MinHalfPipeCurveStrength => minHalfPipeCurveStrength;
         public float MaxHalfPipeCurveStrength => maxHalfPipeCurveStrength;
         public float MinHalfPipeWallAngle => minHalfPipeWallAngle;
         public float MaxHalfPipeWallAngle => maxHalfPipeWallAngle;
-        public float MinHalfPipeCenterFlatWidthRatio => minHalfPipeCenterFlatWidthRatio;
-        public float MaxHalfPipeCenterFlatWidthRatio => maxHalfPipeCenterFlatWidthRatio;
+        public float MinHalfPipeCenterFlatRatio => minHalfPipeCenterFlatRatio;
+        public float MaxHalfPipeCenterFlatRatio => maxHalfPipeCenterFlatRatio;
         public int MinHalfPipeProfileResolution => minHalfPipeProfileResolution;
         public int MaxHalfPipeProfileResolution => maxHalfPipeProfileResolution;
-
-        public float MinTransitionBlendLength => minTransitionBlendLength;
-        public float MaxTransitionBlendLength => maxTransitionBlendLength;
-        public float MinBankBlendLength => minBankBlendLength;
-        public float MaxBankBlendLength => maxBankBlendLength;
-        public float MinPitchBlendLength => minPitchBlendLength;
-        public float MaxPitchBlendLength => maxPitchBlendLength;
-        public float MinWidthBlendLength => minWidthBlendLength;
-        public float MaxWidthBlendLength => maxWidthBlendLength;
-        public float MinCrossSectionBlendLength => minCrossSectionBlendLength;
-        public float MaxCrossSectionBlendLength => maxCrossSectionBlendLength;
-        public float MaxBankRampAngle => maxBankRampAngle;
-
-        public float MinLateralSeparationLength => minLateralSeparationLength;
-        public float MaxLateralSeparationLength => maxLateralSeparationLength;
-        public float MinVerticalDivergenceDelay => minVerticalDivergenceDelay;
-        public float MaxVerticalDivergenceDelay => maxVerticalDivergenceDelay;
-        public float MinVerticalDivergenceLength => minVerticalDivergenceLength;
-        public float MaxVerticalDivergenceLength => maxVerticalDivergenceLength;
-        public float MinRouteLateralSeparation => minRouteLateralSeparation;
-        public float MaxRouteLateralSeparation => maxRouteLateralSeparation;
+        public float MinSafetyLipHeight => minSafetyLipHeight;
+        public float MaxSafetyLipHeight => maxSafetyLipHeight;
 
         public float MinMetersPerRing => minMetersPerRing;
         public float MaxMetersPerRing => maxMetersPerRing;
+        public float MinFeatureMetersPerRing => minFeatureMetersPerRing;
+        public float MaxFeatureMetersPerRing => maxFeatureMetersPerRing;
+        public float MinFacetAngle => minFacetAngle;
+        public float MaxFacetAngle => maxFacetAngle;
         public int MaxRingsPerMacroSection => maxRingsPerMacroSection;
         public int MaxTotalTrackRings => maxTotalTrackRings;
 
-        public float TrackRadius => trackRadius;
-        public int ControlPointCount => controlPointCount;
-        public float ElevationFrequency => elevationFrequency;
-        public float BankingMultiplier => bankingMultiplier;
-        public float LoopProbability => loopProbability;
-        public float CorkscrewProbability => corkscrewProbability;
-        public float SteepSectionProbability => steepSectionProbability;
-        public float LaneWidth => laneWidth;
-        public int MainRoadLanes => mainRoadLanes;
-        public int ShortcutRoadLanes => shortcutRoadLanes;
-        public float MainRoadWidth => laneWidth * mainRoadLanes;
-        public float ShortcutRoadWidth => laneWidth * shortcutRoadLanes;
-        public float WallHeight => wallHeight;
-        public int MinShortcuts => minShortcuts;
-        public int MaxShortcuts => maxShortcuts;
-        public float ShortcutLengthRatio => shortcutLengthRatio;
-        public float ShortcutDifficultyBias => shortcutDifficultyBias;
-        public float ShortcutMergeDistance => shortcutMergeDistance;
-        public float WallRideProbability => wallRideProbability;
-        public float RampProbabilityPerSegment => rampProbabilityPerSegment;
-        public float RampMaxHeight => rampMaxHeight;
-        public float GravityZoneProbability => gravityZoneProbability;
-        public float GravityFieldStrength => gravityFieldStrength;
-        public float GravityFieldRadius => gravityFieldRadius;
-        public int DefaultLapCount => defaultLapCount;
-        public int SplineSubdivisions => splineSubdivisions;
-        public float MeshSegmentLength => meshSegmentLength;
-        public int ElevationSmoothingPasses => elevationSmoothingPasses;
-        public int MinStraightSections => minStraightSections;
-        public int MaxStraightSections => maxStraightSections;
-        public float BankTransitionLength => bankTransitionLength;
-        public int MinStunts => minStunts;
-        public int MaxStunts => maxStunts;
-        public float MinStuntSpacing => minStuntSpacing;
-        public int MinBoostPads => minBoostPads;
-        public int MaxBoostPads => maxBoostPads;
-        public float BoostPadStrength => boostPadStrength;
-        public float CurveSmoothingTension => curveSmoothingTension;
+        public float ClosurePositionTolerance => closurePositionTolerance;
+        public float ClosureForwardTolerance => closureForwardTolerance;
+        public float ClosureUpTolerance => closureUpTolerance;
+        public float ClosureWidthTolerance => closureWidthTolerance;
+        public float ClosureBankTolerance => closureBankTolerance;
+        public float ClosurePitchTolerance => closurePitchTolerance;
 
-        /// <summary>
-        /// Clamps interdependent fields so rulebook invariants remain valid.
-        /// </summary>
+        public float ReferenceGravity => referenceGravity;
+        public float ReferenceTopSpeedKph => referenceTopSpeedKph;
+        public float ReferenceTopSpeedMps => referenceTopSpeedKph / 3.6f;
+        public float ReferenceAcceleration => referenceAcceleration;
+        public float ReferenceBraking => referenceBraking;
+        public float ReferenceLateralAcceleration => referenceLateralAcceleration;
+        public float ReferenceRollStability => referenceRollStability;
+        public float ReferenceLandingRecovery => referenceLandingRecovery;
+
+        public int DefaultLapCount => defaultLapCount;
+
+        /// <summary>Clamps interdependent fields so rulebook invariants remain valid.</summary>
         public void Validate()
         {
-            if (minTrackLength > maxTrackLength) minTrackLength = maxTrackLength;
-            if (minRoadWidth > maxRoadWidth) minRoadWidth = maxRoadWidth;
-            if (minCurveRadius > maxCurveRadius) minCurveRadius = maxCurveRadius;
+            void Order(ref float min, ref float max) { if (min > max) min = max; }
+            void OrderInt(ref int min, ref int max) { if (min > max) min = max; }
 
-            if (minStraightLength > maxStraightLength) minStraightLength = maxStraightLength;
-            if (minBoostStraightLength > maxBoostStraightLength) minBoostStraightLength = maxBoostStraightLength;
-            if (minRecoveryStraightLength > maxRecoveryStraightLength) minRecoveryStraightLength = maxRecoveryStraightLength;
-            if (minCurveAngle > maxCurveAngle) minCurveAngle = maxCurveAngle;
-            if (minBankTransitionLength > maxBankTransitionLength) minBankTransitionLength = maxBankTransitionLength;
+            Order(ref minDesignSpeedKph, ref maxDesignSpeedKph);
+            Order(ref minTargetLapTime, ref maxTargetLapTime);
+            Order(ref minTrackLength, ref maxTrackLength);
+            Order(ref minRoadWidth, ref maxRoadWidth);
+            Order(ref minCurveRadius, ref maxCurveRadius);
 
-            if (minElevationStep > maxElevationStep) minElevationStep = maxElevationStep;
-            if (minRollingHillHeight > maxRollingHillHeight) minRollingHillHeight = maxRollingHillHeight;
-            if (minLayeredHeightOffset > maxLayeredHeightOffset) minLayeredHeightOffset = maxLayeredHeightOffset;
-            if (minBridgeHeight > maxBridgeHeight) minBridgeHeight = maxBridgeHeight;
-            if (minUnderpassDepth > maxUnderpassDepth) minUnderpassDepth = maxUnderpassDepth;
-            if (minClimbLength > maxClimbLength) minClimbLength = maxClimbLength;
-            if (minDropLength > maxDropLength) minDropLength = maxDropLength;
+            Order(ref minStraightSeconds, ref maxStraightSeconds);
+            Order(ref minBoostStraightSeconds, ref maxBoostStraightSeconds);
+            Order(ref minRecoverySeconds, ref maxRecoverySeconds);
+            Order(ref minApproachSeconds, ref maxApproachSeconds);
+            Order(ref minDangerousSpacingSeconds, ref maxDangerousSpacingSeconds);
+            Order(ref minVisualPreviewSeconds, ref maxVisualPreviewSeconds);
 
-            if (minRouteSplitLength > maxRouteSplitLength) minRouteSplitLength = maxRouteSplitLength;
-            if (minLayeredRouteLength > maxLayeredRouteLength) minLayeredRouteLength = maxLayeredRouteLength;
-            if (minLayeredRouteHeightSeparation > maxLayeredRouteHeightSeparation)
-                minLayeredRouteHeightSeparation = maxLayeredRouteHeightSeparation;
+            Order(ref minGenericTransitionSeconds, ref maxGenericTransitionSeconds);
+            Order(ref minBankTransitionSeconds, ref maxBankTransitionSeconds);
+            Order(ref minPitchTransitionSeconds, ref maxPitchTransitionSeconds);
+            Order(ref minRollTransitionSeconds, ref maxRollTransitionSeconds);
+            Order(ref minWidthTransitionSeconds, ref maxWidthTransitionSeconds);
+            Order(ref minCrossSectionTransitionSeconds, ref maxCrossSectionTransitionSeconds);
 
-            if (minFlowingCurveRadius > maxFlowingCurveRadius) minFlowingCurveRadius = maxFlowingCurveRadius;
-            if (minTechnicalCurveRadius > maxTechnicalCurveRadius) minTechnicalCurveRadius = maxTechnicalCurveRadius;
-            if (minInsaneSpeedStraightLength > maxInsaneSpeedStraightLength)
-                minInsaneSpeedStraightLength = maxInsaneSpeedStraightLength;
-            if (minTechnicalStraightLength > maxTechnicalStraightLength)
-                minTechnicalStraightLength = maxTechnicalStraightLength;
+            Order(ref minLoopRadius, ref maxLoopRadius);
+            Order(ref minLoopApproachSeconds, ref maxLoopApproachSeconds);
+            Order(ref minLoopRecoverySeconds, ref maxLoopRecoverySeconds);
 
-            if (minLoopRadius > maxLoopRadius) minLoopRadius = maxLoopRadius;
-            if (minCorkscrewLength > maxCorkscrewLength) minCorkscrewLength = maxCorkscrewLength;
-            if (minCorkscrewRadius > maxCorkscrewRadius) minCorkscrewRadius = maxCorkscrewRadius;
+            Order(ref minHalfLoopRadius, ref maxHalfLoopRadius);
+            Order(ref minHalfLoopRolloutSeconds, ref maxHalfLoopRolloutSeconds);
+            Order(ref minHalfLoopApproachSeconds, ref maxHalfLoopApproachSeconds);
+            Order(ref minHalfLoopRecoverySeconds, ref maxHalfLoopRecoverySeconds);
 
-            if (minMetersPerRing > maxMetersPerRing) minMetersPerRing = maxMetersPerRing;
+            Order(ref minCorkscrewSeconds, ref maxCorkscrewSeconds);
+            Order(ref minCorkscrewRadius, ref maxCorkscrewRadius);
+            Order(ref minCorkscrewRollDegrees, ref maxCorkscrewRollDegrees);
+            Order(ref minCorkscrewApproachSeconds, ref maxCorkscrewApproachSeconds);
+            Order(ref minCorkscrewRecoverySeconds, ref maxCorkscrewRecoverySeconds);
 
-            if (minHalfPipeSideHeight > maxHalfPipeSideHeight) minHalfPipeSideHeight = maxHalfPipeSideHeight;
-            if (minHalfPipeCurveStrength > maxHalfPipeCurveStrength) minHalfPipeCurveStrength = maxHalfPipeCurveStrength;
-            if (minHalfPipeWallAngle > maxHalfPipeWallAngle) minHalfPipeWallAngle = maxHalfPipeWallAngle;
-            if (minHalfPipeCenterFlatWidthRatio > maxHalfPipeCenterFlatWidthRatio) minHalfPipeCenterFlatWidthRatio = maxHalfPipeCenterFlatWidthRatio;
-            if (minHalfPipeProfileResolution > maxHalfPipeProfileResolution) minHalfPipeProfileResolution = maxHalfPipeProfileResolution;
-            minHalfPipeSideHeight = Mathf.Max(0f, minHalfPipeSideHeight);
-            minHalfPipeProfileResolution = Mathf.Max(3, minHalfPipeProfileResolution);
-            maxHalfPipeProfileResolution = Mathf.Clamp(maxHalfPipeProfileResolution, minHalfPipeProfileResolution, 24);
-            minHalfPipeCenterFlatWidthRatio = Mathf.Clamp01(minHalfPipeCenterFlatWidthRatio);
-            maxHalfPipeCenterFlatWidthRatio = Mathf.Clamp(maxHalfPipeCenterFlatWidthRatio, minHalfPipeCenterFlatWidthRatio, 0.9f);
+            Order(ref minSpiralRadius, ref maxSpiralRadius);
+            OrderInt(ref minSpiralRevolutions, ref maxSpiralRevolutions);
+            Order(ref minSpiralClimbPerRevolution, ref maxSpiralClimbPerRevolution);
+            Order(ref minSpiralApproachSeconds, ref maxSpiralApproachSeconds);
+            Order(ref minSpiralRecoverySeconds, ref maxSpiralRecoverySeconds);
 
-            if (minTransitionBlendLength > maxTransitionBlendLength) minTransitionBlendLength = maxTransitionBlendLength;
-            if (minBankBlendLength > maxBankBlendLength) minBankBlendLength = maxBankBlendLength;
-            if (minPitchBlendLength > maxPitchBlendLength) minPitchBlendLength = maxPitchBlendLength;
-            if (minWidthBlendLength > maxWidthBlendLength) minWidthBlendLength = maxWidthBlendLength;
-            if (minCrossSectionBlendLength > maxCrossSectionBlendLength) minCrossSectionBlendLength = maxCrossSectionBlendLength;
+            Order(ref minJumpApproachSeconds, ref maxJumpApproachSeconds);
+            Order(ref minLaunchTransitionSeconds, ref maxLaunchTransitionSeconds);
+            Order(ref minJumpAirtimeSeconds, ref maxJumpAirtimeSeconds);
+            Order(ref minLandingTransitionSeconds, ref maxLandingTransitionSeconds);
+            Order(ref minJumpRecoverySeconds, ref maxJumpRecoverySeconds);
+            Order(ref minJumpHeight, ref maxJumpHeight);
 
-            if (minLateralSeparationLength > maxLateralSeparationLength) minLateralSeparationLength = maxLateralSeparationLength;
-            if (minVerticalDivergenceDelay > maxVerticalDivergenceDelay) minVerticalDivergenceDelay = maxVerticalDivergenceDelay;
-            if (minVerticalDivergenceLength > maxVerticalDivergenceLength) minVerticalDivergenceLength = maxVerticalDivergenceLength;
-            if (minRouteLateralSeparation > maxRouteLateralSeparation) minRouteLateralSeparation = maxRouteLateralSeparation;
+            Order(ref minDecisionPreviewSeconds, ref maxDecisionPreviewSeconds);
+            Order(ref minBranchRouteSeconds, ref maxBranchRouteSeconds);
+            Order(ref minLateralSplitSeconds, ref maxLateralSplitSeconds);
+            Order(ref minVerticalDivergenceDelaySeconds, ref maxVerticalDivergenceDelaySeconds);
+            Order(ref minVerticalDivergenceSeconds, ref maxVerticalDivergenceSeconds);
+            Order(ref minMergeSeconds, ref maxMergeSeconds);
+            Order(ref minPostMergeRecoverySeconds, ref maxPostMergeRecoverySeconds);
+            Order(ref minRouteCenterlineSeparation, ref maxRouteCenterlineSeparation);
+            Order(ref minRouteVerticalSeparation, ref maxRouteVerticalSeparation);
+            Order(ref minTimeBalanceTolerance, ref maxTimeBalanceTolerance);
+            Order(ref minSpecializationAdvantage, ref maxSpecializationAdvantage);
 
-            if (minShortcuts > maxShortcuts) minShortcuts = maxShortcuts;
-            if (minStraightSections > maxStraightSections) minStraightSections = maxStraightSections;
-            if (minStunts > maxStunts) minStunts = maxStunts;
-            if (minBoostPads > maxBoostPads) minBoostPads = maxBoostPads;
+            Order(ref minHalfPipeSideHeight, ref maxHalfPipeSideHeight);
+            Order(ref minHalfPipeCurveStrength, ref maxHalfPipeCurveStrength);
+            Order(ref minHalfPipeWallAngle, ref maxHalfPipeWallAngle);
+            Order(ref minHalfPipeCenterFlatRatio, ref maxHalfPipeCenterFlatRatio);
+            OrderInt(ref minHalfPipeProfileResolution, ref maxHalfPipeProfileResolution);
+            Order(ref minSafetyLipHeight, ref maxSafetyLipHeight);
 
-            if (!allowRouteSplits)
-            {
-                allowOverpasses = false;
-                allowUnderpasses = false;
-                allowLayeredRouteCrossings = false;
-            }
+            Order(ref minMetersPerRing, ref maxMetersPerRing);
+            Order(ref minFeatureMetersPerRing, ref maxFeatureMetersPerRing);
+            Order(ref minFacetAngle, ref maxFacetAngle);
 
-            minTrackLength = Mathf.Max(1f, minTrackLength);
-            maxTrackLength = Mathf.Max(minTrackLength, maxTrackLength);
-            minRoadWidth = Mathf.Max(1f, minRoadWidth);
-            maxRoadWidth = Mathf.Max(minRoadWidth, maxRoadWidth);
-            minVerticalClearance = Mathf.Max(0f, minVerticalClearance);
-            minRecoveryLength = Mathf.Max(0f, minRecoveryLength);
-            maxMajorElevationChangesPerTrack = Mathf.Max(0, maxMajorElevationChangesPerTrack);
-            maxLayeredSectionsPerTrack = Mathf.Max(0, maxLayeredSectionsPerTrack);
-            maxRouteGroupsPerTrack = Mathf.Max(0, maxRouteGroupsPerTrack);
-            maxOverUnderCrossingsPerTrack = Mathf.Max(0, maxOverUnderCrossingsPerTrack);
-            maxRingsPerMacroSection = Mathf.Max(8, maxRingsPerMacroSection);
+            minTrackLength = Mathf.Max(500f, minTrackLength);
+            minRoadWidth = Mathf.Max(4f, minRoadWidth);
+            minCurveRadius = Mathf.Max(20f, minCurveRadius);
+            minVerticalClearance = Mathf.Max(5f, minVerticalClearance);
+            maxBranchGroupsPerTrack = Mathf.Clamp(maxBranchGroupsPerTrack, 0, 8);
+            maxPairedRouteInteractions = Mathf.Clamp(maxPairedRouteInteractions, 0, 8);
+            minSpiralRevolutions = Mathf.Max(1, minSpiralRevolutions);
+            maxSpiralRevolutions = Mathf.Clamp(maxSpiralRevolutions, minSpiralRevolutions, 6);
+            maxRingsPerMacroSection = Mathf.Max(32, maxRingsPerMacroSection);
             maxTotalTrackRings = Mathf.Max(maxRingsPerMacroSection, maxTotalTrackRings);
+            minHalfPipeProfileResolution = Mathf.Clamp(minHalfPipeProfileResolution, 3, 96);
+            maxHalfPipeProfileResolution = Mathf.Clamp(maxHalfPipeProfileResolution, minHalfPipeProfileResolution, 96);
+            referenceGravity = Mathf.Max(0.1f, referenceGravity);
+            referenceTopSpeedKph = Mathf.Max(50f, referenceTopSpeedKph);
+
+            closurePositionTolerance = Mathf.Max(0.001f, closurePositionTolerance);
+            closureForwardTolerance = Mathf.Max(0.001f, closureForwardTolerance);
+            closureUpTolerance = Mathf.Max(0.001f, closureUpTolerance);
+            closureWidthTolerance = Mathf.Max(0.001f, closureWidthTolerance);
+            closureBankTolerance = Mathf.Max(0.001f, closureBankTolerance);
+            closurePitchTolerance = Mathf.Max(0.001f, closurePitchTolerance);
         }
 
         private void OnValidate()
