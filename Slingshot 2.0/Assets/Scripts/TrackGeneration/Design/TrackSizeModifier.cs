@@ -8,7 +8,10 @@ namespace TrackGeneration.Design
         Small,
         Medium,
         Large,
-        Huge
+        Huge,
+
+        /// <summary>45–60 s sprint lap (target 52.5 s): FEWER sections and features — never individually shrunken ones.</summary>
+        VerySmall
     }
 
     /// <summary>
@@ -25,6 +28,12 @@ namespace TrackGeneration.Design
         public static void Apply(TrackDesignerSettings s, TrackSizeLevel level)
         {
             if (s == null || level == TrackSizeLevel.Medium) return;
+
+            if (level == TrackSizeLevel.VerySmall)
+            {
+                ApplyVerySmall(s);
+                return;
+            }
 
             float lapTime, lengthCap, turns, features, branches, elevSections, amplitude;
             switch (level)
@@ -56,13 +65,15 @@ namespace TrackGeneration.Design
             ScaleRule(s.Features.Corkscrews, features);
             ScaleRule(s.Features.Spirals, features);
             ScaleRule(s.Features.HalfLoops, features);
+            ScaleRule(s.Features.FullPipes, features);
+            ScaleRule(s.Features.Wallrides, features);
             ScaleRule(s.Features.Chicanes, features);
             ScaleRule(s.Features.SCurves, features);
             ScaleRule(s.Features.Hairpins, features);
             // Explicit RequiredPatterns are deliberate designer demands — never scaled.
 
-            s.Branches.MinBranchGroups = Mathf.RoundToInt(s.Branches.MinBranchGroups * branches);
-            s.Branches.MaxBranchGroups = Mathf.RoundToInt(s.Branches.MaxBranchGroups * branches);
+            s.Quarters.MinimumDualQuarterCount = Mathf.Clamp(Mathf.RoundToInt(s.Quarters.MinimumDualQuarterCount * branches), 0, 4);
+            s.Quarters.MaximumDualQuarterCount = Mathf.Clamp(Mathf.RoundToInt(s.Quarters.MaximumDualQuarterCount * branches), s.Quarters.MinimumDualQuarterCount, 4);
 
             s.Elevation.MinMajorElevationSections = Mathf.RoundToInt(s.Elevation.MinMajorElevationSections * elevSections);
             s.Elevation.MaxMajorElevationSections = Mathf.RoundToInt(s.Elevation.MaxMajorElevationSections * elevSections);
@@ -70,6 +81,61 @@ namespace TrackGeneration.Design
             ScaleRule(s.Elevation.Crests, features);
             ScaleRule(s.Elevation.Bridges, features);
             ScaleRule(s.Elevation.Underpasses, features);
+
+            s.ModifiedSincePreset = true;
+            s.Sanitize();
+        }
+
+        /// <summary>
+        /// Very Small: a 45–60 s sprint lap (target 52.5 s). REDUCES the number of
+        /// sections and features; it never shrinks individual loops, corkscrews, jumps
+        /// or transitions below their safe high-speed values — feature sizes come from
+        /// the rulebook windows, which this method does not touch. If locked/required
+        /// content cannot fit the short lap, resolution reports the conflict instead of
+        /// silently oversizing the track.
+        /// </summary>
+        private static void ApplyVerySmall(TrackDesignerSettings s)
+        {
+            s.Scale.TargetLapTimeSeconds = 52.5f;
+            // Cap gives the closure solver working room but keeps the lap a sprint:
+            // ≈ 75 s at design speed (a technical lap runs well below design speed).
+            s.Scale.MaxTrackLengthMeters = s.Scale.DesignSpeedMps * 75f;
+
+            // Turn count ≈ 5–10, style-dependent (proportional, clamped to the window).
+            s.Layout.MinTurnCount = Mathf.Clamp(Mathf.RoundToInt(s.Layout.MinTurnCount * 0.5f), 4, 9);
+            s.Layout.MaxTurnCount = Mathf.Clamp(Mathf.RoundToInt(s.Layout.MaxTurnCount * 0.5f), s.Layout.MinTurnCount + 1, 10);
+
+            // 1–3 major feature groups, at most one compound, 0–1 dual quarters.
+            s.Features.MinFeatureGroups = Mathf.Min(s.Features.MinFeatureGroups, 1);
+            s.Features.MaxFeatureGroups = Mathf.Clamp(Mathf.RoundToInt(s.Features.MaxFeatureGroups * 0.4f), 1, 3);
+            s.Features.CompoundFeatureChance *= 0.5f;
+            s.Features.MaxCompoundElements = Mathf.Min(s.Features.MaxCompoundElements, 2);
+            ScaleRule(s.Features.Jumps, 0.5f);
+            ScaleRule(s.Features.Loops, 0.5f);
+            ScaleRule(s.Features.Corkscrews, 0.5f);
+            ScaleRule(s.Features.Spirals, 0.5f);
+            ScaleRule(s.Features.HalfLoops, 0.5f);
+            ScaleRule(s.Features.FullPipes, 0.5f);
+            ScaleRule(s.Features.Wallrides, 0.6f);
+            ScaleRule(s.Features.Chicanes, 0.5f);
+            ScaleRule(s.Features.SCurves, 0.5f);
+            // Hairpins are cut hardest: their near-reversal arcs are driven far below
+            // design speed, and a hairpin-heavy style (Switchback) blows the 45–60s
+            // window on ESTIMATED time long before it blows it on distance.
+            ScaleRule(s.Features.Hairpins, 0.35f);
+            s.Features.Hairpins.MaximumCount = Mathf.Min(s.Features.Hairpins.MaximumCount, 2);
+
+            s.Quarters.MinimumDualQuarterCount = 0;
+            s.Quarters.MaximumDualQuarterCount = Mathf.Min(s.Quarters.MaximumDualQuarterCount, 1);
+
+            // 1–4 major elevation groups; amplitude trimmed, angles untouched (safety).
+            s.Elevation.MinMajorElevationSections = Mathf.Clamp(s.Elevation.MinMajorElevationSections / 2, 1, 3);
+            s.Elevation.MaxMajorElevationSections = Mathf.Clamp(s.Elevation.MaxMajorElevationSections / 2,
+                s.Elevation.MinMajorElevationSections + 1, 4);
+            s.Elevation.TargetElevationAmplitude *= 0.7f;
+            ScaleRule(s.Elevation.Crests, 0.5f);
+            ScaleRule(s.Elevation.Bridges, 0.5f);
+            ScaleRule(s.Elevation.Underpasses, 0.5f);
 
             s.ModifiedSincePreset = true;
             s.Sanitize();

@@ -571,55 +571,6 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
---- !u!1 &824776478
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 824776480}
-  - component: {fileID: 824776479}
-  m_Layer: 0
-  m_Name: Postprocess
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &824776479
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 824776478}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.Volume
-  m_IsGlobal: 1
-  priority: 0
-  blendDistance: 0
-  weight: 1
-  sharedProfile: {fileID: 11400000, guid: 9c0efb94e8910d74daca4a4f465fbcd1, type: 2}
---- !u!4 &824776480
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 824776478}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 590.3727, y: -522.9989, z: -4332.6226}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -690,7 +641,7 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4455442690710395105, guid: de1100ac0a0c40848b878c6ff5b128e7, type: 3}
   m_PrefabInstance: {fileID: 1980542949}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &1150519281
+--- !u!1 &1282291996
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -698,9 +649,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1150519284}
-  - component: {fileID: 1150519283}
-  - component: {fileID: 1150519282}
+  - component: {fileID: 1282291999}
+  - component: {fileID: 1282291998}
+  - component: {fileID: 1282291997}
   m_Layer: 0
   m_Name: TrackGenerator
   m_TagString: Untagged
@@ -708,91 +659,104 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1150519282
+--- !u!114 &1282291997
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1150519281}
+  m_GameObject: {fileID: 1282291996}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c8c81e78716b0bd4c838ca2811c4b50a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TrackGeneration.TrackGenerator
+  m_EditorClassIdentifier: Slingshot.TrackGeneration::TrackGeneration.TrackGenerator
   Designer:
-    AppliedPresetName: Flowing
-    ModifiedSincePreset: 1
-    appliedPresetSnapshotJson: '{"AppliedPresetName":"Flowing","ModifiedSincePreset":false,"appliedPresetSnapshotJson":"","Scale":{"DesignSpeedKph":1300.0,"TargetLapTimeSeconds":60.0,"MaxTrackLengthMeters":45000.0,"PacingVariation":0.44999998807907107},"Layout":{"MinTurnCount":8,"MaxTurnCount":12,"DirectionPattern":1,"MinStraightSeconds":0.800000011920929,"MaxStraightSeconds":3.200000047683716,"CornerSequenceChance":0.550000011920929},"Corners":{"MinCurveRadius":700.0,"MaxCurveRadius":2200.0,"TurnWeights":{"GentleBend":3.0,"Sweeper":5.0,"StandardCorner":2.0,"SharpCorner":0.5,"Hairpin":0.0},"BankingStrength":0.8999999761581421,"MaxBankAngle":75.0,"FloorTiltStrength":0.20000000298023225},"Road":{"RoadWidth":28.0,"HalfPipeSideHeight":6.0,"CenterFlatWidthRatio":0.3499999940395355,"WallCurveStrength":0.75,"MaxWallAngle":60.0,"SafetyLipHeight":1.0,"ProfileResolution":32},"Transitions":{"GenericTransitionSeconds":1.100000023841858,"BankTransitionSeconds":1.2000000476837159,"PitchTransitionSeconds":1.2999999523162842,"RollTransitionSeconds":1.5,"WidthTransitionSeconds":0.8999999761581421,"CrossSectionTransitionSeconds":1.0,"BlendCurve":2,"DefaultApproachSeconds":1.600000023841858,"DefaultRecoverySeconds":1.2000000476837159,"DangerousSpacingSeconds":2.0,"VisualPreviewSeconds":1.7999999523162842,"PostMergeRecoverySeconds":1.2000000476837159},"Elevation":{"TargetElevationAmplitude":120.0,"MinMajorElevationSections":2,"MaxMajorElevationSections":5,"MaxClimbAngle":24.0,"MaxDropAngle":26.0,"Crests":{"Enabled":true,"MinimumCount":0,"MaximumCount":4,"OptionalWeight":1.0,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Bridges":{"Enabled":true,"MinimumCount":0,"MaximumCount":2,"OptionalWeight":0.699999988079071,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Underpasses":{"Enabled":true,"MinimumCount":0,"MaximumCount":2,"OptionalWeight":0.6000000238418579,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"GroundLevelPolicy":1},"Features":{"Jumps":{"Enabled":true,"MinimumCount":0,"MaximumCount":1,"OptionalWeight":0.800000011920929,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Loops":{"Enabled":true,"MinimumCount":0,"MaximumCount":1,"OptionalWeight":0.4000000059604645,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Corkscrews":{"Enabled":true,"MinimumCount":0,"MaximumCount":1,"OptionalWeight":0.4000000059604645,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Spirals":{"Enabled":true,"MinimumCount":0,"MaximumCount":1,"OptionalWeight":0.4000000059604645,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"HalfLoops":{"Enabled":true,"MinimumCount":0,"MaximumCount":1,"OptionalWeight":0.30000001192092898,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Chicanes":{"Enabled":true,"MinimumCount":0,"MaximumCount":1,"OptionalWeight":0.6000000238418579,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"SCurves":{"Enabled":true,"MinimumCount":0,"MaximumCount":2,"OptionalWeight":1.2000000476837159,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Hairpins":{"Enabled":false,"MinimumCount":0,"MaximumCount":0,"OptionalWeight":0.0,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"MinFeatureGroups":1,"MaxFeatureGroups":3,"CompoundFeatureChance":0.15000000596046449,"MaxCompoundElements":2,"RequiredPatterns":[]},"Branches":{"MinBranchGroups":0,"MaxBranchGroups":2,"MinRouteDurationSeconds":5.0,"MaxRouteDurationSeconds":9.0,"PairingMode":1,"InteractionWeights":{"Separated":1.0,"Parallel":1.0,"Converging":1.0,"AlternatingCrossover":1.0,"Braided":0.5,"SharedAxis":0.5,"PairedFeature":0.5},"RouteA":{"Style":0,"WidthScale":1.0,"WeaveIntensity":0.5,"ElevationBias":0.0,"AllowRollFeature":true,"RiskTarget":0.5},"RouteB":{"Style":0,"WidthScale":1.0,"WeaveIntensity":0.5,"ElevationBias":0.0,"AllowRollFeature":true,"RiskTarget":0.5},"DecisionPreviewSeconds":2.0,"TimeBalanceTolerance":0.029999999329447748,"SpecializationTarget":0.03999999910593033,"LateralSeparationRange":{"x":60.0,"y":150.0},"VerticalSeparationRange":{"x":40.0,"y":120.0},"MaxCrossovers":2,"SplitDurationSeconds":1.5,"VerticalDivergenceDelaySeconds":0.6000000238418579,"VerticalDivergenceSeconds":1.5,"MergeDurationSeconds":1.5},"Generation":{"MaxAttempts":96,"SelectionMode":1,"CandidatesToScore":4,"FailurePolicy":0,"ClosureReserveFraction":0.20000000298023225,"MetersPerRing":1.5,"MaxFacetAngleDegrees":0.5,"TargetTotalRings":20000}}'
+    AppliedPresetName: Rollercoaster
+    ModifiedSincePreset: 0
+    appliedPresetSnapshotJson: '{"AppliedPresetName":"Rollercoaster","ModifiedSincePreset":false,"appliedPresetSnapshotJson":"","Scale":{"DesignSpeedKph":1300.0,"TargetLapTimeSeconds":75.0,"MaxTrackLengthMeters":60000.0,"PacingVariation":0.699999988079071},"Layout":{"MinTurnCount":8,"MaxTurnCount":13,"DirectionPattern":1,"MinStraightSeconds":0.800000011920929,"MaxStraightSeconds":3.0,"CornerSequenceChance":0.3499999940395355},"Corners":{"MinCurveRadius":550.0,"MaxCurveRadius":1800.0,"TurnWeights":{"GentleBend":1.5,"Sweeper":3.0,"StandardCorner":3.0,"SharpCorner":1.0,"Hairpin":0.20000000298023225},"BankingStrength":0.949999988079071,"MaxBankAngle":80.0,"FloorTiltStrength":0.20000000298023225},"Road":{"RoadWidth":32.0,"HalfPipeSideHeight":6.5,"CenterFlatWidthRatio":0.3499999940395355,"WallCurveStrength":0.75,"MaxWallAngle":60.0,"SafetyLipHeight":1.0,"ProfileResolution":32,"DynamicTurnRounding":true,"TurnRoundingStrength":0.8500000238418579,"MinimumTurnCenterFlatRatio":0.05000000074505806,"OutsideCatchWall":true,"CatchWallStrength":0.6000000238418579,"MaxOverhangAngle":18.0,"OverhangRadius":10.0,"CatchWallMinimumDemand":0.3499999940395355},"Transitions":{"GenericTransitionSeconds":1.2000000476837159,"BankTransitionSeconds":1.399999976158142,"PitchTransitionSeconds":1.600000023841858,"RollTransitionSeconds":1.7999999523162842,"WidthTransitionSeconds":0.8999999761581421,"CrossSectionTransitionSeconds":1.0,"BlendCurve":2,"MinimumConnectorSeconds":0.4000000059604645,"ConnectorInheritanceStrength":1.0,"SameDirectionBridgeSeconds":2.200000047683716,"MinimumBankReversalSeconds":0.8999999761581421,"AllowConnectorExpansion":true,"AllowConnectorAbsorption":true,"DefaultApproachSeconds":2.0,"DefaultRecoverySeconds":1.5,"DangerousSpacingSeconds":1.7999999523162842,"VisualPreviewSeconds":2.200000047683716},"Elevation":{"TargetElevationAmplitude":500.0,"MinMajorElevationSections":5,"MaxMajorElevationSections":10,"MaxClimbAngle":34.0,"MaxDropAngle":36.0,"Crests":{"Enabled":true,"MinimumCount":0,"MaximumCount":4,"OptionalWeight":1.0,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Bridges":{"Enabled":true,"MinimumCount":0,"MaximumCount":2,"OptionalWeight":0.699999988079071,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Underpasses":{"Enabled":true,"MinimumCount":0,"MaximumCount":2,"OptionalWeight":0.6000000238418579,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"GroundLevelPolicy":1},"Features":{"Jumps":{"Enabled":true,"MinimumCount":1,"MaximumCount":3,"OptionalWeight":1.0,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Loops":{"Enabled":true,"MinimumCount":1,"MaximumCount":3,"OptionalWeight":1.5,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Corkscrews":{"Enabled":true,"MinimumCount":1,"MaximumCount":3,"OptionalWeight":1.5,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Spirals":{"Enabled":true,"MinimumCount":1,"MaximumCount":2,"OptionalWeight":1.0,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"HalfLoops":{"Enabled":true,"MinimumCount":0,"MaximumCount":2,"OptionalWeight":1.0,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"FullPipes":{"Enabled":true,"MinimumCount":0,"MaximumCount":1,"OptionalWeight":0.6000000238418579,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Wallrides":{"Enabled":true,"MinimumCount":0,"MaximumCount":2,"OptionalWeight":0.699999988079071,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"MinFullPipeSeconds":3.0,"MaxFullPipeSeconds":6.0,"FullPipeRadiusScale":0.800000011920929,"PipeTransitionSeconds":1.2000000476837159,"Chicanes":{"Enabled":true,"MinimumCount":0,"MaximumCount":1,"OptionalWeight":0.4000000059604645,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"SCurves":{"Enabled":true,"MinimumCount":0,"MaximumCount":2,"OptionalWeight":0.800000011920929,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"Hairpins":{"Enabled":true,"MinimumCount":0,"MaximumCount":1,"OptionalWeight":0.20000000298023225,"MinimumSpacingOverrideSeconds":-1.0,"AllowInCompoundPatterns":true},"MinFeatureGroups":4,"MaxFeatureGroups":8,"CompoundFeatureChance":0.6499999761581421,"MaxCompoundElements":3,"RequiredPatterns":[]},"Quarters":{"MinimumDualQuarterCount":1,"MaximumDualQuarterCount":2,"QuarterTypeOverrides":[0,0,0,0],"PreventAdjacentDualQuarters":false,"AllowQ1Dual":false,"AllowQ4Dual":true,"ChoiceType":1,"LaneSeparationMeters":24.0,"CatchWidthScale":1.7000000476837159,"DualRoadWidthScale":1.0,"RoadLengthTolerance":0.20000000298023225,"NeutralTimeTolerancePercent":4.0,"RequireArchetypeDifferentiation":true,"BalancePolicy":0},"Generation":{"MaxAttempts":192,"SelectionMode":1,"CandidatesToScore":4,"FailurePolicy":0,"ClosureReserveFraction":0.20000000298023225,"MetersPerRing":1.5,"MaxFacetAngleDegrees":0.5,"TargetTotalRings":20000},"Visual":{"CenterGuideEnabled":true,"CenterGuideColor":{"r":1.0,"g":1.0,"b":1.0,"a":1.0},"CenterGuideWidth":0.3499999940395355,"CenterGuideEmission":1.2000000476837159,"WallMarkersEnabled":true,"WallMarkerColor":{"r":1.0,"g":1.0,"b":1.0,"a":1.0},"WallMarkerWidth":0.800000011920929,"WallMarkerSpacingMeters":48.0,"MarkerFadeDistance":800.0}}'
     Scale:
       DesignSpeedKph: 1300
-      TargetLapTimeSeconds: 36
-      MaxTrackLengthMeters: 27000.002
-      PacingVariation: 0.45
+      TargetLapTimeSeconds: 75
+      MaxTrackLengthMeters: 60000
+      PacingVariation: 0.7
     Layout:
-      MinTurnCount: 4
-      MaxTurnCount: 7
+      MinTurnCount: 8
+      MaxTurnCount: 13
       DirectionPattern: 1
       MinStraightSeconds: 0.8
-      MaxStraightSeconds: 3.2
-      CornerSequenceChance: 0.55
+      MaxStraightSeconds: 3
+      CornerSequenceChance: 0.35
     Corners:
-      MinCurveRadius: 875
-      MaxCurveRadius: 2200
+      MinCurveRadius: 550
+      MaxCurveRadius: 1800
       TurnWeights:
-        GentleBend: 3
-        Sweeper: 5
-        StandardCorner: 2
-        SharpCorner: 0.5
-        Hairpin: 0
-      BankingStrength: 0.9
-      MaxBankAngle: 75
+        GentleBend: 1.5
+        Sweeper: 3
+        StandardCorner: 3
+        SharpCorner: 1
+        Hairpin: 0.2
+      BankingStrength: 0.95
+      MaxBankAngle: 80
       FloorTiltStrength: 0.2
     Road:
-      RoadWidth: 32.2
-      HalfPipeSideHeight: 6
+      RoadWidth: 32
+      HalfPipeSideHeight: 6.5
       CenterFlatWidthRatio: 0.35
       WallCurveStrength: 0.75
       MaxWallAngle: 60
       SafetyLipHeight: 1
       ProfileResolution: 32
+      DynamicTurnRounding: 1
+      TurnRoundingStrength: 0.85
+      MinimumTurnCenterFlatRatio: 0.05
+      OutsideCatchWall: 1
+      CatchWallStrength: 0.6
+      MaxOverhangAngle: 18
+      OverhangRadius: 10
+      CatchWallMinimumDemand: 0.35
     Transitions:
-      GenericTransitionSeconds: 1.1
-      BankTransitionSeconds: 1.2
-      PitchTransitionSeconds: 1.3
-      RollTransitionSeconds: 1.5
+      GenericTransitionSeconds: 1.2
+      BankTransitionSeconds: 1.4
+      PitchTransitionSeconds: 1.6
+      RollTransitionSeconds: 1.8
       WidthTransitionSeconds: 0.9
       CrossSectionTransitionSeconds: 1
       BlendCurve: 2
+      MinimumConnectorSeconds: 0.4
+      ConnectorInheritanceStrength: 1
+      SameDirectionBridgeSeconds: 2.2
+      MinimumBankReversalSeconds: 0.9
+      AllowConnectorExpansion: 1
+      AllowConnectorAbsorption: 1
       DefaultApproachSeconds: 2
       DefaultRecoverySeconds: 1.5
-      DangerousSpacingSeconds: 2.4
-      VisualPreviewSeconds: 1.8
-      PostMergeRecoverySeconds: 1.2
+      DangerousSpacingSeconds: 1.8
+      VisualPreviewSeconds: 2.2
     Elevation:
-      TargetElevationAmplitude: 102
-      MinMajorElevationSections: 1
-      MaxMajorElevationSections: 4
-      MaxClimbAngle: 24
-      MaxDropAngle: 26
+      TargetElevationAmplitude: 500
+      MinMajorElevationSections: 5
+      MaxMajorElevationSections: 10
+      MaxClimbAngle: 34
+      MaxDropAngle: 36
       Crests:
         Enabled: 1
         MinimumCount: 0
-        MaximumCount: 2
+        MaximumCount: 4
         OptionalWeight: 1
         MinimumSpacingOverrideSeconds: -1
         AllowInCompoundPatterns: 1
       Bridges:
         Enabled: 1
         MinimumCount: 0
-        MaximumCount: 1
+        MaximumCount: 2
         OptionalWeight: 0.7
         MinimumSpacingOverrideSeconds: -1
         AllowInCompoundPatterns: 1
       Underpasses:
         Enabled: 1
         MinimumCount: 0
-        MaximumCount: 1
+        MaximumCount: 2
         OptionalWeight: 0.6
         MinimumSpacingOverrideSeconds: -1
         AllowInCompoundPatterns: 1
@@ -800,105 +764,100 @@ MonoBehaviour:
     Features:
       Jumps:
         Enabled: 1
-        MinimumCount: 0
-        MaximumCount: 1
-        OptionalWeight: 0.8
+        MinimumCount: 1
+        MaximumCount: 3
+        OptionalWeight: 1
         MinimumSpacingOverrideSeconds: -1
         AllowInCompoundPatterns: 1
       Loops:
         Enabled: 1
-        MinimumCount: 0
-        MaximumCount: 1
-        OptionalWeight: 0.4
+        MinimumCount: 1
+        MaximumCount: 3
+        OptionalWeight: 1.5
         MinimumSpacingOverrideSeconds: -1
         AllowInCompoundPatterns: 1
       Corkscrews:
         Enabled: 1
-        MinimumCount: 0
-        MaximumCount: 1
-        OptionalWeight: 0.4
+        MinimumCount: 1
+        MaximumCount: 3
+        OptionalWeight: 1.5
         MinimumSpacingOverrideSeconds: -1
         AllowInCompoundPatterns: 1
       Spirals:
         Enabled: 1
-        MinimumCount: 0
-        MaximumCount: 1
-        OptionalWeight: 0.4
+        MinimumCount: 1
+        MaximumCount: 2
+        OptionalWeight: 1
         MinimumSpacingOverrideSeconds: -1
         AllowInCompoundPatterns: 1
       HalfLoops:
         Enabled: 1
         MinimumCount: 0
-        MaximumCount: 1
-        OptionalWeight: 0.3
+        MaximumCount: 2
+        OptionalWeight: 1
         MinimumSpacingOverrideSeconds: -1
         AllowInCompoundPatterns: 1
-      Chicanes:
+      FullPipes:
         Enabled: 1
         MinimumCount: 0
         MaximumCount: 1
         OptionalWeight: 0.6
         MinimumSpacingOverrideSeconds: -1
         AllowInCompoundPatterns: 1
-      SCurves:
+      Wallrides:
+        Enabled: 1
+        MinimumCount: 0
+        MaximumCount: 2
+        OptionalWeight: 0.7
+        MinimumSpacingOverrideSeconds: -1
+        AllowInCompoundPatterns: 1
+      MinFullPipeSeconds: 3
+      MaxFullPipeSeconds: 6
+      FullPipeRadiusScale: 0.8
+      PipeTransitionSeconds: 1.2
+      Chicanes:
         Enabled: 1
         MinimumCount: 0
         MaximumCount: 1
-        OptionalWeight: 1.2
+        OptionalWeight: 0.4
+        MinimumSpacingOverrideSeconds: -1
+        AllowInCompoundPatterns: 1
+      SCurves:
+        Enabled: 1
+        MinimumCount: 0
+        MaximumCount: 2
+        OptionalWeight: 0.8
         MinimumSpacingOverrideSeconds: -1
         AllowInCompoundPatterns: 1
       Hairpins:
-        Enabled: 0
+        Enabled: 1
         MinimumCount: 0
-        MaximumCount: 0
-        OptionalWeight: 0
+        MaximumCount: 1
+        OptionalWeight: 0.2
         MinimumSpacingOverrideSeconds: -1
         AllowInCompoundPatterns: 1
-      MinFeatureGroups: 1
-      MaxFeatureGroups: 1
-      CompoundFeatureChance: 0.075
-      MaxCompoundElements: 2
+      MinFeatureGroups: 4
+      MaxFeatureGroups: 8
+      CompoundFeatureChance: 0.65
+      MaxCompoundElements: 3
       RequiredPatterns: []
-    Branches:
-      MinBranchGroups: 0
-      MaxBranchGroups: 1
-      MinRouteDurationSeconds: 5
-      MaxRouteDurationSeconds: 9
-      PairingMode: 1
-      InteractionWeights:
-        Separated: 1
-        Parallel: 1
-        Converging: 1
-        AlternatingCrossover: 1
-        Braided: 0.5
-        SharedAxis: 0.5
-        PairedFeature: 0.5
-      RouteA:
-        Style: 0
-        WidthScale: 1
-        WeaveIntensity: 0.5
-        ElevationBias: 0
-        AllowRollFeature: 1
-        RiskTarget: 0.5
-      RouteB:
-        Style: 0
-        WidthScale: 1
-        WeaveIntensity: 0.5
-        ElevationBias: 0
-        AllowRollFeature: 1
-        RiskTarget: 0.5
-      DecisionPreviewSeconds: 2
-      TimeBalanceTolerance: 0.03
-      SpecializationTarget: 0.04
-      LateralSeparationRange: {x: 60, y: 150}
-      VerticalSeparationRange: {x: 40, y: 120}
-      MaxCrossovers: 2
-      SplitDurationSeconds: 1.5
-      VerticalDivergenceDelaySeconds: 0.6
-      VerticalDivergenceSeconds: 1.5
-      MergeDurationSeconds: 1.5
+    Quarters:
+      MinimumDualQuarterCount: 1
+      MaximumDualQuarterCount: 2
+      QuarterTypeOverrides: 00000000000000000000000000000000
+      PreventAdjacentDualQuarters: 0
+      AllowQ1Dual: 0
+      AllowQ4Dual: 1
+      ChoiceType: 1
+      LaneSeparationMeters: 24
+      CatchWidthScale: 1.7
+      DualRoadWidthScale: 1
+      RoadLengthTolerance: 0.2
+      NeutralTimeTolerancePercent: 4
+      RequireArchetypeDifferentiation: 1
+      BalancePolicy: 0
     Generation:
-      MaxAttempts: 96
+      MaxAttempts: 192
       SelectionMode: 1
       CandidatesToScore: 4
       FailurePolicy: 0
@@ -906,6 +865,16 @@ MonoBehaviour:
       MetersPerRing: 1.5
       MaxFacetAngleDegrees: 0.5
       TargetTotalRings: 20000
+    Visual:
+      CenterGuideEnabled: 1
+      CenterGuideColor: {r: 1, g: 1, b: 1, a: 1}
+      CenterGuideWidth: 0.35
+      CenterGuideEmission: 1.2
+      WallMarkersEnabled: 1
+      WallMarkerColor: {r: 1, g: 1, b: 1, a: 1}
+      WallMarkerWidth: 0.8
+      WallMarkerSpacingMeters: 48
+      MarkerFadeDistance: 800
   Config: {fileID: 11400000, guid: 4d0b4b36f22cd3e48a102032c11d5212, type: 2}
   MainRoadMaterial: {fileID: 2100000, guid: 4f2f9e9c84f53594ca593721b39bc609, type: 2}
   WallMaterial: {fileID: 2100000, guid: fe765668807c4bd43a0f52032bb48755, type: 2}
@@ -918,129 +887,1392 @@ MonoBehaviour:
   placeHovercraftOnStart: 1
   startLineForwardOffset: 0
   resetHovercraftWithBackspace: 1
+  seedStreams:
+    LayoutSeed: 2064089392
+    FeatureSeed: -1322360338
+    ElevationSeed: -1662992619
+    QuarterSeed: 308251044
+    SurfaceSeed: 2098582437
+    VisualSeed: -1937371834
+    PresetResolutionSeed: -852694479
+  settingsLocks:
+    ScaleAndSpeed: 0
+    Layout: 0
+    Corners: 0
+    RoadShape: 0
+    Transitions: 0
+    Elevation: 0
+    Features: 0
+    Quarters: 0
+    GenerationBehavior: 0
+    Visual: 0
+  layoutLockMode: 0
   lastReport:
-    Seed: -629543337
+    Seed: -1773463294
     Success: 1
     UsedFallback: 0
     FallbackDescription: 
-    AttemptsEvaluated: 10
+    AttemptsEvaluated: 122
     ValidCandidateCount: 4
-    SelectedCandidateScore: 64.03757
+    SelectedCandidateScore: 50.68383
     Failures:
     - AttemptIndex: 0
-      Reason: 10
-      Subject: CandidateBuilder
-      RouteOrBranch: 
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
       RequestedValue: 0
       AchievedValue: 0
       Position: {x: 0, y: 0, z: 0}
-      Message: 'Branch group 0: neutral route time difference 6.3% exceeds the 3.0%
-        tolerance after balancing iterations.'
+      Message: 'Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        2 demoted to SingleRoad: Quarter 2 road B: 2D residual 1656.22m with 10 corners).'
+    - AttemptIndex: 1
+      Reason: 7
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Elevation residual 171.7m exceeds slope capacity \u2014 the lap cannot
+        return to its start height legally."
     - AttemptIndex: 2
-      Reason: 9
-      Subject: BranchGroups
-      RouteOrBranch: group 0
-      RequestedValue: 163
-      AchievedValue: 162.62378
-      Position: {x: -1430.826, y: 89.957245, z: 3367.9146}
-      Message: 'Branch group 0: routes pass 162.6m apart with only 0.0m vertical
-        separation outside the merge throat.'
-    - AttemptIndex: 3
       Reason: 5
       Subject: TopologyPlanner
-      RouteOrBranch: 
+      QuarterOrRoad: 
       RequestedValue: 0
       AchievedValue: 0
       Position: {x: 0, y: 0, z: 0}
-      Message: 2D closure residual 405.6m (initial 6278m) exceeds tolerance with
-        6 straights + 4 closure curves (S-bend rescue exhausted).
+      Message: 2D closure residual 11865.8m (initial 22069m) exceeds tolerance with
+        13 straights + 11 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 3
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 57.2km \u2014 the 60.0km cap cannot fit
+        this plan."
     - AttemptIndex: 4
       Reason: 5
       Subject: TopologyPlanner
-      RouteOrBranch: 
+      QuarterOrRoad: 
       RequestedValue: 0
       AchievedValue: 0
       Position: {x: 0, y: 0, z: 0}
-      Message: 2D closure residual 735.2m (initial 10134m) exceeds tolerance with
-        6 straights + 4 closure curves (S-bend rescue exhausted).
+      Message: 2D closure residual 7201.6m (initial 18977m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
     - AttemptIndex: 5
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.6km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 6
       Reason: 5
       Subject: TopologyPlanner
-      RouteOrBranch: 
+      QuarterOrRoad: 
       RequestedValue: 0
       AchievedValue: 0
       Position: {x: 0, y: 0, z: 0}
-      Message: 2D closure residual 59.8m (initial 7693m) exceeds tolerance with 6
-        straights + 6 closure curves (S-bend rescue exhausted).
+      Message: 2D closure residual 1161.0m (initial 17704m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
     - AttemptIndex: 7
-      Reason: 10
-      Subject: CandidateBuilder
-      RouteOrBranch: 
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
       RequestedValue: 0
       AchievedValue: 0
       Position: {x: 0, y: 0, z: 0}
-      Message: 'Branch group 0: neutral route time difference 8.2% exceeds the 3.0%
-        tolerance after balancing iterations.'
+      Message: 2D closure residual 10259.8m (initial 20524m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 8
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.0km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 9
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 4984.7m (initial 12416m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 10
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 57.7km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 11
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        1 demoted to SingleRoad: Quarter 1 road B: 2D residual 4858.27m with 10 corners).'
+    - AttemptIndex: 12
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 4233.9m (initial 10110m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 13
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        2 demoted to SingleRoad: Quarter 2 road B: 2D residual 2682.72m with 10 corners).'
+    - AttemptIndex: 15
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 2124.7m (initial 17157m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 16
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.5km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 17
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        3 demoted to SingleRoad: Quarter 3 road B: road B passes 85m from road A
+        (need 115m lateral or 53m vertical)).'
+    - AttemptIndex: 18
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        3 demoted to SingleRoad: Quarter 3 road B: road B fitted to 13784m vs road
+        A 9479m (tolerance \xB11706m))."
+    - AttemptIndex: 19
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 57.1km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 20
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 196.9m (initial 15062m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 21
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        3 demoted to SingleRoad: Quarter 3 road B: 2D residual 4824.70m with 7 corners).'
+    - AttemptIndex: 22
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 1348.8m (initial 16124m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 23
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        3 demoted to SingleRoad: Quarter 3 road B: corner arcs (6848m) exceed the
+        5834m length target).'
+    - AttemptIndex: 24
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 7036.3m (initial 17690m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 25
+      Reason: 8
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Plan-view walk brings unrelated track segments closer than the safe
+        corridor without vertical separation: ''Corkscrew_12u_R_H1R225_H2R253_Orbit8''
+        (arc 897m, h 0m) vs ''Straight_05_Climb283m'' (arc 16795m, h -12m) at 85m
+        apart.'
+    - AttemptIndex: 26
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        3 demoted to SingleRoad: Quarter 3 road B: 2D residual 5747.91m with 9 corners).'
+    - AttemptIndex: 27
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 4970.9m (initial 15938m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 28
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 59.2km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 29
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        3 demoted to SingleRoad: Quarter 3 road B: corner arcs (6965m) exceed the
+        5746m length target).'
+    - AttemptIndex: 30
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 11183.8m (initial 25913m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 31
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 2655.9m (initial 14564m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 32
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 6624.0m (initial 18216m) exceeds tolerance with
+        13 straights + 15 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 33
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.0km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 34
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 7093.2m (initial 20928m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 35
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        3 demoted to SingleRoad: Quarter 3 road B: road B fitted to 26688m vs road
+        A 16816m (tolerance \xB13027m))."
+    - AttemptIndex: 36
+      Reason: 8
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Plan-view walk brings unrelated track segments closer than the safe
+        corridor without vertical separation: ''Straight_00_Drop274m'' (arc 700m,
+        h -192m) vs ''Spiral_2rev_Up_Right'' (arc 4807m, h -164m) at 79m apart.'
+    - AttemptIndex: 37
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 7831.0m (initial 14299m) exceeds tolerance with
+        13 straights + 11 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 38
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 5947.7m (initial 14369m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 39
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        3 demoted to SingleRoad: Quarter 3 road B: 2D residual 8418.37m with 10 corners).'
+    - AttemptIndex: 40
+      Reason: 8
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Plan-view walk brings unrelated track segments closer than the safe
+        corridor without vertical separation: ''Straight_01_Drop7m'' (arc 3679m,
+        h 103m) vs ''Corkscrew_4u_R_H1R357_H2R334_Orbit10'' (arc 40770m, h 141m)
+        at 84m apart.'
+    - AttemptIndex: 41
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 2704.6m (initial 12780m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 42
+      Reason: 8
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Plan-view walk brings unrelated track segments closer than the safe
+        corridor without vertical separation: ''SpiralApproach'' (arc 9463m, h 178m)
+        vs ''LoopToCorkscrew_Continuous_2ph'' (arc 28702m, h 134m) at 68m apart.'
+    - AttemptIndex: 43
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 55.9km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 44
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 8803.9m (initial 15518m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 45
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 5539.2m (initial 11141m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 46
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 57.8km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 47
+      Reason: 8
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Plan-view walk brings unrelated track segments closer than the safe
+        corridor without vertical separation: ''SCurve_55deg_LeftFirst'' (arc 28744m,
+        h 234m) vs ''BankedCurve_75deg_Right'' (arc 38481m, h 204m) at 66m apart.'
+    - AttemptIndex: 48
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 7403.3m (initial 18874m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 49
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        2 demoted to SingleRoad: Quarter 2 road B: 2D residual 1423.90m with 10 corners).'
+    - AttemptIndex: 50
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.9km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 51
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        2 demoted to SingleRoad: Quarter 2 road B: corner arcs (7199m) exceed the
+        5614m length target).'
+    - AttemptIndex: 52
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.8km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 53
+      Reason: 8
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Plan-view walk brings unrelated track segments closer than the safe
+        corridor without vertical separation: ''LandingRamp_H23m'' (arc 12688m, h
+        145m) vs ''Straight_05_Climb173m'' (arc 26401m, h 187m) at 63m apart.'
+    - AttemptIndex: 54
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 2276.0m (initial 16149m) exceeds tolerance with
+        13 straights + 15 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 55
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 3721.5m (initial 9419m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 56
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.8km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 58
+      Reason: 8
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Plan-view walk brings unrelated track segments closer than the safe
+        corridor without vertical separation: ''BankedCurve_60deg_Left'' (arc 11305m,
+        h 144m) vs ''QuarterEntry_AirGap_775m_2.15s'' (arc 28628m, h 139m) at 85m
+        apart.'
+    - AttemptIndex: 59
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 3211.2m (initial 14503m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 60
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        2 demoted to SingleRoad: Quarter 2 road B: road B fitted to 21977m vs road
+        A 10640m (tolerance \xB11915m))."
+    - AttemptIndex: 61
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 7428.7m (initial 13367m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 62
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.3km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 63
+      Reason: 7
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Elevation residual 135.1m exceeds slope capacity \u2014 the lap cannot
+        return to its start height legally."
+    - AttemptIndex: 64
+      Reason: 8
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Plan-view walk brings unrelated track segments closer than the safe
+        corridor without vertical separation: ''Wallride_120deg_Left'' (arc 11197m,
+        h 340m) vs ''Bridge_H26m'' (arc 38887m, h 323m) at 85m apart.'
+    - AttemptIndex: 65
+      Reason: 7
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Elevation residual 169.9m exceeds slope capacity \u2014 the lap cannot
+        return to its start height legally."
+    - AttemptIndex: 66
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 5923.3m (initial 17685m) exceeds tolerance with
+        13 straights + 11 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 67
+      Reason: 8
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Plan-view walk brings unrelated track segments closer than the safe
+        corridor without vertical separation: ''Straight_00'' (arc 50m, h 0m) vs
+        ''Loop_4u_H1R328_H2R331'' (arc 19396m, h 28m) at 85m apart.'
+    - AttemptIndex: 68
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 9324.6m (initial 15301m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 69
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 1077.4m (initial 11222m) exceeds tolerance with
+        13 straights + 11 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 70
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 10792.9m (initial 22080m) exceeds tolerance with
+        13 straights + 11 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 71
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 1834.9m (initial 11048m) exceeds tolerance with
+        13 straights + 11 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 72
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 2742.2m (initial 10259m) exceeds tolerance with
+        13 straights + 15 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 73
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 4000.5m (initial 22922m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 74
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 7473.2m (initial 21999m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 75
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.5km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 76
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 4519.4m (initial 22050m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 77
+      Reason: 2
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Only 0 of the required 1 Dual Road Quarters could be built (Quarter
+        3 demoted to SingleRoad: Quarter 3 road B: road B fitted to 12303m vs road
+        A 9770m (tolerance \xB11759m))."
+    - AttemptIndex: 78
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 4827.7m (initial 12274m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 79
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 9769.6m (initial 19624m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 80
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 4015.7m (initial 15382m) exceeds tolerance with
+        13 straights + 10 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 81
+      Reason: 8
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Plan-view walk brings unrelated track segments closer than the safe
+        corridor without vertical separation: ''LandingRamp_H26m'' (arc 6223m, h
+        -184m) vs ''SpiralApproach'' (arc 25097m, h -191m) at 62m apart.'
+    - AttemptIndex: 82
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.5km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 83
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 14073.8m (initial 20427m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 84
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 11062.3m (initial 20851m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 85
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 6254.4m (initial 16726m) exceeds tolerance with
+        13 straights + 15 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 86
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 57.3km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 87
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.6km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 88
+      Reason: 8
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Plan-view walk brings unrelated track segments closer than the safe
+        corridor without vertical separation: ''Spiral_2rev_Up_Left'' (arc 7744m,
+        h -25m) vs ''ClosureSBend_57deg'' (arc 40468m, h 0m) at 78m apart.'
+    - AttemptIndex: 89
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 3087.2m (initial 16063m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 90
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.4km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 91
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 68.9km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 93
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 5940.3m (initial 15417m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 94
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 11471.9m (initial 20181m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 95
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 3755.6m (initial 11744m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 96
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 1415.8m (initial 11103m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 97
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 6103.8m (initial 14954m) exceeds tolerance with
+        13 straights + 10 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 98
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 7248.1m (initial 12247m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 99
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 8345.6m (initial 18461m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 100
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 5959.6m (initial 19075m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 101
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 2498.2m (initial 12976m) exceeds tolerance with
+        13 straights + 11 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 102
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.1km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 103
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 2258.9m (initial 10563m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 104
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 64.8km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 105
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.7km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 106
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 5336.1m (initial 12016m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 107
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 10581.0m (initial 20389m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 108
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 2466.6m (initial 11521m) exceeds tolerance with
+        13 straights + 11 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 109
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 7357.6m (initial 20944m) exceeds tolerance with
+        13 straights + 12 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 110
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 8023.8m (initial 15041m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 111
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.7km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 112
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 1803.5m (initial 14597m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 113
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 64.1km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 114
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 7835.7m (initial 18035m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 115
+      Reason: 4
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: "Locked content alone needs 56.7km \u2014 the 60.0km cap cannot fit
+        this plan."
+    - AttemptIndex: 116
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 7232.7m (initial 17402m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 117
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 12384.3m (initial 23401m) exceeds tolerance with
+        13 straights + 13 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 118
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 5893.1m (initial 22813m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 119
+      Reason: 5
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 2D closure residual 4983.9m (initial 20007m) exceeds tolerance with
+        13 straights + 14 closure curves (S-bend rescue exhausted).
+    - AttemptIndex: 120
+      Reason: 8
+      Subject: TopologyPlanner
+      QuarterOrRoad: 
+      RequestedValue: 0
+      AchievedValue: 0
+      Position: {x: 0, y: 0, z: 0}
+      Message: 'Plan-view walk brings unrelated track segments closer than the safe
+        corridor without vertical separation: ''Bridge_H31m'' (arc 350m, h 31m) vs
+        ''BankedCurve_90deg_Right'' (arc 28993m, h 67m) at 81m apart.'
     Warnings:
-    - 'Road.RoadWidth: Clamped from 32.2 to 100 by the rulebook.'
-    - 'Road.HalfPipeSideHeight: Clamped from 6 to 30 by the rulebook.'
-    - 'Road.MaxWallAngle: Clamped from 60 to 90 by the rulebook.'
+    - 'Road.RoadWidth: Clamped from 32 to 64 by the rulebook.'
+    - 'Road.HalfPipeSideHeight: Clamped from 6.5 to 24 by the rulebook.'
+    - 'Elevation.MaxClimbAngle: Clamped from 34 to 22 by the rulebook.'
+    - 'Elevation.MaxDropAngle: Clamped from 36 to 22 by the rulebook.'
+    - "Quarter 2 demoted to SingleRoad: Quarter 2 road B: road B fitted to 27176m
+      vs road A 15804m (tolerance \xB12845m)"
     RelaxedSettings: []
-    BranchBalance: []
+    RegenerationCommand: Generate New Everything
+    PreservedStreams: []
+    ChangedStreams:
+    - Layout
+    - Feature
+    - Elevation
+    - Quarter
+    - Surface
+    - Visual
+    LockedSettingsGroups: []
+    LayoutLockMode: Unlocked
+    ResolvedSelectionSummary: 
+    ConnectorDecisions:
+    - Name: Straight_01
+      Behavior: 4
+      OriginalLength: 786.8604
+      ResolvedLength: 786.8604
+      RequiredLength: 144.44444
+      Absorbed: 1
+      AbsorbedInto: TurnComplex_0
+      InheritedProperties: bank, outside wall support, depth, turn rounding
+      Notes: "treated as one turn complex \u2014 no reset between the turns"
+    - Name: QuarterApproach_1
+      Behavior: 2
+      OriginalLength: 722.2222
+      ResolvedLength: 722.2222
+      RequiredLength: 325
+      Absorbed: 0
+      AbsorbedInto: 
+      InheritedProperties: 
+      Notes: 
+    - Name: Straight_03
+      Behavior: 6
+      OriginalLength: 704.04596
+      ResolvedLength: 704.04596
+      RequiredLength: 505.55554
+      Absorbed: 0
+      AbsorbedInto: 
+      InheritedProperties: 
+      Notes: 
+    - Name: SpiralApproach
+      Behavior: 2
+      OriginalLength: 722.2222
+      ResolvedLength: 722.2222
+      RequiredLength: 144.44444
+      Absorbed: 0
+      AbsorbedInto: 
+      InheritedProperties: 
+      Notes: 
+    - Name: Straight_05
+      Behavior: 5
+      OriginalLength: 1009.1522
+      ResolvedLength: 1009.1522
+      RequiredLength: 505.55554
+      Absorbed: 0
+      AbsorbedInto: 
+      InheritedProperties: overall wall support (emphasis hands over sides)
+      Notes: bank crosses zero at the field's minimum reversal duration; carry 0.91
+    - Name: RecoveryStraight
+      Behavior: 2
+      OriginalLength: 541.6667
+      ResolvedLength: 541.6667
+      RequiredLength: 361.1111
+      Absorbed: 0
+      AbsorbedInto: 
+      InheritedProperties: 
+      Notes: 
+    - Name: PostCatchRecovery
+      Behavior: 6
+      OriginalLength: 541.6667
+      ResolvedLength: 541.6667
+      RequiredLength: 325
+      Absorbed: 0
+      AbsorbedInto: 
+      InheritedProperties: 
+      Notes: 
+    - Name: JumpApproach
+      Behavior: 2
+      OriginalLength: 722.2222
+      ResolvedLength: 722.2222
+      RequiredLength: 144.44444
+      Absorbed: 0
+      AbsorbedInto: 
+      InheritedProperties: 
+      Notes: 
+    - Name: RecoveryStraight
+      Behavior: 6
+      OriginalLength: 541.6667
+      ResolvedLength: 541.6667
+      RequiredLength: 505.55554
+      Absorbed: 0
+      AbsorbedInto: 
+      InheritedProperties: 
+      Notes: 
+    - Name: Straight_08
+      Behavior: 4
+      OriginalLength: 818.49963
+      ResolvedLength: 818.49963
+      RequiredLength: 144.44444
+      Absorbed: 0
+      AbsorbedInto: 
+      InheritedProperties: bank, outside wall support, depth, turn rounding
+      Notes: "graded carry 1.00 (longer than the bridge window \u2014 partial relax)"
+    - Name: Straight_10
+      Behavior: 4
+      OriginalLength: 538.5728
+      ResolvedLength: 538.5728
+      RequiredLength: 144.44444
+      Absorbed: 1
+      AbsorbedInto: TurnComplex_1
+      InheritedProperties: bank, outside wall support, depth, turn rounding
+      Notes: "treated as one turn complex \u2014 no reset between the turns"
+    - Name: Straight_11
+      Behavior: 4
+      OriginalLength: 607.93427
+      ResolvedLength: 607.93427
+      RequiredLength: 144.44444
+      Absorbed: 1
+      AbsorbedInto: TurnComplex_2
+      InheritedProperties: bank, outside wall support, depth, turn rounding
+      Notes: "treated as one turn complex \u2014 no reset between the turns"
+    - Name: Straight_12
+      Behavior: 5
+      OriginalLength: 738.61755
+      ResolvedLength: 738.61755
+      RequiredLength: 505.55554
+      Absorbed: 0
+      AbsorbedInto: 
+      InheritedProperties: overall wall support (emphasis hands over sides)
+      Notes: bank crosses zero at the field's minimum reversal duration; carry 1.00
+    SubdivisionRegions:
+    - RegionName: Region 00
+      Sections: "Straight_00_Drop41m, LoopToCorkscrew_Continuous_2ph, BankedCurve_35deg_Right,
+        Straight_01, \u2026"
+      LengthMeters: 9148.844
+      RawRequirement: 2280
+      SelectedTier: 3072
+      SpacingMeters: 2.9781392
+      LimitingFactor: ring budget
+    - RegionName: Region 01
+      Sections: "QuarterEntryFlareA_LandingRamp_H20m, Straight_03_Drop21m, BankedCurve_105deg_Right,
+        Straight_04, \u2026"
+      LengthMeters: 21464.547
+      RawRequirement: 8242
+      SelectedTier: 12288
+      SpacingMeters: 1.7467893
+      LimitingFactor: ring budget
+    - RegionName: Region 02
+      Sections: "QuarterExitCatch_LandingRamp_H13m, PostCatchRecovery, Straight_07_Climb52m,
+        JumpApproach, \u2026"
+      LengthMeters: 3679.5
+      RawRequirement: 848
+      SelectedTier: 1024
+      SpacingMeters: 3.5932617
+      LimitingFactor: ring budget
+    - RegionName: Region 03
+      Sections: "LandingRamp_H37m, RecoveryStraight, BankedCurve_30deg_Right, Straight_08_Drop247m,
+        \u2026"
+      LengthMeters: 13931.07
+      RawRequirement: 3210
+      SelectedTier: 4096
+      SpacingMeters: 3.4011402
+      LimitingFactor: ring budget
+    - RegionName: Region 04
+      Sections: "QuarterEntryFlareB_LandingRamp_H20m, Q1RoadB_01_Straight, Q1RoadB_02_BankedCurve,
+        Q1RoadB_03_Straight, \u2026"
+      LengthMeters: 23540.707
+      RawRequirement: 5423
+      SelectedTier: 6144
+      SpacingMeters: 3.8314953
+      LimitingFactor: ring budget
+    QuarterBalance:
+    - QuarterIndex: 1
+      NeutralTimeDifferencePercent: 3.0583682
+      NeutralWithinTolerance: 1
+      RouteAPreferredBySomeArchetype: 1
+      RouteBPreferredBySomeArchetype: 1
+      TimeTable:
+      - Archetype: 0
+        RouteASeconds: 70.36139
+        RouteBSeconds: 68.24189
+      - Archetype: 1
+        RouteASeconds: 72.04459
+        RouteBSeconds: 66.77393
+      - Archetype: 2
+        RouteASeconds: 68.54499
+        RouteBSeconds: 70.10014
+      - Archetype: 3
+        RouteASeconds: 70.91237
+        RouteBSeconds: 70.16497
+      - Archetype: 4
+        RouteASeconds: 70.37996
+        RouteBSeconds: 69.63826
+      - Archetype: 5
+        RouteASeconds: 71.37026
+        RouteBSeconds: 69.921684
+    failureCounts:
+    - Reason: 2
+      Count: 15
+    - Reason: 7
+      Count: 3
+    - Reason: 5
+      Count: 62
+    - Reason: 4
+      Count: 26
+    - Reason: 8
+      Count: 12
   lastMetrics:
-    LapLengthMeters: 16439.8
-    EstimatedNeutralLapTimeSeconds: 45.72746
-    TurnCount: 6
-    LoopCount: 0
-    CorkscrewCount: 0
-    SpiralCount: 0
+    LapLengthMeters: 51902.7
+    EstimatedNeutralLapTimeSeconds: 168.27632
+    TurnCount: 13
+    LoopCount: 2
+    CorkscrewCount: 2
+    SpiralCount: 1
     HalfLoopCount: 0
-    JumpCount: 0
+    JumpCount: 1
     HairpinCount: 0
     ChicaneCount: 0
-    SCurveCount: 3
-    CompoundPatternCount: 0
-    BranchGroupCount: 0
-    MinElevation: 0
-    MaxElevation: 0
-    MinObservedClearance: 71
-    MaxFacetAngleObserved: 0.10087056
-    TotalRings: 10975
-    SelectedCandidateScore: 64.03757
-  generatedMeshCount: 272
-  generatedVertexCount: 1175974
-  generatedTriangleCount: 2082358
---- !u!114 &1150519283
+    SCurveCount: 2
+    FullPipeCount: 0
+    WallrideCount: 2
+    CompoundPatternCount: 1
+    DualRoadQuarterCount: 1
+    MinElevation: -51.006165
+    MaxElevation: 604.94525
+    MinObservedClearance: 62
+    MaxFacetAngleObserved: 1.7585845
+    TotalRings: 26692
+    SelectedCandidateScore: 50.68383
+  generationRevision: 60
+  generatedMeshCount: 0
+  generatedVertexCount: 0
+  generatedTriangleCount: 0
+--- !u!114 &1282291998
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1150519281}
+  m_GameObject: {fileID: 1282291996}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 33d9bc3f5c3e23944a5a186674317523, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TrackGeneration.Core.TrackSeedManager
+  m_EditorClassIdentifier: Slingshot.TrackGeneration::TrackGeneration.Core.TrackSeedManager
   config: {fileID: 11400000, guid: 4d0b4b36f22cd3e48a102032c11d5212, type: 2}
-  currentSeedInput: -629543337
+  currentSeedInput: -1773463294
   useRandomSeed: 1
   activeSeed:
-    BaseSeed: -629543337
-    DisplayName: Seed_-629543337
-    createdAtTicks: 639195529515988405
+    BaseSeed: -1773463294
+    DisplayName: Seed_-1773463294
+    createdAtTicks: 639197180687564077
   savedSeeds: []
-  lastGeneratedHash: 7e94697f5758e6b19f285e08b962ac4679442e3a3da65df0bea71ef099e9960f
---- !u!4 &1150519284
+  lastGeneratedHash: 352ddd40699090170196b3c6eaba134dd1ecc6d88069a91b4d4d228f6191d589
+--- !u!4 &1282291999
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1150519281}
+  m_GameObject: {fileID: 1282291996}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0, y: -0, z: -0}
+  m_LocalPosition: {x: 9386.68, y: -0.00021, z: 12094.292}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1170,6 +2402,5 @@ SceneRoots:
   - {fileID: 330585546}
   - {fileID: 410087041}
   - {fileID: 832575519}
-  - {fileID: 1150519284}
   - {fileID: 1980542949}
-  - {fileID: 824776480}
+  - {fileID: 1282291999}

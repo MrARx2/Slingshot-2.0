@@ -33,6 +33,30 @@ namespace TrackGeneration.Macro
         [Tooltip("Pitch angle in degrees. Positive = nose up.")]
         public float PitchAngle;
 
+        [Tooltip("Unwrapped intentional road roll. 0, 360, 720 and 1080 remain distinct.")]
+        public float AccumulatedRoadRoll;
+
+        [Tooltip("Unwrapped vertical-centerline rotation accumulated by rotational events.")]
+        public float AccumulatedVerticalRotation;
+
+        [Tooltip("Signed plan-view curvature in radians per meter.")]
+        public float HorizontalCurvature;
+
+        [Tooltip("Change of horizontal curvature per meter.")]
+        public float HorizontalCurvatureRate;
+
+        [Tooltip("Signed vertical curvature in radians per meter.")]
+        public float VerticalCurvature;
+
+        [Tooltip("Change of vertical curvature per meter.")]
+        public float VerticalCurvatureRate;
+
+        [Tooltip("Unwrapped intentional road-roll rate in degrees per meter.")]
+        public float RoadRollRate;
+
+        [Tooltip("Change of road-roll rate in degrees per square meter.")]
+        public float RoadRollAcceleration;
+
         [Tooltip("Accumulated arc length from track start (meters). Keeps UVs continuous across sections. Inside a branch route this is the ROUTE distance — physical distance along that route.")]
         public float ArcLength;
 
@@ -47,6 +71,18 @@ namespace TrackGeneration.Macro
 
         [Tooltip("Suppression of the RIGHT half-pipe wall. 0 = full wall (default), 1 = fully open, negative = boosted.")]
         public float RightWallSuppression;
+
+        [Tooltip("Dynamic turn rounding 0..1: 0 = configured center-flat ratio, 1 = fully rounded bowl (flat center gone). Set by the global turn-rounding field.")]
+        public float TurnRounding;
+
+        [Tooltip("LEFT wall overhang engagement 0..1: 0 = ordinary wall (safety-lip curl only), 1 = full catch-wall curl past vertical. Set by the catch-wall/wallride passes.")]
+        public float LeftOverhang;
+
+        [Tooltip("RIGHT wall overhang engagement 0..1.")]
+        public float RightOverhang;
+
+        [Tooltip("Pipe closure 0..1: 0 = open half-pipe road, 1 = fully closed tube. Set by full-pipe feature sections; the cross-section morphs smoothly between them.")]
+        public float PipeClosure;
 
         /// <summary>Left wall height multiplier (1 = full half-pipe wall, 0 = open edge, above 1 = banked outside wall).</summary>
         public float LeftWallMultiplier => Mathf.Clamp(1f - LeftWallSuppression, 0f, 3f);

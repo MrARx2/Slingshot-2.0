@@ -13,15 +13,18 @@ namespace TrackGeneration.Macro
     /// straights, banked curves, splits, bridges, jumps, loops, and corkscrews all
     /// use it. FlatWithWalls exists only as a legacy/debug fallback.
     ///
+    /// UNIFIED PARAMETRIC CROSS-SECTION: every ring evaluates ONE ordered 2D chain
+    /// (<see cref="TrackCrossSection"/>) that continuously expresses the plain
+    /// half-pipe, dynamically rounded turn bowls, outside catch walls curling past
+    /// vertical, wallride support and full pipe closure. The ring is that chain
+    /// (drivable inner surface) plus an outer shell offset along the chain's outward
+    /// normals — so overhangs and closed pipes are real solids, and the collider
+    /// evaluates the SAME chain (render and collision cannot disagree).
+    ///
     /// JUNCTION / AIR-GAP OPENINGS: per-frame wall multipliers (set by the layout's
     /// wall-mask pass) suppress the INNER walls through split/merge throats so forked
     /// half-pipes never cross through each other, and air-gap boundaries (jump lip,
     /// landing mouth) are OPEN edges — no caps or geometry across the flight path.
-    ///
-    /// Geometry stays clean prism/ring-based: each subdivision frame becomes one
-    /// cross-section ring (curved top profile + safety lip + outer walls + bottom
-    /// slab), and consecutive rings are stitched with quads. No n-gons, no messy
-    /// topology.
     ///
     /// STRUCTURE: render meshes are fixed-arc CHUNKS with LODGroups (per-section
     /// meshes are km-long, so screen-height LOD never engages on them); collision is
@@ -31,11 +34,11 @@ namespace TrackGeneration.Macro
     /// </summary>
     public class BoxPrismTrackMeshBuilder
     {
-        // Road slab thickness in meters (center floor surface to bottom face).
+        // Road shell thickness in meters (drivable inner surface to outer skin).
         private const float RoadThickness = 1.2f;
 
-        // Collision slab thickness (collider only, thicker than the visual slab): at
-        // 420 m/s a heavy frame can step the craft body more than a thin slab in one
+        // Collision shell thickness (collider only, thicker than the visual shell): at
+        // 420 m/s a heavy frame can step the craft body more than a thin shell in one
         // discrete physics tick — the deeper collision volume catches it instead of
         // letting it tunnel through the road.
         private const float ColliderThickness = 5f;
@@ -43,29 +46,28 @@ namespace TrackGeneration.Macro
         // UV tiling length along the track in meters.
         private const float TileLength = 10f;
 
-        // Outward thickness of the top safety lip (meters). Keeps the barrier a real
-        // solid instead of a zero-thickness fin (bad for collision).
-        private const float LipThickness = 0.4f;
-
         private readonly TrackRoadProfileSettings _profile;
         private bool _warnedMissingProfile;
+
+        // Per-ring scratch buffers (builder is single-threaded).
+        private Vector2[] _pts;
+        private float[] _cross;
+        private Vector2[] _outward;
 
         public BoxPrismTrackMeshBuilder() : this(null) { }
 
         public BoxPrismTrackMeshBuilder(TrackRoadProfileSettings profile)
         {
             _profile = profile ?? new TrackRoadProfileSettings();
+            int n = InnerPointCount;
+            _pts = new Vector2[n];
+            _cross = new float[n];
+            _outward = new Vector2[n];
         }
 
         /// <summary>
         /// Builds the track as CHAIN-CHUNKED render meshes with LODs plus continuous
         /// chain colliders. AirGap sections emit nothing (they ARE the hole).
-        ///
-        /// Render meshes are fixed-arc chunks (not per-section): a 40 km lap otherwise
-        /// draws millions of triangles with no level of detail — sections are km-long,
-        /// so per-section LOD never engages. Normals are computed ONCE over the whole
-        /// chain (wrap-aware at the start/finish weld), so no chunk or section boundary
-        /// can ever show a lighting seam.
         /// </summary>
         public void Build(List<GeneratedTrackSection> sections, Material roadMaterial, Material sideMaterial, Transform root)
         {
@@ -154,10 +156,48 @@ namespace TrackGeneration.Macro
             return frames;
         }
 
+        // ──────────────────────────── Ring cross-section ────────────────────────────
+
+        /// <summary>Points of the drivable inner chain (parametric — includes wall extensions).</summary>
+        private int InnerPointCount => TrackCrossSection.PointCount(_profile);
+
+        /// <summary>Render verts per ring: inner chain + offset outer shell + 4 duplicated tip-cap verts.</summary>
+        private int VertsPerRing => InnerPointCount * 2 + 4;
+
+        /// <summary>Collider verts per ring: inner chain + outer shell (no hard-edge duplicates needed).</summary>
+        private int ColliderVertsPerRing => InnerPointCount * 2;
+
+        /// <summary>
+        /// Evaluates the parametric chain and its per-point OUTWARD 2D normals into the
+        /// scratch buffers. Outward is perpendicular to the local chain tangent, away
+        /// from the road interior — the outer shell offsets along it, so overhangs and
+        /// closed pipes become real solids without self-intersection.
+        /// </summary>
+        private void EvaluateRing(in TrackConnectionFrame f)
+        {
+            int n = InnerPointCount;
+            TrackCrossSection.Evaluate(_profile, f, _pts, _cross);
+
+            Vector2 lastOutward = new Vector2(0f, -1f);
+            for (int k = 0; k < n; k++)
+            {
+                Vector2 t = _pts[Mathf.Min(k + 1, n - 1)] - _pts[Mathf.Max(k - 1, 0)];
+                if (t.sqrMagnitude < 1e-10f)
+                {
+                    _outward[k] = lastOutward; // degenerate (collapsed extension) — carry on
+                    continue;
+                }
+                t.Normalize();
+                lastOutward = new Vector2(t.y, -t.x); // interior is on the LEFT of the chain direction
+                _outward[k] = lastOutward;
+            }
+        }
+
+        // ──────────────────────────── Chain colliders ────────────────────────────
+
         // PhysX's BVH34 midphase is broken above 2,097,152 (2^21) triangles per mesh —
         // Unity warns and collisions can be MISSED (the craft falls through the road).
-        // Chunk size is chosen so a chunk stays far below the limit: 2000 rings at the
-        // widest profile ≈ 350k triangles, and cooking stays fast per chunk.
+        // Chunk size is chosen so a chunk stays far below the limit.
         private const int MaxRingsPerColliderChunk = 2000;
 
         private void BuildChainCollider(List<GeneratedTrackSection> chain, int index, Transform root)
@@ -187,17 +227,27 @@ namespace TrackGeneration.Macro
         private void BuildColliderChunk(List<TrackConnectionFrame> frames, int r0, int r1,
             string name, Transform root, bool capHead, bool capTail)
         {
-            int n = TopPointCount;
-            int vpr = VertsPerRing;
+            int n = InnerPointCount;
+            int vpr = ColliderVertsPerRing;
             int rings = r1 - r0 + 1;
             if (rings < 2) return;
 
             Vector3 origin = frames[r0 % frames.Count].Position;
-            var vertices = new List<Vector3>(rings * vpr + 64);
+            var vertices = new List<Vector3>(rings * vpr + n * 2 + 8);
             for (int r = r0; r <= r1; r++)
-                EmitColliderRing(frames[r % frames.Count], origin, vertices);
+            {
+                var f = frames[r % frames.Count];
+                EvaluateRing(f);
+                for (int k = 0; k < n; k++)
+                    vertices.Add(f.Position + f.Right * _pts[k].x + f.Up * _pts[k].y - origin);
+                for (int k = 0; k < n; k++)
+                {
+                    Vector2 o = _pts[k] + _outward[k] * ColliderThickness;
+                    vertices.Add(f.Position + f.Right * o.x + f.Up * o.y - origin);
+                }
+            }
 
-            var tris = new List<int>((rings - 1) * (n + 7) * 6);
+            var tris = new List<int>((rings - 1) * n * 12);
             for (int r = 0; r < rings - 1; r++)
             {
                 int a = r * vpr;
@@ -205,19 +255,23 @@ namespace TrackGeneration.Macro
 
                 for (int i = 0; i < n - 1; i++)
                 {
+                    // Inner drivable surface (faces the interior).
                     tris.Add(a + i); tris.Add(b + i); tris.Add(b + i + 1);
                     tris.Add(a + i); tris.Add(b + i + 1); tris.Add(a + i + 1);
+                    // Outer shell (faces away — reversed winding).
+                    tris.Add(a + n + i); tris.Add(b + n + i + 1); tris.Add(b + n + i);
+                    tris.Add(a + n + i); tris.Add(a + n + i + 1); tris.Add(b + n + i + 1);
                 }
-                for (int s = 0; s < 7; s++)
-                {
-                    int p = n + s * 2;
-                    tris.Add(a + p); tris.Add(b + p); tris.Add(b + p + 1);
-                    tris.Add(a + p); tris.Add(b + p + 1); tris.Add(a + p + 1);
-                }
+
+                // Tip edge strips sealing the shell (left tip: inner0↔outer0; right tip).
+                tris.Add(a); tris.Add(a + n); tris.Add(b + n);
+                tris.Add(a); tris.Add(b + n); tris.Add(b);
+                tris.Add(a + n - 1); tris.Add(b + n - 1); tris.Add(b + 2 * n - 1);
+                tris.Add(a + n - 1); tris.Add(b + 2 * n - 1); tris.Add(a + 2 * n - 1);
             }
 
-            if (capHead) AddColliderCap(vertices, tris, frames[r0], origin, facingForward: false);
-            if (capTail) AddColliderCap(vertices, tris, frames[r1], origin, facingForward: true);
+            if (capHead) AddColliderCap(vertices, tris, frames[r0 % frames.Count], origin, facingForward: false);
+            if (capTail) AddColliderCap(vertices, tris, frames[r1 % frames.Count], origin, facingForward: true);
 
             var mesh = new UnityEngine.Mesh { name = name };
             if (vertices.Count > 65535) mesh.indexFormat = IndexFormat.UInt32;
@@ -232,70 +286,32 @@ namespace TrackGeneration.Macro
             collider.sharedMesh = mesh;
         }
 
-        /// <summary>Same ring vertex layout as the render mesh (n top points + 14 hard-edge verts), positions only.</summary>
-        private void EmitColliderRing(TrackConnectionFrame f, Vector3 origin, List<Vector3> vertices)
-        {
-            int n = TopPointCount;
-            float halfW = f.Width * 0.5f;
-            float lip = LipHeight;
-
-            for (int i = 0; i < n; i++)
-                vertices.Add(TopPoint(f, _profile.ProfileXAt(i, n)) - origin);
-
-            Vector3 edgeTopL = TopPoint(f, -1f) - origin;
-            Vector3 edgeTopR = TopPoint(f, 1f) - origin;
-            Vector3 lipTopL = edgeTopL + f.Up * (lip * f.LeftWallMultiplier);
-            Vector3 lipTopR = edgeTopR + f.Up * (lip * f.RightWallMultiplier);
-            Vector3 lipTopOuterL = lipTopL - f.Right * LipThickness;
-            Vector3 lipTopOuterR = lipTopR + f.Right * LipThickness;
-            Vector3 botOuterL = f.Position - f.Right * (halfW + LipThickness) - f.Up * ColliderThickness - origin;
-            Vector3 botOuterR = f.Position + f.Right * (halfW + LipThickness) - f.Up * ColliderThickness - origin;
-
-            vertices.Add(lipTopL); vertices.Add(edgeTopL);
-            vertices.Add(lipTopOuterL); vertices.Add(lipTopL);
-            vertices.Add(botOuterL); vertices.Add(lipTopOuterL);
-            vertices.Add(edgeTopR); vertices.Add(lipTopR);
-            vertices.Add(lipTopR); vertices.Add(lipTopOuterR);
-            vertices.Add(lipTopOuterR); vertices.Add(botOuterR);
-            vertices.Add(botOuterR); vertices.Add(botOuterL);
-        }
-
-        /// <summary>Positions-only version of <see cref="AddCap"/> for chain collider end caps.</summary>
+        /// <summary>Cap closing an exposed boundary: an annulus between the inner chain and the outer shell.</summary>
         private void AddColliderCap(List<Vector3> vertices, List<int> tris, TrackConnectionFrame f, Vector3 origin, bool facingForward)
         {
-            int n = TopPointCount;
-            float halfW = f.Width * 0.5f;
-            float lip = LipHeight;
+            int n = InnerPointCount;
+            EvaluateRing(f);
 
-            Vector3 lipTopL = TopPoint(f, -1f) + f.Up * (lip * f.LeftWallMultiplier) - origin;
-            Vector3 lipTopR = TopPoint(f, 1f) + f.Up * (lip * f.RightWallMultiplier) - origin;
-            Vector3 lipTopOuterL = lipTopL - f.Right * LipThickness;
-            Vector3 lipTopOuterR = lipTopR + f.Right * LipThickness;
-            Vector3 botOuterL = f.Position - f.Right * (halfW + LipThickness) - f.Up * ColliderThickness - origin;
-            Vector3 botOuterR = f.Position + f.Right * (halfW + LipThickness) - f.Up * ColliderThickness - origin;
-
-            var boundary = new List<Vector3> { botOuterL, lipTopOuterL, lipTopL };
-            for (int i = 0; i < n; i++)
-                boundary.Add(TopPoint(f, _profile.ProfileXAt(i, n)) - origin);
-            boundary.Add(lipTopR);
-            boundary.Add(lipTopOuterR);
-            boundary.Add(botOuterR);
-
-            Vector3 center = (botOuterL + botOuterR) * 0.5f;
-            int c = vertices.Count;
-            vertices.Add(center);
             int b0 = vertices.Count;
-            vertices.AddRange(boundary);
+            for (int k = 0; k < n; k++)
+                vertices.Add(f.Position + f.Right * _pts[k].x + f.Up * _pts[k].y - origin);
+            for (int k = 0; k < n; k++)
+            {
+                Vector2 o = _pts[k] + _outward[k] * ColliderThickness;
+                vertices.Add(f.Position + f.Right * o.x + f.Up * o.y - origin);
+            }
 
-            for (int k = 0; k < boundary.Count - 1; k++)
+            for (int k = 0; k < n - 1; k++)
             {
                 if (facingForward)
                 {
-                    tris.Add(c); tris.Add(b0 + k + 1); tris.Add(b0 + k);
+                    tris.Add(b0 + k); tris.Add(b0 + k + 1); tris.Add(b0 + n + k + 1);
+                    tris.Add(b0 + k); tris.Add(b0 + n + k + 1); tris.Add(b0 + n + k);
                 }
                 else
                 {
-                    tris.Add(c); tris.Add(b0 + k); tris.Add(b0 + k + 1);
+                    tris.Add(b0 + k); tris.Add(b0 + n + k + 1); tris.Add(b0 + k + 1);
+                    tris.Add(b0 + k); tris.Add(b0 + n + k); tris.Add(b0 + n + k + 1);
                 }
             }
         }
@@ -324,7 +340,7 @@ namespace TrackGeneration.Macro
             var frames = ChainFrames(chain, out bool circular);
             if (frames.Count < 2) return;
 
-            int n = TopPointCount;
+            int n = InnerPointCount;
             int vpr = VertsPerRing;
             int ringCount = frames.Count;
             Vector3 chainOrigin = frames[0].Position;
@@ -332,8 +348,9 @@ namespace TrackGeneration.Macro
             // ── Chain-wide vertex data ──
             var positions = new Vector3[ringCount * vpr];
             var uvs = new Vector2[ringCount * vpr];
+            var colors = new Color[ringCount * vpr];
             for (int r = 0; r < ringCount; r++)
-                EmitRenderRing(frames[r], chainOrigin, r * vpr, positions, uvs);
+                EmitRenderRing(frames[r], chainOrigin, r * vpr, positions, uvs, colors);
 
             // ── Chain-wide accumulated normals (area-weighted, wrap-aware) ──
             var normals = new Vector3[ringCount * vpr];
@@ -343,17 +360,21 @@ namespace TrackGeneration.Macro
                 int a = r * vpr;
                 int b = ((r + 1) % ringCount) * vpr;
 
-                void Quad(int col)
+                void Quad(int col, bool reversed)
                 {
                     int a0 = a + col, a1 = a + col + 1, b0 = b + col, b1 = b + col + 1;
                     Vector3 face = Vector3.Cross(positions[b0] - positions[a0], positions[b1] - positions[a0]);
+                    if (reversed) face = -face;
                     normals[a0] += face; normals[b0] += face; normals[b1] += face;
                     face = Vector3.Cross(positions[b1] - positions[a0], positions[a1] - positions[a0]);
+                    if (reversed) face = -face;
                     normals[a0] += face; normals[b1] += face; normals[a1] += face;
                 }
 
-                for (int i = 0; i < n - 1; i++) Quad(i);
-                for (int s = 0; s < 7; s++) Quad(n + s * 2);
+                for (int i = 0; i < n - 1; i++) Quad(i, false);          // inner surface
+                for (int i = 0; i < n - 1; i++) Quad(n + i, true);       // outer shell
+                Quad(2 * n, false);                                       // left tip cap
+                Quad(2 * n + 2, false);                                   // right tip cap
             }
             for (int v = 0; v < normals.Length; v++)
                 normals[v] = normals[v].sqrMagnitude > 1e-12f ? normals[v].normalized : Vector3.up;
@@ -369,16 +390,16 @@ namespace TrackGeneration.Macro
                 int r1 = Mathf.Min(lastRing, r0 + RingsPerRenderChunk);
                 bool capHead = c == 0 && !circular && head.CapStart && !head.OpenStart;
                 bool capTail = c == chunkCount - 1 && !circular && tail.CapEnd && !tail.OpenEnd;
-                BuildRenderChunk(frames, positions, uvs, normals, chainOrigin, r0, r1,
+                BuildRenderChunk(frames, positions, uvs, colors, normals, chainOrigin, r0, r1,
                     $"Track_{index:D2}_{c:D2}", roadMaterial, sideMaterial, root, capHead, capTail);
             }
         }
 
         private void BuildRenderChunk(List<TrackConnectionFrame> frames, Vector3[] positions, Vector2[] uvs,
-            Vector3[] normals, Vector3 chainOrigin, int r0, int r1, string name,
+            Color[] colors, Vector3[] normals, Vector3 chainOrigin, int r0, int r1, string name,
             Material roadMaterial, Material sideMaterial, Transform root, bool capHead, bool capTail)
         {
-            int n = TopPointCount;
+            int n = InnerPointCount;
             int vpr = VertsPerRing;
             int ringCount = frames.Count;
             if (r1 - r0 < 1) return;
@@ -399,9 +420,10 @@ namespace TrackGeneration.Macro
                 for (int r = r0; r < r1; r += LodRingStrides[lod]) ringIdx.Add(r);
                 ringIdx.Add(r1);
 
-                var verts = new List<Vector3>(ringIdx.Count * vpr + 64);
-                var uv = new List<Vector2>(ringIdx.Count * vpr + 64);
-                var norm = new List<Vector3>(ringIdx.Count * vpr + 64);
+                var verts = new List<Vector3>(ringIdx.Count * vpr + n * 2 + 8);
+                var uv = new List<Vector2>(ringIdx.Count * vpr + n * 2 + 8);
+                var col = new List<Color>(ringIdx.Count * vpr + n * 2 + 8);
+                var norm = new List<Vector3>(ringIdx.Count * vpr + n * 2 + 8);
                 foreach (int r in ringIdx)
                 {
                     int baseIdx = (r % ringCount) * vpr;
@@ -409,24 +431,30 @@ namespace TrackGeneration.Macro
                     {
                         verts.Add(positions[baseIdx + v] + delta);
                         uv.Add(uvs[baseIdx + v]);
+                        col.Add(colors[baseIdx + v]);
                         norm.Add(normals[baseIdx + v]);
                     }
                 }
 
                 var roadTris = new List<int>((ringIdx.Count - 1) * (n - 1) * 6);
-                var sideTris = new List<int>((ringIdx.Count - 1) * 42 + 64);
+                var sideTris = new List<int>((ringIdx.Count - 1) * (n + 1) * 6 + 64);
                 for (int r = 0; r < ringIdx.Count - 1; r++)
                 {
                     int a = r * vpr;
                     int b = (r + 1) * vpr;
                     for (int i = 0; i < n - 1; i++)
                     {
+                        // Inner drivable surface.
                         roadTris.Add(a + i); roadTris.Add(b + i); roadTris.Add(b + i + 1);
                         roadTris.Add(a + i); roadTris.Add(b + i + 1); roadTris.Add(a + i + 1);
+                        // Outer shell (reversed winding — faces away from the road).
+                        sideTris.Add(a + n + i); sideTris.Add(b + n + i + 1); sideTris.Add(b + n + i);
+                        sideTris.Add(a + n + i); sideTris.Add(a + n + i + 1); sideTris.Add(b + n + i + 1);
                     }
-                    for (int s = 0; s < 7; s++)
+                    // Tip cap strips (duplicated verts — crisp edges).
+                    for (int s = 0; s < 2; s++)
                     {
-                        int p = n + s * 2;
+                        int p = 2 * n + s * 2;
                         sideTris.Add(a + p); sideTris.Add(b + p); sideTris.Add(b + p + 1);
                         sideTris.Add(a + p); sideTris.Add(b + p + 1); sideTris.Add(a + p + 1);
                     }
@@ -434,12 +462,12 @@ namespace TrackGeneration.Macro
 
                 if (capHead)
                 {
-                    AddCap(verts, uv, sideTris, frames[r0], chunkOrigin, facingForward: false);
-                    while (norm.Count < verts.Count) norm.Add(-frames[r0].Forward);
+                    AddCap(verts, uv, col, sideTris, frames[r0 % ringCount], chunkOrigin, facingForward: false);
+                    while (norm.Count < verts.Count) norm.Add(-frames[r0 % ringCount].Forward);
                 }
                 if (capTail)
                 {
-                    AddCap(verts, uv, sideTris, frames[r1 % ringCount], chunkOrigin, facingForward: true);
+                    AddCap(verts, uv, col, sideTris, frames[r1 % ringCount], chunkOrigin, facingForward: true);
                     while (norm.Count < verts.Count) norm.Add(frames[r1 % ringCount].Forward);
                 }
 
@@ -447,6 +475,7 @@ namespace TrackGeneration.Macro
                 if (verts.Count > 65535) mesh.indexFormat = IndexFormat.UInt32;
                 mesh.SetVertices(verts);
                 mesh.SetUVs(0, uv);
+                mesh.SetColors(col);
                 mesh.SetNormals(norm);
                 mesh.subMeshCount = 2;
                 mesh.SetTriangles(roadTris, 0);
@@ -471,146 +500,101 @@ namespace TrackGeneration.Macro
             group.RecalculateBounds();
         }
 
-        // ──────────────────────────── Ring cross-section ────────────────────────────
-
-        /// <summary>Number of drivable top-surface profile points across the width.</summary>
-        private int TopPointCount => _profile.ProfilePointCount;
-
-        /// <summary>Verts per ring: N smooth top points + 14 duplicated hard-edge verts (lip/walls/bottom).</summary>
-        private int VertsPerRing => TopPointCount + 14;
-
-        private float SideHeightFor(TrackConnectionFrame f)
-            => f.SideHeight > 0.001f ? f.SideHeight : _profile.SideHeight;
-
-        /// <summary>
-        /// Top-surface point of the half-pipe profile in root-local space.
-        /// The center floor stays AT the frame baseline; sides rise upward along the frame's
-        /// Up axis — the banked/pitched frame tilts the whole bowl, so banking is an
-        /// additional transformation ON TOP of the global half-pipe shape.
-        /// Heights are never negative: no hidden dips below the section baseline.
-        /// Per-side wall multipliers (split/merge open throats) scale each side's rise:
-        /// a suppressed inner wall flattens smoothly to the road baseline.
-        /// </summary>
-        private Vector3 TopPoint(TrackConnectionFrame f, float normalizedX)
-        {
-            float halfW = f.Width * 0.5f;
-            float sideMult = normalizedX < 0f ? f.LeftWallMultiplier : f.RightWallMultiplier;
-            float h = _profile.HeightAt(normalizedX, halfW, SideHeightFor(f)) * sideMult;
-            return f.Position + f.Right * (normalizedX * halfW) + f.Up * h;
-        }
-
-        private float EdgeHeight(TrackConnectionFrame f)
-            => _profile.HeightAt(1f, f.Width * 0.5f, SideHeightFor(f));
-
-        private float LipHeight => Mathf.Max(0.05f, _profile.SafetyLipHeight);
-
-        // ──────────────────────────── Section mesh ────────────────────────────
-
         /// <summary>
         /// One render ring written into the chain-wide arrays at <paramref name="baseIdx"/>.
         /// Layout per ring (base index r*vpr):
-        ///  0..n-1 : drivable half-pipe top profile, left → right (SMOOTH, road submesh)
-        ///  n+0/1  : left inner lip strip   (lipTopL, edgeTopL)         faces +Right
-        ///  n+2/3  : left lip cap strip     (lipTopOuterL, lipTopL)     faces +Up
-        ///  n+4/5  : left outer wall strip  (botOuterL, lipTopOuterL)   faces -Right
-        ///  n+6/7  : right inner lip strip  (edgeTopR, lipTopR)         faces -Right
-        ///  n+8/9  : right lip cap strip    (lipTopR, lipTopOuterR)     faces +Up
-        ///  n+10/11: right outer wall strip (lipTopOuterR, botOuterR)   faces +Right
-        ///  n+12/13: bottom strip           (botOuterR, botOuterL)      faces -Up
-        /// Safety lips scale with the per-side wall multiplier: a suppressed inner wall
-        /// (split/merge throat) has no lip fin poking out of the open surface.
+        ///  0..n-1     : drivable parametric chain, left tip → right tip (road submesh)
+        ///  n..2n-1    : outer shell, inner chain offset outward (side submesh)
+        ///  2n / 2n+1  : left tip cap strip (outer tip, inner tip — duplicated, crisp edge)
+        ///  2n+2 / 2n+3: right tip cap strip (inner tip, outer tip)
+        /// Vertex colors carry guidance data for the road shaders:
+        ///  R = signed cross parameter remapped to 0..1 (0.5 = center, ±0.25 offset = flat boundary)
+        ///  G = height above the floor baseline, normalized by road width
+        ///  B = pipe closure blend
         /// </summary>
-        private void EmitRenderRing(TrackConnectionFrame f, Vector3 origin, int baseIdx,
-            Vector3[] positions, Vector2[] uvs)
+        private void EmitRenderRing(in TrackConnectionFrame f, Vector3 origin, int baseIdx,
+            Vector3[] positions, Vector2[] uvs, Color[] colors)
         {
-            int n = TopPointCount;
-            float halfW = f.Width * 0.5f;
-            float lip = LipHeight;
+            int n = InnerPointCount;
             float v = f.ArcLength / TileLength;
             int w = baseIdx;
 
-            for (int i = 0; i < n; i++)
+            EvaluateRing(f);
+
+            for (int k = 0; k < n; k++)
             {
-                float xNorm = _profile.ProfileXAt(i, n);
-                positions[w] = TopPoint(f, xNorm) - origin;
-                uvs[w] = new Vector2((xNorm + 1f) * 0.5f, v);
-                w++;
+                positions[w + k] = f.Position + f.Right * _pts[k].x + f.Up * _pts[k].y - origin;
+                uvs[w + k] = new Vector2(k / (float)(n - 1), v);
+                colors[w + k] = RingColor(f, k);
+            }
+            for (int k = 0; k < n; k++)
+            {
+                Vector2 o = _pts[k] + _outward[k] * RoadThickness;
+                positions[w + n + k] = f.Position + f.Right * o.x + f.Up * o.y - origin;
+                uvs[w + n + k] = new Vector2(k / (float)(n - 1), v);
+                colors[w + n + k] = RingColor(f, k);
             }
 
-            Vector3 edgeTopL = TopPoint(f, -1f) - origin;
-            Vector3 edgeTopR = TopPoint(f, 1f) - origin;
-            Vector3 lipTopL = edgeTopL + f.Up * (lip * f.LeftWallMultiplier);
-            Vector3 lipTopR = edgeTopR + f.Up * (lip * f.RightWallMultiplier);
-            Vector3 lipTopOuterL = lipTopL - f.Right * LipThickness;
-            Vector3 lipTopOuterR = lipTopR + f.Right * LipThickness;
-            Vector3 botOuterL = f.Position - f.Right * (halfW + LipThickness) - f.Up * RoadThickness - origin;
-            Vector3 botOuterR = f.Position + f.Right * (halfW + LipThickness) - f.Up * RoadThickness - origin;
+            // Duplicated tip verts for the crisp cap strips.
+            positions[w + 2 * n] = positions[w + n];         // left outer tip
+            positions[w + 2 * n + 1] = positions[w];         // left inner tip
+            positions[w + 2 * n + 2] = positions[w + n - 1]; // right inner tip
+            positions[w + 2 * n + 3] = positions[w + 2 * n - 1]; // right outer tip
+            for (int d = 0; d < 4; d++)
+            {
+                uvs[w + 2 * n + d] = new Vector2(d < 2 ? 0f : 1f, v);
+                colors[w + 2 * n + d] = RingColor(f, d < 2 ? 0 : n - 1);
+            }
+        }
 
-            positions[w] = lipTopL; uvs[w] = new Vector2(v, 1f); w++;
-            positions[w] = edgeTopL; uvs[w] = new Vector2(v, 0f); w++;
-            positions[w] = lipTopOuterL; uvs[w] = new Vector2(v, 0f); w++;
-            positions[w] = lipTopL; uvs[w] = new Vector2(v, 1f); w++;
-            positions[w] = botOuterL; uvs[w] = new Vector2(v, 0f); w++;
-            positions[w] = lipTopOuterL; uvs[w] = new Vector2(v, 1f); w++;
-            positions[w] = edgeTopR; uvs[w] = new Vector2(v, 0f); w++;
-            positions[w] = lipTopR; uvs[w] = new Vector2(v, 1f); w++;
-            positions[w] = lipTopR; uvs[w] = new Vector2(v, 1f); w++;
-            positions[w] = lipTopOuterR; uvs[w] = new Vector2(v, 0f); w++;
-            positions[w] = lipTopOuterR; uvs[w] = new Vector2(v, 1f); w++;
-            positions[w] = botOuterR; uvs[w] = new Vector2(v, 0f); w++;
-            positions[w] = botOuterR; uvs[w] = new Vector2(0f, v); w++;
-            positions[w] = botOuterL; uvs[w] = new Vector2(1f, v);
+        private Color RingColor(in TrackConnectionFrame f, int k)
+        {
+            float heightFrac = Mathf.Clamp01(_pts[k].y / Mathf.Max(1f, f.Width));
+            return new Color(
+                Mathf.Clamp01((_cross[k] + 2f) * 0.25f),
+                heightFrac,
+                Mathf.Clamp01(f.PipeClosure),
+                1f);
         }
 
         /// <summary>
-        /// Cap closing the exposed cross-section of a boundary. Fans over the full
-        /// half-pipe boundary from the bottom center, which sees every boundary point.
-        /// NEVER generated on open boundaries (jump lip / landing mouth / air-gap edges) —
-        /// those must stay clear of any geometry across the flight path. Driven purely by
-        /// the section's CapStart/CapEnd metadata.
+        /// Cap closing the exposed cross-section of a boundary: an annulus between the
+        /// inner chain and the outer shell. NEVER generated on open boundaries (jump
+        /// lip / landing mouth / air-gap edges) — those must stay clear of any geometry
+        /// across the flight path. Driven purely by the section's CapStart/CapEnd metadata.
         /// </summary>
-        private void AddCap(List<Vector3> vertices, List<Vector2> uvs, List<int> tris, TrackConnectionFrame f, Vector3 origin, bool facingForward)
+        private void AddCap(List<Vector3> vertices, List<Vector2> uvs, List<Color> colors,
+            List<int> tris, in TrackConnectionFrame f, Vector3 origin, bool facingForward)
         {
-            int n = TopPointCount;
-            float halfW = f.Width * 0.5f;
-            float lip = LipHeight;
+            int n = InnerPointCount;
+            EvaluateRing(f);
 
-            Vector3 lipTopL = TopPoint(f, -1f) + f.Up * (lip * f.LeftWallMultiplier) - origin;
-            Vector3 lipTopR = TopPoint(f, 1f) + f.Up * (lip * f.RightWallMultiplier) - origin;
-            Vector3 lipTopOuterL = lipTopL - f.Right * LipThickness;
-            Vector3 lipTopOuterR = lipTopR + f.Right * LipThickness;
-            Vector3 botOuterL = f.Position - f.Right * (halfW + LipThickness) - f.Up * RoadThickness - origin;
-            Vector3 botOuterR = f.Position + f.Right * (halfW + LipThickness) - f.Up * RoadThickness - origin;
-
-            // Boundary chain: bottom-left, up the left wall, across the drivable profile,
-            // up/over the right lip, down to bottom-right.
-            var boundary = new List<Vector3> { botOuterL, lipTopOuterL, lipTopL };
-            for (int i = 0; i < n; i++)
-                boundary.Add(TopPoint(f, _profile.ProfileXAt(i, n)) - origin);
-            boundary.Add(lipTopR);
-            boundary.Add(lipTopOuterR);
-            boundary.Add(botOuterR);
-
-            Vector3 center = (botOuterL + botOuterR) * 0.5f;
-
-            int c = vertices.Count;
-            vertices.Add(center); uvs.Add(new Vector2(0.5f, 0f));
             int b0 = vertices.Count;
-            for (int i = 0; i < boundary.Count; i++)
+            for (int k = 0; k < n; k++)
             {
-                vertices.Add(boundary[i]);
-                uvs.Add(new Vector2((float)i / (boundary.Count - 1), 1f));
+                vertices.Add(f.Position + f.Right * _pts[k].x + f.Up * _pts[k].y - origin);
+                uvs.Add(new Vector2(k / (float)(n - 1), 0f));
+                colors.Add(RingColor(f, k));
+            }
+            for (int k = 0; k < n; k++)
+            {
+                Vector2 o = _pts[k] + _outward[k] * RoadThickness;
+                vertices.Add(f.Position + f.Right * o.x + f.Up * o.y - origin);
+                uvs.Add(new Vector2(k / (float)(n - 1), 1f));
+                colors.Add(RingColor(f, k));
             }
 
-            for (int k = 0; k < boundary.Count - 1; k++)
+            for (int k = 0; k < n - 1; k++)
             {
                 if (facingForward)
                 {
-                    tris.Add(c); tris.Add(b0 + k + 1); tris.Add(b0 + k);
+                    tris.Add(b0 + k); tris.Add(b0 + k + 1); tris.Add(b0 + n + k + 1);
+                    tris.Add(b0 + k); tris.Add(b0 + n + k + 1); tris.Add(b0 + n + k);
                 }
                 else
                 {
-                    tris.Add(c); tris.Add(b0 + k); tris.Add(b0 + k + 1);
+                    tris.Add(b0 + k); tris.Add(b0 + n + k + 1); tris.Add(b0 + k + 1);
+                    tris.Add(b0 + k); tris.Add(b0 + n + k); tris.Add(b0 + n + k + 1);
                 }
             }
         }

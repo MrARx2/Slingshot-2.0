@@ -55,9 +55,24 @@ namespace TrackGeneration
         [SerializeField, Min(0f)] private float startLineForwardOffset = 0f;
         [SerializeField] private bool resetHovercraftWithBackspace = true;
 
-        [Header("Last Generation Report (read-only)")]
-        [SerializeField] private TrackGenerationReport lastReport = new TrackGenerationReport();
-        [SerializeField] private TrackGenerationMetrics lastMetrics = new TrackGenerationMetrics();
+        [Header("Seed Streams (independent subsystem randomness)")]
+        [Tooltip("Per-subsystem seed streams. Partial regeneration commands re-randomize only some of them — 'Same Layout, New Content' keeps Layout+Quarter and rolls Feature/Elevation/Surface/Visual.")]
+        [SerializeField] private TrackSeedStreams seedStreams = new TrackSeedStreams();
+
+        [Header("Settings Locks (preserved across presets and Random)")]
+        [SerializeField] private SettingsLockState settingsLocks = new SettingsLockState();
+
+        [Tooltip("Layout lock: Skeleton preserves the corner plan/branch topology streams across 'Randomize All Unlocked'; Geometry preserves every generation stream (only surface/visual treatment may change).")]
+        [SerializeField] private LayoutLockMode layoutLockMode = LayoutLockMode.Unlocked;
+
+        // Read-only generation output. HIDDEN from the inspector: the custom editor
+        // shows a cached summary instead — the default property drawer would traverse
+        // every failure/warning string of the report on every repaint.
+        [SerializeField, HideInInspector] private TrackGenerationReport lastReport = new TrackGenerationReport();
+        [SerializeField, HideInInspector] private TrackGenerationMetrics lastMetrics = new TrackGenerationMetrics();
+
+        [Tooltip("Bumped whenever a generation result is stored — editor caches key off it.")]
+        [SerializeField, HideInInspector] private int generationRevision;
 
         [SerializeField, HideInInspector] private int generatedMeshCount;
         [SerializeField, HideInInspector] private int generatedVertexCount;
@@ -75,9 +90,25 @@ namespace TrackGeneration
         public TrackGenerationReport LastReport => lastReport;
         public TrackGenerationMetrics LastMetrics => lastMetrics;
 
+        /// <summary>Independent per-subsystem seed streams (serialized — partial regeneration state).</summary>
+        public TrackSeedStreams SeedStreams => seedStreams;
+
+        /// <summary>Settings-group locks (editor state; never part of runtime resolution).</summary>
+        public SettingsLockState SettingsLocks => settingsLocks;
+
+        /// <summary>Layout lock mode consumed by 'Randomize All Unlocked'.</summary>
+        public LayoutLockMode LayoutLockMode
+        {
+            get => layoutLockMode;
+            set => layoutLockMode = value;
+        }
+
         public int GeneratedMeshCount => generatedMeshCount;
         public int GeneratedVertexCount => generatedVertexCount;
         public int GeneratedTriangleCount => generatedTriangleCount;
+
+        /// <summary>Monotonic counter of stored generation results — inspector caches rebuild only when this changes.</summary>
+        public int GenerationRevision => generationRevision;
 
         private TrackSeedManager _seedManager;
         private ITrackRaceCraft _craft;
@@ -115,8 +146,101 @@ namespace TrackGeneration
 
         // ─────────────────────────── Generation ───────────────────────────
 
+        /// <summary>Full generation: every seed stream re-derives from the (new or fixed) master seed.</summary>
         [ContextMenu("Generate Track")]
         public void GenerateTrack()
+        {
+            GenerateInternal("Generate", deriveStreamsFromMaster: true, changedStreams: null);
+        }
+
+        /// <summary>New master seed + all streams: a completely fresh track.</summary>
+        [ContextMenu("Generate New Everything")]
+        public void GenerateNewEverything()
+        {
+            if (_seedManager == null) _seedManager = GetComponent<TrackSeedManager>();
+            _seedManager.UseRandomSeed = true;
+            GenerateInternal("Generate New Everything", deriveStreamsFromMaster: true, changedStreams: null);
+        }
+
+        /// <summary>Deterministic re-run of the current master seed and settings.</summary>
+        [ContextMenu("Regenerate Same Settings")]
+        public void RegenerateSameSettings()
+        {
+            if (_seedManager == null) _seedManager = GetComponent<TrackSeedManager>();
+            _seedManager.UseRandomSeed = false;
+            GenerateInternal("Regenerate Same Settings", deriveStreamsFromMaster: true, changedStreams: null);
+        }
+
+        /// <summary>Keeps the layout skeleton (Layout + Quarter streams); rolls features, elevation, surface, visuals.</summary>
+        [ContextMenu("Same Layout, New Content")]
+        public void SameLayoutNewContent()
+            => PartialRegenerate("Same Layout, New Content",
+                SeedStream.Feature, SeedStream.Elevation, SeedStream.Surface, SeedStream.Visual);
+
+        /// <summary>Keeps every generation stream; rolls only surface and visual treatment.</summary>
+        [ContextMenu("Same Geometry, New Surface")]
+        public void SameGeometryNewSurface()
+            => PartialRegenerate("Same Geometry, New Surface", SeedStream.Surface, SeedStream.Visual);
+
+        /// <summary>Rolls only the feature stream (which features fill the gaps and their parameters).</summary>
+        [ContextMenu("New Features Only")]
+        public void NewFeaturesOnly()
+            => PartialRegenerate("New Features Only", SeedStream.Feature);
+
+        /// <summary>Rolls only the quarter stream (dual-quarter selection and alternate road content).</summary>
+        [ContextMenu("New Quarter Content Only")]
+        public void NewQuarterContentOnly()
+            => PartialRegenerate("New Quarter Content Only", SeedStream.Quarter);
+
+        /// <summary>Rolls only the visual stream (marker phasing/decoration — geometry untouched).</summary>
+        [ContextMenu("New Visuals Only")]
+        public void NewVisualsOnly()
+            => PartialRegenerate("New Visuals Only", SeedStream.Visual);
+
+        /// <summary>
+        /// Randomizes every stream the LAYOUT LOCK allows: Unlocked = everything,
+        /// Skeleton = keep Layout+Quarter, Geometry = only Surface+Visual.
+        /// </summary>
+        [ContextMenu("Randomize All Unlocked")]
+        public void RandomizeAllUnlocked()
+        {
+            switch (layoutLockMode)
+            {
+                case LayoutLockMode.Skeleton:
+                    PartialRegenerate("Randomize All Unlocked (Skeleton lock)",
+                        SeedStream.Feature, SeedStream.Elevation, SeedStream.Surface, SeedStream.Visual);
+                    break;
+                case LayoutLockMode.Geometry:
+                    PartialRegenerate("Randomize All Unlocked (Geometry lock)",
+                        SeedStream.Surface, SeedStream.Visual);
+                    break;
+                default:
+                    GenerateNewEverything();
+                    break;
+            }
+        }
+
+        private void PartialRegenerate(string command, params SeedStream[] randomize)
+        {
+            EnsureStreamsInitialized();
+            seedStreams.Randomize(randomize);
+            GenerateInternal(command, deriveStreamsFromMaster: false, changedStreams: randomize);
+        }
+
+        /// <summary>Streams of a freshly added component derive from the active/master seed once.</summary>
+        private void EnsureStreamsInitialized()
+        {
+            seedStreams ??= new TrackSeedStreams();
+            bool uninitialized = seedStreams.LayoutSeed == 0 && seedStreams.FeatureSeed == 0 &&
+                                 seedStreams.ElevationSeed == 0 && seedStreams.QuarterSeed == 0;
+            if (!uninitialized) return;
+
+            if (_seedManager == null) _seedManager = GetComponent<TrackSeedManager>();
+            int master = _seedManager.GetActiveSeed()?.BaseSeed ?? _seedManager.CurrentSeedInput;
+            seedStreams.DeriveAllFrom(master);
+        }
+
+        private void GenerateInternal(string command, bool deriveStreamsFromMaster, SeedStream[] changedStreams)
         {
             if (Config == null)
             {
@@ -125,15 +249,39 @@ namespace TrackGeneration
             }
 
             if (_seedManager == null) _seedManager = GetComponent<TrackSeedManager>();
-            TrackSeed seed = _seedManager.InitializeSeed();
+
+            TrackSeed seed;
+            if (deriveStreamsFromMaster)
+            {
+                seed = _seedManager.InitializeSeed();
+                (seedStreams ??= new TrackSeedStreams()).DeriveAllFrom(seed.BaseSeed);
+            }
+            else
+            {
+                seed = _seedManager.GetActiveSeed() ?? _seedManager.InitializeSeed();
+            }
 
             Designer ??= TrackStylePresetLibrary.Create(TrackStylePresetLibrary.Balanced);
             Designer.Sanitize();
 
             TrackGenerationResult result = RunPipelineWithPolicy(seed);
 
+            // Provenance: what this run preserved/changed and under which locks.
+            result.Report.RegenerationCommand = command;
+            result.Report.LayoutLockMode = layoutLockMode.ToString();
+            result.Report.LockedSettingsGroups = settingsLocks?.LockedGroupNames() ?? new List<string>();
+            var allStreams = new[] { SeedStream.Layout, SeedStream.Feature, SeedStream.Elevation,
+                SeedStream.Quarter, SeedStream.Surface, SeedStream.Visual };
+            foreach (var s in allStreams)
+            {
+                bool changed = deriveStreamsFromMaster ||
+                    (changedStreams != null && System.Array.IndexOf(changedStreams, s) >= 0);
+                (changed ? result.Report.ChangedStreams : result.Report.PreservedStreams).Add(s.ToString());
+            }
+
             lastReport = result.Report;
             lastMetrics = result.Layout?.Metrics ?? new TrackGenerationMetrics();
+            unchecked { generationRevision++; }
 
             if (!result.Success)
             {
@@ -156,7 +304,7 @@ namespace TrackGeneration
             var pipeline = new TrackGenerationPipeline();
 
             ResolvedTrackGenerationConfig resolved = ResolvedTrackGenerationConfig.Resolve(Config, Designer);
-            TrackGenerationResult result = pipeline.Run(resolved, seed);
+            TrackGenerationResult result = pipeline.Run(resolved, seed, seedStreams);
             if (result.Success) return result;
 
             switch (Designer.Generation.FailurePolicy)
@@ -166,10 +314,10 @@ namespace TrackGeneration
                     TrackDesignerSettings relaxed = Designer.Clone();
                     var records = RelaxOptionalSettings(relaxed);
                     var relaxedResolved = ResolvedTrackGenerationConfig.Resolve(Config, relaxed);
-                    TrackGenerationResult retry = pipeline.Run(relaxedResolved, seed);
+                    TrackGenerationResult retry = pipeline.Run(relaxedResolved, seed, seedStreams);
 
                     // Merge failure history so the report shows the whole story.
-                    retry.Report.Failures.InsertRange(0, result.Report.Failures);
+                    retry.Report.PrependFailuresFrom(result.Report);
                     retry.Report.RelaxedSettings.AddRange(records);
                     retry.Report.AttemptsEvaluated += result.Report.AttemptsEvaluated;
                     return retry;
@@ -179,9 +327,9 @@ namespace TrackGeneration
                 {
                     TrackDesignerSettings template = BuildTemplateSettings();
                     var templateResolved = ResolvedTrackGenerationConfig.Resolve(Config, template);
-                    TrackGenerationResult retry = pipeline.Run(templateResolved, seed);
+                    TrackGenerationResult retry = pipeline.Run(templateResolved, seed, seedStreams);
 
-                    retry.Report.Failures.InsertRange(0, result.Report.Failures);
+                    retry.Report.PrependFailuresFrom(result.Report);
                     retry.Report.AttemptsEvaluated += result.Report.AttemptsEvaluated;
                     if (retry.Success)
                     {
@@ -249,22 +397,22 @@ namespace TrackGeneration
             RelaxRule("Features.Chicanes", s.Features.Chicanes);
             RelaxRule("Features.SCurves", s.Features.SCurves);
 
-            if (s.Branches.MaxBranchGroups > s.Branches.MinBranchGroups)
+            if (s.Quarters.MaximumDualQuarterCount > s.Quarters.MinimumDualQuarterCount)
             {
                 records.Add(new RelaxedSettingRecord
                 {
-                    SettingName = "Branches.MaxBranchGroups",
-                    OriginalValue = s.Branches.MaxBranchGroups,
-                    RelaxedValue = s.Branches.MinBranchGroups
+                    SettingName = "Quarters.MaximumDualQuarterCount",
+                    OriginalValue = s.Quarters.MaximumDualQuarterCount,
+                    RelaxedValue = s.Quarters.MinimumDualQuarterCount
                 });
-                s.Branches.MaxBranchGroups = s.Branches.MinBranchGroups;
+                s.Quarters.MaximumDualQuarterCount = s.Quarters.MinimumDualQuarterCount;
             }
 
             s.Sanitize();
             return records;
         }
 
-        /// <summary>A minimal circuit request that still respects the rulebook's allowed features (no features, no branches).</summary>
+        /// <summary>A minimal circuit request that still respects the rulebook's allowed features (no features, no dual quarters).</summary>
         private TrackDesignerSettings BuildTemplateSettings()
         {
             TrackDesignerSettings t = Designer.Clone();
@@ -283,8 +431,8 @@ namespace TrackGeneration
             t.Features.MinFeatureGroups = 0;
             t.Features.MaxFeatureGroups = 0;
             t.Features.RequiredPatterns.Clear();
-            t.Branches.MinBranchGroups = 0;
-            t.Branches.MaxBranchGroups = 0;
+            t.Quarters.MinimumDualQuarterCount = 0;
+            t.Quarters.MaximumDualQuarterCount = 0;
             t.Elevation.TargetElevationAmplitude = Mathf.Min(t.Elevation.TargetElevationAmplitude, 80f);
             t.Elevation.MinMajorElevationSections = 0;
             t.Elevation.MaxMajorElevationSections = 3;
@@ -302,7 +450,15 @@ namespace TrackGeneration
         {
             GeneratedTrackLayout layout = result.Layout;
             var tempRootObj = new GameObject($"GeneratedTrack_{seed.BaseSeed}_pending");
-            tempRootObj.transform.SetParent(transform, false);
+
+            // The generated track is a SCENE-ROOT SIBLING linked by the trackRoot
+            // reference — NEVER a child of the generator. Selecting a GameObject makes
+            // the editor's inspector machinery (preview footer, header aggregation)
+            // work over its child hierarchy every repaint; hanging a multi-million-
+            // vertex track under the generator made selecting it freeze the editor.
+            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(tempRootObj, gameObject.scene);
+            tempRootObj.transform.SetPositionAndRotation(transform.position, transform.rotation);
+            tempRootObj.transform.localScale = transform.lossyScale;
 
             try
             {
@@ -310,6 +466,10 @@ namespace TrackGeneration
 
                 var prismBuilder = new BoxPrismTrackMeshBuilder(resolved.RoadProfile);
                 prismBuilder.Build(layout.Sections, MainRoadMaterial, WallMaterial, tempRootObj.transform);
+
+                // Guidance visuals: center-flat guide lines + wall marker bands
+                // (non-colliding overlay meshes; break only at air gaps/open edges).
+                TrackGuideMarkingBuilder.Build(layout.Sections, resolved.RoadProfile, Designer.Visual, tempRootObj.transform);
 
                 // Validate the built objects before committing.
                 int meshCount = 0;
@@ -363,6 +523,24 @@ namespace TrackGeneration
                 DestroyObject(tempRootObj);
                 return false;
             }
+        }
+
+        /// <summary>Writes the full text diagnostic report next to the project (see <see cref="TrackDebugReportExporter"/>).</summary>
+        [ContextMenu("Export Debug Report")]
+        public void ExportDebugReport()
+        {
+            TrackDebugReportExporter.Export(this);
+        }
+
+        /// <summary>Destroys the current generated track (explicit designer action — generation never does this before a successful swap).</summary>
+        [ContextMenu("Clear Track")]
+        public void ClearTrack()
+        {
+            if (trackRoot != null) DestroyObject(trackRoot.gameObject);
+            trackRoot = null;
+            CurrentMacroSections = null;
+            CurrentLayout = null;
+            UpdateGeneratedMeshStats();
         }
 
         private static void DestroyObject(GameObject obj)
@@ -506,9 +684,9 @@ namespace TrackGeneration
                 $"attempts {result.AttemptsEvaluated}, candidates {result.ValidCandidateCount}, score {result.Report.SelectedCandidateScore:F1}.\n" +
                 $"  Lap {m.LapLengthMeters / 1000f:F2}km, est. {m.EstimatedNeutralLapTimeSeconds:F1}s | turns {m.TurnCount} | " +
                 $"loops {m.LoopCount}, corkscrews {m.CorkscrewCount}, spirals {m.SpiralCount}, half-loops {m.HalfLoopCount}, jumps {m.JumpCount} | " +
-                $"branches {m.BranchGroupCount} | elevation {m.MinElevation:F0}..{m.MaxElevation:F0}m | rings {m.TotalRings}.");
+                $"dual quarters {m.DualRoadQuarterCount} | elevation {m.MinElevation:F0}..{m.MaxElevation:F0}m | rings {m.TotalRings}.");
 
-            foreach (var b in result.Report.BranchBalance)
+            foreach (var b in result.Report.QuarterBalance)
                 Debug.Log($"[TrackGenerator] {b}");
 
             foreach (var w in result.Report.Warnings)

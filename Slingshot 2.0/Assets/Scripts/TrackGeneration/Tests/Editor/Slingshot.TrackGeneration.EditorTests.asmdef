@@ -3,6 +3,7 @@
     "rootNamespace": "TrackGeneration.Tests",
     "references": [
         "Slingshot.TrackGeneration",
+        "Slingshot.TrackGeneration.Editor",
         "Unity.Mathematics",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"

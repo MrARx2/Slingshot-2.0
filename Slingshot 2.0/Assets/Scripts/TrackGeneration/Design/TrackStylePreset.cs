@@ -161,8 +161,7 @@ namespace TrackGeneration.Design
             s.Features.SCurves = new TrackFeatureRule(true, 0, 2, 1.2f);
             s.Features.CompoundFeatureChance = 0.15f;
 
-            s.Branches.MinBranchGroups = 0; s.Branches.MaxBranchGroups = 2;
-            s.Branches.PairingMode = BranchPairingMode.Similar;
+            s.Quarters.MinimumDualQuarterCount = 0; s.Quarters.MaximumDualQuarterCount = 1;
 
             return s;
         }
@@ -215,8 +214,7 @@ namespace TrackGeneration.Design
             s.Features.SCurves = new TrackFeatureRule(true, 0, 2, 1f);
             s.Features.CompoundFeatureChance = 0.35f;
 
-            s.Branches.MinBranchGroups = 1; s.Branches.MaxBranchGroups = 3;
-            s.Branches.PairingMode = BranchPairingMode.Contrasting;
+            s.Quarters.MinimumDualQuarterCount = 1; s.Quarters.MaximumDualQuarterCount = 2;
 
             return s;
         }
@@ -273,8 +271,7 @@ namespace TrackGeneration.Design
             s.Features.SCurves = new TrackFeatureRule(true, 1, 4, 1.5f);
             s.Features.CompoundFeatureChance = 0.15f;
 
-            s.Branches.MinBranchGroups = 0; s.Branches.MaxBranchGroups = 2;
-            s.Branches.PairingMode = BranchPairingMode.AlternatingAdvantage;
+            s.Quarters.MinimumDualQuarterCount = 0; s.Quarters.MaximumDualQuarterCount = 1;
 
             return s;
         }
@@ -328,8 +325,7 @@ namespace TrackGeneration.Design
             s.Features.SCurves = new TrackFeatureRule(true, 0, 1, 0.5f);
             s.Features.CompoundFeatureChance = 0.2f;
 
-            s.Branches.MinBranchGroups = 0; s.Branches.MaxBranchGroups = 1;
-            s.Branches.PairingMode = BranchPairingMode.Similar;
+            s.Quarters.MinimumDualQuarterCount = 0; s.Quarters.MaximumDualQuarterCount = 1;
 
             return s;
         }
@@ -386,8 +382,7 @@ namespace TrackGeneration.Design
             s.Features.CompoundFeatureChance = 0.65f;
             s.Features.MaxCompoundElements = 3;
 
-            s.Branches.MinBranchGroups = 1; s.Branches.MaxBranchGroups = 3;
-            s.Branches.PairingMode = BranchPairingMode.FeatureVersusGround;
+            s.Quarters.MinimumDualQuarterCount = 1; s.Quarters.MaximumDualQuarterCount = 2;
 
             return s;
         }
@@ -449,8 +444,7 @@ namespace TrackGeneration.Design
             s.Features.SCurves = new TrackFeatureRule(true, 0, 3, 1f);
             s.Features.CompoundFeatureChance = 0.2f;
 
-            s.Branches.MinBranchGroups = 1; s.Branches.MaxBranchGroups = 4;
-            s.Branches.PairingMode = BranchPairingMode.AlternatingAdvantage;
+            s.Quarters.MinimumDualQuarterCount = 1; s.Quarters.MaximumDualQuarterCount = 2;
 
             return s;
         }

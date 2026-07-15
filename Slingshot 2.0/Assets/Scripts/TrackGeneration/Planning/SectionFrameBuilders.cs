@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using TrackGeneration.Macro;
 
@@ -16,6 +17,11 @@ namespace TrackGeneration.Planning
         public float MaxClimbAngle;          // degrees
         public float MaxDropAngle;           // degrees
         public float FloorTiltFraction;      // fraction of the bank realized as geometric floor tilt
+        public float RotationUnitDegrees;
+        public float MaxRotationalSampleDistance;
+        public float MaxRotationalForwardAngle;
+        public float MaxRotationalRollAngle;
+        public int MinSamplesPerRotationUnit;
 
         public static FrameBuildContext From(ResolvedTrackGenerationConfig cfg) => new FrameBuildContext
         {
@@ -28,7 +34,12 @@ namespace TrackGeneration.Planning
             WidthTransitionLength = cfg.WidthTransitionLength,
             MaxClimbAngle = cfg.MaxClimbAngle,
             MaxDropAngle = cfg.MaxDropAngle,
-            FloorTiltFraction = cfg.FloorTiltFraction
+            FloorTiltFraction = cfg.FloorTiltFraction,
+            RotationUnitDegrees = Mathf.Max(1f, cfg.RotationUnitDegrees),
+            MaxRotationalSampleDistance = Mathf.Max(0.25f, cfg.MaxRotationalSampleDistance),
+            MaxRotationalForwardAngle = Mathf.Max(0.05f, cfg.MaxRotationalForwardAngle),
+            MaxRotationalRollAngle = Mathf.Max(0.05f, cfg.MaxRotationalRollAngle),
+            MinSamplesPerRotationUnit = Mathf.Max(4, cfg.MinSamplesPerRotationUnit)
         };
     }
 
@@ -173,6 +184,22 @@ namespace TrackGeneration.Planning
 
         /// <summary>Smoothstep 0→1 with zero derivative at both ends.</summary>
         public static float Smooth01(float u) => u * u * (3f - 2f * u);
+
+        /// <summary>
+        /// Minimum nominal climb per revolution needed when a multi-level spiral eases
+        /// its TOTAL elevation with <see cref="Smooth01"/>. The first/last layer pair
+        /// receives less than the nominal step, so using clearance directly is unsafe.
+        /// </summary>
+        public static float RequiredSpiralClimbPerRevolution(float clearance, int revolutions)
+        {
+            if (revolutions <= 1) return Mathf.Max(0f, clearance);
+            float easedLayerFactor = revolutions * Smooth01(1f / revolutions);
+            return Mathf.Max(0f, clearance) / Mathf.Max(0.001f, easedLayerFactor);
+        }
+
+        /// <summary>Rounds a vertical design value upward; safety clearances must never round down.</summary>
+        public static float QuantizeElevationUp(float meters, float quantum = 5f)
+            => Mathf.Ceil(Mathf.Max(0f, meters) / Mathf.Max(0.01f, quantum)) * Mathf.Max(0.01f, quantum);
 
         /// <summary>Net-zero bump 0→1→0 with zero end derivatives, peak at u = 0.5.</summary>
         public static float Bump(float u) => 4f * Smooth01(u) * Smooth01(1f - u);
@@ -351,8 +378,8 @@ namespace TrackGeneration.Planning
 
             float blendLen = Mathf.Min(ctx.WidthTransitionLength, length * 0.5f);
 
-            Vector3 fwdH = Flatten(entry.Forward);
-            Vector3 rightH = Flatten(entry.Right);
+            Vector3 entryForward = entry.Forward.normalized;
+            Vector3 entryRight = (entry.Right - Vector3.Dot(entry.Right, entryForward) * entryForward).normalized;
 
             for (int i = 0; i < rings; i++)
             {
@@ -362,37 +389,77 @@ namespace TrackGeneration.Planning
                 float h = delta * Smooth01(u) + hill * Bump(u);
                 float slope = (delta * 6f * u * (1f - u) + hill * BumpDerivative(u)) / Mathf.Max(length, 0.01f);
 
-                Vector3 fwd = (fwdH + Vector3.up * slope).normalized;
-                Vector3 up = Vector3.Cross(fwd, rightH).normalized;
+                Vector3 fwd = (entryForward + Vector3.up * slope).normalized;
+                Quaternion transport = Quaternion.FromToRotation(entryForward, fwd);
+                Vector3 right = (transport * entryRight).normalized;
+                Vector3 up = Vector3.Cross(fwd, right).normalized;
+                right = Vector3.Cross(up, fwd).normalized;
 
                 float widthT = blendLen > 0.001f ? TrackBlend.Evaluate(ctx.BlendCurve, s / blendLen) : 1f;
 
                 frames[i] = new TrackConnectionFrame
                 {
-                    Position = new Vector3(entry.Position.x + fwdH.x * s, entry.Position.y + h, entry.Position.z + fwdH.z * s),
+                    Position = entry.Position + entryForward * s + Vector3.up * h,
                     Forward = fwd,
-                    Right = rightH,
+                    Right = right,
                     Up = up,
                     Width = Mathf.Lerp(entry.Width, def.Width, widthT),
-                    BankAngle = 0f,
+                    BankAngle = entry.BankAngle,
                     PitchAngle = Mathf.Rad2Deg * Mathf.Atan(slope),
+                    AccumulatedRoadRoll = entry.AccumulatedRoadRoll,
+                    AccumulatedVerticalRotation = entry.AccumulatedVerticalRotation,
+                    HorizontalCurvature = entry.HorizontalCurvature,
+                    HorizontalCurvatureRate = entry.HorizontalCurvatureRate,
+                    VerticalCurvature = 0f,
+                    VerticalCurvatureRate = 0f,
+                    RoadRollRate = entry.RoadRollRate,
+                    RoadRollAcceleration = 0f,
                     ArcLength = entry.ArcLength + s
                 };
             }
 
-            // Exact flat exit at entry height + delta (weld contract).
+            // Exact natural exit: the straight preserves the incoming frame instead of
+            // flattening or unrolling it. Optional elevation shaping has zero end slope.
             var last = frames[rings - 1];
-            last.Position = new Vector3(entry.Position.x + fwdH.x * length, entry.Position.y + delta, entry.Position.z + fwdH.z * length);
-            last.Forward = fwdH;
-            last.Right = rightH;
-            last.Up = Vector3.up;
-            last.PitchAngle = 0f;
+            last.Position = entry.Position + entryForward * length + Vector3.up * delta;
+            last.Forward = entryForward;
+            last.Right = entryRight;
+            last.Up = Vector3.Cross(entryForward, entryRight).normalized;
+            last.PitchAngle = Mathf.Asin(Mathf.Clamp(entryForward.y, -1f, 1f)) * Mathf.Rad2Deg;
             frames[rings - 1] = last;
+
+            frames[0] = entry;
 
             return frames;
         }
 
         // ─────────────────────────── Arcs (bobsled banked) ───────────────────────────
+
+        /// <summary>
+        /// Separates the frame's current physical roll from its unwrapped historical
+        /// rotation counters. A vertical half-loop plus a 180-degree road roll is
+        /// physically upright even though both counters read 180; using the road-roll
+        /// counter alone reverses the local turn plane and swaps inside/outside walls.
+        /// </summary>
+        private static void PhysicalRollBasis(in TrackConnectionFrame entry, out Vector3 forward,
+            out Vector3 baseRight, out Vector3 baseUp, out float physicalRollDegrees)
+        {
+            forward = entry.Forward.sqrMagnitude > 1e-8f ? entry.Forward.normalized : Vector3.forward;
+
+            baseUp = Vector3.up - Vector3.Dot(Vector3.up, forward) * forward;
+            if (baseUp.sqrMagnitude < 1e-6f)
+                baseUp = entry.Up - Vector3.Dot(entry.Up, forward) * forward;
+            if (baseUp.sqrMagnitude < 1e-6f)
+                baseUp = Vector3.Cross(forward,
+                    Mathf.Abs(forward.x) < 0.9f ? Vector3.right : Vector3.forward);
+            baseUp.Normalize();
+            baseRight = Vector3.Cross(baseUp, forward).normalized;
+
+            Vector3 physicalRight = entry.Right - Vector3.Dot(entry.Right, forward) * forward;
+            if (physicalRight.sqrMagnitude < 1e-6f) physicalRight = baseRight;
+            else physicalRight.Normalize();
+            physicalRollDegrees = Vector3.SignedAngle(baseRight, physicalRight, forward);
+        }
 
         /// <summary>
         /// Horizontal arc with EASED (clothoid-style) curvature as PURE geometry: level
@@ -417,8 +484,8 @@ namespace TrackGeneration.Planning
             int rings = Mathf.Clamp(Mathf.Max(Mathf.CeilToInt(arcLen / ctx.MetersPerRing) + 1, facetRings), 9, ctx.MaxRingsPerSection);
             var frames = new TrackConnectionFrame[rings];
 
-            Vector3 fwdH = Flatten(entry.Forward);
-            Vector3 rightH = Flatten(entry.Right);
+            PhysicalRollBasis(entry, out Vector3 baseForward, out Vector3 baseRight,
+                out Vector3 baseUp, out float physicalRollDegrees);
             Vector3 basePos = entry.Position;
 
             for (int i = 0; i < rings; i++)
@@ -426,31 +493,63 @@ namespace TrackGeneration.Planning
                 float u = (float)i / (rings - 1);
                 float thetaDeg = side * SampleTable(profile.theta, u) * Mathf.Rad2Deg;
                 Vector2 pl = SampleTable(profile.plane, u) * arcLen;
+                float curvature;
+                if (i == 0 || i == rings - 1)
+                {
+                    curvature = 0f;
+                }
+                else
+                {
+                    float du = 1f / (rings - 1);
+                    float thetaBefore = SampleTable(profile.theta, u - du);
+                    float thetaAfter = SampleTable(profile.theta, u + du);
+                    curvature = side * (thetaAfter - thetaBefore) /
+                                Mathf.Max(0.001f, 2f * du * arcLen);
+                }
 
-                Quaternion yaw = Quaternion.AngleAxis(thetaDeg, Vector3.up);
+                Quaternion yaw = Quaternion.AngleAxis(thetaDeg, baseUp);
+                Vector3 forward = (yaw * baseForward).normalized;
+                Vector3 unrolledRight = (yaw * baseRight).normalized;
+                Quaternion explicitRoll = Quaternion.AngleAxis(physicalRollDegrees, forward);
+                Vector3 right = (explicitRoll * unrolledRight).normalized;
+                Vector3 up = Vector3.Cross(forward, right).normalized;
 
                 frames[i] = new TrackConnectionFrame
                 {
-                    Position = basePos + fwdH * pl.x + rightH * (side * pl.y),
-                    Forward = yaw * fwdH,
-                    Right = yaw * rightH,
-                    Up = Vector3.up,
+                    Position = basePos + baseForward * pl.x + baseRight * (side * pl.y),
+                    Forward = forward,
+                    Right = right,
+                    Up = up,
                     Width = entry.Width,
-                    BankAngle = 0f,
-                    PitchAngle = 0f,
+                    BankAngle = entry.BankAngle,
+                    PitchAngle = Mathf.Asin(Mathf.Clamp(forward.y, -1f, 1f)) * Mathf.Rad2Deg,
+                    AccumulatedRoadRoll = entry.AccumulatedRoadRoll,
+                    AccumulatedVerticalRotation = entry.AccumulatedVerticalRotation,
+                    HorizontalCurvature = curvature,
+                    HorizontalCurvatureRate = i > 0
+                        ? (curvature - frames[i - 1].HorizontalCurvature) /
+                          Mathf.Max(0.001f, arcLen / (rings - 1))
+                        : 0f,
+                    RoadRollRate = entry.RoadRollRate,
                     ArcLength = entry.ArcLength + arcLen * u
                 };
             }
 
             // Exact eased end pose (identical to the planner's 2D model).
             Vector2 endPl = profile.plane[profile.plane.Length - 1] * arcLen;
-            Quaternion endYaw = Quaternion.AngleAxis(side * angleAbs, Vector3.up);
+            Quaternion endYaw = Quaternion.AngleAxis(side * angleAbs, baseUp);
             var last = frames[rings - 1];
-            last.Position = basePos + fwdH * endPl.x + rightH * (side * endPl.y);
-            last.Forward = endYaw * fwdH;
-            last.Right = endYaw * rightH;
-            last.Up = Vector3.up;
+            last.Position = basePos + baseForward * endPl.x + baseRight * (side * endPl.y);
+            last.Forward = (endYaw * baseForward).normalized;
+            Vector3 endBaseRight = (endYaw * baseRight).normalized;
+            last.Right = (Quaternion.AngleAxis(physicalRollDegrees, last.Forward) * endBaseRight).normalized;
+            last.Up = Vector3.Cross(last.Forward, last.Right).normalized;
+            last.PitchAngle = Mathf.Asin(Mathf.Clamp(last.Forward.y, -1f, 1f)) * Mathf.Rad2Deg;
+            last.HorizontalCurvature = 0f;
+            last.HorizontalCurvatureRate = 0f;
             frames[rings - 1] = last;
+
+            frames[0] = entry;
 
             return frames;
         }
@@ -577,9 +676,13 @@ namespace TrackGeneration.Planning
             return frames;
         }
 
-        /// <summary>Keyframes for a jump launch ramp: level → climb pitch → shallow launch pitch at the lip.</summary>
-        public static (float u, float pitch)[] LaunchRampKeys(float climbPitchDeg, float launchPitchDeg)
-            => new[] { (0f, 0f), (0.6f, climbPitchDeg), (1f, launchPitchDeg) };
+        /// <summary>Keyframes for a jump launch ramp whose pitch never decreases before the lip.</summary>
+        public static (float u, float pitch)[] LaunchRampKeys(float intermediatePitchDeg, float launchPitchDeg)
+        {
+            float lip = Mathf.Max(0f, launchPitchDeg);
+            float middle = Mathf.Clamp(intermediatePitchDeg, 0f, lip);
+            return new[] { (0f, 0f), (0.6f, middle), (1f, lip) };
+        }
 
         /// <summary>Keyframes for a jump landing ramp: shallow arrival pitch → descent pitch → level.</summary>
         public static (float u, float pitch)[] LandingRampKeys(float arrivalPitchDeg, float descentPitchDeg)
@@ -635,6 +738,551 @@ namespace TrackGeneration.Planning
             }
 
             return frames;
+        }
+
+        // ─────────────────────────── Full pipe ───────────────────────────
+
+        /// <summary>
+        /// Straight full-pipe section: the cross-section closes gradually from the
+        /// open half-pipe into a complete tube (PipeClosure 0 → 1 over the closure
+        /// span), holds, and reopens before the exit — never over one or two samples.
+        /// The centerline is a level straight; the craft may roll around the interior
+        /// circumference. Width carries the pipe diameter (radius = width/2); the
+        /// entry/exit rings stay at ROAD width so the weld contract holds, with the
+        /// width blending alongside the closure.
+        /// </summary>
+        public static TrackConnectionFrame[] BuildFullPipe(TrackConnectionFrame entry, TrackMacroSectionDefinition def,
+            in FrameBuildContext ctx)
+        {
+            float length = def.Length;
+            float closeEnd = def.PipeCloseFraction > 0.001f ? Mathf.Clamp(def.PipeCloseFraction, 0.05f, 0.45f) : 0.3f;
+            float openStart = def.PipeOpenFraction > 0.001f ? Mathf.Clamp(def.PipeOpenFraction, 0.55f, 0.95f) : 0.7f;
+
+            int rings = Mathf.Clamp(Mathf.CeilToInt(length / ctx.FeatureMetersPerRing) + 1, 24, ctx.MaxRingsPerSection);
+            var frames = new TrackConnectionFrame[rings];
+
+            Vector3 fwdH = Flatten(entry.Forward);
+            Vector3 rightH = Flatten(entry.Right);
+
+            for (int i = 0; i < rings; i++)
+            {
+                float u = (float)i / (rings - 1);
+
+                float closure = u < closeEnd
+                    ? Smooth01(u / closeEnd)
+                    : u > openStart
+                        ? Smooth01((1f - u) / Mathf.Max(0.0001f, 1f - openStart))
+                        : 1f;
+
+                frames[i] = new TrackConnectionFrame
+                {
+                    Position = entry.Position + fwdH * (length * u),
+                    Forward = fwdH,
+                    Right = rightH,
+                    Up = Vector3.up,
+                    Width = Mathf.Lerp(entry.Width, def.Width, Smooth01(Mathf.Clamp01(closure * 1.5f))),
+                    BankAngle = 0f,
+                    PitchAngle = 0f,
+                    ArcLength = entry.ArcLength + length * u,
+                    PipeClosure = closure
+                };
+            }
+
+            // Exact weld exit: road width, open profile.
+            var last = frames[rings - 1];
+            last.Width = entry.Width;
+            last.PipeClosure = 0f;
+            frames[rings - 1] = last;
+
+            return frames;
+        }
+
+        // ─────────────────────────── Wallride turn ───────────────────────────
+
+        /// <summary>
+        /// Intentional wallride corner: the same eased horizontal arc as a banked
+        /// curve, but the section OWNS its cross-section — full turn rounding (no flat
+        /// center), the outside wall boosted to primary-surface height with a full
+        /// catch-curl past vertical, and the inside wall trimmed for visibility. All
+        /// channels follow one smooth hold envelope, so entry and exit migrate the
+        /// racing line on and off the wall gradually.
+        /// </summary>
+        public static TrackConnectionFrame[] BuildWallrideTurn(TrackConnectionFrame entry, TrackMacroSectionDefinition def,
+            in FrameBuildContext ctx)
+        {
+            var frames = BuildArc(entry, def.TurnAngle * def.TurnSign, def.Radius, def.BankingAngle, ctx);
+
+            // Envelope ease spans: entry/exit fractions from the arc length vs the
+            // roll transition (the craft needs real distance to climb the wall).
+            float arcLen = frames[frames.Length - 1].ArcLength - frames[0].ArcLength;
+            float easeFrac = Mathf.Clamp(ctx.BankTransitionLength / Mathf.Max(1f, arcLen), 0.15f, 0.4f);
+
+            bool rightTurn = def.TurnSign >= 0;
+            for (int i = 0; i < frames.Length; i++)
+            {
+                float u = (float)i / (frames.Length - 1);
+                float e = HoldProfile(u, easeFrac, TrackBlendCurve.SmootherStep);
+
+                var f = frames[i];
+                f.TurnRounding = e;
+                // Outside wall becomes the primary surface: boosted high (multiplier
+                // up to 3) with a full catch-curl; inside wall trimmed for visibility.
+                float outsideSupp = -2f * e;   // multiplier 1 → 3
+                float insideSupp = 0.55f * e;  // multiplier 1 → 0.45 (KeepLow policy)
+                if (rightTurn) // right turn rides the LEFT wall
+                {
+                    f.LeftWallSuppression = outsideSupp;
+                    f.RightWallSuppression = insideSupp;
+                    f.LeftOverhang = e;
+                }
+                else
+                {
+                    f.RightWallSuppression = outsideSupp;
+                    f.LeftWallSuppression = insideSupp;
+                    f.RightOverhang = e;
+                }
+                f.BankAngle = def.TurnSign * def.BankingAngle * e;
+                frames[i] = f;
+            }
+
+            // Exact weld boundaries: neutral cross-section at both ends.
+            var first = frames[0];
+            first.TurnRounding = 0f; first.LeftOverhang = 0f; first.RightOverhang = 0f;
+            first.LeftWallSuppression = 0f; first.RightWallSuppression = 0f; first.BankAngle = 0f;
+            frames[0] = first;
+            var last = frames[frames.Length - 1];
+            last.TurnRounding = 0f; last.LeftOverhang = 0f; last.RightOverhang = 0f;
+            last.LeftWallSuppression = 0f; last.RightWallSuppression = 0f; last.BankAngle = 0f;
+            frames[frames.Length - 1] = last;
+
+            return frames;
+        }
+
+        // ───────────────────── Continuous rotational road event ─────────────────────
+
+        public static float RotationalBlendFraction(RotationalBlendPreset preset) => preset switch
+        {
+            RotationalBlendPreset.Short => 0.10f,
+            RotationalBlendPreset.Medium => 0.20f,
+            RotationalBlendPreset.Long => 0.30f,
+            _ => 0f
+        };
+
+        /// <summary>Physical event length after approved adjacent phase overlaps.</summary>
+        public static float RotationalEventLength(TrackMacroSectionDefinition def)
+        {
+            var phases = def.RotationalPhases;
+            if (phases == null || phases.Count == 0) return Mathf.Max(1f, def.Length);
+
+            float end = 0f;
+            for (int i = 0; i < phases.Count; i++)
+            {
+                float length = phases[i]?.Length ?? 1f;
+                if (i == 0) end = length;
+                else
+                {
+                    var previous = phases[i - 1];
+                    float overlap = RotationalBlendFraction(previous?.BlendToNext ?? RotationalBlendPreset.None) *
+                                    Mathf.Min(previous?.Length ?? 1f, length);
+                    end += length - overlap;
+                }
+            }
+            return Mathf.Max(1f, end);
+        }
+
+        /// <summary>
+        /// Cubic Hermite correction whose value is zero at both ends but whose distance
+        /// derivative matches the requested entry/exit angular rates. It lets an event
+        /// inherit and propagate curvature without changing any quantized phase total.
+        /// </summary>
+        private static float EndpointRateCorrection(float distance, float length,
+            float entryDegreesPerMeter, float exitDegreesPerMeter)
+        {
+            float u = Mathf.Clamp01(distance / Mathf.Max(0.001f, length));
+            float u2 = u * u;
+            float u3 = u2 * u;
+            float h10 = u3 - 2f * u2 + u;
+            float h11 = u3 - u2;
+            return length * (entryDegreesPerMeter * h10 + exitDegreesPerMeter * h11);
+        }
+
+        /// <summary>
+        /// Integrates independent horizontal curvature, vertical curvature and explicit
+        /// road roll into one propagated frame stream. No world-up reconstruction, entry
+        /// flattening, exit snapping or rotation normalization occurs.
+        /// </summary>
+        public static TrackConnectionFrame[] BuildRotationalEvent(TrackConnectionFrame entry,
+            TrackMacroSectionDefinition def, in FrameBuildContext ctx)
+        {
+            var phases = def.RotationalPhases;
+            if (phases == null || phases.Count == 0)
+                return BuildStraight(entry, def, ctx);
+
+            int count = phases.Count;
+            var starts = new float[count];
+            var ends = new float[count];
+            var cdf = new float[count][];
+            const int profileSamples = 256;
+
+            float cursor = 0f;
+            int totalUnits = 0;
+            float totalForwardDegrees = 0f;
+            float totalRollDegrees = 0f;
+            for (int p = 0; p < count; p++)
+            {
+                var phase = phases[p] ?? new RotationalPhaseDefinition();
+                float length = phase.Length;
+                if (p > 0)
+                {
+                    var previous = phases[p - 1];
+                    cursor -= RotationalBlendFraction(previous?.BlendToNext ?? RotationalBlendPreset.None) *
+                              Mathf.Min(previous?.Length ?? 1f, length);
+                }
+                starts[p] = cursor;
+                ends[p] = cursor + length;
+                cursor = ends[p];
+
+                totalUnits += Mathf.Max(1, phase.RotationUnits);
+                float degrees = Mathf.Abs(phase.Degrees(ctx.RotationUnitDegrees));
+                if (phase.Axis == RotationalPhaseAxis.VerticalCenterline) totalForwardDegrees += degrees;
+                else totalRollDegrees += degrees;
+                totalForwardDegrees += Mathf.Abs(phase.HorizontalTurnDegrees) + Mathf.Abs(phase.VerticalDriftDegrees);
+                // Each half bias rises from zero and returns to zero, so its forward-
+                // direction demand is twice the selected peak angle.
+                totalForwardDegrees += 2f * (Mathf.Abs(phase.FirstHalfYawBiasDegrees) +
+                                             Mathf.Abs(phase.SecondHalfYawBiasDegrees) +
+                                             Mathf.Abs(phase.FirstHalfPitchBiasDegrees) +
+                                             Mathf.Abs(phase.SecondHalfPitchBiasDegrees));
+                // A corkscrew orbit rotates a temporary tangent vector once per roll
+                // unit. Budget its changing direction as centerline geometry, not roll.
+                totalForwardDegrees += 2f * Mathf.Abs(phase.CenterlineOrbitDegrees) *
+                                       Mathf.Max(1, phase.RotationUnits);
+
+                // A smooth positive rate envelope, weighted by the two-half radius model.
+                // Its integral is normalized, so shaping can never alter the exact target.
+                var table = new float[profileSamples + 1];
+                float firstLen = Mathf.Max(1f, phase.FirstHalfLength);
+                float midpoint = firstLen / Mathf.Max(2f, phase.Length);
+                float previousWeight = 0f;
+                float integral = 0f;
+                for (int k = 0; k <= profileSamples; k++)
+                {
+                    float x = (float)k / profileSamples;
+                    float transition = Smooth01(Mathf.InverseLerp(
+                        Mathf.Max(0f, midpoint - 0.20f), Mathf.Min(1f, midpoint + 0.20f), x));
+                    float radius = Mathf.Lerp(Mathf.Max(1f, phase.FirstHalfRadius),
+                                              Mathf.Max(1f, phase.SecondHalfRadius), transition);
+                    float envelope = Mathf.Sin(Mathf.PI * x);
+                    float weight = envelope * envelope / radius;
+                    if (k > 0) integral += (previousWeight + weight) * 0.5f / profileSamples;
+                    table[k] = integral;
+                    previousWeight = weight;
+                }
+                float inv = integral > 1e-8f ? 1f / integral : 1f;
+                for (int k = 0; k <= profileSamples; k++) table[k] *= inv;
+                table[profileSamples] = 1f;
+                cdf[p] = table;
+            }
+
+            float lengthTotal = Mathf.Max(1f, cursor);
+            RotationalPhaseDefinition finalPhase = null;
+            for (int p = count - 1; p >= 0 && finalPhase == null; p--)
+                finalPhase = phases[p];
+            float exitHorizontalCurvature = finalPhase?.ExitHorizontalCurvature ?? 0f;
+            float exitVerticalCurvature = finalPhase?.ExitVerticalCurvature ?? 0f;
+            float exitRoadRollRate = finalPhase?.ExitRoadRollRate ?? 0f;
+            // Endpoint-rate Hermite corrections have zero net angle, but their local
+            // excursion still needs tessellation budget.
+            totalForwardDegrees += lengthTotal * Mathf.Rad2Deg *
+                (Mathf.Abs(entry.HorizontalCurvature) + Mathf.Abs(exitHorizontalCurvature) +
+                 Mathf.Abs(entry.VerticalCurvature) + Mathf.Abs(exitVerticalCurvature));
+            totalRollDegrees += lengthTotal *
+                (Mathf.Abs(entry.RoadRollRate) + Mathf.Abs(exitRoadRollRate));
+            int distanceIntervals = Mathf.CeilToInt(lengthTotal / ctx.MaxRotationalSampleDistance);
+            // The normalized sin²/radius phase envelope can peak above its average;
+            // fourfold headroom keeps the actual adjacent angular delta under the
+            // configured limit even with the largest approved two-half radius contrast.
+            int forwardIntervals = Mathf.CeilToInt(totalForwardDegrees * 4f / ctx.MaxRotationalForwardAngle);
+            int rollIntervals = Mathf.CeilToInt(totalRollDegrees * 4f / ctx.MaxRotationalRollAngle);
+            int unitIntervals = totalUnits * ctx.MinSamplesPerRotationUnit;
+            int intervals = Mathf.Clamp(Mathf.Max(Mathf.Max(distanceIntervals, forwardIntervals),
+                Mathf.Max(rollIntervals, unitIntervals)), 8, Mathf.Max(8, ctx.MaxRingsPerSection - 1));
+            var frames = new TrackConnectionFrame[intervals + 1];
+            frames[0] = entry;
+
+            float SampleProgress(int p, float distance)
+            {
+                float x = Mathf.InverseLerp(starts[p], ends[p], distance);
+                if (x <= 0f) return 0f;
+                if (x >= 1f) return 1f;
+                float tableX = x * profileSamples;
+                int lo = Mathf.Min((int)tableX, profileSamples - 1);
+                return Mathf.Lerp(cdf[p][lo], cdf[p][lo + 1], tableX - lo);
+            }
+
+            float accumulatedRoll = entry.AccumulatedRoadRoll;
+            float accumulatedVertical = entry.AccumulatedVerticalRotation;
+
+            PhysicalRollBasis(entry, out Vector3 forward, out Vector3 baseRight,
+                out Vector3 baseUp, out float entryPhysicalRollDegrees);
+            Vector3 entryBaseForward = forward;
+            Vector3 entryBaseRight = baseRight;
+            Vector3 entryBaseUp = baseUp;
+            Vector3 position = entry.Position;
+
+            float previousHorizontal = 0f;
+            float previousVerticalMotion = 0f;
+            float previousVerticalIntent = 0f;
+            float previousRoll = accumulatedRoll;
+            float previousHorizontalCurvature = entry.HorizontalCurvature;
+            float previousVerticalCurvature = entry.VerticalCurvature;
+            float previousRollRate = entry.RoadRollRate;
+            float previousWidth = entry.Width;
+
+            for (int i = 1; i <= intervals; i++)
+            {
+                float distance = lengthTotal * i / intervals;
+                float horizontal = 0f;
+                float verticalMotion = 0f;
+                float verticalIntent = entry.AccumulatedVerticalRotation;
+                float roll = entry.AccumulatedRoadRoll;
+                float width = entry.Width;
+                float widthTarget = entry.Width;
+
+                for (int p = 0; p < count; p++)
+                {
+                    var phase = phases[p] ?? new RotationalPhaseDefinition();
+                    float progress = SampleProgress(p, distance);
+                    horizontal += phase.HorizontalTurnDegrees * progress;
+                    verticalMotion += phase.VerticalDriftDegrees * progress;
+                    float local = Mathf.InverseLerp(starts[p], ends[p], distance);
+                    float midpoint = Mathf.Max(0.001f, phase.FirstHalfLength) /
+                                     Mathf.Max(0.002f, phase.Length);
+                    float halfLocal;
+                    float yawBias;
+                    float pitchBias;
+                    if (local <= midpoint)
+                    {
+                        halfLocal = Mathf.Clamp01(local / midpoint);
+                        yawBias = phase.FirstHalfYawBiasDegrees;
+                        pitchBias = phase.FirstHalfPitchBiasDegrees;
+                    }
+                    else
+                    {
+                        halfLocal = Mathf.Clamp01((local - midpoint) / Mathf.Max(0.001f, 1f - midpoint));
+                        yawBias = phase.SecondHalfYawBiasDegrees;
+                        pitchBias = phase.SecondHalfPitchBiasDegrees;
+                    }
+                    float biasEnvelope = Mathf.Sin(Mathf.PI * halfLocal);
+                    biasEnvelope *= biasEnvelope;
+                    float yawEnvelope = biasEnvelope;
+                    if (phase.Axis == RotationalPhaseAxis.RoadRoll &&
+                        phase.CenterlineOrbitDegrees > 0.001f)
+                    {
+                        // Corkscrew entry/exit steering belongs in upright shoulders,
+                        // not at the 90/270-degree roll stations where an unrelated
+                        // horizontal bend would pull away from the supporting surface.
+                        const float shoulder = 0.18f;
+                        if (local < shoulder)
+                        {
+                            float shoulderLocal = Mathf.Clamp01(local / shoulder);
+                            yawEnvelope = Mathf.Sin(Mathf.PI * shoulderLocal);
+                            yawEnvelope *= yawEnvelope;
+                            yawBias = phase.FirstHalfYawBiasDegrees;
+                        }
+                        else if (local > 1f - shoulder)
+                        {
+                            float shoulderLocal = Mathf.Clamp01((local - (1f - shoulder)) / shoulder);
+                            yawEnvelope = Mathf.Sin(Mathf.PI * shoulderLocal);
+                            yawEnvelope *= yawEnvelope;
+                            yawBias = phase.SecondHalfYawBiasDegrees;
+                        }
+                        else
+                        {
+                            yawEnvelope = 0f;
+                            yawBias = 0f;
+                        }
+                    }
+                    horizontal += yawBias * yawEnvelope;
+                    verticalMotion += pitchBias * biasEnvelope;
+                    float intentional = phase.Degrees(ctx.RotationUnitDegrees) * progress;
+                    if (phase.Axis == RotationalPhaseAxis.VerticalCenterline)
+                    {
+                        verticalMotion += intentional;
+                        verticalIntent += intentional;
+                    }
+                    else
+                    {
+                        roll += intentional;
+
+                        // A real corkscrew's centerline tangent orbits in lockstep with
+                        // its road roll. Its curvature therefore points along the rolled
+                        // road normal (the surface-support direction), while the sinÂ²
+                        // envelope gives straight, level welds at both ends.
+                        float orbitDegrees = Mathf.Abs(phase.CenterlineOrbitDegrees);
+                        if (orbitDegrees > 0.001f && local > 0f && local < 1f)
+                        {
+                            float envelope = Mathf.Sin(Mathf.PI * local);
+                            envelope *= envelope;
+                            float rollRadians = intentional * Mathf.Deg2Rad;
+                            float rollSign = (float)phase.Direction;
+                            horizontal += rollSign * orbitDegrees * Mathf.Cos(rollRadians) * envelope;
+                            verticalMotion += rollSign * orbitDegrees * Mathf.Sin(rollRadians) * envelope;
+                        }
+                    }
+
+                    float nextWidth = phase.ExitWidth > 0.01f ? phase.ExitWidth : widthTarget;
+                    width += (nextWidth - widthTarget) * progress;
+                    widthTarget = nextWidth;
+                }
+
+                horizontal += EndpointRateCorrection(distance, lengthTotal,
+                    entry.HorizontalCurvature * Mathf.Rad2Deg,
+                    exitHorizontalCurvature * Mathf.Rad2Deg);
+                verticalMotion += EndpointRateCorrection(distance, lengthTotal,
+                    entry.VerticalCurvature * Mathf.Rad2Deg,
+                    exitVerticalCurvature * Mathf.Rad2Deg);
+                roll += EndpointRateCorrection(distance, lengthTotal,
+                    entry.RoadRollRate, exitRoadRollRate);
+
+                float yawDelta = horizontal - previousHorizontal;
+                float pitchDelta = verticalMotion - previousVerticalMotion;
+                Vector3 oldForward = forward;
+
+                // Evaluate the two centerline channels as absolute entry-relative
+                // states. This keeps them independent: completing 360/720/1080 degrees
+                // of vertical rotation cannot geometrically cancel a requested plan-
+                // view heading change (the incremental minimal-transport version could).
+                // The axes come from the inherited frame's physical-roll decomposition,
+                // never from its historical counters, so completed inversions cannot
+                // silently flip the following section's turn plane.
+                Quaternion yaw = Quaternion.AngleAxis(horizontal, entryBaseUp);
+                Vector3 yawedForward = (yaw * entryBaseForward).normalized;
+                Vector3 yawedRight = (yaw * entryBaseRight).normalized;
+                Quaternion pitch = Quaternion.AngleAxis(-verticalMotion, yawedRight);
+                forward = (pitch * yawedForward).normalized;
+                baseRight = (pitch * yawedRight).normalized;
+                baseRight = (baseRight - Vector3.Dot(baseRight, forward) * forward).normalized;
+                baseUp = Vector3.Cross(forward, baseRight).normalized;
+
+                float ds = lengthTotal / intervals;
+                Vector3 travel = oldForward + forward;
+                if (travel.sqrMagnitude < 1e-8f) travel = forward;
+                position += travel.normalized * ds;
+
+                float physicalRoll = entryPhysicalRollDegrees + (roll - entry.AccumulatedRoadRoll);
+                Quaternion explicitRoll = Quaternion.AngleAxis(physicalRoll, forward);
+                Vector3 right = (explicitRoll * baseRight).normalized;
+                Vector3 up = Vector3.Cross(forward, right).normalized;
+                right = Vector3.Cross(up, forward).normalized;
+
+                float horizontalCurvature = yawDelta * Mathf.Deg2Rad / ds;
+                float verticalCurvature = pitchDelta * Mathf.Deg2Rad / ds;
+                float rollRate = (roll - previousRoll) / ds;
+
+                frames[i] = new TrackConnectionFrame
+                {
+                    Position = position,
+                    Forward = forward,
+                    Right = right,
+                    Up = up,
+                    Width = Mathf.Max(1f, width),
+                    BankAngle = entry.BankAngle,
+                    PitchAngle = Mathf.Asin(Mathf.Clamp(forward.y, -1f, 1f)) * Mathf.Rad2Deg,
+                    AccumulatedRoadRoll = roll,
+                    AccumulatedVerticalRotation = verticalIntent,
+                    HorizontalCurvature = horizontalCurvature,
+                    HorizontalCurvatureRate = (horizontalCurvature - previousHorizontalCurvature) / ds,
+                    VerticalCurvature = verticalCurvature,
+                    VerticalCurvatureRate = (verticalCurvature - previousVerticalCurvature) / ds,
+                    RoadRollRate = rollRate,
+                    RoadRollAcceleration = (rollRate - previousRollRate) / ds,
+                    ArcLength = entry.ArcLength + distance
+                };
+
+                previousHorizontal = horizontal;
+                previousVerticalMotion = verticalMotion;
+                previousVerticalIntent = verticalIntent;
+                previousRoll = roll;
+                previousHorizontalCurvature = horizontalCurvature;
+                previousVerticalCurvature = verticalCurvature;
+                previousRollRate = rollRate;
+                previousWidth = width;
+            }
+
+            // The geometry approaches these derivatives through the Hermite correction.
+            // Stamp the analytical endpoint state so the next section receives it without
+            // finite-difference drift from the last sample interval.
+            var exactExit = frames[frames.Length - 1];
+            var beforeExit = frames[frames.Length - 2];
+            float endpointDs = lengthTotal / intervals;
+            exactExit.HorizontalCurvature = exitHorizontalCurvature;
+            exactExit.VerticalCurvature = exitVerticalCurvature;
+            exactExit.RoadRollRate = exitRoadRollRate;
+            exactExit.HorizontalCurvatureRate =
+                (exactExit.HorizontalCurvature - beforeExit.HorizontalCurvature) / endpointDs;
+            exactExit.VerticalCurvatureRate =
+                (exactExit.VerticalCurvature - beforeExit.VerticalCurvature) / endpointDs;
+            exactExit.RoadRollAcceleration =
+                (exactExit.RoadRollRate - beforeExit.RoadRollRate) / endpointDs;
+            frames[frames.Length - 1] = exactExit;
+
+            return frames;
+        }
+
+        /// <summary>
+        /// Measures the closest non-neighbouring centerline samples in a rotational
+        /// event using the same sampling contract as the built-layout validator.
+        /// Planning uses this to reject a folded shape before it reaches mesh work.
+        /// </summary>
+        public static float MeasureRotationalEventClearance(TrackConnectionFrame[] frames, float width,
+            out float firstArc, out float secondArc)
+        {
+            firstArc = 0f;
+            secondArc = 0f;
+            if (frames == null || frames.Length < 2) return float.PositiveInfinity;
+
+            float clearanceStep = Mathf.Max(8f, width * 0.20f);
+            float ignoreAlong = width * 2.5f;
+            var samples = new List<int>();
+            float nextSampleArc = frames[0].ArcLength;
+            for (int i = 0; i < frames.Length; i++)
+            {
+                if (frames[i].ArcLength + 0.001f < nextSampleArc && i < frames.Length - 1) continue;
+                samples.Add(i);
+                nextSampleArc = frames[i].ArcLength + clearanceStep;
+            }
+
+            float minimumSq = float.PositiveInfinity;
+            for (int a = 0; a < samples.Count; a++)
+            for (int b = a + 1; b < samples.Count; b++)
+            {
+                int ia = samples[a];
+                int ib = samples[b];
+                if (frames[ib].ArcLength - frames[ia].ArcLength < ignoreAlong) continue;
+                float distanceSq = (frames[ib].Position - frames[ia].Position).sqrMagnitude;
+                if (distanceSq >= minimumSq) continue;
+                minimumSq = distanceSq;
+                firstArc = frames[ia].ArcLength - frames[0].ArcLength;
+                secondArc = frames[ib].ArcLength - frames[0].ArcLength;
+            }
+
+            return float.IsPositiveInfinity(minimumSq) ? float.PositiveInfinity : Mathf.Sqrt(minimumSq);
+        }
+
+        /// <summary>Stamps the planner's local footprint from the same builder used at runtime.</summary>
+        public static void StampRotationalEventPlan(TrackMacroSectionDefinition def,
+            ResolvedTrackGenerationConfig cfg)
+        {
+            def.Length = RotationalEventLength(def);
+            var frames = BuildRotationalEvent(TrackConnectionFrame.Origin(def.Width), def,
+                FrameBuildContext.From(cfg));
+            var last = frames[frames.Length - 1];
+            def.PlanHorizontalLength = last.Position.z;
+            def.PlanLateralOffset = last.Position.x;
+            def.ElevationChange = last.Position.y;
+            Vector3 flat = Flatten(last.Forward);
+            def.TurnAngle = Vector3.SignedAngle(Vector3.forward, flat, Vector3.up);
         }
 
         // ─────────────────────────── Loop ───────────────────────────
@@ -720,6 +1368,62 @@ namespace TrackGeneration.Planning
         // ─────────────────────────── Corkscrew ───────────────────────────
 
         /// <summary>
+        /// Corkscrew roll progress with optional straight entry/exit shoulders. The
+        /// active roll uses cosine velocity ramps and a constant-rate middle, keeping
+        /// the derivative continuous. With the planner's combined 0.15 shoulder cap,
+        /// peak normalized roll rate remains at or below the classic smoothstep's 1.5.
+        /// </summary>
+        public static float CorkscrewRollProgress(float u, float entryStraightFraction,
+            float exitStraightFraction, out float derivative)
+        {
+            u = Mathf.Clamp01(u);
+            float entryHold = Mathf.Clamp(entryStraightFraction, 0f, 0.08f);
+            float exitHold = Mathf.Clamp(exitStraightFraction, 0f, 0.08f);
+            float holdTotal = entryHold + exitHold;
+
+            // Existing serialized definitions have zero shoulders and retain the
+            // original profile exactly.
+            if (holdTotal < 0.0001f)
+            {
+                derivative = 6f * u * (1f - u);
+                return Smooth01(u);
+            }
+
+            float active = Mathf.Max(0.84f, 1f - holdTotal);
+            if (u <= entryHold) { derivative = 0f; return 0f; }
+            if (u >= 1f - exitHold) { derivative = 0f; return 1f; }
+
+            float x = Mathf.Clamp01((u - entryHold) / active);
+            const float ease = 0.2f;
+            float normalizer = 1f - ease;
+            float progress;
+            float velocity;
+
+            if (x < ease)
+            {
+                float phase = Mathf.PI * x / ease;
+                velocity = 0.5f * (1f - Mathf.Cos(phase));
+                progress = (0.5f * x - 0.5f * ease / Mathf.PI * Mathf.Sin(phase)) / normalizer;
+            }
+            else if (x > 1f - ease)
+            {
+                float mirror = 1f - x;
+                float phase = Mathf.PI * mirror / ease;
+                velocity = 0.5f * (1f - Mathf.Cos(phase));
+                float mirrorProgress = (0.5f * mirror - 0.5f * ease / Mathf.PI * Mathf.Sin(phase)) / normalizer;
+                progress = 1f - mirrorProgress;
+            }
+            else
+            {
+                velocity = 1f;
+                progress = (x - 0.5f * ease) / normalizer;
+            }
+
+            derivative = velocity / (normalizer * active);
+            return Mathf.Clamp01(progress);
+        }
+
+        /// <summary>
         /// One corkscrew: the road rolls smoothly around the travel axis on a helix
         /// centerline, entering and exiting upright, with analytic tangents.
         /// </summary>
@@ -727,7 +1431,11 @@ namespace TrackGeneration.Planning
             in FrameBuildContext ctx)
         {
             float L = def.Length;
-            float r = def.Radius;
+            float firstRadius = Mathf.Max(1f, def.Radius);
+            float secondRadius = def.SecondaryRadius > 0.001f
+                ? Mathf.Max(1f, def.SecondaryRadius)
+                : firstRadius;
+            float elevation = def.ElevationChange;
             float rollTotal = def.RollChange; // signed
 
             int facetRings = Mathf.CeilToInt(Mathf.Abs(rollTotal) * 1.5f / ctx.MaxFacetAngle) + 1;
@@ -739,18 +1447,30 @@ namespace TrackGeneration.Planning
 
             Vector3 RadialAt(float u)
             {
-                float roll = rollTotal * Smooth01(u);
+                float roll = rollTotal * CorkscrewRollProgress(u,
+                    def.FeatureEntryStraightFraction, def.FeatureExitStraightFraction, out _);
                 return Quaternion.AngleAxis(roll, fwdH) * (-Vector3.up);
             }
 
             for (int i = 0; i < rings; i++)
             {
                 float u = (float)i / (rings - 1);
-                float roll = rollTotal * Smooth01(u);
+                float rollProgress = CorkscrewRollProgress(u,
+                    def.FeatureEntryStraightFraction, def.FeatureExitStraightFraction, out float rollDerivative);
+                float roll = rollTotal * rollProgress;
                 Vector3 radial = RadialAt(u);
 
-                float rollRateRad = rollTotal * 6f * u * (1f - u) * Mathf.Deg2Rad;
-                Vector3 fwd = (fwdH * L + Vector3.Cross(fwdH, radial) * (r * rollRateRad)).normalized;
+                float rollRateRad = rollTotal * rollDerivative * Mathf.Deg2Rad;
+                float radiusBlend = Smooth01(rollProgress);
+                float radius = Mathf.Lerp(firstRadius, secondRadius, radiusBlend);
+                float smoothDerivative = 6f * rollProgress * (1f - rollProgress) * rollDerivative;
+                float radiusDerivative = (secondRadius - firstRadius) * smoothDerivative;
+                float elevationDerivative = elevation * smoothDerivative;
+                Vector3 radialDerivative = Vector3.Cross(fwdH, radial) * rollRateRad;
+                Vector3 fwd = (fwdH * L
+                               + (Vector3.up + radial) * radiusDerivative
+                               + radialDerivative * radius
+                               + Vector3.up * elevationDerivative).normalized;
 
                 Vector3 up = Quaternion.AngleAxis(roll, fwdH) * Vector3.up;
                 up = (up - Vector3.Dot(up, fwd) * fwd).normalized;
@@ -758,13 +1478,15 @@ namespace TrackGeneration.Planning
 
                 frames[i] = new TrackConnectionFrame
                 {
-                    Position = basePos + fwdH * (L * u) + Vector3.up * r + radial * r,
+                    Position = basePos + fwdH * (L * u)
+                               + (Vector3.up + radial) * radius
+                               + Vector3.up * (elevation * radiusBlend),
                     Forward = fwd,
                     Right = right,
                     Up = up,
                     Width = entry.Width,
                     BankAngle = Mathf.DeltaAngle(0f, roll),
-                    PitchAngle = 0f,
+                    PitchAngle = Mathf.Asin(Mathf.Clamp(fwd.y, -1f, 1f)) * Mathf.Rad2Deg,
                     ArcLength = entry.ArcLength + L * u
                 };
             }
@@ -775,7 +1497,7 @@ namespace TrackGeneration.Planning
             frames[0].ArcLength = first.ArcLength;
 
             var last = frames[rings - 1];
-            last.Position = basePos + fwdH * L;
+            last.Position = basePos + fwdH * L + Vector3.up * elevation;
             last.Forward = fwdH;
             last.Right = Flatten(entry.Right);
             last.Up = Vector3.up;
@@ -787,10 +1509,34 @@ namespace TrackGeneration.Planning
 
         // ─────────────────────────── Spiral ───────────────────────────
 
+        /// <summary>Arc-length estimate for a spiral whose helix drifts forward while climbing.</summary>
+        public static float EstimateDriftingSpiralLength(float radius, float turnAngleDegrees,
+            float forwardDrift, float climb)
+        {
+            const int steps = 256;
+            float totalAngleRad = Mathf.Max(360f, Mathf.Abs(turnAngleDegrees)) * Mathf.Deg2Rad;
+            float circularDerivative = Mathf.Max(1f, radius) * totalAngleRad;
+            float length = 0f;
+            for (int i = 0; i < steps; i++)
+            {
+                float u = (i + 0.5f) / steps;
+                float theta = totalAngleRad * u;
+                float smoothDerivative = 6f * u * (1f - u);
+                // Circular tangent dot the fixed forward axis is cos(theta).
+                float driftDerivative = forwardDrift * smoothDerivative;
+                float verticalDerivative = climb * smoothDerivative;
+                float horizontalSq = circularDerivative * circularDerivative
+                                   + driftDerivative * driftDerivative
+                                   + 2f * circularDerivative * driftDerivative * Mathf.Cos(theta);
+                length += Mathf.Sqrt(Mathf.Max(0f, horizontalSq) + verticalDerivative * verticalDerivative) / steps;
+            }
+            return length;
+        }
+
         /// <summary>
         /// Climbing/descending helix (parking-garage spiral): full revolutions around a
-        /// vertical axis, exiting directly above/below the entry with the entry heading —
-        /// zero net 2D displacement by construction. Bobsled-banked like every corner.
+        /// vertical axis, optionally drifting forward to absorb its own recovery run,
+        /// and exiting with the entry heading. Bobsled-banked like every corner.
         /// </summary>
         public static TrackConnectionFrame[] BuildSpiral(TrackConnectionFrame entry, TrackMacroSectionDefinition def,
             in FrameBuildContext ctx)
@@ -800,6 +1546,8 @@ namespace TrackGeneration.Planning
             float radius = Mathf.Max(def.Width, def.Radius);
             float arcLen = def.Length;
             float climb = def.ElevationChange; // may be negative (descending spiral)
+            float forwardDrift = Mathf.Max(0f, def.PlanHorizontalLength);
+            float circularDerivative = radius * totalAngle * Mathf.Deg2Rad;
 
             int facetRings = Mathf.CeilToInt(totalAngle / ctx.MaxFacetAngle) + 1;
             int rings = Mathf.Clamp(Mathf.Max(Mathf.CeilToInt(arcLen / ctx.FeatureMetersPerRing) + 1, facetRings), 24, ctx.MaxRingsPerSection);
@@ -816,12 +1564,19 @@ namespace TrackGeneration.Planning
                 float theta = side * totalAngle * u;
 
                 Quaternion yaw = Quaternion.AngleAxis(theta, Vector3.up);
-                Vector3 pos = center + yaw * toStart + Vector3.up * (climb * Smooth01(u));
+                float smooth = Smooth01(u);
+                float smoothDerivative = 6f * u * (1f - u);
+                Vector3 pos = center + yaw * toStart
+                              + fwdH * (forwardDrift * smooth)
+                              + Vector3.up * (climb * smooth);
 
-                float slope = climb * 6f * u * (1f - u) / Mathf.Max(arcLen, 0.01f);
                 Vector3 flatFwd = yaw * fwdH;
-                Vector3 fwd = (flatFwd + Vector3.up * slope).normalized;
+                Vector3 derivative = flatFwd * circularDerivative
+                                     + fwdH * (forwardDrift * smoothDerivative)
+                                     + Vector3.up * (climb * smoothDerivative);
+                Vector3 fwd = derivative.normalized;
                 Vector3 right = yaw * rightH;
+                right = (right - Vector3.Dot(right, fwd) * fwd).normalized;
                 Vector3 up = Vector3.Cross(fwd, right).normalized;
 
                 // Pure helix geometry — wall support/tilt come from the global banking field.
@@ -833,14 +1588,14 @@ namespace TrackGeneration.Planning
                     Up = up,
                     Width = entry.Width,
                     BankAngle = 0f,
-                    PitchAngle = Mathf.Rad2Deg * Mathf.Atan(slope),
+                    PitchAngle = Mathf.Asin(Mathf.Clamp(fwd.y, -1f, 1f)) * Mathf.Rad2Deg,
                     ArcLength = entry.ArcLength + arcLen * u
                 };
             }
 
-            // Exact exit: directly above/below the entry, entry heading, level, unbanked.
+            // Exact exit: forward-drifted and above/below the entry, level and unbanked.
             var last = frames[rings - 1];
-            last.Position = entry.Position + Vector3.up * climb;
+            last.Position = entry.Position + fwdH * forwardDrift + Vector3.up * climb;
             last.Forward = fwdH;
             last.Right = rightH;
             last.Up = Vector3.up;

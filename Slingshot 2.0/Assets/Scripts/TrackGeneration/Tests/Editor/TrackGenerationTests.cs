@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
+using TrackGeneration.Core;
 using TrackGeneration.Design;
 using TrackGeneration.Macro;
 using TrackGeneration.Planning;
+using TrackGeneration.Validation;
 
 namespace TrackGeneration.Tests
 {
@@ -75,7 +77,7 @@ namespace TrackGeneration.Tests
                 Pattern = TrackPatternType.HalfLoopToCorkscrew,
                 Count = 1
             });
-            s.Branches.MinBranchGroups = 0;
+            s.Quarters.MinimumDualQuarterCount = 0;
 
             // Four orientation features on one lap need VERTICAL ROOM (a half-loop exits
             // ≈2× its radius above grade and that height must be paid back) and a deep
@@ -131,7 +133,7 @@ namespace TrackGeneration.Tests
 
                 var s = TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Balanced);
                 s.Features.Corkscrews.MinimumCount = 1;
-                s.Branches.MinBranchGroups = 0;
+                s.Quarters.MinimumDualQuarterCount = 0;
 
                 var result = TrackGenerationTestUtil.Generate(s, 555, config);
                 Assert.IsFalse(result.Success, "Requiring a disallowed feature must fail, never silently succeed.");
@@ -147,7 +149,7 @@ namespace TrackGeneration.Tests
         public void MaximumCountsAreNeverExceeded()
         {
             var s = TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Rollercoaster);
-            s.Branches.MinBranchGroups = 0;
+            s.Quarters.MinimumDualQuarterCount = 0;
             for (int seed = 300; seed < 306; seed++)
             {
                 var result = TrackGenerationTestUtil.Generate(s, seed);
@@ -173,6 +175,7 @@ namespace TrackGeneration.Tests
         [TestCase(TrackStylePresetLibrary.Velocity)]
         [TestCase(TrackStylePresetLibrary.Rollercoaster)]
         [TestCase(TrackStylePresetLibrary.Switchback)]
+        [Timeout(900000)] // 100 corner-heavy seeds legitimately exceed NUnit's 180 s default
         public void PresetGeneratesReliably(string presetName)
         {
             int successes = 0;
@@ -227,74 +230,105 @@ namespace TrackGeneration.Tests
         }
     }
 
-    /// <summary>Branch groups: gate connection, balance, specialization, clearance, lap progress.</summary>
-    public class BranchTests
+    /// <summary>
+    /// The 4-quarter topology: dual quarters are jump-gated (choice in the air), lap
+    /// length counts road A only, roads stay similar in length, both roads agree on
+    /// gate progress, and the Quarter seed stream never touches the corner skeleton.
+    /// </summary>
+    public class QuarterTests
     {
-        private static TrackGenerationResult GenerateWithBranches(BranchPairingMode pairing, int seed)
+        private static TrackGenerationResult GenerateWithDual(int seed, int minDual = 1, int maxDual = 1)
         {
             var s = TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Balanced);
-            s.Branches.MinBranchGroups = 1;
-            s.Branches.MaxBranchGroups = 1;
-            s.Branches.PairingMode = pairing;
+            s.Quarters.MinimumDualQuarterCount = minDual;
+            s.Quarters.MaximumDualQuarterCount = maxDual;
             s.Features.MinFeatureGroups = 0;
             s.Features.MaxFeatureGroups = 2;
             return TrackGenerationTestUtil.Generate(s, seed);
         }
 
-        [TestCase(BranchPairingMode.Contrasting)]
-        [TestCase(BranchPairingMode.SafeVersusRisky)]
-        [TestCase(BranchPairingMode.AlternatingAdvantage)]
-        [TestCase(BranchPairingMode.FeatureVersusGround)]
-        public void BranchRoutesConnectAndBalance(BranchPairingMode pairing)
+        private static TrackGenerationResult ScanForDual(int firstSeed, int scan, int minDual = 1, int maxDual = 1)
         {
             TrackGenerationResult result = null;
-            for (int seed = 900; seed < 920; seed++)
+            for (int seed = firstSeed; seed < firstSeed + scan; seed++)
             {
-                result = GenerateWithBranches(pairing, seed);
-                if (result.Success && result.Layout.BranchGroups.Count > 0) break;
+                result = GenerateWithDual(seed, minDual, maxDual);
+                if (result.Success && result.Layout.Metrics.DualRoadQuarterCount >= minDual) return result;
             }
+            return result;
+        }
 
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.Success && result.Layout.BranchGroups.Count > 0,
-                $"No seed produced a valid {pairing} branch track.");
+        [Test]
+        public void DualQuarterStructureIsJumpGated()
+        {
+            var result = ScanForDual(900, 20);
+            Assert.IsTrue(result != null && result.Success && result.Layout.Metrics.DualRoadQuarterCount >= 1,
+                "No seed produced a valid dual-quarter track.");
 
-            foreach (var group in result.Layout.BranchGroups)
+            Assert.AreEqual(4, result.Layout.Quarters.Count, "A lap always has exactly 4 quarters.");
+
+            var sections = result.Layout.Sections;
+            foreach (var q in result.Layout.Quarters)
             {
-                GeneratedTrackSection secA = null, secB = null;
-                foreach (var sec in result.Layout.Sections)
-                {
-                    if (sec.BranchGroupId != group.BranchGroupId) continue;
-                    if (sec.RouteId == 0) secA = sec;
-                    if (sec.RouteId == 1) secB = sec;
-                }
+                if (!q.IsDual) continue;
+                Assert.IsNotNull(q.RouteB, "Dual quarter is missing its alternate road.");
 
-                Assert.IsNotNull(secA, "Route A section missing.");
-                Assert.IsNotNull(secB, "Route B section missing.");
+                var flareB = sections[q.RouteB.FirstSectionIndex];
+                var lipB = sections[q.RouteB.LastSectionIndex];
+                var lipA = sections[q.RouteB.FirstSectionIndex - 1];
 
-                // Both routes connect to their shared gates.
-                Assert.Less(Vector3.Distance(secA.StartFrame.Position, secB.StartFrame.Position), 0.05f, "Entry gates differ.");
-                Assert.Less(Vector3.Distance(secA.EndFrame.Position, secB.EndFrame.Position), 0.05f, "Merge gates differ.");
+                // The exit sequence around the alternate road: lipA → [road B chain] → air gap → catch.
+                Assert.AreEqual(TrackMacroSectionType.JumpRamp, lipA.Definition.SectionType, "Road A's launch lip missing before the alternate road.");
+                Assert.AreEqual(TrackMacroSectionType.LandingRamp, flareB.Definition.SectionType, "Road B must start with its landing flare.");
+                Assert.AreEqual(TrackMacroSectionType.JumpRamp, lipB.Definition.SectionType, "Road B must end with its launch lip.");
 
-                // Continuous frames (drivable route).
-                Assert.Greater(secA.SubdivisionFrames.Length, 8);
-                Assert.Greater(secB.SubdivisionFrames.Length, 8);
+                var exitGap = sections[q.RouteB.LastSectionIndex + 1];
+                var catchSec = sections[q.RouteB.LastSectionIndex + 2];
+                Assert.AreEqual(TrackMacroSectionType.AirGap, exitGap.Definition.SectionType, "Exit air gap missing after road B's lip.");
+                Assert.AreEqual(TrackMacroSectionType.LandingRamp, catchSec.Definition.SectionType, "Shared convergence catch missing.");
 
-                // Neutral time within tolerance (safe/risky may carry the sanctioned edge).
-                Assert.IsNotNull(group.Balance, "Balance metrics missing.");
-                if (pairing != BranchPairingMode.SafeVersusRisky)
-                    Assert.LessOrEqual(group.Balance.NeutralTimeDifference, 0.06f,
-                        $"Neutral time difference {group.Balance.NeutralTimeDifference:P1} too large.");
+                // Open gate edges — mouths and lips face air, never caps.
+                Assert.IsTrue(flareB.OpenStart && !flareB.CapStart, "Road B's mouth must be open.");
+                Assert.IsTrue(lipB.OpenEnd && !lipB.CapEnd, "Road B's lip must be open.");
+                Assert.IsTrue(lipA.OpenEnd && !lipA.CapEnd, "Road A's lip must be open.");
 
-                // Lap progress agrees at the gates and is monotonic on each route.
-                Assert.AreEqual(secA.StartFrame.LapProgress, secB.StartFrame.LapProgress, 0.001f, "Entry progress differs.");
-                Assert.AreEqual(secA.EndFrame.LapProgress, secB.EndFrame.LapProgress, 0.001f, "Merge progress differs.");
-                AssertMonotonicProgress(secA);
-                AssertMonotonicProgress(secB);
+                // Readable in-air choice: lanes separated at the mouths AND at the lips.
+                float mouthSep = Vector3.Distance(q.RouteA.EntryFrame.Position, flareB.StartFrame.Position);
+                float lipSep = Vector3.Distance(lipA.EndFrame.Position, lipB.EndFrame.Position);
+                Assert.GreaterOrEqual(lipSep, 16f, "Launch lips not separated — no lane identity at the exit.");
+                Assert.GreaterOrEqual(Vector3.Distance(
+                    FindEntryFlareA(sections, q).StartFrame.Position, flareB.StartFrame.Position), 16f,
+                    "Landing mouths not separated — no in-air choice.");
+
+                // Broad shared catch that can receive both lanes.
+                Assert.Greater(catchSec.StartFrame.Width, result.Layout.Sections[0].StartFrame.Width * 1.15f,
+                    "Catch is not broad enough for two arriving lanes.");
+
+                // Both roads agree on gate lap progress; road B progress is monotonic.
+                var flareA = FindEntryFlareA(sections, q);
+                Assert.AreEqual(flareA.StartFrame.LapProgress, flareB.StartFrame.LapProgress, 0.002f, "Mouth progress differs.");
+                Assert.AreEqual(lipA.EndFrame.LapProgress, lipB.EndFrame.LapProgress, 0.002f, "Lip progress differs.");
+                for (int i = q.RouteB.FirstSectionIndex; i <= q.RouteB.LastSectionIndex; i++)
+                    AssertMonotonicProgress(sections[i]);
             }
+        }
+
+        private static GeneratedTrackSection FindEntryFlareA(System.Collections.Generic.List<GeneratedTrackSection> sections,
+            TrackGeneration.Planning.GeneratedTrackQuarter q)
+        {
+            for (int i = q.RouteA.FirstSectionIndex; i <= q.RouteA.LastSectionIndex; i++)
+            {
+                if (sections[i].RoadId == 0 && sections[i].OpenStart &&
+                    sections[i].Definition.SectionType == TrackMacroSectionType.LandingRamp)
+                    return sections[i];
+            }
+            Assert.Fail("Road A's landing flare not found.");
+            return null;
         }
 
         private static void AssertMonotonicProgress(GeneratedTrackSection sec)
         {
+            if (sec.SubdivisionFrames == null) return;
             for (int i = 1; i < sec.SubdivisionFrames.Length; i++)
             {
                 Assert.GreaterOrEqual(sec.SubdivisionFrames[i].LapProgress + 1e-4f, sec.SubdivisionFrames[i - 1].LapProgress,
@@ -303,23 +337,222 @@ namespace TrackGeneration.Tests
         }
 
         [Test]
+        public void LapLengthCountsRoadAOnly()
+        {
+            var result = ScanForDual(1000, 20);
+            Assert.IsTrue(result != null && result.Success && result.Layout.Metrics.DualRoadQuarterCount >= 1);
+
+            // The canonical lap = the last (canonical) section's arc. Summing EVERY
+            // section's span exceeds it exactly by the alternate roads' lengths —
+            // a Dual Road Quarter never duplicates lap length.
+            float sumAll = 0f;
+            float sumAlternate = 0f;
+            foreach (var sec in result.Layout.Sections)
+            {
+                float span = sec.EndFrame.ArcLength - sec.StartFrame.ArcLength;
+                sumAll += span;
+                if (sec.RoadId == 1) sumAlternate += span;
+            }
+
+            Assert.Greater(sumAlternate, 0f, "Expected alternate road sections.");
+            Assert.Greater(sumAll, result.Layout.LapLength, "Alternate roads must not be part of the lap arc.");
+            Assert.AreEqual(result.Layout.LapLength, result.Layout.Metrics.LapLengthMeters, 0.01f);
+
+            foreach (var q in result.Layout.Quarters)
+            {
+                if (!q.IsDual) continue;
+                Assert.Greater(q.RouteB.PhysicalLengthMeters, 0f);
+            }
+        }
+
+        [Test]
+        public void DualRoadsHaveSimilarLength()
+        {
+            var result = ScanForDual(1100, 20);
+            Assert.IsTrue(result != null && result.Success && result.Layout.Metrics.DualRoadQuarterCount >= 1);
+
+            var sections = result.Layout.Sections;
+            foreach (var q in result.Layout.Quarters)
+            {
+                if (!q.IsDual) continue;
+
+                // Compare like spans: mouth→lip on both roads.
+                var flareA = FindEntryFlareA(sections, q);
+                var lipA = sections[q.RouteB.FirstSectionIndex - 1];
+                float lenA = lipA.EndFrame.ArcLength - flareA.StartFrame.ArcLength;
+                float lenB = q.RouteB.PhysicalLengthMeters;
+
+                Assert.AreEqual(lenA, lenB, lenA * 0.25f,
+                    $"Quarter {q.QuarterIndex}: road lengths differ too much (A {lenA:F0}m, B {lenB:F0}m).");
+            }
+        }
+
+        [Test]
         public void RouteTimeTableCoversAllArchetypes()
         {
-            TrackGenerationResult result = null;
-            for (int seed = 950; seed < 970; seed++)
-            {
-                result = GenerateWithBranches(BranchPairingMode.Contrasting, seed);
-                if (result.Success && result.Layout.BranchGroups.Count > 0) break;
-            }
-            Assert.IsTrue(result != null && result.Success && result.Layout.BranchGroups.Count > 0);
+            var result = ScanForDual(950, 20);
+            Assert.IsTrue(result != null && result.Success && result.Layout.Metrics.DualRoadQuarterCount >= 1);
 
-            var balance = result.Layout.BranchGroups[0].Balance;
+            TrackGeneration.Planning.QuarterRouteBalance balance = null;
+            foreach (var q in result.Layout.Quarters)
+                if (q.IsDual && q.Balance != null) { balance = q.Balance; break; }
+
+            Assert.IsNotNull(balance, "Dual quarter has no balance table.");
             Assert.AreEqual(6, balance.TimeTable.Count, "Expected a time estimate per craft archetype.");
             foreach (var row in balance.TimeTable)
             {
                 Assert.Greater(row.RouteASeconds, 0f);
                 Assert.Greater(row.RouteBSeconds, 0f);
             }
+        }
+
+        [Test]
+        [Timeout(300000)]
+        public void DualQuarterCanOwnFeaturePatternsOnRoadA()
+        {
+            TrackGenerationResult found = null;
+            GeneratedTrackQuarter foundQuarter = null;
+
+            for (int seed = 1200; seed < 1224 && foundQuarter == null; seed++)
+            {
+                var settings = TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Rollercoaster);
+                settings.Quarters.MinimumDualQuarterCount = 1;
+                settings.Quarters.MaximumDualQuarterCount = 1;
+                settings.Features.MinFeatureGroups = Mathf.Max(4, settings.Features.MinFeatureGroups);
+                settings.Features.MaxFeatureGroups = Mathf.Max(6, settings.Features.MaxFeatureGroups);
+                settings.Generation.MaxAttempts = Mathf.Max(192, settings.Generation.MaxAttempts);
+
+                var result = TrackGenerationTestUtil.Generate(settings, seed);
+                if (!result.Success) continue;
+                foreach (var quarter in result.Layout.Quarters)
+                {
+                    if (!quarter.IsDual || quarter.RouteA == null || !quarter.RouteA.HasFeatures) continue;
+                    found = result;
+                    foundQuarter = quarter;
+                    break;
+                }
+            }
+
+            Assert.IsNotNull(foundQuarter,
+                "No generated dual quarter owned a feature pattern on Road A; dual gaps may have become reserved again.");
+            Assert.IsFalse(foundQuarter.RouteB.HasFeatures,
+                "The fitted alternate road should remain feature-free until it has an explicit feature-placement solver.");
+
+            var seen = new HashSet<string>();
+            foreach (string id in foundQuarter.RouteA.FeaturePatternIds)
+            {
+                Assert.IsFalse(string.IsNullOrEmpty(id));
+                Assert.IsFalse(id.StartsWith("Quarter_"), "Gate pattern IDs are not route features.");
+                Assert.IsTrue(seen.Add(id), "Route feature IDs must be distinct.");
+
+                bool present = false;
+                for (int i = foundQuarter.RouteA.FirstSectionIndex; i <= foundQuarter.RouteA.LastSectionIndex; i++)
+                {
+                    var sec = found.Layout.Sections[i];
+                    if (sec.RoadId == 0 && sec.PatternId == id) { present = true; break; }
+                }
+                Assert.IsTrue(present, $"Route metadata lists feature '{id}' but no Road-A section owns it.");
+            }
+        }
+
+        [Test]
+        public void ZeroDualQuartersIsCleanFourQuarterTrack()
+        {
+            var result = GenerateWithDual(4321, minDual: 0, maxDual: 0);
+            Assert.IsTrue(result.Success, "Zero-dual track failed to generate.");
+            Assert.AreEqual(0, result.Layout.Metrics.DualRoadQuarterCount);
+            Assert.AreEqual(4, result.Layout.Quarters.Count, "Even a single-road lap records exactly 4 quarters.");
+
+            foreach (var sec in result.Layout.Sections)
+            {
+                Assert.AreEqual(0, sec.RoadId, "No alternate road sections on a zero-dual track.");
+                Assert.IsTrue(sec.QuarterIndex >= 0 && sec.QuarterIndex <= 3,
+                    $"Section '{sec.Definition.DebugName}' has no quarter ({sec.QuarterIndex}).");
+                Assert.IsTrue(string.IsNullOrEmpty(sec.PatternId) || !sec.PatternId.StartsWith("Quarter_"),
+                    "No quarter gate pieces may exist without dual quarters.");
+            }
+
+            // Quarters are contiguous and ascending along the canonical road.
+            int prevQuarter = 0;
+            foreach (var sec in result.Layout.Sections)
+            {
+                Assert.GreaterOrEqual(sec.QuarterIndex, prevQuarter, "Quarter indices must never go backwards.");
+                prevQuarter = sec.QuarterIndex;
+            }
+        }
+
+        [Test]
+        public void QuarterSeedNeverChangesTheCornerSkeleton()
+        {
+            var s = TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Balanced);
+            s.Quarters.MinimumDualQuarterCount = 0;
+            s.Quarters.MaximumDualQuarterCount = 2;
+
+            // The invariant is PER ATTEMPT: a different Quarter seed may legitimately
+            // fail an attempt the other run passes (gate feasibility), advancing the
+            // whole generation to a fresh Layout draw. Compare skeletons only when
+            // both runs succeeded on the SAME attempt.
+            TrackGenerationResult resultA = null, resultB = null;
+            for (int master = 777; master < 789; master++)
+            {
+                var streamsA = new TrackSeedStreams();
+                streamsA.DeriveAllFrom(master);
+                var streamsB = streamsA.Clone();
+                streamsB.QuarterSeed = streamsA.QuarterSeed + 12345;
+
+                resultA = TrackGenerationTestUtil.Generate(s, master, streams: streamsA);
+                resultB = TrackGenerationTestUtil.Generate(s, master, streams: streamsB);
+                if (resultA.Success && resultB.Success &&
+                    resultA.AttemptsEvaluated == resultB.AttemptsEvaluated)
+                    break;
+                resultA = null;
+            }
+            Assert.IsNotNull(resultA, "No master seed in the window succeeded on the same attempt for both quarter seeds.");
+
+            Assert.AreEqual(CornerSkeleton(resultA.Layout), CornerSkeleton(resultB.Layout),
+                "Re-rolling only the Quarter seed must keep the corner skeleton (angles, directions, order).");
+        }
+
+        private static string CornerSkeleton(GeneratedTrackLayout layout)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var sec in layout.Sections)
+            {
+                if (sec.RoadId == 1) continue;
+                var t = sec.Definition.SectionType;
+                if (t != TrackMacroSectionType.BankedCurve && t != TrackMacroSectionType.BankedHairpin &&
+                    t != TrackMacroSectionType.WallrideTurn)
+                    continue;
+                sb.Append(t).Append(':').Append(sec.Definition.TurnAngle.ToString("F0"))
+                  .Append(':').Append(sec.Definition.TurnSign).Append(';');
+            }
+            return sb.ToString();
+        }
+
+        [Test]
+        public void JumpsDisallowedResolvesToZeroDualQuarters()
+        {
+            var s = TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Balanced);
+            s.Quarters.MinimumDualQuarterCount = 1;
+            s.Quarters.MaximumDualQuarterCount = 2;
+            s.Features.Jumps = new TrackFeatureRule(false, 0, 0, 0f);
+
+            var config = TrackGenerationTestUtil.CreateConfig();
+            var so = new UnityEditor.SerializedObject(config);
+            so.FindProperty("allowJumps").boolValue = false;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            config.Validate();
+
+            var resolved = ResolvedTrackGenerationConfig.Resolve(config, s);
+            Assert.AreEqual(0, resolved.MaxDualQuarters,
+                "Dual quarters are jump-gated: with jumps disallowed they must resolve to 0.");
+            bool warned = false;
+            foreach (var issue in resolved.Issues)
+                if (issue.Field.StartsWith("Quarters") && issue.Severity == ResolvedIssueSeverity.Warning) warned = true;
+            Assert.IsTrue(warned, "Resolution must warn (not error) when dual quarters are dropped.");
+            Assert.IsFalse(resolved.HasHardErrors, "Dropping dual quarters is a warning, never a hard error.");
+
+            Object.DestroyImmediate(config);
         }
     }
 
@@ -370,9 +603,11 @@ namespace TrackGeneration.Tests
         [Test]
         public void WeldsAreContinuousBetweenSections()
         {
-            var result = TrackGenerationTestUtil.Generate(
-                TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Balanced), 31337);
-            Assert.IsTrue(result.Success, "Generation failed.");
+            TrackGenerationResult result = null;
+            for (int s = 31337; s < 31345 && (result == null || !result.Success); s++)
+                result = TrackGenerationTestUtil.Generate(
+                    TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Balanced), s);
+            Assert.IsTrue(result is { Success: true }, "Generation failed for every seed in the window.");
 
             var sections = result.Layout.Sections;
             for (int i = 0; i < sections.Count - 1; i++)
@@ -380,7 +615,7 @@ namespace TrackGeneration.Tests
                 var cur = sections[i];
                 var next = sections[i + 1];
                 if (cur.OpenEnd || next.OpenStart) continue;   // air gaps are open by design
-                if (cur.RouteId == 1 || next.RouteId == 1) continue; // route B shares gates via route A
+                if (cur.RoadId == 1 || next.RoadId == 1) continue; // alternate roads meet the lap only over air gaps
 
                 Assert.Less(Vector3.Distance(cur.EndFrame.Position, next.StartFrame.Position), 0.02f,
                     $"Weld gap between {cur.Definition.DebugName} and {next.Definition.DebugName}");
@@ -491,7 +726,7 @@ namespace TrackGeneration.Tests
                 var next = sections[(sIdx + 1) % sections.Count];
                 if (sec.OpenEnd || next.OpenStart) continue;
                 if (next.SubdivisionFrames == null || next.SubdivisionFrames.Length < 2) continue;
-                if (next.RouteId == 1) continue; // route B starts its own chain at the gate
+                if (next.RoadId == 1) continue; // an alternate road starts its own chain at its mouth
 
                 var nf = next.SubdivisionFrames;
                 Check(frames[frames.Length - 1].ArcLength - frames[frames.Length - 2].ArcLength,
@@ -520,7 +755,7 @@ namespace TrackGeneration.Tests
             Assert.Less(small.Scale.MaxTrackLengthMeters, baseline.Scale.MaxTrackLengthMeters);
             Assert.LessOrEqual(small.Layout.MaxTurnCount, baseline.Layout.MaxTurnCount);
             Assert.LessOrEqual(small.Features.MaxFeatureGroups, baseline.Features.MaxFeatureGroups);
-            Assert.LessOrEqual(small.Branches.MaxBranchGroups, baseline.Branches.MaxBranchGroups);
+            Assert.LessOrEqual(small.Quarters.MaximumDualQuarterCount, baseline.Quarters.MaximumDualQuarterCount);
             Assert.IsTrue(small.ModifiedSincePreset, "Size modifier must mark the settings as customized.");
 
             var huge = TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Balanced);
@@ -585,7 +820,7 @@ namespace TrackGeneration.Tests
             var s = TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Balanced);
             s.Features.Jumps.MinimumCount = 1;
             s.Features.Jumps.MaximumCount = 2;
-            s.Branches.MinBranchGroups = 0;
+            s.Quarters.MinimumDualQuarterCount = 0;
 
             TrackGenerationResult result = null;
             for (int seed = 800; seed < 812; seed++)
@@ -652,6 +887,145 @@ namespace TrackGeneration.Tests
                     sec.Definition.SectionType == TrackMacroSectionType.BankedHairpin)
                     Assert.GreaterOrEqual(sec.Definition.Radius, 180f,
                         "Even technical corners must respect the high-speed rulebook minimum.");
+            }
+        }
+    }
+
+    public class DualRoadClearanceTests
+    {
+        private static TrackConnectionFrame[] Line(int count, System.Func<int, Vector3> position)
+        {
+            var frames = new TrackConnectionFrame[count];
+            for (int i = 0; i < count; i++)
+            {
+                frames[i] = TrackConnectionFrame.Origin(100f);
+                frames[i].Position = position(i);
+                frames[i].ArcLength = i * 10f;
+            }
+            return frames;
+        }
+
+        private static (GeneratedTrackLayout layout, GeneratedTrackQuarter quarter) Pair(
+            TrackConnectionFrame[] roadA, TrackConnectionFrame[] roadB)
+        {
+            var layout = new GeneratedTrackLayout();
+            layout.Sections.Add(new GeneratedTrackSection { RoadId = 0, SubdivisionFrames = roadA });
+            layout.Sections.Add(new GeneratedTrackSection { RoadId = 1, SubdivisionFrames = roadB });
+            var quarter = new GeneratedTrackQuarter
+            {
+                QuarterIndex = 2,
+                QuarterType = TrackQuarterType.DualRoad,
+                RouteA = new GeneratedQuarterRoute { RoadId = 0, FirstSectionIndex = 0, LastSectionIndex = 0 },
+                RouteB = new GeneratedQuarterRoute { RoadId = 1, FirstSectionIndex = 1, LastSectionIndex = 1 }
+            };
+            return (layout, quarter);
+        }
+
+        [Test]
+        public void CrossingNearRouteEndIsRejected()
+        {
+            var config = TrackGenerationTestUtil.CreateConfig();
+            try
+            {
+                var resolved = ResolvedTrackGenerationConfig.Resolve(config,
+                    TrackStylePresetLibrary.Create(TrackStylePresetLibrary.Balanced));
+                var pair = Pair(
+                    Line(101, i => new Vector3(i * 10f, 0f, 0f)),
+                    Line(101, i => new Vector3(950f, 0f, -500f + i * 10f)));
+                var issues = new List<ValidationIssue>();
+
+                TrackValidators.ValidateRoadPairClearance(pair.layout, pair.quarter, resolved, issues);
+
+                Assert.IsTrue(issues.Exists(i => i.IsError && i.Reason == GenerationFailureReason.SelfIntersection),
+                    "A road crossing at 95% progress escaped the dual-road clearance validator.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(config);
+            }
+        }
+
+        [Test]
+        public void ParallelGateLanesAtResolvedSeparationAreAccepted()
+        {
+            var config = TrackGenerationTestUtil.CreateConfig();
+            try
+            {
+                var resolved = ResolvedTrackGenerationConfig.Resolve(config,
+                    TrackStylePresetLibrary.Create(TrackStylePresetLibrary.Balanced));
+                float separation = Mathf.Max(resolved.RoadWidth, resolved.DualRoadWidth) +
+                                   resolved.RoadProfile.SideHeight * 2f + resolved.WallMaskSafetyMargin;
+                var pair = Pair(
+                    Line(101, i => new Vector3(i * 10f, 0f, 0f)),
+                    Line(101, i => new Vector3(i * 10f, 0f, separation)));
+                var issues = new List<ValidationIssue>();
+
+                TrackValidators.ValidateRoadPairClearance(pair.layout, pair.quarter, resolved, issues);
+
+                Assert.IsFalse(issues.Exists(i => i.IsError),
+                    "Numerical tolerance should allow the intentionally parallel gate lanes at resolved separation.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(config);
+            }
+        }
+
+        [Test]
+        public void InternalFeatureFlightCrossingRoadBIsRejected()
+        {
+            var config = TrackGenerationTestUtil.CreateConfig();
+            try
+            {
+                var resolved = ResolvedTrackGenerationConfig.Resolve(config,
+                    TrackStylePresetLibrary.Create(TrackStylePresetLibrary.Balanced));
+                var layout = new GeneratedTrackLayout();
+
+                var gap = new GeneratedTrackSection
+                {
+                    RoadId = 0,
+                    PatternId = "JumpGap_0",
+                    Definition = new TrackMacroSectionDefinition
+                    {
+                        SectionType = TrackMacroSectionType.AirGap,
+                        AirtimeSeconds = 2f,
+                        Length = 200f,
+                        PatternId = "JumpGap_0"
+                    },
+                    SubdivisionFrames = null,
+                    StartFrame = TrackConnectionFrame.Origin(100f),
+                    EndFrame = TrackConnectionFrame.Origin(100f)
+                };
+                gap.StartFrame.Position = new Vector3(-100f, 0f, 0f);
+                gap.EndFrame.Position = new Vector3(100f, 0f, 0f);
+                gap.EndFrame.ArcLength = 200f;
+
+                layout.Sections.Add(new GeneratedTrackSection { RoadId = 0, SubdivisionFrames = null });
+                layout.Sections.Add(gap);
+                layout.Sections.Add(new GeneratedTrackSection { RoadId = 0, SubdivisionFrames = null });
+                layout.Sections.Add(new GeneratedTrackSection
+                {
+                    RoadId = 1,
+                    SubdivisionFrames = Line(101, i => new Vector3(0f, 5f, -500f + i * 10f))
+                });
+
+                var quarter = new GeneratedTrackQuarter
+                {
+                    QuarterIndex = 1,
+                    QuarterType = TrackQuarterType.DualRoad,
+                    RouteA = new GeneratedQuarterRoute { RoadId = 0, FirstSectionIndex = 0, LastSectionIndex = 2 },
+                    RouteB = new GeneratedQuarterRoute { RoadId = 1, FirstSectionIndex = 3, LastSectionIndex = 3 }
+                };
+                var issues = new List<ValidationIssue>();
+
+                TrackValidators.ValidateRoadPairClearance(layout, quarter, resolved, issues);
+
+                Assert.IsTrue(issues.Exists(i => i.IsError && i.Reason == GenerationFailureReason.SelfIntersection),
+                    "Road B crossed an internal feature's ballistic flight path without being rejected.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(config);
             }
         }
     }

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
-using TrackGeneration.Branching;
+using TrackGeneration.Design;
 using TrackGeneration.Macro;
 
 namespace TrackGeneration.Planning
@@ -8,8 +8,8 @@ namespace TrackGeneration.Planning
     /// <summary>
     /// Turns a validated <see cref="TopologyPlan"/> into resolved geometry frames:
     /// section-by-section frame building (weld contracts exact by construction),
-    /// branch route pairs, ballistic air gaps, the global half-pipe depth blend,
-    /// junction wall masks, lap-progress stamping and the final closure check.
+    /// dual-quarter alternate roads, ballistic air gaps, the global half-pipe depth
+    /// blend, lap-progress stamping and the final closure check.
     ///
     /// There is NO residual warping: the plan solved closure with legal primitives, the
     /// builders land within float/numeric precision, and the final weld only snaps the
@@ -32,46 +32,54 @@ namespace TrackGeneration.Planning
 
             TrackConnectionFrame frame = TrackConnectionFrame.Origin(defs.Count > 0 ? defs[0].Width : cfg.RoadWidth);
             TrackConnectionFrame startFrame = frame;
-            int branchCursor = 0;
+
+            // Dual-quarter bookkeeping: the entry choice gap's landing frame IS road A's
+            // landing mouth; road B's mouth mirrors it one lane across the flight midline.
+            var mouthAOf = new Dictionary<int, TrackConnectionFrame>();
+            TrackConnectionFrame mainRoadFrame = frame; // cursor parked at road A's lip while a road B chain builds
+            bool onAlternateRoad = false;
 
             for (int i = 0; i < defs.Count; i++)
             {
                 var def = defs[i];
 
-                // ── Branch pair: two sections spanning the same gates ──
-                if (def.SectionType == TrackMacroSectionType.SplitRoute)
+                // ── Road transitions (canonical ↔ alternate) ──
+                if (def.RoadId == 1 && !onAlternateRoad)
                 {
-                    if (i + 1 >= defs.Count || defs[i + 1].SectionType != TrackMacroSectionType.SplitRoute ||
-                        branchCursor >= plan.BranchGroups.Count)
+                    // Park the canonical cursor at road A's lip; road B starts at its
+                    // own landing mouth, one lane left of road A's.
+                    if (!mouthAOf.TryGetValue(def.QuarterIndex, out var mouthA))
                     {
-                        Fail(GenerationFailureReason.BranchMergeFailure, "Split-route definition without its route pair.");
+                        Fail(GenerationFailureReason.DualRoadFitFailure,
+                            $"Road B of quarter {def.QuarterIndex} appears before its entry gap.");
                         return null;
                     }
 
-                    var group = plan.BranchGroups[branchCursor++];
-                    var pair = BranchRoutePlanner.BuildPair(frame, group, def, defs[i + 1], cfg, ctx);
-                    if (!pair.BalanceValid)
+                    mainRoadFrame = frame;
+                    var mouthB = mouthA;
+                    mouthB.Position -= SectionFrameBuilders.Flatten(mouthA.Right) * plan.Quarters[def.QuarterIndex].LaneSeparation;
+                    mouthB.Width = def.Width;
+                    frame = mouthB;
+                    onAlternateRoad = true;
+                }
+                else if (def.RoadId != 1 && onAlternateRoad)
+                {
+                    // Road B just ended at its launch lip: it must sit exactly one lane
+                    // left of road A's lip (same ballistic solution, same grade).
+                    var lipA = mainRoadFrame;
+                    Vector3 expected = lipA.Position - SectionFrameBuilders.Flatten(lipA.Right) *
+                        plan.Quarters[defs[i - 1].QuarterIndex].LaneSeparation;
+                    Vector3 error = frame.Position - expected;
+                    if (new Vector2(error.x, error.z).magnitude > 0.5f || Mathf.Abs(error.y) > 1.5f)
                     {
-                        Fail(GenerationFailureReason.BranchBalanceFailure, pair.FailureMessage);
+                        Fail(GenerationFailureReason.DualRoadFitFailure,
+                            $"Road B of quarter {defs[i - 1].QuarterIndex} missed its launch lip by " +
+                            $"{new Vector2(error.x, error.z).magnitude:F2}m horizontally / {error.y:F2}m vertically.");
                         return null;
                     }
 
-                    var secA = MakeSection(def, layout.Sections.Count, pair.FramesA);
-                    secA.BranchGroupId = group.GroupId;
-                    secA.RouteId = 0;
-                    layout.Sections.Add(secA);
-
-                    var secB = MakeSection(defs[i + 1], layout.Sections.Count, pair.FramesB);
-                    secB.BranchGroupId = group.GroupId;
-                    secB.RouteId = 1;
-                    layout.Sections.Add(secB);
-
-                    BranchRoutePlanner.MaskSplitPair(secA, secB, cfg);
-
-                    layout.BranchGroups.Add(pair.Group);
-                    frame = pair.FramesA[pair.FramesA.Length - 1];
-                    i++; // consumed the pair
-                    continue;
+                    frame = mainRoadFrame;
+                    onAlternateRoad = false;
                 }
 
                 // ── Ordinary sections ──
@@ -142,6 +150,18 @@ namespace TrackGeneration.Planning
                         frames = SectionFrameBuilders.BuildHalfLoopRollout(frame, def, ctx);
                         break;
 
+                    case TrackMacroSectionType.RotationalEvent:
+                        frames = SectionFrameBuilders.BuildRotationalEvent(frame, def, ctx);
+                        break;
+
+                    case TrackMacroSectionType.FullPipe:
+                        frames = SectionFrameBuilders.BuildFullPipe(frame, def, ctx);
+                        break;
+
+                    case TrackMacroSectionType.WallrideTurn:
+                        frames = SectionFrameBuilders.BuildWallrideTurn(frame, def, ctx);
+                        break;
+
                     case TrackMacroSectionType.AirGap:
                         frames = System.Array.Empty<TrackConnectionFrame>();
                         break;
@@ -174,9 +194,13 @@ namespace TrackGeneration.Planning
                 {
                     // Ballistic flight from the actual built lip frame: the landing mouth
                     // position/pitch match the predicted trajectory by construction.
+                    // Dual-quarter gaps land laterally off the flight midline (lane A on
+                    // the choice jump in, back to the midline on the convergence out).
                     section.StartFrame = frame; // the launch lip
                     Vector3 dirH = SectionFrameBuilders.Flatten(frame.Forward);
-                    Vector3 landingPos = frame.Position + dirH * def.PlanHorizontalLength + Vector3.up * def.ElevationChange;
+                    Vector3 landingPos = frame.Position + dirH * def.PlanHorizontalLength
+                                       + SectionFrameBuilders.Flatten(frame.Right) * def.PlanLateralOffset
+                                       + Vector3.up * def.ElevationChange;
 
                     float arrivalRad = def.PitchChange * Mathf.Deg2Rad;
                     Vector3 arrivalFwd = (dirH * Mathf.Cos(arrivalRad) + Vector3.up * Mathf.Sin(arrivalRad)).normalized;
@@ -189,9 +213,16 @@ namespace TrackGeneration.Planning
                     landing.PitchAngle = def.PitchChange;
                     landing.BankAngle = 0f;
                     landing.ArcLength = frame.ArcLength + def.Length;
+                    // The gap's own width defines the arrival road (branch-zone catches
+                    // are BROAD two-lane sections even when the launch side was narrow).
+                    if (def.Width > 1f) landing.Width = def.Width;
 
                     frame = landing;
                     section.EndFrame = landing;
+
+                    // The choice gap's landing is road A's mouth — road B mirrors it.
+                    if (def.PlanLateralOffset > 0.01f)
+                        mouthAOf[def.QuarterIndex] = landing;
                 }
                 else
                 {
@@ -225,8 +256,31 @@ namespace TrackGeneration.Planning
 
             if (posErr > weldWindow)
             {
+                Vector3 closureDelta = endF.Position - startFrame.Position;
+                string worstStampedDrift = "none";
+                float worstStampedDriftMeters = 0f;
+                foreach (var builtSection in layout.Sections)
+                {
+                    var builtDef = builtSection.Definition;
+                    if (builtDef == null || builtDef.RoadId == 1 ||
+                        builtDef.PlanHorizontalLength <= 0.001f) continue;
+                    Vector3 sectionDelta = builtSection.EndFrame.Position - builtSection.StartFrame.Position;
+                    Vector3 localForward = SectionFrameBuilders.Flatten(builtSection.StartFrame.Forward);
+                    Vector3 localRight = SectionFrameBuilders.Flatten(builtSection.StartFrame.Right);
+                    var actualLocal = new Vector2(Vector3.Dot(sectionDelta, localRight),
+                        Vector3.Dot(sectionDelta, localForward));
+                    var plannedLocal = new Vector2(builtDef.PlanLateralOffset,
+                        builtDef.PlanHorizontalLength);
+                    float drift = Vector2.Distance(actualLocal, plannedLocal);
+                    if (drift <= worstStampedDriftMeters) continue;
+                    worstStampedDriftMeters = drift;
+                    worstStampedDrift = $"{builtDef.DebugName} plan/actual local " +
+                        $"{plannedLocal.x:F1},{plannedLocal.y:F1}/{actualLocal.x:F1},{actualLocal.y:F1}m";
+                }
                 Fail(GenerationFailureReason.ClosurePositionFailure,
-                    $"Built closure position error {posErr:F3}m exceeds the weld window {weldWindow:F2}m.");
+                    $"Built closure position error {posErr:F3}m exceeds the weld window {weldWindow:F2}m " +
+                    $"(delta x/y/z {closureDelta.x:F1}/{closureDelta.y:F1}/{closureDelta.z:F1}m; " +
+                    $"largest stamped-section drift {worstStampedDriftMeters:F1}m: {worstStampedDrift}).");
                 return null;
             }
             if (fwdErr > Mathf.Max(cfg.ClosureForwardTolerance, 0.05f) * 10f)
@@ -263,8 +317,11 @@ namespace TrackGeneration.Planning
                 closing.EndFrame = weld;
             }
 
-            // ── Lap progress (logical race progress; branch routes share gate progress) ──
+            // ── Lap progress (logical race progress; both quarter roads share gate progress) ──
             StampLapProgress(layout);
+
+            // ── Authoritative quarter records ──
+            PopulateQuarters(layout, plan, cfg);
 
             // ── Global banking field: wall support + floor tilt from ONE blurred
             // curvature signal over the whole lap (never per-section ease profiles) ──
@@ -300,7 +357,9 @@ namespace TrackGeneration.Planning
                 Definition = def,
                 SectionIndex = index,
                 SubdivisionFrames = frames,
-                PatternId = def.PatternId
+                PatternId = def.PatternId,
+                QuarterIndex = def.QuarterIndex,
+                RoadId = def.RoadId
             };
 
             if (frames != null && frames.Length > 0)
@@ -313,73 +372,210 @@ namespace TrackGeneration.Planning
         }
 
         /// <summary>
-        /// Assigns logical lap progress: monotonic along the main chain (route A of each
-        /// branch is canonical); route B remaps its own physical distance onto the same
-        /// entry→merge progress window, so both routes always agree at the gates.
+        /// Assigns logical lap progress: monotonic along the canonical road; each dual
+        /// quarter's road B remaps its own physical distance onto the same mouth→lip
+        /// progress window as road A, so both roads always agree at the gate frames.
         /// </summary>
         private static void StampLapProgress(GeneratedTrackLayout layout)
         {
-            float total = Mathf.Max(1f, layout.Sections[layout.Sections.Count - 1].EndFrame.ArcLength);
+            var sections = layout.Sections;
+            float total = Mathf.Max(1f, sections[sections.Count - 1].EndFrame.ArcLength);
 
-            foreach (var sec in layout.Sections)
+            // Canonical road: progress IS normalized arc.
+            foreach (var sec in sections)
             {
+                if (sec.RoadId == 1) continue;
+
                 if (sec.SubdivisionFrames == null || sec.SubdivisionFrames.Length == 0)
+                {
+                    // Air gaps carry no rings but their boundary frames still need real
+                    // progress — a dual quarter's canonical span STARTS at its entry gap,
+                    // and quarter bookkeeping reads these frames.
+                    var sf = sec.StartFrame;
+                    sf.LapProgress = Mathf.Clamp01(sf.ArcLength / total);
+                    sec.StartFrame = sf;
+                    var ef = sec.EndFrame;
+                    ef.LapProgress = Mathf.Clamp01(ef.ArcLength / total);
+                    sec.EndFrame = ef;
                     continue;
-
-                if (sec.RouteId == 1)
-                {
-                    // Remap route B's own distance onto the gate progress window.
-                    float p0 = Mathf.Clamp01(sec.StartFrame.ArcLength / total);
-                    float aLen = 0f;
-                    foreach (var other in layout.Sections)
-                    {
-                        if (other.BranchGroupId == sec.BranchGroupId && other.RouteId == 0)
-                        {
-                            aLen = other.EndFrame.ArcLength - other.StartFrame.ArcLength;
-                            break;
-                        }
-                    }
-                    float p1 = Mathf.Clamp01((sec.StartFrame.ArcLength + aLen) / total);
-                    float bLen = Mathf.Max(0.01f, sec.EndFrame.ArcLength - sec.StartFrame.ArcLength);
-
-                    for (int i = 0; i < sec.SubdivisionFrames.Length; i++)
-                    {
-                        var f = sec.SubdivisionFrames[i];
-                        float t = (f.ArcLength - sec.StartFrame.ArcLength) / bLen;
-                        f.LapProgress = Mathf.Lerp(p0, p1, Mathf.Clamp01(t));
-                        sec.SubdivisionFrames[i] = f;
-                    }
-                }
-                else
-                {
-                    for (int i = 0; i < sec.SubdivisionFrames.Length; i++)
-                    {
-                        var f = sec.SubdivisionFrames[i];
-                        f.LapProgress = Mathf.Clamp01(f.ArcLength / total);
-                        sec.SubdivisionFrames[i] = f;
-                    }
                 }
 
-                var sf = sec.StartFrame;
-                sf.LapProgress = sec.SubdivisionFrames[0].LapProgress;
-                sec.StartFrame = sf;
-                var ef = sec.EndFrame;
-                ef.LapProgress = sec.SubdivisionFrames[sec.SubdivisionFrames.Length - 1].LapProgress;
-                sec.EndFrame = ef;
+                for (int i = 0; i < sec.SubdivisionFrames.Length; i++)
+                {
+                    var f = sec.SubdivisionFrames[i];
+                    f.LapProgress = Mathf.Clamp01(f.ArcLength / total);
+                    sec.SubdivisionFrames[i] = f;
+                }
+                RefreshBoundaryProgress(sec);
             }
 
-            // Branch group gate progress bookkeeping.
-            foreach (var group in layout.BranchGroups)
+            // Alternate roads: each consecutive RoadId==1 run spans the window from its
+            // mouth (same arc as road A's mouth) to road A's lip end.
+            for (int i = 0; i < sections.Count; i++)
             {
-                foreach (var sec in layout.Sections)
+                if (sections[i].RoadId != 1) continue;
+
+                int runStart = i;
+                int runEnd = i;
+                while (runEnd + 1 < sections.Count && sections[runEnd + 1].RoadId == 1) runEnd++;
+
+                // The canonical section right before the run is road A's launch lip.
+                var lipA = sections[runStart - 1];
+                float chainStartArc = sections[runStart].StartFrame.ArcLength;
+                float chainEndArc = sections[runEnd].EndFrame.ArcLength;
+                float bLen = Mathf.Max(0.01f, chainEndArc - chainStartArc);
+                float p0 = Mathf.Clamp01(chainStartArc / total);
+                float p1 = Mathf.Clamp01(lipA.EndFrame.ArcLength / total);
+
+                for (int s = runStart; s <= runEnd; s++)
                 {
-                    if (sec.BranchGroupId == group.BranchGroupId && sec.RouteId == 0)
+                    var sec = sections[s];
+                    if (sec.SubdivisionFrames == null || sec.SubdivisionFrames.Length == 0) continue;
+                    for (int f = 0; f < sec.SubdivisionFrames.Length; f++)
                     {
-                        group.EntryLapProgress = sec.StartFrame.LapProgress;
-                        group.MergeLapProgress = sec.EndFrame.LapProgress;
+                        var fr = sec.SubdivisionFrames[f];
+                        float t = (fr.ArcLength - chainStartArc) / bLen;
+                        fr.LapProgress = Mathf.Lerp(p0, p1, Mathf.Clamp01(t));
+                        sec.SubdivisionFrames[f] = fr;
+                    }
+                    RefreshBoundaryProgress(sec);
+                }
+
+                i = runEnd;
+            }
+        }
+
+        private static void RefreshBoundaryProgress(GeneratedTrackSection sec)
+        {
+            var sf = sec.StartFrame;
+            sf.LapProgress = sec.SubdivisionFrames[0].LapProgress;
+            sec.StartFrame = sf;
+            var ef = sec.EndFrame;
+            ef.LapProgress = sec.SubdivisionFrames[sec.SubdivisionFrames.Length - 1].LapProgress;
+            sec.EndFrame = ef;
+        }
+
+        /// <summary>
+        /// Fills the authoritative 4-quarter records from the built sections: section
+        /// ranges, boundary frames, road lengths and the plan's balance verdicts.
+        /// A quarter's physical length counts road A only.
+        /// </summary>
+        private static void PopulateQuarters(GeneratedTrackLayout layout, TopologyPlan plan,
+            ResolvedTrackGenerationConfig cfg)
+        {
+            layout.Quarters.Clear();
+            var sections = layout.Sections;
+
+            foreach (var pq in plan.Quarters)
+            {
+                var gq = new GeneratedTrackQuarter
+                {
+                    QuarterIndex = pq.Index,
+                    QuarterType = pq.Dual ? TrackQuarterType.DualRoad : TrackQuarterType.SingleRoad,
+                    LogicalProgressStart = pq.Index * 0.25f,
+                    LogicalProgressEnd = (pq.Index + 1) * 0.25f,
+                    ChoiceType = cfg.QuarterChoiceType,
+                    LaneSeparationMeters = pq.Dual ? pq.LaneSeparation : 0f,
+                    Balance = pq.Balance
+                };
+
+                int firstA = -1, lastA = -1, firstB = -1, lastB = -1;
+                for (int i = 0; i < sections.Count; i++)
+                {
+                    var sec = sections[i];
+                    if (sec.QuarterIndex != pq.Index) continue;
+                    if (sec.RoadId == 1)
+                    {
+                        if (firstB < 0) firstB = i;
+                        lastB = i;
+                    }
+                    else
+                    {
+                        if (firstA < 0) firstA = i;
+                        lastA = i;
+                    }
+                }
+
+                // Exclusive-route length only. The shared choice/convergence AIR GAPS
+                // are excluded from both routes, while an ordinary feature jump inside
+                // Road A remains part of that route's physical/timing comparison.
+                float RouteLength(int first, int last, int roadId)
+                {
+                    float sum = 0f;
+                    for (int i = first; i <= last; i++)
+                    {
+                        var sec = sections[i];
+                        if (sec.RoadId != roadId || sec.QuarterIndex != pq.Index) continue;
+                        // Choice/convergence flights belong to the shared gate contract,
+                        // so neither exclusive route owns their length. An ordinary
+                        // feature jump inside Road A is route content and its flight arc
+                        // must count just like the fitter counted it.
+                        if (sec.IsEmptySpace && !string.IsNullOrEmpty(sec.PatternId) &&
+                            sec.PatternId.StartsWith("Quarter_"))
+                            continue;
+                        sum += sec.EndFrame.ArcLength - sec.StartFrame.ArcLength;
+                    }
+                    return sum;
+                }
+
+                List<string> RouteFeatures(int first, int last, int roadId)
+                {
+                    var ids = new List<string>();
+                    var seen = new HashSet<string>();
+                    for (int i = first; i <= last; i++)
+                    {
+                        var sec = sections[i];
+                        string id = sec.PatternId;
+                        if (sec.RoadId != roadId || sec.QuarterIndex != pq.Index ||
+                            string.IsNullOrEmpty(id) || id.StartsWith("Quarter_") || !seen.Add(id))
+                            continue;
+                        ids.Add(id);
+                    }
+                    return ids;
+                }
+
+                if (firstA >= 0)
+                {
+                    gq.EntryFrame = sections[firstA].StartFrame;
+                    gq.ExitFrame = sections[lastA].EndFrame;
+                    gq.RouteA = new GeneratedQuarterRoute
+                    {
+                        RoadId = 0,
+                        FirstSectionIndex = firstA,
+                        LastSectionIndex = lastA,
+                        EntryFrame = sections[firstA].StartFrame,
+                        ExitFrame = sections[lastA].EndFrame,
+                        PhysicalLengthMeters = RouteLength(firstA, lastA, 0),
+                        FeaturePatternIds = RouteFeatures(firstA, lastA, 0)
+                    };
+                }
+
+                if (pq.Dual && firstB >= 0)
+                {
+                    gq.RouteB = new GeneratedQuarterRoute
+                    {
+                        RoadId = 1,
+                        FirstSectionIndex = firstB,
+                        LastSectionIndex = lastB,
+                        EntryFrame = sections[firstB].StartFrame,
+                        ExitFrame = sections[lastB].EndFrame,
+                        PhysicalLengthMeters = RouteLength(firstB, lastB, 1),
+                        FeaturePatternIds = RouteFeatures(firstB, lastB, 1)
+                    };
+                }
+
+                if (pq.Balance != null)
+                {
+                    foreach (var row in pq.Balance.TimeTable)
+                    {
+                        if (row.Archetype != CraftArchetype.Neutral) continue;
+                        if (gq.RouteA != null) gq.RouteA.EstimatedNeutralTimeSeconds = row.RouteASeconds;
+                        if (gq.RouteB != null) gq.RouteB.EstimatedNeutralTimeSeconds = row.RouteBSeconds;
                         break;
                     }
                 }
+
+                layout.Quarters.Add(gq);
             }
         }
 
@@ -404,22 +600,33 @@ namespace TrackGeneration.Planning
         /// </summary>
         private static void ApplyGlobalBankingField(GeneratedTrackLayout layout, ResolvedTrackGenerationConfig cfg)
         {
-            // Main chain (route A is canonical) is circular; each route B is its own
-            // open chain with its own route distances.
+            // The canonical road is one circular chain; each dual quarter's road B is
+            // its own open chain with its own route distances.
             var mainChain = new List<GeneratedTrackSection>();
             foreach (var sec in layout.Sections)
             {
-                if (sec.RouteId == 1) continue;
+                if (sec.RoadId == 1) continue;
                 if (sec.SubdivisionFrames == null || sec.SubdivisionFrames.Length < 2) continue;
                 mainChain.Add(sec);
             }
             ProcessBankingChain(mainChain, circular: true, cfg);
 
+            var alternate = new List<GeneratedTrackSection>();
             foreach (var sec in layout.Sections)
             {
-                if (sec.RouteId != 1 || sec.SubdivisionFrames == null || sec.SubdivisionFrames.Length < 2) continue;
-                ProcessBankingChain(new List<GeneratedTrackSection> { sec }, circular: false, cfg);
+                if (sec.RoadId == 1 && sec.SubdivisionFrames != null && sec.SubdivisionFrames.Length >= 2)
+                {
+                    alternate.Add(sec);
+                    continue;
+                }
+                if (alternate.Count > 0)
+                {
+                    ProcessBankingChain(alternate, circular: false, cfg);
+                    alternate = new List<GeneratedTrackSection>();
+                }
             }
+            if (alternate.Count > 0)
+                ProcessBankingChain(alternate, circular: false, cfg);
         }
 
         /// <summary>Frames of these sections may carry field banking (everything else keeps its authored orientation).</summary>
@@ -438,10 +645,10 @@ namespace TrackGeneration.Planning
                 case TrackMacroSectionType.SCurve:
                 case TrackMacroSectionType.Chicane:
                 case TrackMacroSectionType.Spiral:
+                case TrackMacroSectionType.RotationalEvent:
                     return true;
-                case TrackMacroSectionType.SplitRoute:
-                    // Shared-axis orbits declare RollChange and own their orientation.
-                    return Mathf.Abs(sec.Definition.RollChange) < 90f;
+                // FullPipe and WallrideTurn OWN their cross-section channels — the
+                // field feathers to zero at their boundaries like other features.
                 default:
                     return false;
             }
@@ -456,6 +663,8 @@ namespace TrackGeneration.Planning
             var ringOf = new List<int>();
             var arcs = new List<float>();
             var bankable = new List<bool>();
+            var sampleStartOf = new Dictionary<GeneratedTrackSection, int>();
+            var sampleCountOf = new Dictionary<GeneratedTrackSection, int>();
 
             // ZERO ANCHORS: arc positions where the field MUST vanish so both sides of a
             // shared boundary ring agree exactly — boundaries of excluded (feature)
@@ -467,6 +676,8 @@ namespace TrackGeneration.Planning
             {
                 bool b = IsBankable(sec);
                 var frames = sec.SubdivisionFrames;
+                sampleStartOf[sec] = arcs.Count;
+                sampleCountOf[sec] = frames.Length;
                 for (int r = 0; r < frames.Length; r++)
                 {
                     secOf.Add(sec);
@@ -476,11 +687,6 @@ namespace TrackGeneration.Planning
                 }
 
                 if (!b)
-                {
-                    zeroAnchors.Add(sec.StartFrame.ArcLength);
-                    zeroAnchors.Add(sec.EndFrame.ArcLength);
-                }
-                if (sec.Definition.SectionType == TrackMacroSectionType.SplitRoute)
                 {
                     zeroAnchors.Add(sec.StartFrame.ArcLength);
                     zeroAnchors.Add(sec.EndFrame.ArcLength);
@@ -521,10 +727,143 @@ namespace TrackGeneration.Planning
                 raw[i] = Mathf.Sign(headingDelta) * support;
             }
 
+            // ── Connector-aware signal fills (BEFORE the blur) ──
+            // A SameDirectionTurnBridge carries its neighbours' SIGNED support through
+            // the link (the two turns + link read as ONE turn complex — no bank reset,
+            // no wall dip, no center-flat expansion). An OppositeDirectionTransfer
+            // carries only the UNSIGNED support: the bank still crosses zero, but the
+            // overall wall support stays elevated while the outside emphasis hands
+            // over sides. Fills are field inputs — the blur then smooths everything.
+            var rawMag = new float[n];
+            for (int i = 0; i < n; i++) rawMag[i] = Mathf.Abs(raw[i]);
+
+            float inherit = Mathf.Clamp01(cfg.ConnectorInheritanceStrength);
+            if (inherit > 0.001f)
+            {
+                // Peak of the NEAR portion of an adjacent section — the lobe actually
+                // touching the connector. Using the whole section would grab an
+                // S-curve's far lobe with the wrong sign.
+                (int idx, float peakAbs, float sign) NearPeakOf(GeneratedTrackSection sec, bool tailEnd)
+                {
+                    if (sec == null || !sampleStartOf.TryGetValue(sec, out int start)) return (-1, 0f, 0f);
+                    int count = sampleCountOf[sec];
+                    int lo = tailEnd ? start + (int)(count * 0.55f) : start;
+                    int hi = tailEnd ? start + count : start + Mathf.Max(1, (int)(count * 0.45f));
+                    int idx = -1;
+                    float best = 0f, sign = 0f;
+                    for (int k = lo; k < hi; k++)
+                    {
+                        float a = Mathf.Abs(raw[k]);
+                        if (a > best) { best = a; sign = Mathf.Sign(raw[k]); idx = k; }
+                    }
+                    return (idx, best, sign);
+                }
+
+                for (int c = 0; c < chain.Count; c++)
+                {
+                    var sec = chain[c];
+                    var behavior = sec.Definition.ConnectorBehavior;
+                    if (behavior != ConnectorBehavior.SameDirectionTurnBridge &&
+                        behavior != ConnectorBehavior.OppositeDirectionTransfer)
+                        continue;
+
+                    float carry = Mathf.Clamp01(sec.Definition.BridgeCarry);
+                    if (carry < 0.01f) continue;
+
+                    var prevSec = c > 0 ? chain[c - 1] : (circular ? chain[chain.Count - 1] : null);
+                    var nextSec = c < chain.Count - 1 ? chain[c + 1] : (circular ? chain[0] : null);
+                    var p0 = NearPeakOf(prevSec, tailEnd: true);
+                    var p1 = NearPeakOf(nextSec, tailEnd: false);
+                    if (p0.idx < 0 || p1.idx < 0) continue;
+                    if (Mathf.Min(p0.peakAbs, p1.peakAbs) * inherit * carry < 0.01f) continue;
+
+                    // Fill PEAK TO PEAK across the whole turn complex — not just the
+                    // connector. The corners' eased curvature tails would otherwise dip
+                    // on both sides of a filled plateau and blur into a W-shaped wall
+                    // wave; interpolating between the two apex supports leaves the blur
+                    // nothing to wave over.
+                    int span = p1.idx - p0.idx;
+                    if (circular && span <= 0) span += n;
+                    if (span <= 0 || span >= n) continue;
+
+                    float arc0 = arcs[p0.idx];
+                    float arcSpan = arcs[p1.idx] - arc0;
+                    if (circular && arcSpan <= 0f) arcSpan += totalArc;
+                    if (arcSpan <= 1f) continue;
+
+                    bool signedBridge = behavior == ConnectorBehavior.SameDirectionTurnBridge &&
+                                        p0.sign == p1.sign && p0.sign != 0f;
+
+                    for (int s = 0; s <= span; s++)
+                    {
+                        int k = (p0.idx + s) % n;
+                        float ak = arcs[k] - arc0;
+                        if (ak < 0f) ak += totalArc;
+                        float target = Mathf.Lerp(p0.peakAbs, p1.peakAbs, Mathf.Clamp01(ak / arcSpan))
+                                       * inherit * carry;
+
+                        if (signedBridge && Mathf.Abs(raw[k]) < target)
+                            raw[k] = p0.sign * target;
+                        if (rawMag[k] < target)
+                            rawMag[k] = target;
+                    }
+                }
+
+                // Multi-section feature corners (tightening/opening/double-apex) can
+                // meet directly with no connector object between them. Their individual
+                // eased-curvature tails both reach zero at the shared ring; fill peak to
+                // peak so one same-direction feature keeps one outside-wall height.
+                int adjacencyCount = circular ? chain.Count : chain.Count - 1;
+                for (int c = 0; c < adjacencyCount; c++)
+                {
+                    var prevSec = chain[c];
+                    var nextSec = chain[(c + 1) % chain.Count];
+                    string prevPattern = prevSec.PatternId;
+                    string nextPattern = nextSec.PatternId;
+                    string prevComplex = prevSec.Definition.TurnComplexId;
+                    string nextComplex = nextSec.Definition.TurnComplexId;
+                    bool samePattern = !string.IsNullOrEmpty(prevPattern) && prevPattern == nextPattern;
+                    bool sameComplex = !string.IsNullOrEmpty(prevComplex) && prevComplex == nextComplex;
+                    if ((!samePattern && !sameComplex) || !IsBankable(prevSec) || !IsBankable(nextSec)) continue;
+
+                    var p0 = NearPeakOf(prevSec, tailEnd: true);
+                    var p1 = NearPeakOf(nextSec, tailEnd: false);
+                    if (p0.idx < 0 || p1.idx < 0 || p0.sign == 0f || p0.sign != p1.sign) continue;
+
+                    int span = p1.idx - p0.idx;
+                    if (circular && span <= 0) span += n;
+                    if (span <= 0 || span >= n) continue;
+
+                    float arc0 = arcs[p0.idx];
+                    float arcSpan = arcs[p1.idx] - arc0;
+                    if (circular && arcSpan <= 0f) arcSpan += totalArc;
+                    if (arcSpan <= 1f) continue;
+
+                    for (int s = 0; s <= span; s++)
+                    {
+                        int k = (p0.idx + s) % n;
+                        float target = Mathf.Max(p0.peakAbs, p1.peakAbs) * inherit;
+                        if (Mathf.Abs(raw[k]) < target) raw[k] = p0.sign * target;
+                        if (rawMag[k] < target) rawMag[k] = target;
+                    }
+                }
+            }
+
             // ── Arc box blur over the bank-transition distance ──
             // The blur is the whole point: it bridges short straights between corners
             // (no wall dip), eases every entry/exit, and removes any residual seams.
-            float radius = Mathf.Max(60f, cfg.BankTransitionLength * 0.5f);
+            // The radius also enforces the MINIMUM BANK-REVERSAL DURATION: a signed
+            // swing from one side to the other can never happen faster than the blur
+            // window allows, no matter how short the connector between opposed turns.
+            // The floor is PHYSICS-derived: a full −max..+max swing through the
+            // triangle kernel has peak slope swing/(2·radius), and the craft's roll
+            // guard is 0.35°/m — a fixed 60 m floor let short-transition configs
+            // reverse at 0.4°/m+ (stretching connectors instead starves the closure
+            // solver; the field is the right owner of this bound).
+            float fullSwing = 2f * cfg.MaxBankAngle * Mathf.Clamp01(cfg.BankingStrength);
+            float rollRateFloor = fullSwing / (2f * 0.30f); // 0.30°/m leaves margin
+            float radius = Mathf.Max(Mathf.Max(60f, rollRateFloor),
+                Mathf.Max(cfg.BankTransitionLength * 0.5f, cfg.MinimumBankReversalLength * 0.5f));
             var arcArray = arcs.ToArray();
 
             int LowerBound(float value)
@@ -584,8 +923,10 @@ namespace TrackGeneration.Planning
             // TWO box passes = triangular kernel: C1 everywhere. A single box blur of a
             // step (arc curvature IS a step function) is a linear ramp with slope kinks
             // at its edges — exactly the "ramp" feel at speed. The triangle kernel has
-            // no kinks anywhere.
+            // no kinks anywhere. The SIGNED field drives bank/tilt/side emphasis; the
+            // UNSIGNED field keeps overall wall support elevated through transfers.
             var blurred = BoxBlur(BoxBlur(raw));
+            var blurredMag = BoxBlur(BoxBlur(rawMag));
 
             // Feather to ZERO at the anchors: both sides of a boundary shared with an
             // excluded section or another chain then agree on the ring exactly — no
@@ -595,7 +936,7 @@ namespace TrackGeneration.Planning
                 float falloff = radius * 1.5f;
                 for (int i = 0; i < n; i++)
                 {
-                    if (blurred[i] == 0f) continue;
+                    if (blurred[i] == 0f && blurredMag[i] == 0f) continue;
                     float factor = 1f;
                     foreach (float anchor in zeroAnchors)
                     {
@@ -605,6 +946,7 @@ namespace TrackGeneration.Planning
                         if (factor <= 0f) break;
                     }
                     blurred[i] *= factor;
+                    blurredMag[i] *= factor;
                 }
             }
 
@@ -617,10 +959,11 @@ namespace TrackGeneration.Planning
                 var f = sec.SubdivisionFrames[ringOf[i]];
 
                 float signed = Mathf.Clamp(blurred[i], -1f, 1f);
-                float mag = Mathf.Abs(signed);
+                float mag = Mathf.Clamp01(Mathf.Max(blurredMag[i], Mathf.Abs(signed)));
                 float side = Mathf.Sign(signed);
+                float sAbs = Mathf.Abs(signed);
 
-                float bankDeg = mag * cfg.MaxBankAngle * cfg.BankingStrength;
+                float bankDeg = sAbs * cfg.MaxBankAngle * cfg.BankingStrength;
                 f.BankAngle = side * bankDeg;
 
                 // Geometric floor tilt, blurred by construction — it cannot rock.
@@ -637,14 +980,43 @@ namespace TrackGeneration.Planning
                     f.Right = Vector3.Cross(up, f.Forward).normalized;
                 }
 
-                // Outside wall boost / inside trim. Junction masks (positive suppression
-                // set by the split/merge throats) always win on their side.
-                float outer = -mag * 0.75f;
-                float inner = mag * 0.35f;
-                float newLeft = side > 0f ? outer : inner;
-                float newRight = side > 0f ? inner : outer;
+                // Outside wall boost / inside trim, split by side emphasis. In a full
+                // corner (|signed| = mag) this is the classic bobsled boost/trim; through
+                // an opposite-direction transfer (signed → 0 while mag stays up) BOTH
+                // walls hold partial support and the emphasis hands over smoothly —
+                // support never collapses on both sides before the new side rises.
+                // wLeft is the LEFT wall's share of the outside emphasis (a right turn,
+                // signed > 0, boosts the LEFT wall).
+                float wLeft = mag > 1e-4f ? 0.5f * (1f + signed / mag) : 0.5f;
+                float commit = mag > 1e-4f ? sAbs / mag : 0f; // 1 = committed to a side, 0 = mid-transfer
+                float newLeft = -0.75f * mag * wLeft + 0.35f * mag * (1f - wLeft) * commit;
+                float newRight = -0.75f * mag * (1f - wLeft) + 0.35f * mag * wLeft * commit;
+
+                // Junction masks (positive suppression set by the split/merge throats)
+                // always win on their side.
                 f.LeftWallSuppression = f.LeftWallSuppression > 0.001f ? Mathf.Max(f.LeftWallSuppression, newLeft) : newLeft;
                 f.RightWallSuppression = f.RightWallSuppression > 0.001f ? Mathf.Max(f.RightWallSuppression, newRight) : newRight;
+
+                // Dynamic turn rounding: the same committed field drives how far the
+                // flat center closes into a continuous bowl (full rounding at apex,
+                // smooth in/out by construction — the field is C1). Bridges carry it
+                // through turn complexes because their fills feed the same signal.
+                if (cfg.DynamicTurnRoundingEnabled)
+                    f.TurnRounding = Mathf.Clamp01(mag * cfg.TurnRoundingStrength);
+
+                // Outside catch wall: past a demand threshold, the OUTSIDE wall curls
+                // toward (and past) vertical to hold the craft in the bowl. Emphasis
+                // follows the side weights, so transfers hand the curl over smoothly.
+                if (cfg.CatchWallEnabled)
+                {
+                    float engage = Mathf.Clamp01((mag - cfg.CatchWallMinimumDemand) /
+                                   Mathf.Max(0.05f, 1f - cfg.CatchWallMinimumDemand)) * cfg.CatchWallStrength;
+                    if (engage > 0.001f)
+                    {
+                        f.LeftOverhang = Mathf.Max(f.LeftOverhang, engage * wLeft * commit);
+                        f.RightOverhang = Mathf.Max(f.RightOverhang, engage * (1f - wLeft) * commit);
+                    }
+                }
 
                 sec.SubdivisionFrames[ringOf[i]] = f;
             }
@@ -679,11 +1051,35 @@ namespace TrackGeneration.Planning
             int Neighbor(int i, int step)
             {
                 int j = (i + step + n) % n;
-                if (sections[i].Definition.SectionType == TrackMacroSectionType.SplitRoute &&
-                    sections[j].Definition.SectionType == TrackMacroSectionType.SplitRoute &&
-                    Mathf.Approximately(sections[j].StartFrame.ArcLength, sections[i].StartFrame.ArcLength))
-                    j = (j + step + n) % n;
+                // Never blend across a physical break: list adjacency is not physical
+                // adjacency around a dual quarter's alternate road (road A's lip is
+                // followed in the LIST by road B's mouth, one lane away) — and open
+                // air-gap boundaries blend to themselves.
+                var a = sections[i];
+                var b = sections[j];
+                Vector3 aEdge = step > 0 ? a.EndFrame.Position : a.StartFrame.Position;
+                Vector3 bEdge = step > 0 ? b.StartFrame.Position : b.EndFrame.Position;
+                bool open = step > 0 ? (a.OpenEnd || b.OpenStart) : (a.OpenStart || b.OpenEnd);
+                bool airGap = a.IsEmptySpace || b.IsEmptySpace;
+                if (!airGap && (open || (aEdge - bEdge).sqrMagnitude > 0.25f)) return i;
                 return j;
+            }
+
+            // Bridge/transfer connectors CARRY their turn complex's depth through,
+            // GRADED by BridgeCarry: short links hold fully, longer ones relax
+            // proportionally — a dip to plain-straight depth between two banked turns
+            // is a visible wall-height wave on every borderline link.
+            float MultiplierOf(int i)
+            {
+                var s = sections[i];
+                float own = DepthMultiplier(s.Definition.SectionType);
+                float carry = Mathf.Clamp01(s.Definition.BridgeCarry);
+                if (carry < 0.001f) return own;
+
+                float held = Mathf.Min(
+                    DepthMultiplier(sections[Neighbor(i, -1)].Definition.SectionType),
+                    DepthMultiplier(sections[Neighbor(i, +1)].Definition.SectionType));
+                return Mathf.Lerp(own, held, carry);
             }
 
             for (int i = 0; i < n; i++)
@@ -691,11 +1087,11 @@ namespace TrackGeneration.Planning
                 var sec = sections[i];
                 if (sec.SubdivisionFrames == null || sec.SubdivisionFrames.Length == 0) continue;
 
-                float m = DepthMultiplier(sec.Definition.SectionType);
+                float m = MultiplierOf(i);
                 int pi = Neighbor(i, -1);
                 int ni = Neighbor(i, +1);
-                float mPrev = DepthMultiplier(sections[pi].Definition.SectionType);
-                float mNext = DepthMultiplier(sections[ni].Definition.SectionType);
+                float mPrev = MultiplierOf(pi);
+                float mNext = MultiplierOf(ni);
 
                 float len = SectionLen(sec);
                 float w0 = Mathf.Max(0.01f, Mathf.Min(blendLen, Mathf.Min(len, SectionLen(sections[pi]))));
@@ -733,8 +1129,9 @@ namespace TrackGeneration.Planning
         /// Deliberately NARROW band: per-type depth is seasoning, and every step here is
         /// a visible wall-height wave at each section boundary. Banking support comes
         /// from the bobsled wall boost and the floor tilt, not from depth swings.
+        /// Public: the connector analyzer uses it to size cross-section blend needs.
         /// </summary>
-        private static float DepthMultiplier(TrackMacroSectionType t) => t switch
+        public static float DepthMultiplier(TrackMacroSectionType t) => t switch
         {
             TrackMacroSectionType.BankedCurve => 1.08f,
             TrackMacroSectionType.BankedHairpin => 1.1f,
@@ -743,6 +1140,8 @@ namespace TrackGeneration.Planning
             TrackMacroSectionType.LandingRamp => 0.95f,
             TrackMacroSectionType.Spiral => 1.06f,
             TrackMacroSectionType.HalfLoopTwist => 1.04f,
+            TrackMacroSectionType.RotationalEvent => 1.04f,
+            TrackMacroSectionType.WallrideTurn => 1.1f,
             _ => 1f
         };
     }

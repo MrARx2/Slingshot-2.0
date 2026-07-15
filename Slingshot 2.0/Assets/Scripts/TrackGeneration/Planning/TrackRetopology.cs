@@ -5,43 +5,69 @@ using TrackGeneration.Macro;
 namespace TrackGeneration.Planning
 {
     /// <summary>
-    /// GLOBAL RETOPOLOGY: the final layout is resampled so rings sit at ONE uniform
-    /// spacing along the entire track. Builders are free to emit whatever ring density
-    /// their geometry needs (facet limits, roll fidelity) — this pass then rebuilds the
-    /// topology from the finished driving line, so no section boundary, feature entry or
-    /// ramp can ever show a ring-density step in the mesh.
+    /// GLOBAL RETOPOLOGY: the final layout is resampled so every independent physical
+    /// road region (an anchored segment) carries a subdivision count from the APPROVED
+    /// LADDER, distributed at exactly uniform arc spacing. Builders are free to emit
+    /// whatever ring density their geometry needs — this pass rebuilds the topology
+    /// from the finished driving line, so no section boundary, feature entry or ramp
+    /// can ever show a ring-density step in the mesh.
     ///
-    /// The spacing is the base ring spacing tightened to the strictest facet demand
-    /// anywhere on the track (a corkscrew's roll, a loop's curvature), so the uniform
-    /// grid never under-samples a feature.
+    /// Terminology: Subdivision Count = number of intervals; Frame Count = intervals + 1.
+    ///
+    /// Per region, the RAW requirement comes from the greatest of: physical length at
+    /// the base ring spacing, the strictest orientation-change (facet) demand any of
+    /// its source rings exhibits, and the per-section ring cap — then relaxed for the
+    /// global ring budgets. The selected tier is the first ladder entry ≥ the raw
+    /// requirement (never rounded down below the physical requirement). Regions that
+    /// share an anchor ring (section runs across the lap, branch gates, the
+    /// start/finish weld) are reconciled so their ring spacings never step by more
+    /// than ~1.22× across the shared ring.
     ///
     /// Rings that other chains weld to are ANCHORS and are preserved bit-exactly:
     /// chain endpoints (the start/finish weld), branch gate rings (route B meshes join
     /// the fork rings there) and air-gap lip/mouth rings (ballistically matched).
-    /// Between anchors the spacing is exactly uniform; across an anchor it may differ
-    /// by at most half a ring over the whole span.
     /// </summary>
     public static class TrackRetopology
     {
-        /// <summary>Resamples every chain of the layout onto the uniform ring grid.</summary>
+        private const float MaxNeighborSpacingRatio = 1.22f;
+
+        /// <summary>Resamples every chain of the layout onto its region's quantized uniform grid.</summary>
         public static void Apply(GeneratedTrackLayout layout, ResolvedTrackGenerationConfig cfg)
         {
             var segments = CollectSegments(layout);
             if (segments.Count == 0) return;
 
-            float spacing = ChooseSpacing(segments, cfg);
-            if (spacing <= 0.01f) return;
+            var regions = PlanRegions(segments, cfg);
+            if (regions == null) return;
 
-            foreach (var seg in segments)
-                ResampleSegment(seg, spacing);
+            layout.SubdivisionRegions.Clear();
+            for (int i = 0; i < segments.Count; i++)
+            {
+                ResampleSegment(segments[i], regions[i].Intervals);
+                layout.SubdivisionRegions.Add(regions[i].ToRecord(i));
+            }
+        }
+
+        /// <summary>Selects the first approved tier ≥ the raw requirement (spec: never round down below the physical quality requirement).</summary>
+        public static int SelectSubdivisionTier(int required, IReadOnlyList<int> allowedTiers)
+        {
+            if (allowedTiers == null || allowedTiers.Count == 0) return Mathf.Max(8, required);
+
+            required = Mathf.Max(required, allowedTiers[0]);
+            for (int i = 0; i < allowedTiers.Count; i++)
+            {
+                if (allowedTiers[i] >= required)
+                    return allowedTiers[i];
+            }
+            return allowedTiers[allowedTiers.Count - 1];
         }
 
         // ─────────────────────────── Segment collection ───────────────────────────
 
         /// <summary>
         /// Contiguous runs of meshed sections whose interior rings may be moved. Runs
-        /// break at air gaps (no road across) and at branch gates (the fork rings are
-        /// welded to another chain), so every break boundary is an anchor.
+        /// break at air gaps (no road across) and at road transitions (a dual quarter's
+        /// alternate road is its own open chain), so every break boundary is an anchor.
         /// </summary>
         private static List<List<GeneratedTrackSection>> CollectSegments(GeneratedTrackLayout layout)
         {
@@ -57,7 +83,7 @@ namespace TrackGeneration.Planning
             GeneratedTrackSection prev = null;
             foreach (var sec in layout.Sections)
             {
-                if (sec.RouteId == 1) continue; // route B chains handled below
+                if (sec.RoadId == 1) continue; // alternate road chains handled below
 
                 if (sec.SubdivisionFrames == null || sec.SubdivisionFrames.Length < 2)
                 {
@@ -67,49 +93,85 @@ namespace TrackGeneration.Planning
                     continue;
                 }
 
-                // Gate boundaries: entering or leaving a branch group anchors the fork ring.
-                if (prev != null && (prev.BranchGroupId != sec.BranchGroupId || prev.RouteId != sec.RouteId))
-                    CloseRun();
-
                 run.Add(sec);
                 prev = sec;
             }
             CloseRun();
 
+            // Each dual quarter's alternate road is ONE open segment (mouth → lip).
+            var alternate = new List<GeneratedTrackSection>();
             foreach (var sec in layout.Sections)
             {
-                if (sec.RouteId != 1 || sec.SubdivisionFrames == null || sec.SubdivisionFrames.Length < 2) continue;
-                segments.Add(new List<GeneratedTrackSection> { sec }); // endpoints are the gate rings
+                if (sec.RoadId == 1 && sec.SubdivisionFrames != null && sec.SubdivisionFrames.Length >= 2)
+                {
+                    alternate.Add(sec);
+                    continue;
+                }
+                if (alternate.Count > 0)
+                {
+                    segments.Add(alternate);
+                    alternate = new List<GeneratedTrackSection>();
+                }
             }
+            if (alternate.Count > 0) segments.Add(alternate);
 
             return segments;
         }
 
-        // ─────────────────────────── Spacing selection ───────────────────────────
+        // ─────────────────────────── Region planning ───────────────────────────
+
+        private class Region
+        {
+            public List<GeneratedTrackSection> Sections;
+            public float Length;
+            public float DemandSpacing;
+            public int RawRequirement;
+            public int Intervals;
+            public string LimitingFactor = "base spacing";
+
+            public SubdivisionRegionRecord ToRecord(int index)
+            {
+                var names = new List<string>();
+                foreach (var sec in Sections)
+                {
+                    if (names.Count == 4) { names.Add("…"); break; }
+                    names.Add(sec.Definition.DebugName);
+                }
+                return new SubdivisionRegionRecord
+                {
+                    RegionName = $"Region {index:D2}",
+                    Sections = string.Join(", ", names),
+                    LengthMeters = Length,
+                    RawRequirement = RawRequirement,
+                    SelectedTier = Intervals,
+                    SpacingMeters = Length / Mathf.Max(1, Intervals),
+                    LimitingFactor = LimitingFactor
+                };
+            }
+        }
 
         /// <summary>
-        /// One spacing for the whole track: the base ring spacing, tightened until the
-        /// uniform grid satisfies the strictest orientation-change demand any source
-        /// ring pair exhibits (turn, pitch or roll per meter vs the facet limit), then
-        /// relaxed as needed to respect the per-section and total ring budgets.
-        ///
-        /// Every builder already honors the facet limit at its own density, so a pair
-        /// whose jump EXCEEDS the limit is a discrete snap (closure weld, feature exit
-        /// flatten) — densifying the whole track cannot smooth a snap, so such outliers
-        /// are ignored, and the legitimate demand can never undercut the densest
-        /// builder spacing.
+        /// Per-region spacing demand → global budget relaxation → ladder tier
+        /// selection → shared-anchor reconciliation.
         /// </summary>
-        private static float ChooseSpacing(List<List<GeneratedTrackSection>> segments, ResolvedTrackGenerationConfig cfg)
+        private static List<Region> PlanRegions(List<List<GeneratedTrackSection>> segments,
+            ResolvedTrackGenerationConfig cfg)
         {
             float baseSpacing = Mathf.Max(0.5f, cfg.MeshMetersPerRing);
             float facetLimit = Mathf.Max(0.1f, cfg.MaxRingFacetAngle);
-            float spacing = baseSpacing;
+            float featureFloor = Mathf.Max(0.5f, cfg.FeatureMetersPerRing);
+            var ladder = cfg.SubdivisionLadder;
+
+            var regions = new List<Region>(segments.Count);
             float totalLength = 0f;
-            float maxSectionLength = 0f;
-            int sectionCount = 0;
+            int totalSectionCount = 0;
 
             foreach (var seg in segments)
             {
+                float spacing = baseSpacing;
+                string limiting = "base spacing";
+                float maxSectionLength = 0f;
+
                 foreach (var sec in seg)
                 {
                     var frames = sec.SubdivisionFrames;
@@ -118,46 +180,167 @@ namespace TrackGeneration.Planning
                         float ds = frames[i].ArcLength - frames[i - 1].ArcLength;
                         if (ds <= 1e-3f) continue;
 
+                        // Every builder already honors the facet limit at its own
+                        // density, so a pair whose jump EXCEEDS the limit is a discrete
+                        // snap (closure weld, feature exit flatten) — densifying cannot
+                        // smooth a snap, so such outliers are ignored.
                         float ang = Mathf.Max(
                             Vector3.Angle(frames[i - 1].Forward, frames[i].Forward),
                             Vector3.Angle(frames[i - 1].Up, frames[i].Up));
-                        if (ang < 1e-3f || ang > facetLimit) continue; // above-limit = snap outlier
+                        ang = Mathf.Max(ang, Mathf.Abs(frames[i].AccumulatedRoadRoll -
+                                                       frames[i - 1].AccumulatedRoadRoll));
+                        if (ang < 1e-3f || ang > facetLimit) continue;
 
-                        spacing = Mathf.Min(spacing, ds * facetLimit / ang);
+                        float demand = ds * facetLimit / ang;
+                        if (demand < spacing)
+                        {
+                            spacing = demand;
+                            limiting = "curvature/orientation";
+                        }
                     }
 
                     maxSectionLength = Mathf.Max(maxSectionLength,
                         frames[frames.Length - 1].ArcLength - frames[0].ArcLength);
-                    sectionCount++;
+                }
+
+                if (spacing < featureFloor)
+                {
+                    spacing = featureFloor;
+                    limiting = "feature ring floor";
+                }
+
+                // Per-section ring cap (boundary rings duplicated, hence headroom).
+                if (cfg.MaxRingsPerSection > 2)
+                {
+                    float capSpacing = maxSectionLength / (cfg.MaxRingsPerSection - 2);
+                    if (spacing < capSpacing)
+                    {
+                        spacing = capSpacing;
+                        limiting = "section ring cap";
+                    }
                 }
 
                 var first = seg[0].SubdivisionFrames;
                 var last = seg[seg.Count - 1].SubdivisionFrames;
-                totalLength += last[last.Length - 1].ArcLength - first[0].ArcLength;
+                float length = last[last.Length - 1].ArcLength - first[0].ArcLength;
+                totalLength += length;
+                totalSectionCount += seg.Count;
+
+                regions.Add(new Region
+                {
+                    Sections = seg,
+                    Length = Mathf.Max(0.01f, length),
+                    DemandSpacing = spacing,
+                    LimitingFactor = limiting
+                });
             }
 
-            spacing = Mathf.Clamp(spacing, Mathf.Max(0.5f, cfg.FeatureMetersPerRing), baseSpacing);
+            // ── Global ring budgets: relax every region's spacing proportionally
+            // rather than overflow the rulebook cap or the designer performance budget.
+            float expectedRings = 0f;
+            foreach (var r in regions) expectedRings += r.Length / r.DemandSpacing;
 
-            // Ring budgets: relax the spacing rather than overflow the rulebook caps
-            // (boundary rings are duplicated between sections, hence the headroom).
-            if (cfg.MaxRingsPerSection > 2)
-                spacing = Mathf.Max(spacing, maxSectionLength / (cfg.MaxRingsPerSection - 2));
-            int totalBudget = cfg.MaxTotalRings - sectionCount - 8;
-            if (totalBudget > 0)
-                spacing = Mathf.Max(spacing, totalLength / totalBudget);
+            float hardBudget = cfg.MaxTotalRings - totalSectionCount - 8;
+            float perfBudget = cfg.RenderRingBudget > 0 ? cfg.RenderRingBudget : float.MaxValue;
+            float budget = Mathf.Min(hardBudget > 0 ? hardBudget : float.MaxValue, perfBudget);
 
-            // Designer PERFORMANCE budget: a small track keeps the full designed
-            // density; a huge lap (long Rollercoaster tracks) spreads the ring budget
-            // instead of exploding the vertex count and the frame rate with it.
-            if (cfg.RenderRingBudget > 0)
-                spacing = Mathf.Max(spacing, totalLength / cfg.RenderRingBudget);
+            if (expectedRings > budget)
+            {
+                float relax = expectedRings / budget;
+                foreach (var r in regions)
+                {
+                    r.DemandSpacing *= relax;
+                    r.LimitingFactor = "ring budget";
+                }
+            }
 
-            return spacing;
+            // ── Ladder tiers ──
+            foreach (var r in regions)
+            {
+                r.RawRequirement = Mathf.Max(1, Mathf.CeilToInt(r.Length / r.DemandSpacing));
+                r.Intervals = SelectSubdivisionTier(r.RawRequirement, ladder);
+
+                // Structural floor: each section needs at least one interval of its own.
+                int structural = r.Sections.Count + 1;
+                if (r.Intervals < structural)
+                {
+                    r.Intervals = structural;
+                    r.LimitingFactor = "section count";
+                }
+            }
+
+            // ── Shared-anchor reconciliation: regions that meet at an anchor ring
+            // (section runs, branch gates, the start/finish weld) may use different
+            // tiers, but their spacings must not step across the shared ring.
+            ReconcileNeighbors(regions, ladder);
+
+            return regions;
+        }
+
+        /// <summary>
+        /// Finds region pairs sharing an endpoint anchor and bumps the sparser one up
+        /// the ladder until every shared boundary's spacing ratio is within bounds.
+        /// Air-gap boundaries never pair (the lip and mouth are different positions),
+        /// so flight gaps legally separate density domains.
+        /// </summary>
+        private static void ReconcileNeighbors(List<Region> regions, IReadOnlyList<int> ladder)
+        {
+            Vector3 StartPos(Region r) => r.Sections[0].SubdivisionFrames[0].Position;
+            Vector3 EndPos(Region r)
+            {
+                var f = r.Sections[r.Sections.Count - 1].SubdivisionFrames;
+                return f[f.Length - 1].Position;
+            }
+
+            long Key(Vector3 p) => ((long)Mathf.RoundToInt(p.x * 4f) & 0x1FFFFF)
+                                 | (((long)Mathf.RoundToInt(p.y * 4f) & 0x1FFFFF) << 21)
+                                 | (((long)Mathf.RoundToInt(p.z * 4f) & 0x1FFFFF) << 42);
+
+            var byAnchor = new Dictionary<long, List<int>>();
+            void Register(long key, int idx)
+            {
+                if (!byAnchor.TryGetValue(key, out var list)) byAnchor[key] = list = new List<int>();
+                if (!list.Contains(idx)) list.Add(idx);
+            }
+
+            for (int i = 0; i < regions.Count; i++)
+            {
+                Register(Key(StartPos(regions[i])), i);
+                Register(Key(EndPos(regions[i])), i);
+            }
+
+            for (int pass = 0; pass < 6; pass++)
+            {
+                bool changed = false;
+                foreach (var kv in byAnchor)
+                {
+                    var list = kv.Value;
+                    for (int a = 0; a < list.Count; a++)
+                    {
+                        for (int b = a + 1; b < list.Count; b++)
+                        {
+                            var ra = regions[list[a]];
+                            var rb = regions[list[b]];
+                            float sa = ra.Length / ra.Intervals;
+                            float sb = rb.Length / rb.Intervals;
+                            if (Mathf.Max(sa, sb) / Mathf.Min(sa, sb) <= MaxNeighborSpacingRatio) continue;
+
+                            var sparser = sa > sb ? ra : rb;
+                            int bumped = SelectSubdivisionTier(sparser.Intervals + 1, ladder);
+                            if (bumped <= sparser.Intervals) continue; // top of the ladder
+                            sparser.Intervals = bumped;
+                            sparser.LimitingFactor = "neighbor continuity";
+                            changed = true;
+                        }
+                    }
+                }
+                if (!changed) break;
+            }
         }
 
         // ─────────────────────────── Resampling ───────────────────────────
 
-        private static void ResampleSegment(List<GeneratedTrackSection> seg, float spacing)
+        private static void ResampleSegment(List<GeneratedTrackSection> seg, int intervals)
         {
             // Flatten to one source ring list; boundary rings are duplicated between
             // adjacent sections, so skip each later section's entry ring.
@@ -179,9 +362,9 @@ namespace TrackGeneration.Planning
 
             float s0 = src[0].ArcLength;
             float segLen = src[src.Count - 1].ArcLength - s0;
-            if (segLen < spacing * 2f) return; // too short to re-grid — endpoints already anchored
+            if (segLen < 0.5f) return; // degenerate — endpoints already anchored
 
-            int n = Mathf.Max(seg.Count + 1, Mathf.RoundToInt(segLen / spacing));
+            int n = Mathf.Max(seg.Count + 1, intervals);
             float step = segLen / n;
 
             // ── Uniform target rings (endpoints are the untouched anchor frames) ──
@@ -261,11 +444,23 @@ namespace TrackGeneration.Planning
                 Width = Mathf.Lerp(f0.Width, f1.Width, t),
                 BankAngle = Mathf.LerpAngle(f0.BankAngle, f1.BankAngle, t),
                 PitchAngle = Mathf.LerpAngle(f0.PitchAngle, f1.PitchAngle, t),
+                AccumulatedRoadRoll = Mathf.Lerp(f0.AccumulatedRoadRoll, f1.AccumulatedRoadRoll, t),
+                AccumulatedVerticalRotation = Mathf.Lerp(f0.AccumulatedVerticalRotation, f1.AccumulatedVerticalRotation, t),
+                HorizontalCurvature = Mathf.Lerp(f0.HorizontalCurvature, f1.HorizontalCurvature, t),
+                HorizontalCurvatureRate = Mathf.Lerp(f0.HorizontalCurvatureRate, f1.HorizontalCurvatureRate, t),
+                VerticalCurvature = Mathf.Lerp(f0.VerticalCurvature, f1.VerticalCurvature, t),
+                VerticalCurvatureRate = Mathf.Lerp(f0.VerticalCurvatureRate, f1.VerticalCurvatureRate, t),
+                RoadRollRate = Mathf.Lerp(f0.RoadRollRate, f1.RoadRollRate, t),
+                RoadRollAcceleration = Mathf.Lerp(f0.RoadRollAcceleration, f1.RoadRollAcceleration, t),
                 ArcLength = a,
                 LapProgress = Mathf.Lerp(f0.LapProgress, f1.LapProgress, t),
                 SideHeight = Mathf.Lerp(f0.SideHeight, f1.SideHeight, t),
                 LeftWallSuppression = Mathf.Lerp(f0.LeftWallSuppression, f1.LeftWallSuppression, t),
-                RightWallSuppression = Mathf.Lerp(f0.RightWallSuppression, f1.RightWallSuppression, t)
+                RightWallSuppression = Mathf.Lerp(f0.RightWallSuppression, f1.RightWallSuppression, t),
+                TurnRounding = Mathf.Lerp(f0.TurnRounding, f1.TurnRounding, t),
+                LeftOverhang = Mathf.Lerp(f0.LeftOverhang, f1.LeftOverhang, t),
+                RightOverhang = Mathf.Lerp(f0.RightOverhang, f1.RightOverhang, t),
+                PipeClosure = Mathf.Lerp(f0.PipeClosure, f1.PipeClosure, t)
             };
         }
     }

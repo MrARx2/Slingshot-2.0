@@ -17,17 +17,17 @@ namespace TrackGeneration.Race
         [Tooltip("True for the start/finish line, false for a checkpoint.")]
         public bool IsStartFinish;
 
-        [Tooltip("0-based LOGICAL checkpoint order index. -1 for the start/finish line. Gates on alternative branch routes share the same index.")]
+        [Tooltip("0-based LOGICAL checkpoint order index. -1 for the start/finish line. Gates on the alternative roads of a dual quarter share the same index.")]
         public int CheckpointIndex = -1;
 
         [Tooltip("Arc length along the track where this gate sits (meters, for debugging).")]
         public float ArcLength;
 
-        [Tooltip("Branch group this gate belongs to, -1 for main-line gates.")]
-        public int BranchGroupId = -1;
+        [Tooltip("Dual quarter this gate belongs to (0..3), -1 for single-road gates.")]
+        public int QuarterIndex = -1;
 
-        [Tooltip("Route within the branch group (0 = A, 1 = B), -1 for main-line gates.")]
-        public int RouteId = -1;
+        [Tooltip("Road within the quarter (0 = A, 1 = B), -1 for single-road gates.")]
+        public int RoadId = -1;
 
         [Header("Detection Window (gate-local)")]
         [Tooltip("Half-width of the crossing window in meters. Wider than the road so wall-riding and offset lines still register.")]

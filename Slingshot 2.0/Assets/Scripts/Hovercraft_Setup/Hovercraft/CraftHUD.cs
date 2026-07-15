@@ -40,6 +40,27 @@ public class CraftHUD : MonoBehaviour
     public bool showSystemsPanel = true;
     public bool showEnergyPanel = true;
 
+    [Header("Speed Display (bottom center)")]
+    [Tooltip("Distance from the bottom safe-area edge to the speed readout (pixels at 1080p, scales with resolution).")]
+    public float bottomOffset = 42f;
+
+    [Tooltip("Font size of the big speed number (at 1080p).")]
+    public int speedFontSize = 64;
+
+    [Tooltip("Font size of the KM/H unit label (at 1080p).")]
+    public int unitFontSize = 20;
+
+    [Tooltip("Show the KM/H unit label under the number.")]
+    public bool showUnit = true;
+
+    [Tooltip("Display smoothing time constant in seconds. Small values only — the readout must never noticeably lag the craft. 0 = raw.")]
+    [Range(0f, 0.3f)] public float displaySmoothing = 0.08f;
+
+    private float _smoothedSpeedKmh;
+    private GUIStyle _speedNumberStyle;
+    private GUIStyle _speedUnitStyle;
+    private int _speedStyleSizeCache = -1;
+
     [Header("Colors")]
     public Color panelColor = new Color(0f, 0f, 0f, 0.42f);
     public Color textColor = new Color(0.92f, 0.97f, 1f, 1f);
@@ -70,6 +91,18 @@ public class CraftHUD : MonoBehaviour
         {
             _nextAutoAssignTime = Time.unscaledTime + 1f;
             TryAutoAssign();
+        }
+
+        // Exponential display smoothing: converges within ~3τ (≤ a quarter second at
+        // the default), so the readout stays calm without noticeable lag at 1300 km/h.
+        if (craftCore != null)
+        {
+            float speedKmh = GetTelemetry().speed * 3.6f;
+            if (displaySmoothing <= 0.001f)
+                _smoothedSpeedKmh = speedKmh;
+            else
+                _smoothedSpeedKmh = Mathf.Lerp(_smoothedSpeedKmh, speedKmh,
+                    1f - Mathf.Exp(-Time.deltaTime / displaySmoothing));
         }
     }
 
@@ -142,20 +175,63 @@ public class CraftHUD : MonoBehaviour
     {
         CraftTelemetry telemetry = GetTelemetry();
 
+        // ── Bottom-center speed readout ──
+        // Resolution scaling keys off HEIGHT so ultrawide monitors keep the same
+        // physical size; the safe area keeps it clear of notches/rounded corners.
+        float resScale = Screen.height / 1080f * uiScale;
+        Rect safe = Screen.safeArea;
+
+        int numberSize = Mathf.RoundToInt(speedFontSize * resScale);
+        int unitSize = Mathf.RoundToInt(unitFontSize * resScale);
+        if (_speedNumberStyle == null || _speedStyleSizeCache != numberSize)
+        {
+            _speedStyleSizeCache = numberSize;
+            _speedNumberStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = numberSize,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.LowerCenter,
+                normal = { textColor = textColor }
+            };
+            _speedUnitStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = unitSize,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.UpperCenter,
+                normal = { textColor = mutedColor }
+            };
+        }
+
+        // Screen.safeArea has a bottom-left origin; OnGUI a top-left one — the safe
+        // area's bottom edge in GUI space is Screen.height − safe.y.
+        float safeBottomY = Screen.height - safe.y;
+        float unitHeight = showUnit ? unitSize * 1.35f : 0f;
+        float numberHeight = numberSize * 1.25f;
+        float blockWidth = numberSize * 5f;
+        float centerX = safe.x + safe.width * 0.5f;
+        float blockBottom = safeBottomY - bottomOffset * resScale;
+
+        string speed = Mathf.RoundToInt(Mathf.Max(0f, _smoothedSpeedKmh)).ToString();
+        GUI.color = textColor;
+        GUI.Label(new Rect(centerX - blockWidth * 0.5f, blockBottom - unitHeight - numberHeight, blockWidth, numberHeight),
+            speed, _speedNumberStyle);
+        if (showUnit)
+        {
+            GUI.color = mutedColor;
+            GUI.Label(new Rect(centerX - blockWidth * 0.5f, blockBottom - unitHeight, blockWidth, unitHeight),
+                "KM/H", _speedUnitStyle);
+        }
+
+        // ── Craft state panel stays top-right (unchanged information) ──
         float width = 270f * uiScale;
-        float height = 92f * uiScale;
+        float height = 62f * uiScale;
         float x = Screen.width - margin.x - width;
         float y = margin.y;
 
         DrawPanel(new Rect(x, y, width, height));
-
-        string speed = (telemetry.speed * 3.6f).ToString("0");
-        GUI.color = textColor;
-        GUI.Label(new Rect(x + 12f * uiScale, y + 8f * uiScale, width - 24f * uiScale, 38f * uiScale), speed + " km/h", _largeStyle);
-
         string state = GetStateLabel(telemetry, out Color stateColor);
-        DrawRightLabel(x + 12f * uiScale, y + 50f * uiScale, width - 24f * uiScale, "STATE", state, stateColor);
-        DrawRightLabel(x + 12f * uiScale, y + 68f * uiScale, width - 24f * uiScale, "GRIP", GetGripLabel(), GetGripColor());
+        DrawRightLabel(x + 12f * uiScale, y + 10f * uiScale, width - 24f * uiScale, "STATE", state, stateColor);
+        DrawRightLabel(x + 12f * uiScale, y + 32f * uiScale, width - 24f * uiScale, "GRIP", GetGripLabel(), GetGripColor());
 
         GUI.color = Color.white;
     }

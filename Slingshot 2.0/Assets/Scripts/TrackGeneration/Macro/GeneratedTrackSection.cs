@@ -45,15 +45,15 @@ namespace TrackGeneration.Macro
         [Tooltip("This section borders an AirGap — its air-gap-facing boundary must stay open.")]
         public bool ConnectsToAirGap;
 
-        [Header("Pattern / Branch Identity")]
+        [Header("Pattern / Quarter Identity")]
         [Tooltip("Id of the feature pattern this section belongs to, empty for plain sections. Sections of one pattern form an atomic group.")]
         public string PatternId;
 
-        [Tooltip("Branch group this section belongs to, -1 for main-line sections.")]
-        public int BranchGroupId = -1;
+        [Tooltip("Quarter of the lap this section belongs to (0..3). -1 only before quarter stamping.")]
+        public int QuarterIndex = -1;
 
-        [Tooltip("Route within the branch group (0 = A, 1 = B), -1 for main-line sections.")]
-        public int RouteId = -1;
+        [Tooltip("Road within the quarter: 0 = canonical road (route A), 1 = alternate road (route B) of a Dual Road Quarter.")]
+        public int RoadId;
 
         /// <summary>The GameObject built for this section (set by the mesh builder).</summary>
         [NonSerialized]

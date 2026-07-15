@@ -95,8 +95,17 @@ namespace TrackGeneration.Macro
         [Tooltip("Number of cross-section sample points per SIDE (total profile points = 2*resolution + 1). Points are distributed toward the curved walls, where the resolution is actually visible.")]
         public int ProfileResolution = 32;
 
-        [Tooltip("Height of the optional outer safety lip at the very top edge (meters). 0 = none.")]
+        [Tooltip("Height of the optional outer safety lip at the very top edge (meters). 0 = none. Realized as a small inward capture curl, not a raised fin.")]
         public float SafetyLipHeight = 1.0f;
+
+        [Tooltip("Center-flat ratio a fully rounded turn interior may reach (dynamic turn rounding blends the base ratio toward this).")]
+        public float MinTurnCenterFlatRatio = 0.05f;
+
+        [Tooltip("Maximum catch-wall angle past vertical (degrees). The outside wall of a demanding turn curls this far over the road at full engagement.")]
+        public float MaxOverhangAngleDeg = 18f;
+
+        [Tooltip("Radius of the catch-wall capture curl (meters).")]
+        public float OverhangRadius = 10f;
 
         /// <summary>True when the resolved shape produces curved rideable walls.</summary>
         public bool IsHalfPipe => Shape != RoadCrossSectionShape.FlatWithWalls;
@@ -122,15 +131,18 @@ namespace TrackGeneration.Macro
         /// Never returns a negative value — no hidden dips below the section baseline.
         /// </summary>
         public float HeightAt(float normalizedX, float halfWidth, float sideHeight)
+            => HeightAt(normalizedX, halfWidth, sideHeight, Mathf.Clamp01(CenterFlatWidthRatio), CurvePower);
+
+        /// <summary>Height with explicit flat ratio and curve power (dynamic turn rounding varies both per frame).</summary>
+        public float HeightAt(float normalizedX, float halfWidth, float sideHeight, float flat, float power)
         {
             if (!IsHalfPipe || sideHeight <= 0f) return 0f;
 
             float absX = Mathf.Abs(Mathf.Clamp(normalizedX, -1f, 1f));
-            float flat = Mathf.Clamp01(CenterFlatWidthRatio);
             if (absX <= flat) return 0f;
 
             float t = (absX - flat) / Mathf.Max(0.0001f, 1f - flat);
-            float h = Mathf.Pow(t, CurvePower) * ClampedSideHeight(halfWidth, sideHeight);
+            float h = Mathf.Pow(t, power) * ClampedSideHeight(halfWidth, sideHeight, flat, power);
             return Mathf.Max(0f, h);
         }
 
@@ -139,9 +151,13 @@ namespace TrackGeneration.Macro
         /// Max slope of h = H·t^p over the rising span W·(1-flat) is p·H / (W·(1-flat)).
         /// </summary>
         public float ClampedSideHeight(float halfWidth, float sideHeight)
+            => ClampedSideHeight(halfWidth, sideHeight, Mathf.Clamp01(CenterFlatWidthRatio), CurvePower);
+
+        /// <summary>Clamped side height with explicit flat ratio and curve power.</summary>
+        public float ClampedSideHeight(float halfWidth, float sideHeight, float flat, float power)
         {
-            float risingSpan = Mathf.Max(0.01f, halfWidth * (1f - Mathf.Clamp01(CenterFlatWidthRatio)));
-            float maxBySlope = Mathf.Tan(Mathf.Clamp(WallAngle, 5f, 85f) * Mathf.Deg2Rad) * risingSpan / CurvePower;
+            float risingSpan = Mathf.Max(0.01f, halfWidth * (1f - flat));
+            float maxBySlope = Mathf.Tan(Mathf.Clamp(WallAngle, 5f, 85f) * Mathf.Deg2Rad) * risingSpan / Mathf.Max(1.05f, power);
             return Mathf.Min(sideHeight * ShapeDepthScale, maxBySlope);
         }
 
@@ -157,18 +173,21 @@ namespace TrackGeneration.Macro
         /// roughly twice the effective wall smoothness. Symmetric; endpoints exact.
         /// </summary>
         public float ProfileXAt(int i, int count)
+            => ProfileXAt(i, count, Mathf.Clamp01(CenterFlatWidthRatio));
+
+        /// <summary>Warped profile position with an explicit flat ratio (per-frame turn rounding).</summary>
+        public float ProfileXAt(int i, int count, float flat)
         {
             if (count <= 1) return 0f;
             float u = -1f + 2f * i / (count - 1);
             if (!IsHalfPipe) return u;
 
-            float flat = Mathf.Clamp01(CenterFlatWidthRatio);
             float uFlat = flat * 0.5f; // the flat center gets half its proportional sample share
             float au = Mathf.Abs(u);
 
             float x = au <= uFlat
                 ? flat * (au / Mathf.Max(0.0001f, uFlat))
-                : flat + (1f - flat) * Mathf.Pow((au - uFlat) / (1f - uFlat), 0.6f);
+                : flat + (1f - flat) * Mathf.Pow((au - uFlat) / Mathf.Max(0.0001f, 1f - uFlat), 0.6f);
             return Mathf.Sign(u) * Mathf.Min(x, 1f);
         }
     }

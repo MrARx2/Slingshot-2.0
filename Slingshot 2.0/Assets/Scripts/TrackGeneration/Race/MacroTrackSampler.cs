@@ -60,6 +60,9 @@ namespace TrackGeneration.Race
             {
                 GeneratedTrackSection s = sections[i];
                 if (s == null) continue;
+                // Arbitrary-arc sampling always follows the CANONICAL road — a dual
+                // quarter's alternate road overlaps road A's arc range by design.
+                if (s.RoadId == 1) continue;
                 if (arc >= s.StartFrame.ArcLength - 0.001f && arc <= s.EndFrame.ArcLength + 0.001f)
                     return s;
             }

@@ -83,7 +83,11 @@ namespace TrackGeneration.Design
         OpeningCorner,
         SweeperIntoHairpin,
         Hairpin,
-        AlternatingRadiusSequence
+        AlternatingRadiusSequence,
+
+        // Advanced road features (appended — serialized by int, never reorder)
+        FullPipe,
+        WallrideTurn
     }
 
     /// <summary>One required pattern request: this pattern must appear exactly/at least Count times.</summary>
@@ -261,6 +265,32 @@ namespace TrackGeneration.Design
         [Tooltip("Cross-section sample points per SIDE (total profile points = 2×resolution + 1). Higher = smoother bowl, more vertices. Points concentrate on the curved walls automatically.")]
         [Range(4, 96)] public int ProfileResolution = 32;
 
+        [Header("Dynamic Turn Rounding")]
+        [Tooltip("Turn interiors progressively lose their flat center and become continuously rounded bowls; straights keep the configured center-flat ratio. Driven by the same smooth field as banking — no ridge can appear where the flat disappears.")]
+        public bool DynamicTurnRounding = true;
+
+        [Tooltip("How strongly turn demand converts into rounding. 1 = the apex of a committed turn reaches the minimum center-flat ratio.")]
+        [Range(0f, 1f)] public float TurnRoundingStrength = 0.85f;
+
+        [Tooltip("Center-flat ratio at FULL rounding. 0 = the apex may become fully rounded across its width.")]
+        [Range(0f, 0.5f)] public float MinimumTurnCenterFlatRatio = 0.05f;
+
+        [Header("Outside Catch Wall")]
+        [Tooltip("In demanding turns the outside wall continues past vertical into a gentle inward curl that guides the craft back toward the bowl. Still an open road — not a pipe, not a wallride.")]
+        public bool OutsideCatchWall = true;
+
+        [Tooltip("Maximum catch-wall engagement. 1 = full curl (Maximum Overhang Angle past vertical) on the most demanding corners.")]
+        [Range(0f, 1f)] public float CatchWallStrength = 0.6f;
+
+        [Tooltip("How far past vertical the catch wall may curl (degrees). 10–30° is the useful range.")]
+        [Range(0f, 35f)] public float MaxOverhangAngle = 18f;
+
+        [Tooltip("Radius of the capture curl (meters).")]
+        [Range(2f, 60f)] public float OverhangRadius = 10f;
+
+        [Tooltip("Turn demand (0..1 of full support) below which the catch wall stays disengaged — gentle corners keep the ordinary wall + safety lip.")]
+        [Range(0f, 1f)] public float CatchWallMinimumDemand = 0.35f;
+
         public void Sanitize()
         {
             RoadWidth = Mathf.Max(4f, RoadWidth);
@@ -270,6 +300,12 @@ namespace TrackGeneration.Design
             MaxWallAngle = Mathf.Clamp(MaxWallAngle, 10f, 85f);
             SafetyLipHeight = Mathf.Max(0f, SafetyLipHeight);
             ProfileResolution = Mathf.Clamp(ProfileResolution, 3, 96);
+            TurnRoundingStrength = Mathf.Clamp01(TurnRoundingStrength);
+            MinimumTurnCenterFlatRatio = Mathf.Clamp(MinimumTurnCenterFlatRatio, 0f, 0.5f);
+            CatchWallStrength = Mathf.Clamp01(CatchWallStrength);
+            MaxOverhangAngle = Mathf.Clamp(MaxOverhangAngle, 0f, 35f);
+            OverhangRadius = Mathf.Clamp(OverhangRadius, 1f, 100f);
+            CatchWallMinimumDemand = Mathf.Clamp01(CatchWallMinimumDemand);
         }
     }
 
@@ -298,6 +334,25 @@ namespace TrackGeneration.Design
         [Tooltip("Easing curve used by all blends.")]
         public TrackBlendCurve BlendCurve = TrackBlendCurve.SmootherStep;
 
+        [Header("Connectors")]
+        [Tooltip("Shortest meaningful connector, seconds at design speed. Straights between content shorter than the resolved blend requirement are lengthened, absorbed into a turn complex, or bridged — never emitted as tiny independent roads.")]
+        [Range(0.1f, 2.5f)] public float MinimumConnectorSeconds = 0.4f;
+
+        [Tooltip("How strongly bridge/transfer connectors inherit their neighbours' surface intent (bank, wall support, turn rounding). 0 = every connector resets to neutral, 1 = full carry-through (recommended — anything less leaves a proportional dip across every turn complex).")]
+        [Range(0f, 1f)] public float ConnectorInheritanceStrength = 1f;
+
+        [Tooltip("A straight between two SAME-DIRECTION turns shorter than this (seconds at design speed) is one turn complex: bank, outside wall, depth and rounding hold through it — no reset, no wavy wall. Longer straights may legitimately relax to neutral.")]
+        [Range(0.5f, 5f)] public float SameDirectionBridgeSeconds = 2.2f;
+
+        [Tooltip("Shortest time the banking field may take to swing from full one-side bank through zero to the other side, seconds. Left→right flicks faster than this are physically a wall at 1300 km/h.")]
+        [Range(0.3f, 3.5f)] public float MinimumBankReversalSeconds = 0.9f;
+
+        [Tooltip("Allow the connector analysis to LENGTHEN too-short adjustable connectors up to their blend requirement.")]
+        public bool AllowConnectorExpansion = true;
+
+        [Tooltip("Allow too-short connectors between same-direction turns to be absorbed into one turn complex (bank, wall support and rounding carry through instead of resetting).")]
+        public bool AllowConnectorAbsorption = true;
+
         [Header("Safety & Readability")]
         [Tooltip("Default readable approach BEFORE a major feature, seconds (1.4 s ≈ 506 m at 1300 km/h). Feature-specific approaches override via max(), never sum.")]
         [Range(0.8f, 4f)] public float DefaultApproachSeconds = 1.4f;
@@ -311,9 +366,6 @@ namespace TrackGeneration.Design
         [Tooltip("How long a major feature should be visible before the craft reaches it, seconds.")]
         [Range(1.2f, 4f)] public float VisualPreviewSeconds = 1.6f;
 
-        [Tooltip("Recovery time after a branch merge, seconds.")]
-        [Range(1f, 3f)] public float PostMergeRecoverySeconds = 1.2f;
-
         public void Sanitize()
         {
             GenericTransitionSeconds = Mathf.Max(0.1f, GenericTransitionSeconds);
@@ -322,11 +374,14 @@ namespace TrackGeneration.Design
             RollTransitionSeconds = Mathf.Max(0.1f, RollTransitionSeconds);
             WidthTransitionSeconds = Mathf.Max(0.1f, WidthTransitionSeconds);
             CrossSectionTransitionSeconds = Mathf.Max(0.1f, CrossSectionTransitionSeconds);
+            MinimumConnectorSeconds = Mathf.Max(0.05f, MinimumConnectorSeconds);
+            ConnectorInheritanceStrength = Mathf.Clamp01(ConnectorInheritanceStrength);
+            MinimumBankReversalSeconds = Mathf.Max(0.1f, MinimumBankReversalSeconds);
+            SameDirectionBridgeSeconds = Mathf.Max(0.2f, SameDirectionBridgeSeconds);
             DefaultApproachSeconds = Mathf.Max(0.2f, DefaultApproachSeconds);
             DefaultRecoverySeconds = Mathf.Max(0.2f, DefaultRecoverySeconds);
             DangerousSpacingSeconds = Mathf.Max(0.2f, DangerousSpacingSeconds);
             VisualPreviewSeconds = Mathf.Max(0.2f, VisualPreviewSeconds);
-            PostMergeRecoverySeconds = Mathf.Max(0.2f, PostMergeRecoverySeconds);
         }
     }
 
@@ -393,6 +448,23 @@ namespace TrackGeneration.Design
         [Tooltip("Half-loop patterns: half loop up to inverted, then a gradual 180° rollout — reverses heading vertically.")]
         public TrackFeatureRule HalfLoops = new TrackFeatureRule(true, 0, 1, 0.5f);
 
+        [Tooltip("Full closed-pipe road sections: the cross-section closes gradually into a tube the craft can roll around, then reopens.")]
+        public TrackFeatureRule FullPipes = new TrackFeatureRule(true, 0, 1, 0.6f);
+
+        [Tooltip("Wallride turns: corners where the boosted, over-curled outside wall becomes the primary driving surface.")]
+        public TrackFeatureRule Wallrides = new TrackFeatureRule(true, 0, 2, 0.7f);
+
+        [Header("Full Pipe Shape")]
+        [Tooltip("Full-pipe body duration window, seconds at design speed (includes the closure and opening spans).")]
+        [Range(2f, 12f)] public float MinFullPipeSeconds = 3f;
+        [Range(2f, 12f)] public float MaxFullPipeSeconds = 6f;
+
+        [Tooltip("Pipe diameter as a fraction of the road width (radius = width × scale / 2).")]
+        [Range(0.5f, 1.25f)] public float FullPipeRadiusScale = 0.8f;
+
+        [Tooltip("Duration of the pipe closure (and reopening) span, seconds. Short closures are physical walls at 1300 km/h.")]
+        [Range(0.6f, 3f)] public float PipeTransitionSeconds = 1.2f;
+
         [Header("Corner patterns")]
         [Tooltip("Chicane patterns (left-right-left flicks) placed as intentional corner patterns.")]
         public TrackFeatureRule Chicanes = new TrackFeatureRule(true, 0, 2, 1f);
@@ -426,9 +498,15 @@ namespace TrackGeneration.Design
             (Corkscrews ??= new TrackFeatureRule()).Sanitize();
             (Spirals ??= new TrackFeatureRule()).Sanitize();
             (HalfLoops ??= new TrackFeatureRule()).Sanitize();
+            (FullPipes ??= new TrackFeatureRule()).Sanitize();
+            (Wallrides ??= new TrackFeatureRule()).Sanitize();
             (Chicanes ??= new TrackFeatureRule()).Sanitize();
             (SCurves ??= new TrackFeatureRule()).Sanitize();
             (Hairpins ??= new TrackFeatureRule()).Sanitize();
+            MinFullPipeSeconds = Mathf.Clamp(MinFullPipeSeconds, 1f, 15f);
+            MaxFullPipeSeconds = Mathf.Clamp(MaxFullPipeSeconds, MinFullPipeSeconds, 15f);
+            FullPipeRadiusScale = Mathf.Clamp(FullPipeRadiusScale, 0.4f, 1.5f);
+            PipeTransitionSeconds = Mathf.Clamp(PipeTransitionSeconds, 0.4f, 4f);
             MinFeatureGroups = Mathf.Max(0, MinFeatureGroups);
             MaxFeatureGroups = Mathf.Max(MinFeatureGroups, MaxFeatureGroups);
             CompoundFeatureChance = Mathf.Clamp01(CompoundFeatureChance);
@@ -439,185 +517,170 @@ namespace TrackGeneration.Design
         }
     }
 
-    // ── Branch settings ──────────────────────────────────────────────────────
-
-    /// <summary>How the two routes of a branch group relate in character.</summary>
-    public enum BranchPairingMode
+    /// <summary>What a quarter of the lap contains: one road, or two alternative roads.</summary>
+    public enum TrackQuarterType
     {
-        [Tooltip("Deliberately different characters, e.g. Flowing vs Technical.")]
-        Contrasting,
-        [Tooltip("Similar characters with small variations.")]
-        Similar,
-        [Tooltip("Mirror-image routes.")]
-        Mirrored,
-        [Tooltip("Corresponding corners alternate which route holds the inside advantage.")]
-        AlternatingAdvantage,
-        [Tooltip("One conservative route vs one demanding route with a small theoretical advantage.")]
-        SafeVersusRisky,
-        [Tooltip("One route carries a feature (e.g. corkscrew twist); the other stays grounded.")]
-        FeatureVersusGround,
-        [Tooltip("Route A/B styles are taken verbatim from the per-route settings.")]
-        Custom
+        SingleRoad,
+        DualRoad
     }
 
-    /// <summary>How the two routes relate spatially (independent of their personalities).</summary>
-    public enum BranchInteractionPattern
+    /// <summary>
+    /// How a Dual Road Quarter presents the route choice. V1 implements ONLY
+    /// JumpSelection (the choice happens mid-air over an air gap); the other values
+    /// exist for forward compatibility and resolve to JumpSelection with a warning.
+    /// </summary>
+    public enum DualQuarterChoiceType
     {
-        [Tooltip("Routes diverge into fully separate corridors.")]
-        Separated,
-        [Tooltip("Routes run side by side at close, safe distance.")]
-        Parallel,
-        [Tooltip("Routes drift apart then converge gradually toward the merge.")]
-        Converging,
-        [Tooltip("Routes exchange horizontal sides once or more with controlled vertical separation.")]
-        AlternatingCrossover,
-        [Tooltip("Multiple interleaved crossovers.")]
-        Braided,
-        [Tooltip("Both routes wind around a shared central axis (twin corkscrew / double helix).")]
-        SharedAxis,
-        [Tooltip("The routes' geometry is owned by one paired feature (dueling loops, orbit pattern, …).")]
-        PairedFeature
+        GroundSplit,
+        JumpSelection,
+        HighLowSelection,
+        TwinPipeSelection
     }
 
-    /// <summary>Route personality used to initialize one branch route.</summary>
-    public enum BranchRouteStyle
+    /// <summary>Designer override for one quarter's type; Auto lets the Quarter stream decide.</summary>
+    public enum QuarterTypeOverride
     {
-        [Tooltip("Inherit the main track's character.")]
-        InheritTrack,
-        [Tooltip("Broad, fast, momentum-focused route.")]
-        Flowing,
-        [Tooltip("Tighter, weaving, precision route.")]
-        Technical,
-        [Tooltip("Enormous-radius maximum-speed route.")]
-        Velocity,
-        [Tooltip("High line with vertical spectacle.")]
-        HighFeature,
-        [Tooltip("Grounded low line.")]
-        LowGround,
-        [Tooltip("Conservative, wide, forgiving route.")]
-        Safe,
-        [Tooltip("Demanding route with a small theoretical time advantage.")]
-        Risky
+        Auto,
+        SingleRoad,
+        DualRoad
     }
 
-    /// <summary>Relative selection weights for branch spatial interaction patterns.</summary>
+    /// <summary>
+    /// Per-quarter lock levels (production doc §12). V1 honors Unlocked and FullyLocked
+    /// in the partial-regeneration commands; the intermediate modes are staged work.
+    /// </summary>
+    public enum QuarterLockMode
+    {
+        Unlocked,
+        TypeOnly,
+        GatesAndEnvelope,
+        LayoutSkeleton,
+        Geometry,
+        FullyLocked
+    }
+
+    /// <summary>What to do when a dual quarter's routes cannot be balanced (never silently accept a dominant route).</summary>
+    public enum DualQuarterBalancePolicy
+    {
+        DemoteToSingleRoad,
+        RejectCandidate
+    }
+
+    /// <summary>
+    /// Quarter settings: the lap is always divided into exactly 4 logical quarters
+    /// (0–25–50–75–100% lap progress); each is a Single Road Quarter or a Dual Road
+    /// Quarter (two alternative roads, entered and left by jumps — the route choice
+    /// happens in the air). Lap length counts the canonical road only.
+    /// </summary>
     [Serializable]
-    public class BranchInteractionWeights
+    public class TrackQuarterSettings
     {
-        [Min(0f)] public float Separated = 1f;
-        [Min(0f)] public float Parallel = 1f;
-        [Min(0f)] public float Converging = 1f;
-        [Min(0f)] public float AlternatingCrossover = 1f;
-        [Min(0f)] public float Braided = 0.5f;
-        [Min(0f)] public float SharedAxis = 0.5f;
-        [Min(0f)] public float PairedFeature = 0.5f;
+        [Header("Dual Quarter Count")]
+        [Tooltip("Minimum number of Dual Road Quarters on the lap (0–4).")]
+        [Range(0, 4)] public int MinimumDualQuarterCount = 0;
 
-        public float Total => Mathf.Max(0.0001f,
-            Separated + Parallel + Converging + AlternatingCrossover + Braided + SharedAxis + PairedFeature);
+        [Tooltip("Maximum number of Dual Road Quarters on the lap (0–4).")]
+        [Range(0, 4)] public int MaximumDualQuarterCount = 1;
 
-        public BranchInteractionWeights Clone() => (BranchInteractionWeights)MemberwiseClone();
-    }
+        [Tooltip("Per-quarter type override. Auto lets the Quarter seed stream decide within the count limits.")]
+        public QuarterTypeOverride[] QuarterTypeOverrides = new QuarterTypeOverride[4];
 
-    /// <summary>Per-route settings for one side of a branch group.</summary>
-    [Serializable]
-    public class BranchRouteSettings
-    {
-        [Tooltip("Personality this route is initialized from.")]
-        public BranchRouteStyle Style = BranchRouteStyle.InheritTrack;
+        [Tooltip("Forbid two Dual Road Quarters in a row (they would share only a short single-road neck between the convergence catch and the next choice jump).")]
+        public bool PreventAdjacentDualQuarters = false;
 
-        [Tooltip("Road width multiplier relative to the main road (0.6–1.4).")]
-        [Range(0.6f, 1.4f)] public float WidthScale = 1f;
+        [Tooltip("Allow the quarter containing the start line to be dual (the choice jump would come soon after the start).")]
+        public bool AllowQ1Dual = false;
 
-        [Tooltip("How strongly the route weaves/turns inside its corridor. 0 = near straight, 1 = constant direction changes.")]
-        [Range(0f, 1f)] public float WeaveIntensity = 0.5f;
+        [Tooltip("Allow the quarter ending at the finish line to be dual (the convergence catch would come shortly before it).")]
+        public bool AllowQ4Dual = true;
 
-        [Tooltip("Vertical bias: -1 = prefers the low line, +1 = prefers the high line.")]
-        [Range(-1f, 1f)] public float ElevationBias = 0f;
+        [Header("Choice Structure")]
+        [Tooltip("How the route choice is presented. V1 implements JumpSelection only; other values resolve to JumpSelection with a warning.")]
+        public DualQuarterChoiceType ChoiceType = DualQuarterChoiceType.JumpSelection;
 
-        [Tooltip("Whether this route may carry a roll feature (corkscrew twist) when the pairing calls for one.")]
-        public bool AllowRollFeature = true;
+        [Tooltip("Lateral separation between the two landing mouths (and between the two exit lips), meters. Clamped by rulebook limits and by ballistic aim authority at design speed.")]
+        [Range(16f, 80f)] public float LaneSeparationMeters = 24f;
 
-        [Tooltip("Risk character used by the balance estimator: 0 = safe, 1 = maximum demanded precision.")]
-        [Range(0f, 1f)] public float RiskTarget = 0.5f;
+        [Tooltip("Width of the shared convergence catch relative to the road width. Broad catches tolerate lateral aiming error at speed and let both lanes arrive simultaneously.")]
+        [Range(1.2f, 2f)] public float CatchWidthScale = 1.7f;
 
-        public BranchRouteSettings Clone() => (BranchRouteSettings)MemberwiseClone();
-    }
+        [Header("Alternate Road (Route B)")]
+        [Tooltip("Road width of the alternate road relative to the main road width.")]
+        [Range(0.7f, 1.3f)] public float DualRoadWidthScale = 1f;
 
-    /// <summary>Branch (two-route race) settings.</summary>
-    [Serializable]
-    public class TrackBranchSettings
-    {
-        [Tooltip("Minimum branch groups on the lap. Each group is a temporary two-route race: shared approach → fork → independent routes → controlled merge → recovery.")]
-        [Range(0, 5)] public int MinBranchGroups = 1;
+        [Tooltip("Accepted relative length difference between the two roads (fraction of road A's length). The alternate road is fitted to a similar length so ride times stay comparable.")]
+        [Range(0.05f, 0.5f)] public float RoadLengthTolerance = 0.2f;
 
-        [Tooltip("Maximum branch groups on the lap.")]
-        [Range(0, 5)] public int MaxBranchGroups = 3;
+        [Header("Balance (validation only — never iterative geometry repair)")]
+        [Tooltip("Maximum allowed NEUTRAL-craft time difference between the two roads, percent of the faster road (doc target 3–5%).")]
+        [Range(1f, 10f)] public float NeutralTimeTolerancePercent = 4f;
 
-        [Tooltip("Shortest route duration from fork to merge, seconds at design speed.")]
-        [Range(4f, 18f)] public float MinRouteDurationSeconds = 5f;
+        [Tooltip("Require that at least one craft archetype prefers each road (neither road dominates every archetype).")]
+        public bool RequireArchetypeDifferentiation = true;
 
-        [Tooltip("Longest route duration from fork to merge, seconds at design speed.")]
-        [Range(4f, 18f)] public float MaxRouteDurationSeconds = 9f;
-
-        [Tooltip("How the two routes relate in character.")]
-        public BranchPairingMode PairingMode = BranchPairingMode.Contrasting;
-
-        [Tooltip("Relative weights for the spatial interaction patterns.")]
-        public BranchInteractionWeights InteractionWeights = new BranchInteractionWeights();
-
-        [Tooltip("Route A settings (used directly in Custom pairing; used as a base otherwise).")]
-        public BranchRouteSettings RouteA = new BranchRouteSettings();
-
-        [Tooltip("Route B settings (used directly in Custom pairing; used as a base otherwise).")]
-        public BranchRouteSettings RouteB = new BranchRouteSettings();
-
-        [Tooltip("How long the fork should be visible before the decision point, seconds.")]
-        [Range(1.5f, 4f)] public float DecisionPreviewSeconds = 2f;
-
-        [Tooltip("Maximum allowed NEUTRAL-craft time difference between the routes (fraction, 0.03 = 3%). Branches outside this tolerance are rejected.")]
-        [Range(0.01f, 0.06f)] public float TimeBalanceTolerance = 0.03f;
-
-        [Tooltip("Target advantage a specialized craft archetype should gain on its preferred route (fraction).")]
-        [Range(0.01f, 0.1f)] public float SpecializationTarget = 0.04f;
-
-        [Tooltip("Lateral centerline separation range between the routes (meters). Dynamically increased for road widths, wall heights, banking and safety margins.")]
-        public Vector2 LateralSeparationRange = new Vector2(60f, 150f);
-
-        [Tooltip("Vertical centerline separation range for stacked/crossing patterns (meters).")]
-        public Vector2 VerticalSeparationRange = new Vector2(40f, 120f);
-
-        [Tooltip("How many times the routes may exchange sides (crossover patterns).")]
-        [Range(0, 5)] public int MaxCrossovers = 2;
-
-        [Tooltip("Duration of the lateral split at the fork, seconds.")]
-        [Range(0.8f, 3f)] public float SplitDurationSeconds = 1.5f;
-
-        [Tooltip("Delay after the fork before any vertical divergence starts, seconds. Splits must read as left/right choices FIRST.")]
-        [Range(0.3f, 1.5f)] public float VerticalDivergenceDelaySeconds = 0.6f;
-
-        [Tooltip("Duration of the vertical divergence climb/drop, seconds.")]
-        [Range(0.8f, 3.5f)] public float VerticalDivergenceSeconds = 1.5f;
-
-        [Tooltip("Duration of the merge (adjacent lanes → shared open throat → normal road), seconds.")]
-        [Range(0.8f, 3f)] public float MergeDurationSeconds = 1.5f;
+        [Tooltip("What happens when a dual quarter's roads cannot be balanced: demote that quarter to Single Road (with a report warning) or reject the whole candidate.")]
+        public DualQuarterBalancePolicy BalancePolicy = DualQuarterBalancePolicy.DemoteToSingleRoad;
 
         public void Sanitize()
         {
-            MinBranchGroups = Mathf.Max(0, MinBranchGroups);
-            MaxBranchGroups = Mathf.Max(MinBranchGroups, MaxBranchGroups);
-            MinRouteDurationSeconds = Mathf.Max(1f, MinRouteDurationSeconds);
-            MaxRouteDurationSeconds = Mathf.Max(MinRouteDurationSeconds, MaxRouteDurationSeconds);
-            TimeBalanceTolerance = Mathf.Clamp(TimeBalanceTolerance, 0.005f, 0.2f);
-            SpecializationTarget = Mathf.Clamp(SpecializationTarget, 0.005f, 0.2f);
-            LateralSeparationRange = new Vector2(
-                Mathf.Max(10f, Mathf.Min(LateralSeparationRange.x, LateralSeparationRange.y)),
-                Mathf.Max(10f, Mathf.Max(LateralSeparationRange.x, LateralSeparationRange.y)));
-            VerticalSeparationRange = new Vector2(
-                Mathf.Max(0f, Mathf.Min(VerticalSeparationRange.x, VerticalSeparationRange.y)),
-                Mathf.Max(0f, Mathf.Max(VerticalSeparationRange.x, VerticalSeparationRange.y)));
-            InteractionWeights ??= new BranchInteractionWeights();
-            RouteA ??= new BranchRouteSettings();
-            RouteB ??= new BranchRouteSettings();
+            MinimumDualQuarterCount = Mathf.Clamp(MinimumDualQuarterCount, 0, 4);
+            MaximumDualQuarterCount = Mathf.Clamp(MaximumDualQuarterCount, MinimumDualQuarterCount, 4);
+            if (QuarterTypeOverrides == null || QuarterTypeOverrides.Length != 4)
+            {
+                var fixedOverrides = new QuarterTypeOverride[4];
+                if (QuarterTypeOverrides != null)
+                    for (int i = 0; i < Mathf.Min(4, QuarterTypeOverrides.Length); i++)
+                        fixedOverrides[i] = QuarterTypeOverrides[i];
+                QuarterTypeOverrides = fixedOverrides;
+            }
+            LaneSeparationMeters = Mathf.Clamp(LaneSeparationMeters, 8f, 120f);
+            CatchWidthScale = Mathf.Clamp(CatchWidthScale, 1f, 2.5f);
+            DualRoadWidthScale = Mathf.Clamp(DualRoadWidthScale, 0.5f, 1.5f);
+            RoadLengthTolerance = Mathf.Clamp(RoadLengthTolerance, 0.02f, 0.6f);
+            NeutralTimeTolerancePercent = Mathf.Clamp(NeutralTimeTolerancePercent, 0.5f, 20f);
+        }
+    }
+
+    /// <summary>Road guidance visuals: center-aisle guide lines and transverse wall markers.</summary>
+    [Serializable]
+    public class TrackVisualSettings
+    {
+        [Header("Center Guide Lines")]
+        [Tooltip("Two longitudinal guide lines marking the edges of the center-flat region. They move inward and fade as dynamic turn rounding removes the flat zone.")]
+        public bool CenterGuideEnabled = true;
+
+        [Tooltip("Center guide color (shader-based — never raised collision geometry).")]
+        public Color CenterGuideColor = Color.white;
+
+        [Tooltip("Guide line width in meters.")]
+        [Range(0.05f, 2f)] public float CenterGuideWidth = 0.35f;
+
+        [Tooltip("Emission strength of the guide lines.")]
+        [Range(0f, 4f)] public float CenterGuideEmission = 1.2f;
+
+        [Header("Wall Markers")]
+        [Tooltip("Transverse marker lines across the walls: speed, curvature and orientation rhythm. Spacing is VISUAL — independent of the physical ring density.")]
+        public bool WallMarkersEnabled = true;
+
+        [Tooltip("Wall marker color.")]
+        public Color WallMarkerColor = Color.white;
+
+        [Tooltip("Marker line width along the track (meters).")]
+        [Range(0.1f, 4f)] public float WallMarkerWidth = 0.8f;
+
+        [Tooltip("Meters between wall markers. Never draws one per geometric ring — high-resolution geometry would be visual noise.")]
+        [Range(8f, 250f)] public float WallMarkerSpacingMeters = 48f;
+
+        [Tooltip("Distance over which markers fade out (meters).")]
+        [Range(50f, 3000f)] public float MarkerFadeDistance = 800f;
+
+        public void Sanitize()
+        {
+            CenterGuideWidth = Mathf.Clamp(CenterGuideWidth, 0.02f, 4f);
+            CenterGuideEmission = Mathf.Clamp(CenterGuideEmission, 0f, 8f);
+            WallMarkerWidth = Mathf.Clamp(WallMarkerWidth, 0.05f, 8f);
+            WallMarkerSpacingMeters = Mathf.Clamp(WallMarkerSpacingMeters, 4f, 500f);
+            MarkerFadeDistance = Mathf.Clamp(MarkerFadeDistance, 20f, 5000f);
         }
     }
 
@@ -689,19 +752,67 @@ namespace TrackGeneration.Design
         public TrackTransitionSettings Transitions = new TrackTransitionSettings();
         public TrackElevationSettings Elevation = new TrackElevationSettings();
         public TrackFeatureSettings Features = new TrackFeatureSettings();
-        public TrackBranchSettings Branches = new TrackBranchSettings();
+        public TrackQuarterSettings Quarters = new TrackQuarterSettings();
         public TrackGenerationBehaviorSettings Generation = new TrackGenerationBehaviorSettings();
+        public TrackVisualSettings Visual = new TrackVisualSettings();
 
         /// <summary>JSON snapshot taken when a preset was applied (empty when none).</summary>
         public string AppliedPresetSnapshotJson
         {
-            get => appliedPresetSnapshotJson;
-            set => appliedPresetSnapshotJson = value;
+            get
+            {
+                NormalizeAppliedPresetSnapshot();
+                return appliedPresetSnapshotJson;
+            }
+            set => appliedPresetSnapshotJson = StripEmbeddedSnapshot(value);
+        }
+
+        /// <summary>
+        /// Removes a recursively embedded snapshot from legacy serialized data. Older
+        /// ToJson calls included this field, so every preset refresh nested the previous
+        /// JSON again and permanently enlarged the component/Inspector payload.
+        /// </summary>
+        public bool NormalizeAppliedPresetSnapshot()
+        {
+            string normalized = StripEmbeddedSnapshot(appliedPresetSnapshotJson);
+            if (string.Equals(normalized, appliedPresetSnapshotJson, StringComparison.Ordinal)) return false;
+            appliedPresetSnapshotJson = normalized;
+            return true;
+        }
+
+        private static string StripEmbeddedSnapshot(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return json ?? "";
+
+            const string key = "\"appliedPresetSnapshotJson\"";
+            int keyIndex = json.IndexOf(key, StringComparison.Ordinal);
+            if (keyIndex < 0) return json;
+            int colon = json.IndexOf(':', keyIndex + key.Length);
+            if (colon < 0) return json;
+            int valueStart = colon + 1;
+            while (valueStart < json.Length && char.IsWhiteSpace(json[valueStart])) valueStart++;
+            if (valueStart >= json.Length || json[valueStart] != '"') return json;
+
+            bool escaped = false;
+            int valueEnd = valueStart + 1;
+            for (; valueEnd < json.Length; valueEnd++)
+            {
+                char c = json[valueEnd];
+                if (escaped) { escaped = false; continue; }
+                if (c == '\\') { escaped = true; continue; }
+                if (c == '"') break;
+            }
+            if (valueEnd >= json.Length) return json;
+
+            // Already canonical: avoid an allocation on every Inspector comparison.
+            if (valueEnd == valueStart + 1) return json;
+            return string.Concat(json.Substring(0, valueStart), "\"\"", json.Substring(valueEnd + 1));
         }
 
         /// <summary>Ensures every group exists and is internally consistent.</summary>
         public void Sanitize()
         {
+            NormalizeAppliedPresetSnapshot();
             (Scale ??= new TrackScaleSettings()).Sanitize();
             (Layout ??= new TrackLayoutSettings()).Sanitize();
             (Corners ??= new TrackCornerSettings()).Sanitize();
@@ -709,17 +820,40 @@ namespace TrackGeneration.Design
             (Transitions ??= new TrackTransitionSettings()).Sanitize();
             (Elevation ??= new TrackElevationSettings()).Sanitize();
             (Features ??= new TrackFeatureSettings()).Sanitize();
-            (Branches ??= new TrackBranchSettings()).Sanitize();
+            (Quarters ??= new TrackQuarterSettings()).Sanitize();
             (Generation ??= new TrackGenerationBehaviorSettings()).Sanitize();
+            (Visual ??= new TrackVisualSettings()).Sanitize();
         }
 
-        /// <summary>Deep copy via JSON round-trip (all groups are plain serializable data).</summary>
+        /// <summary>Deep copy via a bounded JSON round-trip (all groups are plain serializable data).</summary>
         public TrackDesignerSettings Clone()
         {
-            return JsonUtility.FromJson<TrackDesignerSettings>(JsonUtility.ToJson(this));
+            NormalizeAppliedPresetSnapshot();
+            string snapshot = appliedPresetSnapshotJson;
+            var clone = JsonUtility.FromJson<TrackDesignerSettings>(SerializeSettingsWithoutSnapshot(false));
+            if (clone != null) clone.appliedPresetSnapshotJson = snapshot;
+            return clone;
         }
 
-        /// <summary>Serializes the full settings for snapshots/comparison.</summary>
-        public string ToJson() => JsonUtility.ToJson(this, prettyPrint: false);
+        /// <summary>Serializes designer inputs for snapshots/comparison, excluding the retained snapshot itself.</summary>
+        public string ToJson()
+        {
+            NormalizeAppliedPresetSnapshot();
+            return SerializeSettingsWithoutSnapshot(false);
+        }
+
+        private string SerializeSettingsWithoutSnapshot(bool prettyPrint)
+        {
+            string snapshot = appliedPresetSnapshotJson;
+            appliedPresetSnapshotJson = "";
+            try
+            {
+                return JsonUtility.ToJson(this, prettyPrint);
+            }
+            finally
+            {
+                appliedPresetSnapshotJson = snapshot;
+            }
+        }
     }
 }

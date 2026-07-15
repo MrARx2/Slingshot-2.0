@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using TrackGeneration.Core;
 using TrackGeneration.Design;
+using TrackGeneration.Planning;
 
 namespace TrackGeneration.Macro
 {
@@ -87,6 +88,7 @@ namespace TrackGeneration.Macro
         // ── Corners & banking ──
         public float MinCurveRadius;
         public float MaxCurveRadius;
+        public float MaxClosureCurveRadius;
         public TurnFamilyWeights TurnWeights;
         public float BankingStrength;
         public float MaxBankAngle;
@@ -102,12 +104,19 @@ namespace TrackGeneration.Macro
         public float CrossSectionTransitionLength;
         public float MaxBankRampAngle;
 
+        // ── Connectors ──
+        public float MinimumConnectorLength;        // meters
+        public float ConnectorInheritanceStrength;  // 0..1
+        public float MinimumBankReversalLength;     // meters
+        public float SameDirectionBridgeLength;     // meters — straights shorter than this bridge their turn complex
+        public bool AllowConnectorExpansion;
+        public bool AllowConnectorAbsorption;
+
         // ── Safety & readability (meters) ──
         public float DefaultApproachLength;
         public float DefaultRecoveryLength;
         public float DangerousSpacingLength;
         public float VisualPreviewLength;
-        public float PostMergeRecoveryLength;
 
         // ── Elevation ──
         public float TargetElevationAmplitude;
@@ -127,9 +136,17 @@ namespace TrackGeneration.Macro
         public ResolvedFeatureRule Corkscrews;
         public ResolvedFeatureRule Spirals;
         public ResolvedFeatureRule HalfLoops;
+        public ResolvedFeatureRule FullPipes;
+        public ResolvedFeatureRule Wallrides;
         public ResolvedFeatureRule Chicanes;
         public ResolvedFeatureRule SCurves;
         public ResolvedFeatureRule Hairpins;
+
+        // ── Full pipes ──
+        public float MinFullPipeLength;
+        public float MaxFullPipeLength;
+        public float PipeTransitionLength;
+        public float FullPipeRadiusScale;
         public int MinFeatureGroups;
         public int MaxFeatureGroups;
         public float CompoundFeatureChance;
@@ -161,6 +178,22 @@ namespace TrackGeneration.Macro
         public float CorkscrewRecoveryLength;
         public float CorkscrewClearance;
 
+        // Quantized rotational-road grammar (runtime values derived from TrackConfig).
+        public float RotationUnitDegrees;
+        public int[] AllowedLoopRotationUnits;
+        public int[] AllowedCorkscrewRotationUnits;
+        public bool AllowHalfRotations;
+        public bool AllowQuarterTurnTransitions;
+        public int MaxLoopRotationUnits;
+        public int MaxCorkscrewRotationUnits;
+        public float NormalBankStepDegrees;
+        public RotationalBlendPreset DefaultRotationalBlend;
+        public float MaxRotationalSampleDistance;
+        public float MaxRotationalForwardAngle;
+        public float MaxRotationalRollAngle;
+        public int MinSamplesPerRotationUnit;
+        public float MinDistancePerRotationUnit;
+
         // ── Spirals ──
         public float MinSpiralRadius;
         public float MaxSpiralRadius;
@@ -186,38 +219,35 @@ namespace TrackGeneration.Macro
         public float MaxJumpHeight;
         public float JumpLandingTolerance;
 
-        // ── Branches ──
-        public int MinBranchGroups;
-        public int MaxBranchGroups;
-        public float MinRouteLength;
-        public float MaxRouteLength;
-        public BranchPairingMode PairingMode;
-        public BranchInteractionWeights InteractionWeights;
-        public BranchRouteSettings RouteASettings;
-        public BranchRouteSettings RouteBSettings;
-        public float DecisionPreviewLength;
-        public float TimeBalanceTolerance;
-        public float SpecializationTarget;
-        public float MinLateralSeparation;      // dynamically raised for road envelope
-        public float MaxLateralSeparation;
-        public float MinRouteVerticalSeparation; // dynamically raised for wall/slab envelope
-        public float MaxRouteVerticalSeparation;
-        public int MaxCrossovers;
-        public float SplitLength;
-        public float VerticalDivergenceDelay;
-        public float VerticalDivergenceLength;
-        public float MergeLength;
-
-        // ── Junction wall masks (split/merge open throats) ──
-        public float SplitInnerWallFadeOutLength;
-        public float SplitInnerWallFadeInLength;
-        public float MergeInnerWallFadeOutLength;
-        public float MergeInnerWallFadeInLength;
+        // ── Clearance safety margin (dual-quarter road pairing) ──
         public float WallMaskSafetyMargin;
+
+        // ── Quarters ──
+        public int MinDualQuarters;
+        public int MaxDualQuarters;
+        public QuarterTypeOverride[] QuarterTypeOverrides = new QuarterTypeOverride[4];
+        public bool PreventAdjacentDualQuarters;
+        public bool AllowQ1Dual;
+        public bool AllowQ4Dual;
+        public DualQuarterChoiceType QuarterChoiceType;
+        public float LaneSeparation;           // meters between the two landing mouths / exit lips
+        public float QuarterCatchWidth;        // meters — broad shared convergence catch
+        public float DualRoadWidth;            // meters — alternate road width
+        public float RoadLengthTolerance;      // fraction of road A length
+        public float NeutralTimeTolerance;     // fraction (0.04 = 4%)
+        public bool RequireArchetypeDifferentiation;
+        public DualQuarterBalancePolicy BalancePolicy;
 
         // ── Road & half-pipe ──
         public float RoadWidth;
         public TrackRoadProfileSettings RoadProfile;
+
+        // ── Dynamic cross-section (turn rounding + catch walls) ──
+        public bool DynamicTurnRoundingEnabled;
+        public float TurnRoundingStrength;
+        public bool CatchWallEnabled;
+        public float CatchWallStrength;
+        public float CatchWallMinimumDemand;
 
         // ── Clearance (wall-aware) ──
         public float VerticalClearance;         // rulebook clearance + wall/slab envelope
@@ -229,6 +259,7 @@ namespace TrackGeneration.Macro
         public int MaxRingsPerSection;
         public int MaxTotalRings;
         public int RenderRingBudget;   // designer performance budget — retopology spreads it over huge tracks
+        public List<int> SubdivisionLadder = new List<int>(); // approved ascending interval-count tiers
 
         // ── Closure ──
         public float ClosureReserveFraction;
@@ -278,6 +309,7 @@ namespace TrackGeneration.Macro
                 return r;
             }
 
+            limits.Validate(); // also performs additive TrackConfig schema migration
             settings.Sanitize();
 
             // ══ Speed & scale ══
@@ -302,9 +334,22 @@ namespace TrackGeneration.Macro
             // ══ Corners & banking ══
             r.MinCurveRadius = r.ClampReport(settings.Corners.MinCurveRadius, limits.MinCurveRadius, limits.MaxCurveRadius, "Corners.MinCurveRadius");
             r.MaxCurveRadius = Mathf.Clamp(settings.Corners.MaxCurveRadius, r.MinCurveRadius, limits.MaxCurveRadius);
+            // Styled corners honor the designer's visual range. Closure-only curves
+            // may use the wider legal rulebook envelope to supply positional capacity.
+            r.MaxClosureCurveRadius = Mathf.Max(r.MaxCurveRadius, limits.MaxClosureCurveRadius);
             r.TurnWeights = settings.Corners.TurnWeights.Clone();
-            r.BankingStrength = Mathf.Clamp01(settings.Corners.BankingStrength);
-            r.MaxBankAngle = r.ClampReport(settings.Corners.MaxBankAngle, 0f, limits.MaxBankAngle, "Corners.MaxBankAngle");
+            float requestedBankStrength = Mathf.Clamp01(settings.Corners.BankingStrength);
+            r.NormalBankStepDegrees = limits.NormalBankStepDegrees;
+            float requestedBank = r.ClampReport(settings.Corners.MaxBankAngle, 0f, limits.MaxBankAngle, "Corners.MaxBankAngle");
+            r.MaxBankAngle = Mathf.Floor(requestedBank / Mathf.Max(1f, r.NormalBankStepDegrees)) * r.NormalBankStepDegrees;
+            // Preserve the designer's strength intent while making the actual apex
+            // target an approved bank increment. Intermediate field samples still
+            // interpolate smoothly; only the selected target is discrete.
+            float effectiveBank = Mathf.Floor(requestedBank * requestedBankStrength /
+                                               Mathf.Max(1f, r.NormalBankStepDegrees)) * r.NormalBankStepDegrees;
+            r.BankingStrength = r.MaxBankAngle > 0.001f
+                ? Mathf.Clamp01(effectiveBank / r.MaxBankAngle)
+                : 0f;
             r.FloorTiltFraction = Mathf.Clamp01(settings.Corners.FloorTiltStrength);
 
             // ══ Transitions ══
@@ -317,12 +362,19 @@ namespace TrackGeneration.Macro
             r.CrossSectionTransitionLength = S(r.ClampReport(settings.Transitions.CrossSectionTransitionSeconds, limits.MinCrossSectionTransitionSeconds, limits.MaxCrossSectionTransitionSeconds, "Transitions.CrossSection"));
             r.MaxBankRampAngle = limits.MaxBankRampAngle;
 
+            // ══ Connectors ══
+            r.MinimumConnectorLength = S(r.ClampReport(settings.Transitions.MinimumConnectorSeconds, limits.MinConnectorSeconds, limits.MaxConnectorSeconds, "Transitions.MinimumConnector"));
+            r.ConnectorInheritanceStrength = Mathf.Clamp01(settings.Transitions.ConnectorInheritanceStrength);
+            r.MinimumBankReversalLength = S(r.ClampReport(settings.Transitions.MinimumBankReversalSeconds, limits.MinBankReversalSeconds, limits.MaxBankReversalSeconds, "Transitions.MinimumBankReversal"));
+            r.SameDirectionBridgeLength = S(r.ClampReport(settings.Transitions.SameDirectionBridgeSeconds, limits.MinBridgeSeconds, limits.MaxBridgeSeconds, "Transitions.SameDirectionBridge"));
+            r.AllowConnectorExpansion = settings.Transitions.AllowConnectorExpansion;
+            r.AllowConnectorAbsorption = settings.Transitions.AllowConnectorAbsorption;
+
             // ══ Safety & readability ══
             r.DefaultApproachLength = S(r.ClampReport(settings.Transitions.DefaultApproachSeconds, limits.MinApproachSeconds, limits.MaxApproachSeconds, "Transitions.DefaultApproach"));
             r.DefaultRecoveryLength = S(r.ClampReport(settings.Transitions.DefaultRecoverySeconds, limits.MinRecoverySeconds, limits.MaxRecoverySeconds, "Transitions.DefaultRecovery"));
             r.DangerousSpacingLength = S(r.ClampReport(settings.Transitions.DangerousSpacingSeconds, limits.MinDangerousSpacingSeconds, limits.MaxDangerousSpacingSeconds, "Transitions.DangerousSpacing"));
             r.VisualPreviewLength = S(r.ClampReport(settings.Transitions.VisualPreviewSeconds, limits.MinVisualPreviewSeconds, limits.MaxVisualPreviewSeconds, "Transitions.VisualPreview"));
-            r.PostMergeRecoveryLength = S(r.ClampReport(settings.Transitions.PostMergeRecoverySeconds, limits.MinPostMergeRecoverySeconds, limits.MaxPostMergeRecoverySeconds, "Transitions.PostMergeRecovery"));
 
             // ══ Road & half-pipe ══
             r.RoadWidth = r.ClampReport(settings.Road.RoadWidth, limits.MinRoadWidth, limits.MaxRoadWidth, "Road.RoadWidth");
@@ -334,8 +386,17 @@ namespace TrackGeneration.Macro
                 WallAngle = r.ClampReport(settings.Road.MaxWallAngle, limits.MinHalfPipeWallAngle, limits.MaxHalfPipeWallAngle, "Road.MaxWallAngle"),
                 CenterFlatWidthRatio = r.ClampReport(settings.Road.CenterFlatWidthRatio, limits.MinHalfPipeCenterFlatRatio, limits.MaxHalfPipeCenterFlatRatio, "Road.CenterFlatWidthRatio"),
                 ProfileResolution = Mathf.Clamp(settings.Road.ProfileResolution, limits.MinHalfPipeProfileResolution, limits.MaxHalfPipeProfileResolution),
-                SafetyLipHeight = r.ClampReport(settings.Road.SafetyLipHeight, limits.MinSafetyLipHeight, limits.MaxSafetyLipHeight, "Road.SafetyLipHeight")
+                SafetyLipHeight = r.ClampReport(settings.Road.SafetyLipHeight, limits.MinSafetyLipHeight, limits.MaxSafetyLipHeight, "Road.SafetyLipHeight"),
+                MinTurnCenterFlatRatio = Mathf.Clamp(settings.Road.MinimumTurnCenterFlatRatio, 0f, limits.MaxHalfPipeCenterFlatRatio),
+                MaxOverhangAngleDeg = r.ClampReport(settings.Road.MaxOverhangAngle, 0f, limits.MaxOverhangAngleLimit, "Road.MaxOverhangAngle"),
+                OverhangRadius = r.ClampReport(settings.Road.OverhangRadius, limits.MinOverhangRadius, limits.MaxOverhangRadius, "Road.OverhangRadius")
             };
+
+            r.DynamicTurnRoundingEnabled = settings.Road.DynamicTurnRounding;
+            r.TurnRoundingStrength = Mathf.Clamp01(settings.Road.TurnRoundingStrength);
+            r.CatchWallEnabled = settings.Road.OutsideCatchWall;
+            r.CatchWallStrength = Mathf.Clamp01(settings.Road.CatchWallStrength);
+            r.CatchWallMinimumDemand = Mathf.Clamp01(settings.Road.CatchWallMinimumDemand);
 
             // Wall-aware clearance: a road's rideable walls occupy SideHeight above the
             // floor (up to ~1.5× when bank-boosted) plus the slab below — over/under
@@ -366,6 +427,8 @@ namespace TrackGeneration.Macro
             r.Corkscrews = r.GateRule(settings.Features.Corkscrews, limits.AllowCorkscrews, "Features.Corkscrews");
             r.Spirals = r.GateRule(settings.Features.Spirals, limits.AllowSpirals, "Features.Spirals");
             r.HalfLoops = r.GateRule(settings.Features.HalfLoops, limits.AllowHalfLoops && limits.AllowLoops, "Features.HalfLoops");
+            r.FullPipes = r.GateRule(settings.Features.FullPipes, limits.AllowFullPipes, "Features.FullPipes");
+            r.Wallrides = r.GateRule(settings.Features.Wallrides, limits.AllowWallRides, "Features.Wallrides");
             r.Chicanes = ResolvedFeatureRule.From(settings.Features.Chicanes, true, r.DesignSpeedMps, r.DangerousSpacingLength);
             r.SCurves = ResolvedFeatureRule.From(settings.Features.SCurves, true, r.DesignSpeedMps, r.DangerousSpacingLength);
             r.Hairpins = ResolvedFeatureRule.From(settings.Features.Hairpins, true, r.DesignSpeedMps, r.DangerousSpacingLength);
@@ -406,11 +469,31 @@ namespace TrackGeneration.Macro
             r.MaxCorkscrewLength = S(limits.MaxCorkscrewSeconds);
             r.MinCorkscrewRadius = Mathf.Max(limits.MinCorkscrewRadius, r.RoadWidth * 0.6f);
             r.MaxCorkscrewRadius = Mathf.Max(r.MinCorkscrewRadius, limits.MaxCorkscrewRadius);
-            r.CorkscrewRollDegrees = Mathf.Clamp(360f, limits.MinCorkscrewRollDegrees, limits.MaxCorkscrewRollDegrees);
+            int baseCorkscrewUnits = 4;
+            if (limits.AllowedCorkscrewRotationUnits == null ||
+                System.Array.IndexOf(limits.AllowedCorkscrewRotationUnits, baseCorkscrewUnits) < 0)
+                baseCorkscrewUnits = limits.AllowedCorkscrewRotationUnits != null &&
+                                     limits.AllowedCorkscrewRotationUnits.Length > 0
+                    ? limits.AllowedCorkscrewRotationUnits[0]
+                    : 4;
+            r.CorkscrewRollDegrees = baseCorkscrewUnits * limits.RotationUnitDegrees;
             r.MaxRollRateDegPerMeter = limits.MaxRollRateDegreesPerSecond / Mathf.Max(1f, r.DesignSpeedMps);
             r.CorkscrewApproachLength = Mathf.Max(r.DefaultApproachLength, S(limits.MinCorkscrewApproachSeconds));
             r.CorkscrewRecoveryLength = Mathf.Max(r.DefaultRecoveryLength, S(limits.MinCorkscrewRecoverySeconds));
             r.CorkscrewClearance = limits.MinCorkscrewClearance;
+            r.RotationUnitDegrees = limits.RotationUnitDegrees;
+            r.AllowedLoopRotationUnits = (int[])limits.AllowedLoopRotationUnits.Clone();
+            r.AllowedCorkscrewRotationUnits = (int[])limits.AllowedCorkscrewRotationUnits.Clone();
+            r.AllowHalfRotations = limits.AllowHalfRotations;
+            r.AllowQuarterTurnTransitions = limits.AllowQuarterTurnTransitions;
+            r.MaxLoopRotationUnits = limits.MaxLoopRotationUnits;
+            r.MaxCorkscrewRotationUnits = limits.MaxCorkscrewRotationUnits;
+            r.DefaultRotationalBlend = limits.DefaultRotationalBlend;
+            r.MaxRotationalSampleDistance = limits.MaxRotationalSampleDistance;
+            r.MaxRotationalForwardAngle = limits.MaxRotationalForwardAngle;
+            r.MaxRotationalRollAngle = limits.MaxRotationalRollAngle;
+            r.MinSamplesPerRotationUnit = limits.MinSamplesPerRotationUnit;
+            r.MinDistancePerRotationUnit = limits.MinDistancePerRotationUnit;
 
             // Roll-rate feasibility: the smoothstepped roll peaks at 1.5× the average
             // rate, so a corkscrew needs at least this length for its total roll.
@@ -426,14 +509,28 @@ namespace TrackGeneration.Macro
             r.MaxSpiralRadius = limits.MaxSpiralRadius;
             r.MinSpiralRevolutions = limits.MinSpiralRevolutions;
             r.MaxSpiralRevolutions = limits.MaxSpiralRevolutions;
-            r.MinSpiralClimbPerRevolution = Mathf.Max(limits.MinSpiralClimbPerRevolution, r.VerticalClearance + 5f);
+            float spiralLayerClearance = Mathf.Max(r.VerticalClearance, limits.MinSpiralClearance);
+            float easedClearanceStep = SectionFrameBuilders.RequiredSpiralClimbPerRevolution(
+                spiralLayerClearance, r.MaxSpiralRevolutions);
+            r.MinSpiralClimbPerRevolution = SectionFrameBuilders.QuantizeElevationUp(
+                Mathf.Max(limits.MinSpiralClimbPerRevolution, easedClearanceStep), 5f);
             r.MaxSpiralClimbPerRevolution = Mathf.Max(r.MinSpiralClimbPerRevolution, limits.MaxSpiralClimbPerRevolution);
             if (r.MinSpiralClimbPerRevolution > limits.MaxSpiralClimbPerRevolution)
                 r.Issue(ResolvedIssueSeverity.Warning, "Spirals",
-                    $"Coil clearance ({r.VerticalClearance:F0}m walls included) forces {r.MinSpiralClimbPerRevolution:F0}m climb per revolution, above the rulebook's {limits.MaxSpiralClimbPerRevolution:F0}m.");
+                    $"Eased coil clearance ({spiralLayerClearance:F0}m walls included) forces a quantized " +
+                    $"{r.MinSpiralClimbPerRevolution:F0}m climb per revolution, above the rulebook's {limits.MaxSpiralClimbPerRevolution:F0}m.");
             r.SpiralApproachLength = Mathf.Max(r.DefaultApproachLength, S(limits.MinSpiralApproachSeconds));
             r.SpiralRecoveryLength = Mathf.Max(r.DefaultRecoveryLength, S(limits.MinSpiralRecoverySeconds));
-            r.SpiralClearance = limits.MinSpiralClearance;
+            r.SpiralClearance = spiralLayerClearance;
+
+            // ══ Full pipes ══
+            r.MinFullPipeLength = S(r.ClampReport(settings.Features.MinFullPipeSeconds, limits.MinFullPipeSeconds, limits.MaxFullPipeSeconds, "Features.MinFullPipeSeconds"));
+            r.MaxFullPipeLength = S(r.ClampReport(settings.Features.MaxFullPipeSeconds, limits.MinFullPipeSeconds, limits.MaxFullPipeSeconds, "Features.MaxFullPipeSeconds"));
+            if (r.MaxFullPipeLength < r.MinFullPipeLength) r.MaxFullPipeLength = r.MinFullPipeLength;
+            r.PipeTransitionLength = S(r.ClampReport(settings.Features.PipeTransitionSeconds, limits.MinPipeTransitionSeconds, limits.MaxPipeTransitionSeconds, "Features.PipeTransitionSeconds"));
+            // Pipe radius = width × scale / 2, floored by the rulebook's craft/camera clearance.
+            float minScale = limits.MinFullPipeRadius * 2f / Mathf.Max(1f, r.RoadWidth);
+            r.FullPipeRadiusScale = Mathf.Max(Mathf.Clamp(settings.Features.FullPipeRadiusScale, 0.4f, 1.5f), minScale);
 
             // ══ Jumps (ballistic) ══
             r.Gravity = limits.ReferenceGravity;
@@ -449,64 +546,69 @@ namespace TrackGeneration.Macro
             r.MaxJumpHeight = limits.MaxJumpHeight;
             r.JumpLandingTolerance = limits.JumpLandingTolerance;
 
-            // ══ Branches ══
-            bool branchesAllowed = limits.AllowBranches;
-            int wantedMin = settings.Branches.MinBranchGroups;
-            r.MaxBranchGroups = branchesAllowed ? Mathf.Min(settings.Branches.MaxBranchGroups, limits.MaxBranchGroupsPerTrack) : 0;
-            r.MinBranchGroups = Mathf.Min(wantedMin, r.MaxBranchGroups);
-            if (wantedMin > 0 && !branchesAllowed)
-                r.Issue(ResolvedIssueSeverity.Error, "Branches",
-                    "Branch groups are required by the designer settings, but AllowBranches is false in the TrackConfig rulebook.");
-            else if (wantedMin > r.MaxBranchGroups)
-                r.Issue(ResolvedIssueSeverity.Warning, "Branches",
-                    $"Requested minimum {wantedMin} branch groups exceeds the rulebook cap {limits.MaxBranchGroupsPerTrack} — clamped.");
-
-            r.MinRouteLength = S(r.ClampReport(settings.Branches.MinRouteDurationSeconds, limits.MinBranchRouteSeconds, limits.MaxBranchRouteSeconds, "Branches.MinRouteDuration"));
-            r.MaxRouteLength = S(r.ClampReport(settings.Branches.MaxRouteDurationSeconds, limits.MinBranchRouteSeconds, limits.MaxBranchRouteSeconds, "Branches.MaxRouteDuration"));
-            if (r.MaxRouteLength < r.MinRouteLength) r.MaxRouteLength = r.MinRouteLength;
-            r.PairingMode = settings.Branches.PairingMode;
-            r.InteractionWeights = settings.Branches.InteractionWeights.Clone();
-            r.RouteASettings = settings.Branches.RouteA.Clone();
-            r.RouteBSettings = settings.Branches.RouteB.Clone();
-            r.DecisionPreviewLength = S(r.ClampReport(settings.Branches.DecisionPreviewSeconds, limits.MinDecisionPreviewSeconds, limits.MaxDecisionPreviewSeconds, "Branches.DecisionPreview"));
-            r.TimeBalanceTolerance = r.ClampReport(settings.Branches.TimeBalanceTolerance, limits.MinTimeBalanceTolerance, limits.MaxTimeBalanceTolerance, "Branches.TimeBalanceTolerance");
-            r.SpecializationTarget = r.ClampReport(settings.Branches.SpecializationTarget, limits.MinSpecializationAdvantage, limits.MaxSpecializationAdvantage, "Branches.SpecializationTarget");
-
-            // Dynamic separation floor: half-widths + half-pipe walls + lips + slab +
-            // craft envelope + safety margin — routes must never share wall space.
-            float dynamicLateralFloor = r.RoadWidth                    // both half-widths
-                                      + r.RoadProfile.SideHeight * 2f  // rising walls
-                                      + r.RoadProfile.SafetyLipHeight * 2f
-                                      + 1.2f                           // slab thickness
-                                      + 8f                             // craft envelope
-                                      + 5f;                            // safety margin
-            r.MinLateralSeparation = Mathf.Max(
-                Mathf.Clamp(settings.Branches.LateralSeparationRange.x, limits.MinRouteCenterlineSeparation, limits.MaxRouteCenterlineSeparation),
-                dynamicLateralFloor);
-            r.MaxLateralSeparation = Mathf.Clamp(
-                Mathf.Max(settings.Branches.LateralSeparationRange.y, r.MinLateralSeparation),
-                r.MinLateralSeparation, limits.MaxRouteCenterlineSeparation);
-
-            r.MinRouteVerticalSeparation = Mathf.Max(
-                Mathf.Clamp(settings.Branches.VerticalSeparationRange.x, limits.MinRouteVerticalSeparation, limits.MaxRouteVerticalSeparation),
-                r.VerticalClearance);
-            r.MaxRouteVerticalSeparation = Mathf.Clamp(
-                Mathf.Max(settings.Branches.VerticalSeparationRange.y, r.MinRouteVerticalSeparation),
-                r.MinRouteVerticalSeparation, limits.MaxRouteVerticalSeparation);
-
-            r.MaxCrossovers = Mathf.Min(settings.Branches.MaxCrossovers, limits.MaxPairedRouteInteractions);
-            r.SplitLength = S(r.ClampReport(settings.Branches.SplitDurationSeconds, limits.MinLateralSplitSeconds, limits.MaxLateralSplitSeconds, "Branches.SplitDuration"));
-            r.VerticalDivergenceDelay = S(r.ClampReport(settings.Branches.VerticalDivergenceDelaySeconds, limits.MinVerticalDivergenceDelaySeconds, limits.MaxVerticalDivergenceDelaySeconds, "Branches.VerticalDivergenceDelay"));
-            r.VerticalDivergenceLength = S(r.ClampReport(settings.Branches.VerticalDivergenceSeconds, limits.MinVerticalDivergenceSeconds, limits.MaxVerticalDivergenceSeconds, "Branches.VerticalDivergence"));
-            r.MergeLength = S(r.ClampReport(settings.Branches.MergeDurationSeconds, limits.MinMergeSeconds, limits.MaxMergeSeconds, "Branches.MergeDuration"));
-
-            // Junction wall-mask throats scale with speed (short fixed meters would be
-            // sub-frame at 361 m/s).
-            r.SplitInnerWallFadeOutLength = S(0.25f);
-            r.SplitInnerWallFadeInLength = S(0.4f);
-            r.MergeInnerWallFadeOutLength = S(0.4f);
-            r.MergeInnerWallFadeInLength = S(0.25f);
             r.WallMaskSafetyMargin = 3f;
+
+            // ══ Quarters ══
+            bool dualAllowed = limits.AllowDualRoadQuarters && limits.AllowJumps;
+            r.MaxDualQuarters = dualAllowed
+                ? Mathf.Min(settings.Quarters.MaximumDualQuarterCount, limits.MaxDualQuartersPerTrack)
+                : 0;
+            r.MinDualQuarters = Mathf.Min(settings.Quarters.MinimumDualQuarterCount, r.MaxDualQuarters);
+            if (settings.Quarters.MinimumDualQuarterCount > 0 && !limits.AllowJumps)
+                r.Issue(ResolvedIssueSeverity.Warning, "Quarters",
+                    "Dual Road Quarters are entered and left by jumps, and the rulebook disallows jumps — resolving to 0 dual quarters.");
+            else if (settings.Quarters.MinimumDualQuarterCount > 0 && !limits.AllowDualRoadQuarters)
+                r.Issue(ResolvedIssueSeverity.Warning, "Quarters",
+                    "AllowDualRoadQuarters is false in the TrackConfig rulebook — resolving to 0 dual quarters.");
+            else if (settings.Quarters.MinimumDualQuarterCount > r.MaxDualQuarters)
+                r.Issue(ResolvedIssueSeverity.Warning, "Quarters",
+                    $"Requested minimum {settings.Quarters.MinimumDualQuarterCount} dual quarters exceeds the rulebook cap {limits.MaxDualQuartersPerTrack} — clamped.");
+
+            r.QuarterChoiceType = settings.Quarters.ChoiceType;
+            if (r.QuarterChoiceType != DualQuarterChoiceType.JumpSelection)
+            {
+                r.Issue(ResolvedIssueSeverity.Warning, "Quarters.ChoiceType",
+                    $"{r.QuarterChoiceType} is not implemented yet — using JumpSelection (the route choice happens in the air).");
+                r.QuarterChoiceType = DualQuarterChoiceType.JumpSelection;
+            }
+
+            r.QuarterTypeOverrides = settings.Quarters.QuarterTypeOverrides != null && settings.Quarters.QuarterTypeOverrides.Length == 4
+                ? (QuarterTypeOverride[])settings.Quarters.QuarterTypeOverrides.Clone()
+                : new QuarterTypeOverride[4];
+            int forcedDual = 0;
+            foreach (var o in r.QuarterTypeOverrides) if (o == QuarterTypeOverride.DualRoad) forcedDual++;
+            if (forcedDual > r.MaxDualQuarters)
+                r.Issue(ResolvedIssueSeverity.Warning, "Quarters.QuarterTypeOverrides",
+                    $"{forcedDual} quarters are forced Dual but only {r.MaxDualQuarters} are allowed — later forced quarters resolve Single.");
+            r.PreventAdjacentDualQuarters = settings.Quarters.PreventAdjacentDualQuarters;
+            r.AllowQ1Dual = settings.Quarters.AllowQ1Dual;
+            r.AllowQ4Dual = settings.Quarters.AllowQ4Dual;
+
+            r.DualRoadWidth = r.RoadWidth * Mathf.Clamp(settings.Quarters.DualRoadWidthScale, 0.5f, 1.5f);
+
+            // Dynamic separation floor: the two landing lanes are FULL half-pipe roads —
+            // their mouths must clear each other's walls no matter what the designer or
+            // rulebook window says (a 100 m road cannot land 24 m from its sibling).
+            float laneFloor = (r.RoadWidth + r.DualRoadWidth) * 0.5f   // both half-widths
+                            + r.RoadProfile.SideHeight * 2f            // rising walls
+                            + r.WallMaskSafetyMargin;
+            float requestedLaneSep = r.ClampReport(settings.Quarters.LaneSeparationMeters,
+                limits.MinLaneSeparation, limits.MaxLaneSeparation, "Quarters.LaneSeparation");
+            r.LaneSeparation = Mathf.Max(requestedLaneSep, laneFloor);
+            if (r.LaneSeparation > requestedLaneSep + 0.5f)
+                r.Issue(ResolvedIssueSeverity.Info, "Quarters.LaneSeparation",
+                    $"Raised to {r.LaneSeparation:F0} m so the two landing lanes clear each other's road envelope (road {r.RoadWidth:F0} m + walls).");
+            // The shared catch must swallow BOTH arriving lanes plus aiming error:
+            // the validator demands width ≥ builtLipSep + 16, and BUILT lips drift a
+            // few meters wider than the planned separation — resolve with +24 so the
+            // check keeps real headroom instead of failing by inches.
+            r.QuarterCatchWidth = Mathf.Max(
+                r.RoadWidth * Mathf.Clamp(settings.Quarters.CatchWidthScale, 1f, 2.5f),
+                r.LaneSeparation + 24f);
+            r.RoadLengthTolerance = Mathf.Clamp(settings.Quarters.RoadLengthTolerance, 0.02f, 0.6f);
+            r.NeutralTimeTolerance = Mathf.Clamp(settings.Quarters.NeutralTimeTolerancePercent, 0.5f, 20f) / 100f;
+            r.RequireArchetypeDifferentiation = settings.Quarters.RequireArchetypeDifferentiation;
+            r.BalancePolicy = settings.Quarters.BalancePolicy;
 
             // ══ Mesh ══
             r.MeshMetersPerRing = Mathf.Clamp(settings.Generation.MetersPerRing, limits.MinMetersPerRing, limits.MaxMetersPerRing);
@@ -515,6 +617,7 @@ namespace TrackGeneration.Macro
             r.MaxRingsPerSection = limits.MaxRingsPerMacroSection;
             r.MaxTotalRings = limits.MaxTotalTrackRings;
             r.RenderRingBudget = Mathf.Clamp(settings.Generation.TargetTotalRings, 2000, limits.MaxTotalTrackRings);
+            r.SubdivisionLadder.AddRange(limits.SubdivisionLadder);
 
             // ══ Closure ══
             r.ClosureReserveFraction = settings.Generation.ClosureReserveFraction;
@@ -549,33 +652,52 @@ namespace TrackGeneration.Macro
         /// <summary>Rough length one instance of a feature needs (approach + body + recovery).</summary>
         public float EstimateFeatureFootprint(TrackPatternType pattern)
         {
+            int MaxFullUnits(int[] allowed, int maximum)
+            {
+                int result = 0;
+                if (allowed != null)
+                    foreach (int units in allowed)
+                        if (units >= 4 && units <= maximum && units % 4 == 0)
+                            result = Mathf.Max(result, units);
+                return Mathf.Max(4, result);
+            }
+
             switch (pattern)
             {
                 case TrackPatternType.FullLoop:
-                    return LoopApproachLength + 2f * Mathf.PI * (MinLoopRadius + MaxLoopRadius) * 0.5f * 1.25f + LoopRecoveryLength;
+                    return 2f * Mathf.PI * (MinLoopRadius + MaxLoopRadius) * 0.5f * 1.25f *
+                           (MaxFullUnits(AllowedLoopRotationUnits, MaxLoopRotationUnits) / 4f);
                 case TrackPatternType.Corkscrew:
-                    return CorkscrewApproachLength + (MinCorkscrewLength + MaxCorkscrewLength) * 0.5f + CorkscrewRecoveryLength;
+                {
+                    float rateLength = MaxFullUnits(AllowedCorkscrewRotationUnits,
+                        MaxCorkscrewRotationUnits) * RotationUnitDegrees * 1.5f /
+                                       Mathf.Max(0.001f, MaxRollRateDegPerMeter);
+                    return Mathf.Max((MinCorkscrewLength + MaxCorkscrewLength) * 0.5f, rateLength);
+                }
                 case TrackPatternType.Spiral:
                     return SpiralApproachLength + 2f * Mathf.PI * (MinSpiralRadius + MaxSpiralRadius) * 0.5f + SpiralRecoveryLength;
                 case TrackPatternType.HalfLoopRollout:
                 {
                     float rollout = Mathf.Max(HalfLoopRolloutLength, 180f * 1.5f / Mathf.Max(0.001f, MaxRollRateDegPerMeter));
-                    return HalfLoopApproachLength + Mathf.PI * (MinHalfLoopRadius + MaxHalfLoopRadius) * 0.5f + rollout + HalfLoopRecoveryLength;
+                    return Mathf.PI * (MinHalfLoopRadius + MaxHalfLoopRadius) * 0.5f + rollout;
                 }
                 case TrackPatternType.JumpGap:
                 case TrackPatternType.JumpToBankedLanding:
                     return JumpApproachLength + MaxLaunchTransitionLength + DesignSpeedMps * MaxJumpAirtimeSeconds + MaxLandingTransitionLength + JumpRecoveryLength;
+                case TrackPatternType.FullPipe:
+                    return DefaultApproachLength + (MinFullPipeLength + MaxFullPipeLength) * 0.5f + DefaultRecoveryLength;
                 case TrackPatternType.HalfLoopToCorkscrew:
                 {
                     float rollout = Mathf.Max(HalfLoopRolloutLength, 540f * 1.5f / Mathf.Max(0.001f, MaxRollRateDegPerMeter));
-                    return HalfLoopApproachLength + Mathf.PI * (MinHalfLoopRadius + MaxHalfLoopRadius) * 0.5f + rollout + HalfLoopRecoveryLength;
+                    return Mathf.PI * (MinHalfLoopRadius + MaxHalfLoopRadius) * 0.5f + rollout * 0.8f;
                 }
                 case TrackPatternType.SpiralToCorkscrew:
-                    return SpiralApproachLength + 2f * Mathf.PI * MinSpiralRadius + MinCorkscrewLength + CorkscrewRecoveryLength;
+                    return 2f * Mathf.PI * MinSpiralRadius + MinCorkscrewLength;
                 case TrackPatternType.LoopToCorkscrew:
-                    return LoopApproachLength + 2f * Mathf.PI * MinLoopRadius * 1.25f + MinCorkscrewLength + CorkscrewRecoveryLength;
+                    return (2f * Mathf.PI * MinLoopRadius * 1.25f + MinCorkscrewLength) * 0.85f;
                 case TrackPatternType.DoubleCorkscrew:
-                    return CorkscrewApproachLength + 2f * MinCorkscrewLength + GenericTransitionLength + CorkscrewRecoveryLength;
+                    return Mathf.Max(2f * MinCorkscrewLength,
+                        8f * RotationUnitDegrees * 1.5f / Mathf.Max(0.001f, MaxRollRateDegPerMeter));
                 case TrackPatternType.Hairpin:
                 case TrackPatternType.SweeperIntoHairpin:
                     return Mathf.PI * MinCurveRadius + MinStraightLength;
@@ -594,19 +716,47 @@ namespace TrackGeneration.Macro
         /// <summary>Whether a pattern's underlying features are allowed by the rulebook flags.</summary>
         private bool PatternAllowed(TrackPatternType pattern, TrackConfig limits, out string requirement)
         {
+            bool HasFullRotation(int[] units, int maximum)
+            {
+                if (units == null) return false;
+                foreach (int value in units)
+                    if (value >= 4 && value <= maximum && value % 4 == 0) return true;
+                return false;
+            }
+
             requirement = "";
             switch (pattern)
             {
-                case TrackPatternType.FullLoop: requirement = "loops"; return limits.AllowLoops;
+                case TrackPatternType.FullLoop:
+                    requirement = "loops with an allowed full rotation count";
+                    return limits.AllowLoops && HasFullRotation(limits.AllowedLoopRotationUnits,
+                        limits.MaxLoopRotationUnits);
                 case TrackPatternType.Corkscrew:
-                case TrackPatternType.DoubleCorkscrew: requirement = "corkscrews"; return limits.AllowCorkscrews;
+                    requirement = "corkscrews with an allowed full rotation count";
+                    return limits.AllowCorkscrews && HasFullRotation(limits.AllowedCorkscrewRotationUnits,
+                        limits.MaxCorkscrewRotationUnits);
+                case TrackPatternType.DoubleCorkscrew:
+                    requirement = "an allowed 8-unit corkscrew";
+                    return limits.AllowCorkscrews && limits.MaxCorkscrewRotationUnits >= 8 &&
+                           System.Array.IndexOf(limits.AllowedCorkscrewRotationUnits, 8) >= 0;
                 case TrackPatternType.Spiral: requirement = "spirals"; return limits.AllowSpirals;
-                case TrackPatternType.HalfLoopRollout: requirement = "half-loops"; return limits.AllowHalfLoops && limits.AllowLoops;
-                case TrackPatternType.HalfLoopToCorkscrew: requirement = "half-loops and corkscrews"; return limits.AllowHalfLoops && limits.AllowLoops && limits.AllowCorkscrews;
-                case TrackPatternType.SpiralToCorkscrew: requirement = "spirals and corkscrews"; return limits.AllowSpirals && limits.AllowCorkscrews;
-                case TrackPatternType.LoopToCorkscrew: requirement = "loops and corkscrews"; return limits.AllowLoops && limits.AllowCorkscrews;
+                case TrackPatternType.HalfLoopRollout: requirement = "half-loops"; return limits.AllowHalfLoops && limits.AllowLoops && limits.AllowHalfRotations;
+                case TrackPatternType.HalfLoopToCorkscrew: requirement = "half-loops and corkscrews"; return limits.AllowHalfLoops && limits.AllowLoops && limits.AllowCorkscrews && limits.AllowHalfRotations;
+                case TrackPatternType.SpiralToCorkscrew:
+                    requirement = "spirals and a full corkscrew";
+                    return limits.AllowSpirals && limits.AllowCorkscrews &&
+                           HasFullRotation(limits.AllowedCorkscrewRotationUnits,
+                               limits.MaxCorkscrewRotationUnits);
+                case TrackPatternType.LoopToCorkscrew:
+                    requirement = "full loop and corkscrew rotations";
+                    return limits.AllowLoops && limits.AllowCorkscrews &&
+                           HasFullRotation(limits.AllowedLoopRotationUnits, limits.MaxLoopRotationUnits) &&
+                           HasFullRotation(limits.AllowedCorkscrewRotationUnits,
+                               limits.MaxCorkscrewRotationUnits);
                 case TrackPatternType.JumpGap:
                 case TrackPatternType.JumpToBankedLanding: requirement = "jumps"; return limits.AllowJumps;
+                case TrackPatternType.FullPipe: requirement = "full pipes"; return limits.AllowFullPipes;
+                case TrackPatternType.WallrideTurn: requirement = "wallrides"; return limits.AllowWallRides;
                 default: return true; // corner patterns are always buildable
             }
         }
@@ -629,6 +779,7 @@ namespace TrackGeneration.Macro
             AddRule(Corkscrews, TrackPatternType.Corkscrew);
             AddRule(Spirals, TrackPatternType.Spiral);
             AddRule(HalfLoops, TrackPatternType.HalfLoopRollout);
+            AddRule(FullPipes, TrackPatternType.FullPipe);
             AddRule(Hairpins, TrackPatternType.Hairpin);
             AddRule(Chicanes, TrackPatternType.Chicane);
             AddRule(SCurves, TrackPatternType.SCurve);
@@ -648,13 +799,18 @@ namespace TrackGeneration.Macro
                 Issue(ResolvedIssueSeverity.Info, "Budget",
                     $"Required content (≈{totalRequired / 1000f:F1}km) exceeds the target lap ({TargetTrackLength / 1000f:F1}km) — the lap will grow, up to the {MaxTrackLength / 1000f:F1}km cap.");
 
-            // Branch route durations vs lap time.
-            if (MinBranchGroups > 0)
+            // Dual-quarter gate overhead vs lap time: each dual quarter costs an entry
+            // choice jump, an exit convergence jump, an approach and a recovery.
+            if (MinDualQuarters > 0)
             {
-                float branchTime = MinBranchGroups * (MinRouteLength / Mathf.Max(1f, DesignSpeedMps) + 3f);
-                if (branchTime > TargetLapTimeSeconds * 0.8f)
-                    Issue(ResolvedIssueSeverity.Error, "Branches",
-                        $"{MinBranchGroups} branch groups with ≥{MinRouteLength / DesignSpeedMps:F1}s routes need ≈{branchTime:F0}s, which cannot fit inside a {TargetLapTimeSeconds:F0}s target lap.");
+                float gateOverheadSeconds = 2f * (MaxLaunchTransitionLength / Mathf.Max(1f, DesignSpeedMps)
+                                                  + MaxJumpAirtimeSeconds
+                                                  + MaxLandingTransitionLength / Mathf.Max(1f, DesignSpeedMps))
+                                          + (JumpRecoveryLength + DefaultApproachLength) / Mathf.Max(1f, DesignSpeedMps);
+                float gateTime = MinDualQuarters * gateOverheadSeconds;
+                if (gateTime > TargetLapTimeSeconds * 0.5f)
+                    Issue(ResolvedIssueSeverity.Error, "Quarters",
+                        $"{MinDualQuarters} dual quarters need ≈{gateTime:F0}s of gate jumps alone, which cannot fit inside a {TargetLapTimeSeconds:F0}s target lap.");
             }
 
             // Elevation amplitude must be reachable within the climb angle over the lap.

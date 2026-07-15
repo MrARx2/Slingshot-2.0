@@ -5,29 +5,20 @@ using TrackGeneration.Macro;
 
 namespace TrackGeneration.Planning
 {
-    /// <summary>Plan-time parameters of one reserved branch group (frames are built later).</summary>
-    public class PlannedBranchGroup
-    {
-        public int GroupId;
-        public float CorridorLength;         // fork → merge along the main axis
-        public float LateralSeparation;      // peak centerline separation
-        public float VerticalSeparation;     // peak vertical separation (0 = level routes)
-        public BranchPairingMode PairingMode;
-        public BranchInteractionPattern InteractionPattern;
-        public BranchRouteSettings RouteASpec;
-        public BranchRouteSettings RouteBSpec;
-        public int Crossovers;
-        public uint RouteASeed;
-        public uint RouteBSeed;
-    }
-
     /// <summary>The full plan of one candidate: definitions plus bookkeeping for validation.</summary>
     public class TopologyPlan
     {
         public List<TrackMacroSectionDefinition> Defs = new List<TrackMacroSectionDefinition>();
-        public List<PlannedBranchGroup> BranchGroups = new List<PlannedBranchGroup>();
+
+        /// <summary>The 4 quarters of the lap (always exactly 4 after partition).</summary>
+        public List<PlannedQuarter> Quarters = new List<PlannedQuarter>();
+
         public Dictionary<TrackPatternType, int> PlacedPatterns = new Dictionary<TrackPatternType, int>();
+        public List<ConnectorDecisionRecord> ConnectorDecisions = new List<ConnectorDecisionRecord>();
         public int TurnCount;
+
+        /// <summary>Non-fatal planning notes (dual-quarter demotions, infeasible selections).</summary>
+        public List<string> Warnings = new List<string>();
 
         public GenerationFailureReason Failure = GenerationFailureReason.None;
         public string FailureMessage = "";
@@ -44,6 +35,16 @@ namespace TrackGeneration.Planning
         {
             PlacedPatterns.TryGetValue(type, out int c);
             PlacedPatterns[type] = c + 1;
+        }
+
+        public int DualQuarterCount
+        {
+            get
+            {
+                int c = 0;
+                foreach (var q in Quarters) if (q.Dual) c++;
+                return c;
+            }
         }
     }
 
@@ -71,66 +72,148 @@ namespace TrackGeneration.Planning
             public int Sign => SignedAngle >= 0 ? 1 : -1;
         }
 
-        /// <summary>Plans one candidate. Returns a plan whose Failure explains any rejection.</summary>
+        /// <summary>Legacy single-RNG entry: forks the independent streams from one attempt RNG.</summary>
         public TopologyPlan Plan(ResolvedTrackGenerationConfig cfg, ref Unity.Mathematics.Random rng)
+            => Plan(cfg, PlanRandomStreams.FromSingle(ref rng));
+
+        /// <summary>
+        /// Plans one candidate. Returns a plan whose Failure explains any rejection.
+        /// Every subsystem draws ONLY from its own stream, so re-randomizing one
+        /// stream (features, elevation, quarter content) never perturbs the others.
+        ///
+        /// Dual-quarter demotion loop: the deterministic planning core runs from a COPY
+        /// of the random streams; when the alternate road of one dual quarter cannot be
+        /// fitted (or fails balance under the DemoteToSingleRoad policy), that quarter is
+        /// demoted in the mask and the whole core re-runs from the same stream state —
+        /// fully deterministic, never surgical def removal.
+        /// </summary>
+        public TopologyPlan Plan(ResolvedTrackGenerationConfig cfg, PlanRandomStreams rngs)
         {
+            bool[] dualMask = null;
+            var demotionNotes = new List<string>();
+            TopologyPlan plan = null;
+
+            for (int attempt = 0; attempt <= 4; attempt++)
+            {
+                plan = PlanCore(cfg, rngs.Copy(), dualMask, out int failedQuarter);
+
+                bool demotable = plan.Failed && failedQuarter >= 0 &&
+                                 (plan.Failure == GenerationFailureReason.DualRoadFitFailure ||
+                                  (plan.Failure == GenerationFailureReason.DualRoadBalanceFailure &&
+                                   cfg.BalancePolicy == DualQuarterBalancePolicy.DemoteToSingleRoad));
+                if (!demotable) break;
+
+                if (dualMask == null)
+                {
+                    dualMask = new bool[4];
+                    foreach (var q in plan.Quarters) dualMask[q.Index] = q.Dual;
+                }
+                dualMask[failedQuarter] = false;
+                demotionNotes.Add($"Quarter {failedQuarter} demoted to SingleRoad: {plan.FailureMessage}");
+            }
+
+            if (demotionNotes.Count > 0)
+                plan.Warnings.InsertRange(0, demotionNotes);
+
+            // The demoted plan must still satisfy the resolved minimum.
+            if (!plan.Failed && plan.DualQuarterCount < cfg.MinDualQuarters)
+            {
+                string detail = demotionNotes.Count > 0 ? demotionNotes[demotionNotes.Count - 1] : null;
+                for (int w = plan.Warnings.Count - 1; w >= 0 && detail == null; w--)
+                    if (plan.Warnings[w].StartsWith("Dual selection") ||
+                        plan.Warnings[w].Contains("demoted to SingleRoad"))
+                        detail = plan.Warnings[w];
+                plan.Fail(GenerationFailureReason.RequiredFeatureMissing,
+                    $"Only {plan.DualQuarterCount} of the required {cfg.MinDualQuarters} Dual Road Quarters could be built " +
+                    $"({detail ?? "no eligible quarters"}).");
+            }
+
+            return plan;
+        }
+
+        /// <summary>
+        /// The deterministic planning core. <paramref name="dualMask"/> null = the
+        /// Quarter stream selects which quarters are dual; non-null = exactly the masked
+        /// quarters are dual (demotion re-runs). <paramref name="failedQuarter"/> is the
+        /// quarter whose alternate road failed, -1 for non-quarter failures.
+        /// </summary>
+        private TopologyPlan PlanCore(ResolvedTrackGenerationConfig cfg, PlanRandomStreams rngs,
+            bool[] dualMask, out int failedQuarter)
+        {
+            failedQuarter = -1;
             var plan = new TopologyPlan();
 
-            // ── 1. Corner plan ──
-            List<CornerSlot> corners = PlanCorners(cfg, plan, ref rng);
+            // ── 1. Corner plan (skeleton + realizations, quarter-agnostic) ──
+            List<CornerSlot> corners = PlanCorners(cfg, plan, rngs);
             if (plan.Failed) return plan;
             plan.TurnCount = corners.Count;
 
-            // ── 2/3. Gap budget, then feature instances (required first, then optional) ──
             int gapCount = corners.Count;
             int closureGaps = Mathf.Clamp(Mathf.CeilToInt(gapCount * cfg.ClosureReserveFraction), 2, gapCount - 1);
             int usableGaps = gapCount - closureGaps;
 
-            // Length budget for features: what remains of the cap after the corner arcs,
-            // the minimum straights and the branch minimums. Optional content stops when
+            // ── 2. Quarter partition + dual selection (Quarter stream) ──
+            PartitionQuarters(cfg, plan, corners, dualMask, ref rngs.Quarter);
+            if (plan.Failed) return plan;
+
+            // ── 3. Feature instances (required first, then optional) ──
+            // Length budget: what remains of the cap after the corner arcs, the minimum
+            // straights and the dual-quarter gate overhead. Optional content stops when
             // the budget runs out instead of blowing the cap and failing later.
             float cornerArcEstimate = 0f;
             foreach (var c in corners)
             {
                 float radius = Mathf.Max(Mathf.Lerp(cfg.MaxCurveRadius, cfg.MinCurveRadius, c.Magnitude / 180f), cfg.MinCurveRadius);
-                cornerArcEstimate += SectionFrameBuilders.EasedArcLength(c.Magnitude, radius);
+                float drawnArc = SectionFrameBuilders.EasedArcLength(c.Magnitude, radius);
+                float minArc = SectionFrameBuilders.EasedArcLength(c.Magnitude, cfg.MinCurveRadius);
+                // The closure budget pass can reclaim corner arc by shrinking radii
+                // toward the minimum (it counts 80% of that slack as usable) — charge
+                // features only 35% of the drawn surplus, or feature-heavy presets fail
+                // the budget check for length the solver would happily have found.
+                cornerArcEstimate += Mathf.Lerp(drawnArc, minArc, 0.65f);
             }
-            float branchEstimate = cfg.MinBranchGroups * (cfg.MinRouteLength + cfg.DecisionPreviewLength + cfg.PostMergeRecoveryLength);
+            // The gate overhead uses MAX launch/airtime/landing — solved jumps come in
+            // well under it, and the post-solve cap check now catches real overruns.
+            float gateOverhead = QuarterGateOverhead(cfg) * 0.8f;
+            float quarterEstimate = plan.DualQuarterCount * gateOverhead;
             float straightsEstimate = gapCount * Mathf.Max(MinAdjustableStraight, cfg.MinStraightLength * 0.6f);
-            float featureBudget = cfg.MaxTrackLength * 0.85f - cornerArcEstimate - branchEstimate - straightsEstimate;
+            float featureBudget = cfg.MaxTrackLength * 0.85f - cornerArcEstimate - quarterEstimate - straightsEstimate;
 
-            List<TrackPatternType> gapFeatures = PlanGapFeatures(cfg, plan, usableGaps - cfg.MinBranchGroups, featureBudget, ref rng);
+            // Road A inside a dual quarter may carry ordinary feature patterns. Road B
+            // is fitted independently and the completed pair still has to pass timing,
+            // clearance, and feature validation.
+            List<TrackPatternType> gapFeatures = PlanGapFeatures(cfg, plan, usableGaps, featureBudget, ref rngs.Feature);
             if (plan.Failed) return plan;
 
-            int branchGroups = cfg.MaxBranchGroups > 0
-                ? rng.NextInt(cfg.MinBranchGroups, cfg.MaxBranchGroups + 1)
-                : 0;
-
-            if (gapFeatures.Count + branchGroups > usableGaps)
-            {
-                if (gapFeatures.Count + cfg.MinBranchGroups > usableGaps)
-                {
-                    plan.Fail(GenerationFailureReason.InsufficientLengthBudget,
-                        $"{gapFeatures.Count} feature groups + {cfg.MinBranchGroups} branch groups need more gaps than the {usableGaps} available between {gapCount} corners (closure reserves {closureGaps}). Raise turn count or lower feature/branch minimums.");
-                    return plan;
-                }
-                branchGroups = Mathf.Max(cfg.MinBranchGroups, usableGaps - gapFeatures.Count);
-            }
-
-            // Deterministic shuffled gap order; first N get features, next M get branches.
+            // Deterministic shuffled gap order (Layout stream draws are identical
+            // regardless of the dual selection). Quarter re-rolls therefore preserve
+            // feature placement even when a containing quarter becomes dual.
             var gapOrder = new List<int>();
             for (int i = 0; i < usableGaps; i++) gapOrder.Add(i);
-            Shuffle(gapOrder, ref rng);
+            Shuffle(gapOrder, ref rngs.Layout);
 
             var featureByGap = new Dictionary<int, TrackPatternType>();
-            var branchGaps = new HashSet<int>();
             int cursor = 0;
-            foreach (var f in gapFeatures) featureByGap[gapOrder[cursor++]] = f;
-            for (int b = 0; b < branchGroups && cursor < gapOrder.Count; b++) branchGaps.Add(gapOrder[cursor++]);
+            foreach (var f in gapFeatures)
+            {
+                if (cursor >= gapOrder.Count)
+                {
+                    plan.Fail(GenerationFailureReason.InsufficientLengthBudget,
+                        $"{gapFeatures.Count} feature groups need more free gaps than remain between {gapCount} corners " +
+                        $"(closure reserves {closureGaps}).");
+                    return plan;
+                }
+                featureByGap[gapOrder[cursor++]] = f;
+            }
 
-            // ── 4. Emit definitions gap-by-gap, corner-by-corner ──
-            EmitDefinitions(cfg, plan, corners, featureByGap, branchGaps, closureGaps, ref rng);
+            // ── 4. Emit definitions gap-by-gap, corner-by-corner, with quarter gates ──
+            EmitDefinitions(cfg, plan, corners, featureByGap, closureGaps, rngs);
             if (plan.Failed) return plan;
+
+            // ── 4b. Connector analysis: classify straights between content, absorb
+            // same-direction bridges into turn complexes, lift tiny connectors to
+            // their blend requirement (a solver constraint, never a warp) ──
+            ConnectorAnalyzer.Analyze(plan, cfg);
 
             // ── 5. 2D closure solve on adjustable straights ──
             SolveClosure2D(cfg, plan);
@@ -138,10 +221,30 @@ namespace TrackGeneration.Planning
 
             // ── 6. Elevation plan (BEFORE the proximity check: planned climbs are what
             // legally separate folded mountain-pass legs) ──
-            PlanElevation(cfg, plan, ref rng);
+            PlanElevation(cfg, plan, ref rngs.Elevation);
             if (plan.Failed) return plan;
 
-            // ── 7. Cheap elevation-aware 2D self-proximity check ──
+            // ── 6b. Quarter-index stamping (closure/elevation inserted defs inherit) ──
+            StampQuarterIndices(plan);
+
+            // ── 6c. Alternate roads: fit road B of every dual quarter between its
+            // ballistic gate frames (post-closure, post-elevation — final geometry) ──
+            foreach (var q in plan.Quarters)
+            {
+                if (!q.Dual) continue;
+                var fit = QuarterRoadFitter.Fit(cfg, plan, q, ref rngs.Quarter);
+                if (!fit.Success)
+                {
+                    failedQuarter = q.Index;
+                    plan.Fail(fit.BalanceFailure
+                            ? GenerationFailureReason.DualRoadBalanceFailure
+                            : GenerationFailureReason.DualRoadFitFailure,
+                        $"Quarter {q.Index} road B: {fit.FailureMessage}");
+                    return plan;
+                }
+            }
+
+            // ── 7. Cheap elevation-aware 2D self-proximity check (canonical road) ──
             string collision = Validate2DWalk(cfg, plan);
             if (collision != null)
             {
@@ -153,10 +256,20 @@ namespace TrackGeneration.Planning
             return plan;
         }
 
+        /// <summary>Planned length of one dual quarter's gate suites (entry choice jump + exit convergence jump).</summary>
+        internal static float QuarterGateOverhead(ResolvedTrackGenerationConfig cfg)
+            => 2f * (cfg.MaxLaunchTransitionLength + cfg.DesignSpeedMps * cfg.MaxJumpAirtimeSeconds + cfg.MaxLandingTransitionLength)
+               + cfg.JumpRecoveryLength + cfg.DefaultApproachLength;
+
         // ═══════════════════════════ 1. Corner plan ═══════════════════════════
 
-        private List<CornerSlot> PlanCorners(ResolvedTrackGenerationConfig cfg, TopologyPlan plan, ref Unity.Mathematics.Random rng)
+        private List<CornerSlot> PlanCorners(ResolvedTrackGenerationConfig cfg, TopologyPlan plan, PlanRandomStreams rngs)
         {
+            // Corner GEOMETRY (count, magnitudes, signs, balance) draws from the Layout
+            // stream; realizations (special patterns, half-loops, wallrides) draw from
+            // the Feature stream — so feature re-rolls keep the same corner skeleton.
+            ref Unity.Mathematics.Random rng = ref rngs.Layout;
+
             int count = rng.NextInt(cfg.MinTurnCount, cfg.MaxTurnCount + 1);
             var corners = new List<CornerSlot>(count);
 
@@ -243,25 +356,65 @@ namespace TrackGeneration.Planning
                 : 0;
             for (int i = 0; i < optionalHalfLoopBudget; i++)
             {
-                if (rng.NextFloat() < Mathf.Clamp01(cfg.HalfLoops.OptionalWeight * 0.25f))
+                if (rngs.Feature.NextFloat() < Mathf.Clamp01(cfg.HalfLoops.OptionalWeight * 0.25f))
                     requiredHalfLoopTypes.Add(TrackPatternType.HalfLoopRollout);
             }
 
             if (requiredHalfLoopTypes.Count > 0)
             {
-                // Convert the sharpest non-special corners into half-loop reversals.
+                // Convert the sharpest non-special corners into half-loop reversals,
+                // CLUSTERED so at least one provisional quarter stays half-loop-free:
+                // a half-loop rollout owns the airspace over its ground path, which
+                // makes its quarter ineligible to become a Dual Road Quarter — a
+                // half-loop-heavy preset that scatters them across all four quarters
+                // can never satisfy a dual-quarter minimum. Placement uses only corner
+                // data, so seed-stream independence is preserved.
+                int[] quarterOf = ProvisionalQuarters(corners, cfg);
+                var dirty = new bool[4];
+                // The clean quarter this pass protects must be one that dual-quarter
+                // POLICY can actually use — keeping only Q1/Q4 clean is worthless when
+                // the start/finish policies bar them from ever going dual.
+                bool PolicyEligible(int qi) =>
+                    cfg.QuarterTypeOverrides[qi] != QuarterTypeOverride.SingleRoad &&
+                    (qi != 0 || cfg.AllowQ1Dual) &&
+                    (qi != 3 || cfg.AllowQ4Dual);
+                int CleanEligible()
+                {
+                    int clean = 0;
+                    for (int qi = 0; qi < 4; qi++) if (!dirty[qi] && PolicyEligible(qi)) clean++;
+                    return clean;
+                }
+
+                var indexOf = new Dictionary<CornerSlot, int>();
+                for (int ci = 0; ci < corners.Count; ci++) indexOf[corners[ci]] = ci;
+
                 var byMag = new List<CornerSlot>(corners);
                 byMag.Sort((a, b) => b.Magnitude.CompareTo(a.Magnitude));
                 int assigned = 0;
-                foreach (var c in byMag)
+
+                // Three preference tiers so half-loops CONCENTRATE: (0) quarters that
+                // are already dirty or can never go dual by policy, (1) dirty a fresh
+                // quarter but never the LAST clean policy-eligible one, (2) whatever
+                // remains so required counts always land.
+                for (int pass = 0; pass < 3 && assigned < requiredHalfLoopTypes.Count; pass++)
                 {
-                    if (assigned >= requiredHalfLoopTypes.Count) break;
-                    if (c.IsSpecial || c.IsHalfLoop) continue;
-                    c.IsHalfLoop = true;
-                    c.HalfLoopType = requiredHalfLoopTypes[assigned];
-                    c.SignedAngle = c.Sign * 180;
-                    assigned++;
+                    foreach (var c in byMag)
+                    {
+                        if (assigned >= requiredHalfLoopTypes.Count) break;
+                        if (c.IsSpecial || c.IsHalfLoop) continue;
+
+                        int cq = quarterOf[indexOf[c]];
+                        if (pass == 0 && !dirty[cq] && PolicyEligible(cq)) continue;
+                        if (pass == 1 && !dirty[cq] && PolicyEligible(cq) && CleanEligible() <= 1) continue;
+
+                        c.IsHalfLoop = true;
+                        c.HalfLoopType = requiredHalfLoopTypes[assigned];
+                        c.SignedAngle = c.Sign * 180;
+                        dirty[cq] = true;
+                        assigned++;
+                    }
                 }
+
                 if (assigned < requiredHalfLoopTypes.Count)
                 {
                     plan.Fail(GenerationFailureReason.RequiredPatternMissing,
@@ -278,11 +431,43 @@ namespace TrackGeneration.Planning
                 return corners;
             }
 
+            // Wallride turns: required minimum first (most eligible corners by
+            // magnitude), then optional by weight up to the maximum. A wallride wants
+            // a committed 60–140° corner — hairpin reversals and gentle kinks read
+            // wrong on a wall.
+            if (cfg.Wallrides.Enabled && cfg.Wallrides.MaximumCount > 0)
+            {
+                var eligible = new List<CornerSlot>();
+                foreach (var c in corners)
+                    if (!c.IsSpecial && !c.IsHalfLoop && c.Magnitude >= 60 && c.Magnitude <= 140)
+                        eligible.Add(c);
+                eligible.Sort((a, b) => b.Magnitude.CompareTo(a.Magnitude));
+
+                int assigned = 0;
+                foreach (var c in eligible)
+                {
+                    if (assigned >= cfg.Wallrides.MaximumCount) break;
+                    bool required = assigned < cfg.Wallrides.MinimumCount;
+                    if (!required && rngs.Feature.NextFloat() >= Mathf.Clamp01(cfg.Wallrides.OptionalWeight * 0.3f)) continue;
+                    c.IsSpecial = true;
+                    c.Realization = TrackPatternType.WallrideTurn;
+                    assigned++;
+                    plan.CountPattern(TrackPatternType.WallrideTurn);
+                }
+
+                if (assigned < cfg.Wallrides.MinimumCount)
+                {
+                    plan.Fail(GenerationFailureReason.RequiredFeatureMissing,
+                        $"Required {cfg.Wallrides.MinimumCount} wallride turns but only {assigned} corners in the 60–140° window were available.");
+                    return corners;
+                }
+            }
+
             // Intentional corner sequences on eligible plain corners.
             foreach (var c in corners)
             {
                 if (c.IsSpecial || c.IsHalfLoop) continue;
-                if (rng.NextFloat() >= cfg.CornerSequenceChance) continue;
+                if (rngs.Feature.NextFloat() >= cfg.CornerSequenceChance) continue;
 
                 int mag = c.Magnitude;
                 if (mag >= 150)
@@ -292,8 +477,8 @@ namespace TrackGeneration.Planning
                 }
                 else if (mag >= 90)
                 {
-                    c.Realization = rng.NextBool() ? TrackPatternType.DoubleApex
-                        : (rng.NextBool() ? TrackPatternType.TighteningCorner : TrackPatternType.OpeningCorner);
+                    c.Realization = rngs.Feature.NextBool() ? TrackPatternType.DoubleApex
+                        : (rngs.Feature.NextBool() ? TrackPatternType.TighteningCorner : TrackPatternType.OpeningCorner);
                     plan.CountPattern(c.Realization);
                 }
                 else continue;
@@ -308,7 +493,7 @@ namespace TrackGeneration.Planning
                 if (!c.IsSpecial || c.Realization != TrackPatternType.Hairpin || c.IsHalfLoop) continue;
                 var prev = corners[(i - 1 + corners.Count) % corners.Count];
                 if (prev.IsSpecial || prev.IsHalfLoop || prev.Sign != c.Sign || prev.Magnitude > 80) continue;
-                if (rng.NextFloat() >= cfg.CornerSequenceChance) continue;
+                if (rngs.Feature.NextFloat() >= cfg.CornerSequenceChance) continue;
 
                 c.Realization = TrackPatternType.SweeperIntoHairpin;
                 plan.CountPattern(TrackPatternType.SweeperIntoHairpin);
@@ -316,6 +501,39 @@ namespace TrackGeneration.Planning
             }
 
             return corners;
+        }
+
+        /// <summary>
+        /// Provisional quarter (0..3) of each corner: quartile cuts over the cumulative
+        /// corner-plan arc estimate — the same model PartitionQuarters uses, computed
+        /// from pre-realization magnitudes so realization passes can be quarter-aware
+        /// without touching the Quarter seed stream.
+        /// </summary>
+        private static int[] ProvisionalQuarters(List<CornerSlot> corners, ResolvedTrackGenerationConfig cfg)
+        {
+            int n = corners.Count;
+            var result = new int[n];
+            if (n == 0) return result;
+
+            float avgStraight = (cfg.MinStraightLength + cfg.MaxStraightLength) * 0.5f;
+            var estimate = new float[n];
+            float total = 0f;
+            for (int g = 0; g < n; g++)
+            {
+                float mag = corners[g].Magnitude;
+                float radius = Mathf.Max(Mathf.Lerp(cfg.MaxCurveRadius, cfg.MinCurveRadius, mag / 180f), cfg.MinCurveRadius);
+                estimate[g] = avgStraight + SectionFrameBuilders.EasedArcLength(mag, radius);
+                total += estimate[g];
+            }
+
+            float prefix = 0f;
+            for (int g = 0; g < n; g++)
+            {
+                prefix += estimate[g] * 0.5f; // classify by the gap's midpoint
+                result[g] = Mathf.Clamp(Mathf.FloorToInt(prefix / total * 4f), 0, 3);
+                prefix += estimate[g] * 0.5f;
+            }
+            return result;
         }
 
         /// <summary>Nudges/flips corner magnitudes until the signed sum is exactly ±360.</summary>
@@ -387,12 +605,15 @@ namespace TrackGeneration.Planning
 
             // Feature-count budget per underlying element, respecting maxima across
             // both single and compound placements.
-            int loopsUsed = 0, corksUsed = 0, spiralsUsed = 0, jumpsUsed = 0, chicanesUsed = 0, sCurvesUsed = 0;
+            int loopsUsed = 0, corksUsed = 0, spiralsUsed = 0, jumpsUsed = 0, chicanesUsed = 0, sCurvesUsed = 0, pipesUsed = 0;
 
             bool TryConsume(TrackPatternType t)
             {
                 switch (t)
                 {
+                    case TrackPatternType.FullPipe:
+                        if (!cfg.FullPipes.Enabled || pipesUsed >= cfg.FullPipes.MaximumCount) return false;
+                        pipesUsed++; return true;
                     case TrackPatternType.FullLoop:
                         if (!cfg.Loops.Enabled || loopsUsed >= cfg.Loops.MaximumCount) return false;
                         loopsUsed++; return true;
@@ -478,6 +699,8 @@ namespace TrackGeneration.Planning
             if (plan.Failed) return features;
             Require(cfg.Jumps, TrackPatternType.JumpGap);
             if (plan.Failed) return features;
+            Require(cfg.FullPipes, TrackPatternType.FullPipe);
+            if (plan.Failed) return features;
             Require(cfg.Chicanes, TrackPatternType.Chicane);
             if (plan.Failed) return features;
             Require(cfg.SCurves, TrackPatternType.SCurve);
@@ -509,6 +732,7 @@ namespace TrackGeneration.Planning
                 if (cfg.Corkscrews.Enabled && corksUsed < cfg.Corkscrews.MaximumCount) pool.Add((TrackPatternType.Corkscrew, cfg.Corkscrews.OptionalWeight));
                 if (cfg.Spirals.Enabled && spiralsUsed < cfg.Spirals.MaximumCount) pool.Add((TrackPatternType.Spiral, cfg.Spirals.OptionalWeight));
                 if (cfg.Jumps.Enabled && jumpsUsed < cfg.Jumps.MaximumCount) pool.Add((TrackPatternType.JumpGap, cfg.Jumps.OptionalWeight));
+                if (cfg.FullPipes.Enabled && pipesUsed < cfg.FullPipes.MaximumCount) pool.Add((TrackPatternType.FullPipe, cfg.FullPipes.OptionalWeight));
                 if (cfg.Chicanes.Enabled && chicanesUsed < cfg.Chicanes.MaximumCount) pool.Add((TrackPatternType.Chicane, cfg.Chicanes.OptionalWeight));
                 if (cfg.SCurves.Enabled && sCurvesUsed < cfg.SCurves.MaximumCount) pool.Add((TrackPatternType.SCurve, cfg.SCurves.OptionalWeight));
 
@@ -558,24 +782,278 @@ namespace TrackGeneration.Planning
             return features;
         }
 
+        // ═══════════════════════════ 2b. Quarter partition ═══════════════════════════
+
+        /// <summary>
+        /// Divides the corner-plan gaps into the 4 quarters by cumulative estimated arc
+        /// (quartile cuts) and selects which quarters are dual: overrides first, then the
+        /// Quarter stream within the resolved count window, respecting eligibility
+        /// (span size, no half-loop/wallride realizations inside, Q1/Q4 policies,
+        /// adjacency) and per-quarter ballistic feasibility of the gate jumps.
+        /// </summary>
+        private void PartitionQuarters(ResolvedTrackGenerationConfig cfg, TopologyPlan plan, List<CornerSlot> corners,
+            bool[] dualMask, ref Unity.Mathematics.Random rng)
+        {
+            int n = corners.Count;
+            plan.Quarters.Clear();
+
+            if (n < 4)
+            {
+                plan.Fail(GenerationFailureReason.InvalidConfiguration,
+                    $"The 4-quarter topology needs at least 4 corners; this plan has {n}.");
+                return;
+            }
+
+            // Per-gap arc estimate = corner arc + one average straight.
+            float avgStraight = (cfg.MinStraightLength + cfg.MaxStraightLength) * 0.5f;
+            var estimate = new float[n];
+            float total = 0f;
+            for (int g = 0; g < n; g++)
+            {
+                float mag = corners[g].Magnitude;
+                float radius = Mathf.Max(Mathf.Lerp(cfg.MaxCurveRadius, cfg.MinCurveRadius, mag / 180f), cfg.MinCurveRadius);
+                estimate[g] = avgStraight + SectionFrameBuilders.EasedArcLength(mag, radius);
+                total += estimate[g];
+            }
+
+            // Quartile boundaries over the cumulative estimate.
+            var b = new int[5];
+            b[0] = 0;
+            b[4] = n;
+            float prefix = 0f;
+            int k = 1;
+            for (int g = 0; g < n && k < 4; g++)
+            {
+                prefix += estimate[g];
+                while (k < 4 && prefix >= total * k / 4f)
+                {
+                    b[k] = g + 1;
+                    k++;
+                }
+            }
+            for (int q = 1; q < 4; q++)
+                b[q] = Mathf.Clamp(b[q] <= 0 ? q : b[q], b[q - 1] + 1, n - (4 - q));
+
+            for (int q = 0; q < 4; q++)
+                plan.Quarters.Add(new PlannedQuarter { Index = q, GapStart = b[q], GapEnd = b[q + 1] });
+
+            if (cfg.MaxDualQuarters <= 0 && dualMask == null) return;
+
+            // ── Eligibility ──
+            float SpanEstimate(PlannedQuarter q)
+            {
+                float s = 0f;
+                for (int g = q.GapStart; g < q.GapEnd; g++) s += estimate[g];
+                return s;
+            }
+
+            bool Eligible(PlannedQuarter q, out string why)
+            {
+                why = null;
+                if (q.GapEnd - q.GapStart < 2) { why = "span shorter than 2 gaps"; return false; }
+                if (q.Index == 0 && !cfg.AllowQ1Dual) { why = "AllowQ1Dual is off (start line)"; return false; }
+                if (q.Index == 3 && !cfg.AllowQ4Dual) { why = "AllowQ4Dual is off (finish line)"; return false; }
+                if (cfg.QuarterTypeOverrides[q.Index] == QuarterTypeOverride.SingleRoad) { why = "forced SingleRoad"; return false; }
+                for (int g = q.GapStart; g < q.GapEnd; g++)
+                {
+                    // Half-loop rollouts fly back OVER the ground path — road B cannot
+                    // safely share that airspace. Wallrides and hairpins are ordinary
+                    // corners for eligibility: road B is a separate chain and never
+                    // touches their cross-section channels.
+                    if (corners[g].IsHalfLoop) { why = "contains a half-loop reversal"; return false; }
+                }
+                // The gate suites are ADDED at the boundaries — they never consume span.
+                // The span only needs enough content for a meaningful alternate road.
+                if (SpanEstimate(q) < 3f * avgStraight)
+                {
+                    why = "estimated span too short for meaningful alternate-road content";
+                    return false;
+                }
+                return true;
+            }
+
+            // ── Selection ──
+            var wantDual = new bool[4];
+            if (dualMask != null)
+            {
+                for (int q = 0; q < 4; q++)
+                    wantDual[q] = dualMask[q] && Eligible(plan.Quarters[q], out _);
+            }
+            else
+            {
+                int want = Mathf.Clamp(rng.NextInt(cfg.MinDualQuarters, cfg.MaxDualQuarters + 1), 0, 4);
+
+                bool AdjacencyOk(int q)
+                {
+                    if (!cfg.PreventAdjacentDualQuarters) return true;
+                    return !wantDual[(q + 1) % 4] && !wantDual[(q + 3) % 4];
+                }
+
+                int selected = 0;
+
+                // Forced duals first (resolution already warned when they exceed the cap).
+                for (int q = 0; q < 4 && selected < cfg.MaxDualQuarters; q++)
+                {
+                    if (cfg.QuarterTypeOverrides[q] != QuarterTypeOverride.DualRoad) continue;
+                    if (!Eligible(plan.Quarters[q], out string why))
+                    {
+                        plan.Warnings.Add($"Quarter {q} is forced Dual but not eligible ({why}) — staying Single.");
+                        continue;
+                    }
+                    if (!AdjacencyOk(q)) continue;
+                    wantDual[q] = true;
+                    selected++;
+                }
+
+                // Preference order [1,2,3,0] shuffled by the Quarter stream: quarter 0 is
+                // last so the start line stays off gate pieces unless everything is dual.
+                var order = new List<int> { 1, 2, 3 };
+                Shuffle(order, ref rng);
+                order.Add(0);
+                foreach (int q in order)
+                {
+                    if (selected >= want) break;
+                    if (wantDual[q]) continue;
+                    if (cfg.QuarterTypeOverrides[q] == QuarterTypeOverride.DualRoad) continue; // handled above
+                    if (!Eligible(plan.Quarters[q], out _)) continue;
+                    if (!AdjacencyOk(q)) continue;
+                    wantDual[q] = true;
+                    selected++;
+                }
+
+                // Falling short is a per-attempt fact the failure report needs to
+                // explain — record WHY each quarter was passed over.
+                if (selected < want)
+                {
+                    var reasons = new List<string>(4);
+                    for (int q = 0; q < 4; q++)
+                    {
+                        if (wantDual[q]) continue;
+                        reasons.Add(Eligible(plan.Quarters[q], out string why)
+                            ? $"Q{q + 1} eligible but skipped (quota/adjacency)"
+                            : $"Q{q + 1} {why}");
+                    }
+                    plan.Warnings.Add($"Dual selection reached {selected}/{want}: {string.Join("; ", reasons)}");
+                }
+            }
+
+            // ── Gate ballistics per selected dual quarter ──
+            foreach (var q in plan.Quarters)
+            {
+                if (!wantDual[q.Index]) continue;
+
+                if (!TrySolveGateJumps(cfg, ref rng, out var entry, out var exit, out float laneSep, out string reason))
+                {
+                    plan.Warnings.Add($"Quarter {q.Index} demoted to SingleRoad: {reason}.");
+                    continue;
+                }
+
+                q.Dual = true;
+                q.EntryJump = entry;
+                q.ExitJump = exit;
+                q.LaneSeparation = laneSep;
+            }
+        }
+
+        /// <summary>
+        /// Solves the entry choice jump and exit convergence jump for one dual quarter.
+        /// The lane separation is bounded by the craft's real lateral aim authority
+        /// during the flight (0.35 · ½·a_lat·t²) — the player must be able to REACH
+        /// either lane after committing in the air.
+        /// </summary>
+        private static bool TrySolveGateJumps(ResolvedTrackGenerationConfig cfg, ref Unity.Mathematics.Random rng,
+            out JumpBallistics.Solution entry, out JumpBallistics.Solution exit, out float laneSep, out string reason)
+        {
+            entry = default;
+            exit = default;
+            laneSep = 0f;
+            reason = "";
+
+            float AimAuthority(float airtime) => 0.35f * 0.5f * cfg.ReferenceLateralAcceleration * airtime * airtime;
+
+            // The resolved lane separation already carries the road-envelope FLOOR —
+            // lanes may never land closer (they would physically overlap). Derive the
+            // airtime the aim demands and raise the ballistic draw floor to it, so
+            // every solved jump reaches the lanes instead of gambling on a high roll.
+            float authorityCoef = 0.35f * 0.5f * Mathf.Max(0.01f, cfg.ReferenceLateralAcceleration);
+            float neededAirtime = Mathf.Sqrt(cfg.LaneSeparation * 0.5f * 1.1f / authorityCoef);
+            if (neededAirtime > cfg.MaxJumpAirtimeSeconds)
+            {
+                reason = $"lanes {cfg.LaneSeparation:F0} m apart need {neededAirtime:F1}s of mid-air aim time but the maximum airtime is {cfg.MaxJumpAirtimeSeconds:F1}s";
+                return false;
+            }
+
+            bool solvedEntry = false;
+            for (int attempt = 0; attempt < 8 && !solvedEntry; attempt++)
+            {
+                if (!JumpBallistics.TrySolve(cfg, ref rng, out entry, neededAirtime)) continue;
+                if (AimAuthority(entry.AirtimeSeconds) < cfg.LaneSeparation * 0.5f * 1.1f) continue;
+                laneSep = cfg.LaneSeparation;
+                solvedEntry = true;
+            }
+            if (!solvedEntry)
+            {
+                reason = $"no entry jump offers enough mid-air aim authority to reach lanes {cfg.LaneSeparation:F0} m apart";
+                return false;
+            }
+
+            for (int attempt = 0; attempt < 8; attempt++)
+            {
+                if (!JumpBallistics.TrySolve(cfg, ref rng, out exit, neededAirtime)) continue;
+                // Converging flights: each lane covers laneSep/2 laterally onto the shared catch.
+                if (AimAuthority(exit.AirtimeSeconds) < laneSep * 0.5f * 1.1f) continue;
+                return true;
+            }
+
+            reason = "no exit jump solution lets both lanes converge onto the shared catch";
+            return false;
+        }
+
         // ═══════════════════════════ 3/4. Definition emission ═══════════════════════════
 
         private void EmitDefinitions(ResolvedTrackGenerationConfig cfg, TopologyPlan plan, List<CornerSlot> corners,
-            Dictionary<int, TrackPatternType> featureByGap, HashSet<int> branchGaps, int closureGaps,
-            ref Unity.Mathematics.Random rng)
+            Dictionary<int, TrackPatternType> featureByGap, int closureGaps, PlanRandomStreams rngs)
         {
             var defs = plan.Defs;
             float width = cfg.RoadWidth;
             int patternCounter = 0;
-            int branchCounter = 0;
+
+            int QuarterOfGap(int gap)
+            {
+                foreach (var q in plan.Quarters)
+                    if (gap >= q.GapStart && gap < q.GapEnd)
+                        return q.Index;
+                return 3;
+            }
+
+            void StampFrom(int fromIndex, int quarter)
+            {
+                for (int i = fromIndex; i < defs.Count; i++)
+                    if (defs[i].QuarterIndex < 0)
+                        defs[i].QuarterIndex = quarter;
+            }
 
             for (int gap = 0; gap < corners.Count; gap++)
             {
                 bool inClosureReserve = gap >= corners.Count - closureGaps;
 
+                // Quarter gate suites at this boundary, BEFORE the gap's lead straight.
+                // A quarter ending here emits its exit convergence first; a quarter
+                // starting here emits its entry choice second — adjacent dual quarters
+                // compose into the single-road neck: catch → recovery → approach → ramp.
+                foreach (var q in plan.Quarters)
+                    if (q.Dual && q.GapEnd == gap)
+                        EmitQuarterExitSuite(cfg, q, defs);
+                foreach (var q in plan.Quarters)
+                    if (q.Dual && q.GapStart == gap)
+                        EmitQuarterEntrySuite(cfg, q, defs);
+
+                int quarter = QuarterOfGap(gap);
+                int firstDef = defs.Count;
+
                 // Pacing: straights alternate short/long more strongly with higher variation.
                 float wave = Mathf.PingPong(gap * 0.618f, 1f);
-                float pacedT = Mathf.Lerp(rng.NextFloat(), wave, cfg.PacingVariation * 0.7f);
+                float pacedT = Mathf.Lerp(rngs.Layout.NextFloat(), wave, cfg.PacingVariation * 0.7f);
                 float pacedLength = Mathf.Lerp(cfg.MinStraightLength, cfg.MaxStraightLength, pacedT);
 
                 // Every gap opens with an ADJUSTABLE plain straight (the closure solver's levers).
@@ -584,12 +1062,13 @@ namespace TrackGeneration.Planning
                 lead.IsClosure = inClosureReserve;
                 defs.Add(lead);
 
-                // Gap content: one feature pattern OR one branch group (closure gaps stay plain).
+                // Gap content: one feature pattern. Dual-quarter Road A is eligible;
+                // the alternate-road fit and validators decide whether the pair is safe.
                 if (!inClosureReserve && featureByGap.TryGetValue(gap, out TrackPatternType feature))
                 {
                     string patternId = $"{feature}_{patternCounter++}";
                     if (!FeaturePatternLibrary.TryGet(feature, out var pattern) ||
-                        !pattern.TryPlan(cfg, patternId, ref rng, defs))
+                        !pattern.TryPlan(cfg, patternId, ref rngs.Feature, defs))
                     {
                         plan.Fail(GenerationFailureReason.RequiredPatternMissing,
                             $"Pattern {feature} could not find a legal parameterization under the resolved config.");
@@ -597,118 +1076,106 @@ namespace TrackGeneration.Planning
                     }
                     plan.CountPattern(feature);
                 }
-                else if (!inClosureReserve && branchGaps.Contains(gap))
-                {
-                    EmitBranchGroup(cfg, plan, branchCounter++, ref rng);
-                    if (plan.Failed) return;
-                }
 
                 // The corner that closes this gap.
-                EmitCorner(cfg, plan, corners[gap], patternCounter++, inClosureReserve, ref rng);
+                EmitCorner(cfg, plan, corners[gap], patternCounter++, inClosureReserve, ref rngs.Feature);
                 if (plan.Failed) return;
+
+                StampFrom(firstDef, quarter);
             }
+
+            // Quarter 3's exit boundary IS the lap seam: its exit suite closes the def list.
+            var last = plan.Quarters[3];
+            if (last.Dual && last.GapEnd == corners.Count)
+                EmitQuarterExitSuite(cfg, last, defs);
         }
 
-        private void EmitBranchGroup(ResolvedTrackGenerationConfig cfg, TopologyPlan plan, int groupIndex,
-            ref Unity.Mathematics.Random rng)
+        /// <summary>
+        /// Entry gate suite of a dual quarter: broad approach (both landing lanes are
+        /// readable before takeoff) → choice jump ramp → air gap (the canonical cursor
+        /// lands on lane A, +laneSep/2 off the flight midline) → road A's landing flare.
+        /// The approach and ramp belong to the PREVIOUS quarter ("Q2 ends with a jump").
+        /// </summary>
+        private static void EmitQuarterEntrySuite(ResolvedTrackGenerationConfig cfg, PlannedQuarter q,
+            List<TrackMacroSectionDefinition> defs)
+        {
+            string zoneId = $"Quarter_{q.Index}";
+            // The approach + choice ramp belong to the previous quarter — except at the
+            // lap start, where quarter 0's own intro must not be stamped quarter 3
+            // (sections would read as Q3 at lap progress 0).
+            int prevQuarter = q.Index == 0 ? 0 : q.Index - 1;
+            float catchWidth = cfg.QuarterCatchWidth;
+
+            int before = defs.Count;
+            defs.Add(SectionDefs.Straight(TrackMacroSectionType.Straight, cfg.DefaultApproachLength, catchWidth,
+                $"QuarterApproach_{q.Index}", locked: true));
+            JumpGapPattern.EmitJumpRamp(in q.EntryJump, catchWidth, zoneId, "QuarterEntry_", defs);
+            for (int i = before; i < defs.Count; i++) defs[i].QuarterIndex = prevQuarter;
+
+            before = defs.Count;
+            JumpGapPattern.EmitAirGap(in q.EntryJump, cfg.RoadWidth, zoneId, "QuarterEntry_", defs);
+            defs[defs.Count - 1].PlanLateralOffset = q.LaneSeparation * 0.5f;
+            JumpGapPattern.EmitLandingRamp(in q.EntryJump, cfg.RoadWidth, zoneId, "QuarterEntryFlareA_", defs);
+            for (int i = before; i < defs.Count; i++) defs[i].QuarterIndex = q.Index;
+
+            q.FirstDefIndex = before;
+        }
+
+        /// <summary>
+        /// Exit gate suite of a dual quarter: road A's launch lip → air gap back to the
+        /// flight midline (−laneSep/2) → ONE broad shared catch both lanes converge onto
+        /// → recovery that narrows back to the ordinary road. Road B's fitted chain is
+        /// inserted between the lip and the air gap later.
+        /// </summary>
+        private static void EmitQuarterExitSuite(ResolvedTrackGenerationConfig cfg, PlannedQuarter q,
+            List<TrackMacroSectionDefinition> defs)
+        {
+            string zoneId = $"Quarter_{q.Index}";
+            float catchWidth = cfg.QuarterCatchWidth;
+
+            int before = defs.Count;
+            JumpGapPattern.EmitJumpRamp(in q.ExitJump, cfg.RoadWidth, zoneId, "QuarterExitA_", defs);
+
+            q.RoadBInsertIndex = defs.Count;
+
+            JumpGapPattern.EmitAirGap(in q.ExitJump, catchWidth, zoneId, "QuarterExit_", defs);
+            defs[defs.Count - 1].PlanLateralOffset = -q.LaneSeparation * 0.5f;
+            JumpGapPattern.EmitLandingRamp(in q.ExitJump, catchWidth, zoneId, "QuarterExitCatch_", defs);
+            defs.Add(SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight, cfg.JumpRecoveryLength, cfg.RoadWidth,
+                "PostCatchRecovery", locked: true));
+
+            for (int i = before; i < defs.Count; i++) defs[i].QuarterIndex = q.Index;
+            q.LastDefIndex = defs.Count - 1;
+        }
+
+        /// <summary>
+        /// Post-closure/post-elevation quarter bookkeeping: defs inserted by the closure
+        /// solver (S-bends) inherit their neighbor's quarter, and every dual quarter's
+        /// gate def indices are re-located by scan (insertions shift raw indices).
+        /// </summary>
+        private static void StampQuarterIndices(TopologyPlan plan)
         {
             var defs = plan.Defs;
-            float width = cfg.RoadWidth;
-
-            float corridor = rng.NextFloat(cfg.MinRouteLength, cfg.MaxRouteLength);
-            float lateral = rng.NextFloat(cfg.MinLateralSeparation, cfg.MaxLateralSeparation);
-
-            // Interaction pattern by weight.
-            var w = cfg.InteractionWeights;
-            (BranchInteractionPattern p, float weight)[] pool =
+            for (int i = 0; i < defs.Count; i++)
             {
-                (BranchInteractionPattern.Separated, w.Separated),
-                (BranchInteractionPattern.Parallel, w.Parallel),
-                (BranchInteractionPattern.Converging, w.Converging),
-                (BranchInteractionPattern.AlternatingCrossover, w.AlternatingCrossover),
-                (BranchInteractionPattern.Braided, w.Braided),
-                (BranchInteractionPattern.SharedAxis, w.SharedAxis),
-                (BranchInteractionPattern.PairedFeature, w.PairedFeature)
-            };
-            float pick = rng.NextFloat(0f, w.Total);
-            BranchInteractionPattern interaction = BranchInteractionPattern.Separated;
-            foreach (var entry in pool)
-            {
-                pick -= entry.weight;
-                if (pick <= 0f) { interaction = entry.p; break; }
+                if (defs[i].QuarterIndex >= 0) continue;
+                defs[i].QuarterIndex = i > 0 ? defs[i - 1].QuarterIndex : plan.Quarters[0].Index;
             }
 
-            int crossovers = interaction switch
+            foreach (var q in plan.Quarters)
             {
-                BranchInteractionPattern.AlternatingCrossover => Mathf.Min(1 + rng.NextInt(0, 2), cfg.MaxCrossovers),
-                BranchInteractionPattern.Braided => Mathf.Min(2 + rng.NextInt(0, 2), cfg.MaxCrossovers),
-                _ => 0
-            };
-            bool vertical = crossovers > 0 || interaction == BranchInteractionPattern.SharedAxis ||
-                            (interaction == BranchInteractionPattern.Separated && rng.NextBool());
-            float verticalSep = vertical
-                ? rng.NextFloat(cfg.MinRouteVerticalSeparation, cfg.MaxRouteVerticalSeparation)
-                : 0f;
-
-            // Route corridor must fit its internal zones.
-            float zoneBudget = cfg.SplitLength + cfg.VerticalDivergenceDelay + cfg.VerticalDivergenceLength * 2f + cfg.MergeLength;
-            corridor = Mathf.Max(corridor, zoneBudget / 0.85f);
-            if (corridor > cfg.MaxRouteLength * 1.5f)
-            {
-                plan.Fail(GenerationFailureReason.BranchMergeFailure,
-                    $"Branch zone budget ({zoneBudget:F0}m) cannot fit the allowed route corridor ({cfg.MaxRouteLength:F0}m).");
-                return;
-            }
-
-            var group = new PlannedBranchGroup
-            {
-                GroupId = groupIndex,
-                CorridorLength = corridor,
-                LateralSeparation = lateral,
-                VerticalSeparation = verticalSep,
-                PairingMode = cfg.PairingMode,
-                InteractionPattern = interaction,
-                RouteASpec = cfg.RouteASettings.Clone(),
-                RouteBSpec = cfg.RouteBSettings.Clone(),
-                Crossovers = crossovers,
-                RouteASeed = rng.NextUInt(),
-                RouteBSeed = rng.NextUInt()
-            };
-            Branching.BranchRoutePlanner.ApplyPairingMode(group, ref rng);
-            plan.BranchGroups.Add(group);
-
-            // Decision preview approach (locked).
-            defs.Add(SectionDefs.Straight(TrackMacroSectionType.Straight,
-                Mathf.Max(cfg.DecisionPreviewLength, cfg.DefaultApproachLength), width,
-                $"BranchApproach_{groupIndex}", locked: true));
-
-            for (int route = 0; route < 2; route++)
-            {
-                defs.Add(new TrackMacroSectionDefinition
+                if (!q.Dual) continue;
+                string zoneId = $"Quarter_{q.Index}";
+                q.FirstDefIndex = -1;
+                q.RoadBInsertIndex = -1;
+                for (int i = 0; i < defs.Count; i++)
                 {
-                    SectionType = TrackMacroSectionType.SplitRoute,
-                    Length = corridor,
-                    Width = width * (route == 0 ? group.RouteASpec.WidthScale : group.RouteBSpec.WidthScale),
-                    Direction = route == 0 ? SectionTurnDirection.Right : SectionTurnDirection.Left,
-                    RouteLateralStart = route == 0 ? lateral * 0.5f : -lateral * 0.5f,
-                    RouteLateralEnd = (crossovers % 2 == 1)
-                        ? (route == 0 ? -lateral * 0.5f : lateral * 0.5f)
-                        : (route == 0 ? lateral * 0.5f : -lateral * 0.5f),
-                    HillHeight = route == 0 ? verticalSep : 0f,
-                    // Shared-axis routes DECLARE their orbital roll — the twin-corkscrew
-                    // pattern owns its orientation contract (validators skip generic roll).
-                    RollChange = interaction == BranchInteractionPattern.SharedAxis ? 360f : 0f,
-                    SpeedIntent = SectionSpeedIntent.Fast,
-                    RiskLevel = route == 0 ? SectionRiskLevel.Risky : SectionRiskLevel.Normal,
-                    LockLength = true,
-                    DebugName = $"BranchRoute{(route == 0 ? "A" : "B")}_{groupIndex}_{interaction}",
-                    PatternId = $"Branch_{groupIndex}",
-                    Contract = SectionConnectionContract.Level()
-                });
+                    var d = defs[i];
+                    if (d.PatternId != zoneId || d.SectionType != TrackMacroSectionType.AirGap) continue;
+                    if (d.DebugName.StartsWith("QuarterEntry_")) q.FirstDefIndex = i;
+                    else if (d.DebugName.StartsWith("QuarterExit_")) q.RoadBInsertIndex = i;
+                }
             }
-
-            defs.Add(SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight, cfg.PostMergeRecoveryLength, width,
-                "PostMergeRecovery", locked: true));
         }
 
         private void EmitCorner(ResolvedTrackGenerationConfig cfg, TopologyPlan plan, CornerSlot corner,
@@ -730,7 +1197,9 @@ namespace TrackGeneration.Planning
                 // Tag the reversal sign on the half-loop def for the 2D walk.
                 for (int i = defs.Count - 1; i >= 0; i--)
                 {
-                    if (defs[i].SectionType == TrackMacroSectionType.HalfLoopTwist && defs[i].PatternId == patternId)
+                    if ((defs[i].SectionType == TrackMacroSectionType.HalfLoopTwist ||
+                         defs[i].SectionType == TrackMacroSectionType.RotationalEvent) &&
+                        defs[i].PatternId == patternId)
                     {
                         defs[i].TurnAngle = 180f;
                         break;
@@ -771,6 +1240,34 @@ namespace TrackGeneration.Planning
 
             switch (corner.IsSpecial ? corner.Realization : TrackPatternType.SCurve /* marker for plain */)
             {
+                case TrackPatternType.WallrideTurn:
+                {
+                    // Tighter end of the radius band: a wallride wants real lateral
+                    // demand, and the wall provides the support the bank cannot.
+                    float radius = RadiusFor(angle, 0.9f);
+                    var def = new TrackMacroSectionDefinition
+                    {
+                        SectionType = TrackMacroSectionType.WallrideTurn,
+                        Length = SectionFrameBuilders.EasedArcLength(angle, radius),
+                        Width = width,
+                        Direction = dir,
+                        TurnAngle = angle,
+                        Radius = radius,
+                        BankingAngle = Mathf.Min(SectionDefs.RecommendedBank(cfg, radius) * 1.15f, cfg.MaxBankAngle),
+                        SpeedIntent = SectionSpeedIntent.Fast,
+                        RiskLevel = SectionRiskLevel.Risky,
+                        RequiresRecoveryAfter = true,
+                        LockLength = true,
+                        PatternId = $"Wallride_{patternCounter}",
+                        DebugName = $"Wallride_{angle}deg_{dir}",
+                        IsClosure = false,
+                        Contract = SectionConnectionContract.Level(sign * angle)
+                    };
+                    defs.Add(def);
+                    defs.Add(SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight, cfg.DefaultRecoveryLength, width,
+                        "RecoveryStraight", locked: true, def.PatternId));
+                    break;
+                }
                 case TrackPatternType.Hairpin:
                 {
                     var def = Corner(angle, RadiusFor(angle, 0.85f), $"Hairpin_{angle}deg_{dir}", hairpin: true);
@@ -879,24 +1376,48 @@ namespace TrackGeneration.Planning
                     return;
                 }
 
-                if (round == 0 && !FitLengthBudget(cfg, plan, defs, straightIdx, cornerIdx, cornerBaseRadius))
+                // Re-fit after every rescue insertion as well as on the first round.
+                // An S-bend replaces a straight run but its two eased arcs can still
+                // add net lap length; carrying that excess into the solve used to let
+                // several individually legal radii combine into a 60–100km lap.
+                if ((round == 0 || TotalPlanLength(defs) > cfg.MaxTrackLength * 0.95f) &&
+                    !FitLengthBudget(cfg, plan, defs, straightIdx, cornerIdx, cornerBaseRadius))
                     return;
 
                 Vector2 gap = -RewalkEndPos(defs);
                 if (initialGap < 0f) initialGap = gap.magnitude;
 
-                gap = RunActiveSetSolve(cfg, defs, straightIdx, straightDirs, cornerIdx, cornerDirs, cornerBaseRadius, gap);
+                Vector2 predictedGap = RunActiveSetSolve(cfg, defs, straightIdx, straightDirs,
+                    cornerIdx, cornerDirs, cornerBaseRadius, gap);
+                // Curves are exactly linear in radius. Elevated straights are not quite
+                // linear in physical length, so always trust a fresh exact walk here.
+                gap = -RewalkEndPos(defs);
 
                 if (gap.magnitude <= cfg.ClosurePositionTolerance)
                 {
                     float total = TotalPlanLength(defs);
                     if (total > cfg.MaxTrackLength)
                     {
+                        // The solver may have re-grown straights past the cap while
+                        // closing position — shrink back to budget and solve again
+                        // instead of failing a positionally perfect lap.
+                        if (round < 3)
+                        {
+                            if (!FitLengthBudget(cfg, plan, defs, straightIdx, cornerIdx, cornerBaseRadius))
+                                return;
+                            continue;
+                        }
                         plan.Fail(GenerationFailureReason.InsufficientLengthBudget,
                             $"Solved lap length {total / 1000f:F1}km exceeds the maximum {cfg.MaxTrackLength / 1000f:F1}km.");
                     }
                     return;
                 }
+
+                // If the linearized solve thought it had closed, first refine with
+                // freshly collected post-elevation derivatives instead of spending a
+                // new S-bend on numeric linearization error.
+                if (predictedGap.magnitude <= cfg.ClosurePositionTolerance && round < 3)
+                    continue;
 
                 if (round == 3 || !TryInsertClosureSBend(cfg, defs, straightIdx, straightDirs, gap))
                 {
@@ -918,16 +1439,11 @@ namespace TrackGeneration.Planning
             for (int i = 0; i < defs.Count; i++)
             {
                 var d = defs[i];
+                if (d.RoadId == 1) continue; // alternate roads never drive the canonical walk
                 Vector2 fwd = SectionFrameBuilders.HeadingToDir(heading);
 
                 switch (d.SectionType)
                 {
-                    case TrackMacroSectionType.SplitRoute:
-                    {
-                        bool isSecondOfPair = i > 0 && defs[i - 1].SectionType == TrackMacroSectionType.SplitRoute;
-                        if (!isSecondOfPair) pos += fwd * d.Length;
-                        break;
-                    }
                     case TrackMacroSectionType.Loop:
                     {
                         Vector2 right = new Vector2(fwd.y, -fwd.x);
@@ -936,6 +1452,7 @@ namespace TrackGeneration.Planning
                         break;
                     }
                     case TrackMacroSectionType.Spiral:
+                        pos += fwd * d.PlanHorizontalLength;
                         break;
                     case TrackMacroSectionType.HalfLoopTwist:
                     {
@@ -945,10 +1462,30 @@ namespace TrackGeneration.Planning
                         pos += SectionFrameBuilders.HeadingToDir(heading) * Mathf.Max(0f, d.Length - halfArc);
                         break;
                     }
+                    case TrackMacroSectionType.RotationalEvent:
+                    {
+                        Vector2 right = new Vector2(fwd.y, -fwd.x);
+                        pos += fwd * d.PlanHorizontalLength + right * d.PlanLateralOffset;
+                        heading += d.TurnAngle;
+                        break;
+                    }
                     case TrackMacroSectionType.SCurve:
+                    {
+                        // Closure S-bends remain legal solve variables after insertion.
+                        // Their two opposed eased arcs keep net heading at zero, and
+                        // their complete end offset is exactly linear in radius.
+                        if (d.IsClosure)
+                        {
+                            Vector2 right = new Vector2(fwd.y, -fwd.x);
+                            Vector2 unitOffset = SectionFrameBuilders.EasedSBendUnitOffset(d.TurnAngle);
+                            cornerIdx.Add(i);
+                            cornerDirs.Add(fwd * unitOffset.x + right * (d.TurnSign * unitOffset.y));
+                            cornerBaseRadius.Add(d.Radius);
+                        }
                         SectionFrameBuilders.ApplyEasedArc2D(ref pos, ref heading, d.TurnAngle * d.TurnSign, d.Radius);
                         SectionFrameBuilders.ApplyEasedArc2D(ref pos, ref heading, -d.TurnAngle * d.TurnSign, d.Radius);
                         break;
+                    }
                     case TrackMacroSectionType.Chicane:
                         SectionFrameBuilders.ApplyEasedArc2D(ref pos, ref heading, d.TurnAngle * d.TurnSign, d.Radius);
                         SectionFrameBuilders.ApplyEasedArc2D(ref pos, ref heading, -2f * d.TurnAngle * d.TurnSign, d.Radius);
@@ -956,11 +1493,13 @@ namespace TrackGeneration.Planning
                         break;
                     case TrackMacroSectionType.BankedCurve:
                     case TrackMacroSectionType.BankedHairpin:
+                    case TrackMacroSectionType.WallrideTurn:
                     {
                         // Plain corners double as CLOSURE CURVES: an eased arc's
                         // displacement is still exactly linear in its radius while the
                         // heading delta stays fixed, so the unit-radius end offset is the
-                        // derivative. Corners inside atomic patterns are never touched.
+                        // derivative. Corners inside atomic patterns (incl. wallrides)
+                        // are never touched.
                         if (string.IsNullOrEmpty(d.PatternId))
                         {
                             Vector2 right = new Vector2(fwd.y, -fwd.x);
@@ -975,6 +1514,10 @@ namespace TrackGeneration.Planning
                     default:
                     {
                         pos += fwd * d.HorizontalRun;
+                        // Dual-quarter choice/convergence gaps land laterally off the
+                        // flight midline (lane A in, midline out).
+                        if (d.PlanLateralOffset != 0f)
+                            pos += new Vector2(fwd.y, -fwd.x) * d.PlanLateralOffset;
 
                         bool adjustable = !d.LockLength &&
                             (d.SectionType == TrackMacroSectionType.Straight ||
@@ -991,16 +1534,15 @@ namespace TrackGeneration.Planning
             }
         }
 
-        /// <summary>Total planned lap length (branch pairs counted once).</summary>
+        /// <summary>Total planned lap length. Counts the canonical road only — the player
+        /// rides ONE road through a dual quarter, so road B never adds lap length.</summary>
         private static float TotalPlanLength(List<TrackMacroSectionDefinition> defs)
         {
             float t = 0f;
             for (int i = 0; i < defs.Count; i++)
             {
-                var d = defs[i];
-                bool isSecondOfPair = d.SectionType == TrackMacroSectionType.SplitRoute &&
-                                      i > 0 && defs[i - 1].SectionType == TrackMacroSectionType.SplitRoute;
-                if (!isSecondOfPair) t += d.Length;
+                if (defs[i].RoadId == 1) continue;
+                t += defs[i].Length;
             }
             return t;
         }
@@ -1013,22 +1555,37 @@ namespace TrackGeneration.Planning
             List<TrackMacroSectionDefinition> defs, List<int> straightIdx, List<int> cornerIdx, List<float> cornerBaseRadius)
         {
             float total = TotalPlanLength(defs);
-            float budgetCeiling = cfg.MaxTrackLength * 0.88f; // headroom: closure may grow lengths
+            float budgetCeiling = cfg.MaxTrackLength * 0.95f; // bounded solver below preserves the hard cap
             if (total <= budgetCeiling) return true;
 
+            float FloorOf(TrackMacroSectionDefinition d) => Mathf.Max(MinAdjustableStraight, d.MinimumLength);
+
             float adjustableTotal = 0f;
-            foreach (int idx in straightIdx) adjustableTotal += defs[idx].Length;
+            float floorTotal = 0f;
+            foreach (int idx in straightIdx)
+            {
+                adjustableTotal += defs[idx].Length;
+                floorTotal += FloorOf(defs[idx]);
+            }
             float excess = total - budgetCeiling;
-            float straightShrinkable = Mathf.Max(0f, adjustableTotal - straightIdx.Count * MinAdjustableStraight);
+            float straightShrinkable = Mathf.Max(0f, adjustableTotal - floorTotal);
 
             float cornerShrinkable = 0f;
             for (int c = 0; c < cornerIdx.Count; c++)
             {
                 var def = defs[cornerIdx[c]];
-                cornerShrinkable += SectionFrameBuilders.EasedArcLength(def.TurnAngle, def.Radius) - SectionFrameBuilders.EasedArcLength(def.TurnAngle, Mathf.Min(def.Radius, cfg.MinCurveRadius));
+                float lengthScale = def.SectionType == TrackMacroSectionType.SCurve ? 2f : 1f;
+                cornerShrinkable += lengthScale *
+                    (SectionFrameBuilders.EasedArcLength(def.TurnAngle, def.Radius) -
+                     SectionFrameBuilders.EasedArcLength(def.TurnAngle,
+                         Mathf.Min(def.Radius, cfg.MinCurveRadius)));
             }
 
-            if (excess > straightShrinkable + cornerShrinkable * 0.8f)
+            // Feasibility is judged against the CEILING, not the cap: plans that can
+            // only squeeze between ceiling and cap leave the closure solver no growth
+            // room and die expensively downstream (as ClosurePositionFailure or
+            // solved-over-cap) — measured 90%→82% on Balanced when this was relaxed.
+            if (excess > straightShrinkable + cornerShrinkable)
             {
                 plan.Fail(GenerationFailureReason.InsufficientLengthBudget,
                     $"Locked content alone needs {(total - adjustableTotal - cornerShrinkable) / 1000f:F1}km — the {cfg.MaxTrackLength / 1000f:F1}km cap cannot fit this plan.");
@@ -1040,8 +1597,10 @@ namespace TrackGeneration.Planning
             {
                 float scale = 1f - fromStraights / Mathf.Max(1f, straightShrinkable);
                 foreach (int idx in straightIdx)
-                    defs[idx].Length = Mathf.Max(MinAdjustableStraight,
-                        MinAdjustableStraight + (defs[idx].Length - MinAdjustableStraight) * scale);
+                {
+                    float floor = FloorOf(defs[idx]);
+                    defs[idx].Length = Mathf.Max(floor, floor + (defs[idx].Length - floor) * scale);
+                }
             }
 
             float fromCorners = excess - fromStraights;
@@ -1053,7 +1612,8 @@ namespace TrackGeneration.Planning
                     var def = defs[cornerIdx[c]];
                     float newRadius = cfg.MinCurveRadius + (def.Radius - cfg.MinCurveRadius) * cornerScale;
                     def.Radius = newRadius;
-                    def.Length = SectionFrameBuilders.EasedArcLength(def.TurnAngle, newRadius);
+                    def.Length = (def.SectionType == TrackMacroSectionType.SCurve ? 2f : 1f) *
+                                 SectionFrameBuilders.EasedArcLength(def.TurnAngle, newRadius);
                     def.BankingAngle = SectionDefs.RecommendedBank(cfg, newRadius);
                     cornerBaseRadius[c] = newRadius;
                 }
@@ -1068,13 +1628,15 @@ namespace TrackGeneration.Planning
         /// correction. Pins reset once mid-solve — a new λ direction can legally pull a
         /// pinned variable off its bound. Returns the remaining gap.
         /// </summary>
-        private Vector2 RunActiveSetSolve(ResolvedTrackGenerationConfig cfg, List<TrackMacroSectionDefinition> defs,
+        internal static Vector2 RunActiveSetSolve(ResolvedTrackGenerationConfig cfg, List<TrackMacroSectionDefinition> defs,
             List<int> straightIdx, List<Vector2> straightDirs,
             List<int> cornerIdx, List<Vector2> cornerDirs, List<float> cornerBaseRadius, Vector2 gap)
         {
-            float LenCap(TrackMacroSectionDefinition d) => d.IsClosure
-                ? cfg.SecondsToDistance(8f)
-                : cfg.MaxStraightLength * 1.5f;
+            float LenCap(TrackMacroSectionDefinition d) => d.RoadId == 1
+                ? cfg.SecondsToDistance(12f) // alternate roads span whole quarters — they need real reach
+                : d.IsClosure
+                    ? cfg.SecondsToDistance(8f)
+                    : cfg.MaxStraightLength * 1.5f;
 
             int nStraights = straightIdx.Count;
             int varCount = nStraights + cornerIdx.Count;
@@ -1085,19 +1647,38 @@ namespace TrackGeneration.Planning
                 ? defs[straightIdx[k]].Length
                 : defs[cornerIdx[k - nStraights]].Radius;
 
+            float LengthDerivative(int k)
+            {
+                if (k < nStraights) return 1f;
+                var def = defs[cornerIdx[k - nStraights]];
+                float scale = def.SectionType == TrackMacroSectionType.SCurve ? 2f : 1f;
+                return scale * SectionFrameBuilders.EasedArcLength(def.TurnAngle, 1f);
+            }
+
+            float ClampToTrackLengthBudget(int k, float value, float requested)
+            {
+                if (requested <= value) return requested;
+                float derivative = Mathf.Max(0.0001f, LengthDerivative(k));
+                float headroom = Mathf.Max(0f, cfg.MaxTrackLength - TotalPlanLength(defs));
+                return value + Mathf.Min(requested - value, headroom / derivative);
+            }
+
             // Styled corners flex within a fraction of their designed radius (character
             // survives); closure-reserve corners are TRUE closure curves and may sweep
-            // the full rulebook radius band.
+            // the full rulebook radius band. Straights never shrink below their
+            // connector-analysis minimum.
             float MinOf(int k) => k < nStraights
-                ? MinAdjustableStraight
-                : defs[cornerIdx[k - nStraights]].IsClosure
+                ? Mathf.Max(MinAdjustableStraight, defs[straightIdx[k]].MinimumLength)
+                : defs[cornerIdx[k - nStraights]].IsClosure || defs[cornerIdx[k - nStraights]].RoadId == 1
                     ? cfg.MinCurveRadius
                     : Mathf.Max(cfg.MinCurveRadius, cornerBaseRadius[k - nStraights] * 0.6f);
 
             float MaxOf(int k) => k < nStraights
                 ? LenCap(defs[straightIdx[k]])
-                : defs[cornerIdx[k - nStraights]].IsClosure
-                    ? cfg.MaxCurveRadius
+                : defs[cornerIdx[k - nStraights]].IsClosure || defs[cornerIdx[k - nStraights]].RoadId == 1
+                    ? (defs[cornerIdx[k - nStraights]].IsClosure
+                        ? cfg.MaxClosureCurveRadius
+                        : cfg.MaxCurveRadius)
                     : Mathf.Min(cfg.MaxCurveRadius, cornerBaseRadius[k - nStraights] * 1.8f);
 
             void Apply(int k, float newValue)
@@ -1110,7 +1691,8 @@ namespace TrackGeneration.Planning
                 {
                     var def = defs[cornerIdx[k - nStraights]];
                     def.Radius = newValue;
-                    def.Length = SectionFrameBuilders.EasedArcLength(def.TurnAngle, newValue);
+                    def.Length = (def.SectionType == TrackMacroSectionType.SCurve ? 2f : 1f) *
+                                 SectionFrameBuilders.EasedArcLength(def.TurnAngle, newValue);
                     def.BankingAngle = SectionDefs.RecommendedBank(cfg, newValue);
                 }
             }
@@ -1147,6 +1729,7 @@ namespace TrackGeneration.Planning
                             float value = ValueOf(k);
                             float delta = Vector2.Dot(gap, dir);
                             float newValue = Mathf.Clamp(value + delta, MinOf(k), MaxOf(k));
+                            newValue = ClampToTrackLengthBudget(k, value, newValue);
                             gap -= dir * (newValue - value);
                             appliedTotal += Mathf.Abs(newValue - value);
                             Apply(k, newValue);
@@ -1166,6 +1749,7 @@ namespace TrackGeneration.Planning
                         float value = ValueOf(k);
                         float delta = Vector2.Dot(lambda, dir);
                         float newValue = Mathf.Clamp(value + delta, MinOf(k), MaxOf(k));
+                        newValue = ClampToTrackLengthBudget(k, value, newValue);
                         if (Mathf.Abs(newValue - value - delta) > 0.001f) pinned[k] = true;
                         gap -= dir * (newValue - value);
                         appliedTotal += Mathf.Abs(newValue - value);
@@ -1194,24 +1778,94 @@ namespace TrackGeneration.Planning
         private static bool TryInsertClosureSBend(ResolvedTrackGenerationConfig cfg,
             List<TrackMacroSectionDefinition> defs, List<int> straightIdx, List<Vector2> straightDirs, Vector2 gap)
         {
-            // Host selection: the S-bend displaces PERPENDICULAR to its host, so pick the
-            // straight whose sideways axis best aligns with the residual (closure-reserve
-            // straights strongly preferred, longer hosts break ties).
+            // Host selection: the S-bend displaces PERPENDICULAR to its host, so rank
+            // straights by how well their sideways axis aligns with the residual
+            // (closure-reserve straights strongly preferred, longer hosts break ties) —
+            // then take the best-ranked host whose sideways SWING stays clear of the
+            // rest of the lap. Scored-only choice happily swung the road straight
+            // through geometry the plan walk then rejected wholesale.
             Vector2 gapDir = gap.normalized;
-            int host = -1;
-            float bestScore = 0f;
+            var ranked = new List<(float score, int a)>();
             for (int a = 0; a < straightIdx.Count; a++)
             {
                 var d = defs[straightIdx[a]];
                 Vector2 r = new Vector2(straightDirs[a].y, -straightDirs[a].x);
                 float alignment = Mathf.Abs(Vector2.Dot(gapDir, r));
                 float score = alignment * (d.IsClosure ? 2f : 1f) * Mathf.Clamp01(d.Length / 400f);
-                if (score > bestScore)
+                if (score > 0f) ranked.Add((score, a));
+            }
+            if (ranked.Count == 0) return false;
+            ranked.Sort((p, q) => p.score != q.score ? q.score.CompareTo(p.score) : p.a.CompareTo(q.a));
+
+            // One coarse 2D walk: lap samples for the swing check + candidate starts.
+            var lapPts = new List<Vector2>(768);
+            var lapDefOf = new List<int>(768);
+            var startOf = new Dictionary<int, Vector2>();
+            {
+                var wanted = new HashSet<int>(straightIdx);
+                Vector2 wPos = Vector2.zero;
+                float wHeading = 0f;
+                for (int i = 0; i < defs.Count; i++)
                 {
-                    host = a;
-                    bestScore = score;
+                    var d = defs[i];
+                    if (d.RoadId == 1) continue;
+                    if (wanted.Contains(i)) startOf[i] = wPos;
+                    int first = lapPts.Count;
+                    QuarterRoadFitter.WalkDense(d, ref wPos, ref wHeading, lapPts);
+                    for (int k = first; k < lapPts.Count; k++) lapDefOf.Add(i);
                 }
             }
+
+            float swingClearance = cfg.RoadWidth * 1.3f * 1.05f;
+            float swingClearanceSq = swingClearance * swingClearance;
+            int defCount = defs.Count;
+
+            bool SwingClear(int hostDefIndex, Vector2 bendStart, Vector2 bendDir, float bendLateral, float bendForward)
+            {
+                Vector2 bendRight = new Vector2(bendDir.y, -bendDir.x);
+                const int steps = 12;
+                for (int sIdx = 0; sIdx <= steps; sIdx++)
+                {
+                    float t = (float)sIdx / steps;
+                    float swing = t * t * (3f - 2f * t); // smooth 0→1, like the eased S
+                    Vector2 p = bendStart + bendDir * (bendForward * t) + bendRight * (bendLateral * swing);
+                    for (int k = 0; k < lapPts.Count; k++)
+                    {
+                        int idxDist = Mathf.Abs(lapDefOf[k] - hostDefIndex);
+                        if (Mathf.Min(idxDist, defCount - idxDist) <= 2) continue; // the road legitimately flows here
+                        if ((lapPts[k] - p).sqrMagnitude < swingClearanceSq) return false;
+                    }
+                }
+                return true;
+            }
+
+            int host = -1;
+            foreach (var (_, a) in ranked)
+            {
+                Vector2 cDir = straightDirs[a];
+                Vector2 cRight = new Vector2(cDir.y, -cDir.x);
+                float cLateral = Vector2.Dot(gap, cRight);
+                if (Mathf.Abs(cLateral) < 0.5f) continue;
+                if (!startOf.TryGetValue(straightIdx[a], out Vector2 cStart)) continue;
+
+                // Region estimate from the same closed form the insertion uses.
+                float cRadius = Mathf.Clamp(Mathf.Abs(cLateral) / (2f * 0.45f),
+                    cfg.MinCurveRadius, cfg.MaxClosureCurveRadius);
+                float cOneMinusCos = Mathf.Clamp(Mathf.Abs(cLateral) / (2f * cRadius), 0.005f, 0.741f);
+                float cAlpha = Mathf.Acos(1f - cOneMinusCos) * Mathf.Rad2Deg;
+                float cForward = cRadius * SectionFrameBuilders.EasedSBendUnitOffset(
+                    SectionFrameBuilders.QuantizeArcAngle(cAlpha)).x;
+
+                // The host shrinks by the bend's forward run — the bend occupies the
+                // LAST cForward meters of the host's original span.
+                Vector2 bendStart = cStart + cDir * Mathf.Max(0f, defs[straightIdx[a]].Length - cForward);
+                if (!SwingClear(straightIdx[a], bendStart, cDir, cLateral, cForward))
+                    continue;
+                host = a;
+                break;
+            }
+            // A forced fallback here converted an honest closure-capacity miss into a
+            // deterministic self-intersection on the following validation pass.
             if (host < 0) return false;
 
             Vector2 dir = straightDirs[host];
@@ -1224,17 +1878,21 @@ namespace TrackGeneration.Planning
             // the shared 0.5° profile grid, and the radius is then re-fit from the
             // MEASURED eased-S offset so the bend lands the residual exactly.
             const float maxOneMinusCos = 0.741f; // α ≤ 75°
-            float radius = Mathf.Clamp(Mathf.Abs(lateral) / (2f * 0.45f), cfg.MinCurveRadius, cfg.MaxCurveRadius);
+            float radius = Mathf.Clamp(Mathf.Abs(lateral) / (2f * 0.45f),
+                cfg.MinCurveRadius, cfg.MaxClosureCurveRadius);
             float oneMinusCos = Mathf.Clamp(Mathf.Abs(lateral) / (2f * radius), 0.005f, maxOneMinusCos);
             float alpha = SectionFrameBuilders.QuantizeArcAngle(Mathf.Acos(1f - oneMinusCos) * Mathf.Rad2Deg);
 
             Vector2 unitOffset = SectionFrameBuilders.EasedSBendUnitOffset(alpha);
             radius = Mathf.Clamp(Mathf.Abs(lateral) / Mathf.Max(unitOffset.y, 1e-4f),
-                cfg.MinCurveRadius, cfg.MaxCurveRadius);
+                cfg.MinCurveRadius, cfg.MaxClosureCurveRadius);
 
             var hostDef = defs[straightIdx[host]];
             float forwardRun = radius * unitOffset.x;
-            hostDef.Length = Mathf.Max(MinAdjustableStraight, hostDef.Length - forwardRun);
+            // Respect the connector-analysis floor: shrinking the host below its blend
+            // requirement re-creates the squeezed-blend wall wave the floor prevents.
+            hostDef.Length = Mathf.Max(Mathf.Max(MinAdjustableStraight, hostDef.MinimumLength),
+                hostDef.Length - forwardRun);
 
             var sBend = new TrackMacroSectionDefinition
             {
@@ -1266,16 +1924,11 @@ namespace TrackGeneration.Planning
             for (int i = 0; i < defs.Count; i++)
             {
                 var d = defs[i];
+                if (d.RoadId == 1) continue; // alternate roads never drive the canonical walk
                 Vector2 fwd = SectionFrameBuilders.HeadingToDir(heading);
 
                 switch (d.SectionType)
                 {
-                    case TrackMacroSectionType.SplitRoute:
-                    {
-                        bool isSecondOfPair = i > 0 && defs[i - 1].SectionType == TrackMacroSectionType.SplitRoute;
-                        if (!isSecondOfPair) pos += fwd * d.Length;
-                        break;
-                    }
                     case TrackMacroSectionType.Loop:
                     {
                         Vector2 right = new Vector2(fwd.y, -fwd.x);
@@ -1284,6 +1937,7 @@ namespace TrackGeneration.Planning
                         break;
                     }
                     case TrackMacroSectionType.Spiral:
+                        pos += fwd * d.PlanHorizontalLength;
                         break;
                     case TrackMacroSectionType.HalfLoopTwist:
                     {
@@ -1291,6 +1945,13 @@ namespace TrackGeneration.Planning
                         pos += fwd * SectionFrameBuilders.HalfLoopForwardDisplacement(halfArc);
                         heading += 180f;
                         pos += SectionFrameBuilders.HeadingToDir(heading) * Mathf.Max(0f, d.Length - halfArc);
+                        break;
+                    }
+                    case TrackMacroSectionType.RotationalEvent:
+                    {
+                        Vector2 right = new Vector2(fwd.y, -fwd.x);
+                        pos += fwd * d.PlanHorizontalLength + right * d.PlanLateralOffset;
+                        heading += d.TurnAngle;
                         break;
                     }
                     case TrackMacroSectionType.SCurve:
@@ -1304,10 +1965,13 @@ namespace TrackGeneration.Planning
                         break;
                     case TrackMacroSectionType.BankedCurve:
                     case TrackMacroSectionType.BankedHairpin:
+                    case TrackMacroSectionType.WallrideTurn:
                         SectionFrameBuilders.ApplyEasedArc2D(ref pos, ref heading, d.TurnAngle * d.TurnSign, d.Radius);
                         break;
                     default:
                         pos += fwd * d.HorizontalRun;
+                        if (d.PlanLateralOffset != 0f)
+                            pos += new Vector2(fwd.y, -fwd.x) * d.PlanLateralOffset;
                         break;
                 }
             }
@@ -1342,20 +2006,7 @@ namespace TrackGeneration.Planning
                 arc += length;
             }
 
-            void WalkArc(float signedAngleDeg, float radius)
-            {
-                int n = Mathf.Max(2, Mathf.CeilToInt(Mathf.Abs(signedAngleDeg) / 8f));
-                float sub = signedAngleDeg / n;
-                float subLen = Mathf.Abs(sub) * Mathf.Deg2Rad * radius;
-                for (int k = 0; k < n; k++)
-                {
-                    Emit(pos, arc);
-                    SectionFrameBuilders.ApplyArc2D(ref pos, ref heading, sub, radius);
-                    arc += subLen;
-                }
-            }
-
-            // Corners follow the same eased-arc profile the builder uses (spirals stay circular).
+            // Corners follow the same eased-arc profile the builder uses.
             void WalkEased(float signedAngleDeg, float radius)
             {
                 SectionFrameBuilders.WalkEasedArc2D(ref pos, ref heading, signedAngleDeg, radius, step,
@@ -1365,16 +2016,11 @@ namespace TrackGeneration.Planning
             for (int i = 0; i < defs.Count; i++)
             {
                 var d = defs[i];
+                if (d.RoadId == 1) continue; // road B proximity is validated on the real 3D frames
                 int firstSample = pts.Count;
 
                 switch (d.SectionType)
                 {
-                    case TrackMacroSectionType.SplitRoute:
-                    {
-                        bool isSecondOfPair = i > 0 && defs[i - 1].SectionType == TrackMacroSectionType.SplitRoute;
-                        if (!isSecondOfPair) WalkStraight(d.Length);
-                        break;
-                    }
                     case TrackMacroSectionType.Loop:
                     {
                         WalkStraight(SectionFrameBuilders.LoopForwardDisplacement(d.Length));
@@ -1384,8 +2030,32 @@ namespace TrackGeneration.Planning
                         break;
                     }
                     case TrackMacroSectionType.Spiral:
-                        WalkArc(d.TurnSign * d.TurnAngle, Mathf.Max(1f, d.Radius));
+                    {
+                        // A feature-integrated spiral may drift forward while completing
+                        // whole revolutions. Sample that moving-center helix directly;
+                        // treating it as a closed circle would hide its real corridor.
+                        Vector2 start = pos;
+                        Vector2 fwd = SectionFrameBuilders.HeadingToDir(heading);
+                        Vector2 right = new Vector2(fwd.y, -fwd.x);
+                        float signedAngle = d.TurnSign * d.TurnAngle;
+                        float side = Mathf.Sign(signedAngle);
+                        float radius = Mathf.Max(d.Width, d.Radius);
+                        float totalRad = Mathf.Abs(signedAngle) * Mathf.Deg2Rad;
+                        int samples = Mathf.Max(8, Mathf.CeilToInt(d.Length / step));
+                        float ds = d.Length / samples;
+                        for (int sample = 1; sample <= samples; sample++)
+                        {
+                            float u = (float)sample / samples;
+                            float a = totalRad * u;
+                            pos = start
+                                  + fwd * (radius * Mathf.Sin(a) + d.PlanHorizontalLength * SectionFrameBuilders.Smooth01(u))
+                                  + right * (side * radius * (1f - Mathf.Cos(a)));
+                            arc += ds;
+                            Emit(pos, arc);
+                        }
+                        heading += signedAngle;
                         break;
+                    }
                     case TrackMacroSectionType.HalfLoopTwist:
                     {
                         // Two limbs with DIFFERENT height profiles: the half-loop climbs
@@ -1414,6 +2084,32 @@ namespace TrackGeneration.Planning
                         fixedHeight += d.ElevationChange;
                         continue; // heights stamped above
                     }
+                    case TrackMacroSectionType.RotationalEvent:
+                    {
+                        var localFrames = SectionFrameBuilders.BuildRotationalEvent(
+                            TrackConnectionFrame.Origin(d.Width), d, FrameBuildContext.From(cfg));
+                        Vector2 start = pos;
+                        Vector2 eventFwd = SectionFrameBuilders.HeadingToDir(heading);
+                        Vector2 eventRight = new Vector2(eventFwd.y, -eventFwd.x);
+                        float eventArcStart = arc;
+                        float nextArc = 0f;
+                        for (int sample = 1; sample < localFrames.Length; sample++)
+                        {
+                            var local = localFrames[sample];
+                            if (local.ArcLength + 0.001f < nextArc && sample < localFrames.Length - 1) continue;
+                            pos = start + eventFwd * local.Position.z + eventRight * local.Position.x;
+                            Emit(pos, eventArcStart + local.ArcLength);
+                            heights.Add(fixedHeight + local.Position.y);
+                            owners.Add(i);
+                            nextArc = local.ArcLength + step;
+                        }
+                        var end = localFrames[localFrames.Length - 1];
+                        pos = start + eventFwd * end.Position.z + eventRight * end.Position.x;
+                        arc = eventArcStart + end.ArcLength;
+                        heading += d.TurnAngle;
+                        fixedHeight += end.Position.y;
+                        continue;
+                    }
                     case TrackMacroSectionType.SCurve:
                         WalkEased(d.TurnAngle * d.TurnSign, d.Radius);
                         WalkEased(-d.TurnAngle * d.TurnSign, d.Radius);
@@ -1425,10 +2121,17 @@ namespace TrackGeneration.Planning
                         break;
                     case TrackMacroSectionType.BankedCurve:
                     case TrackMacroSectionType.BankedHairpin:
+                    case TrackMacroSectionType.WallrideTurn:
                         WalkEased(d.TurnAngle * d.TurnSign, d.Radius);
                         break;
                     default:
                         WalkStraight(d.HorizontalRun);
+                        // Choice/convergence gaps land laterally off the flight midline.
+                        if (d.PlanLateralOffset != 0f)
+                        {
+                            Vector2 fwdDir = SectionFrameBuilders.HeadingToDir(heading);
+                            pos += new Vector2(fwdDir.y, -fwdDir.x) * d.PlanLateralOffset;
+                        }
                         break;
                 }
 
@@ -1437,6 +2140,7 @@ namespace TrackGeneration.Planning
                 // straights, and net-zero crest/bridge bumps. Planned vertical separation
                 // is what legally rescues folded mountain-pass legs.
                 float delta = d.SectionType == TrackMacroSectionType.Spiral ||
+                              d.SectionType == TrackMacroSectionType.Corkscrew ||
                               d.SectionType == TrackMacroSectionType.HalfLoopTwist ||
                               d.IsStraightFamily
                     ? d.ElevationChange
@@ -1455,7 +2159,11 @@ namespace TrackGeneration.Planning
             float totalArc = arc;
             if (totalArc < 1f || pts.Count < 8) return "degenerate walk";
 
-            float minClear = cfg.RoadWidth * 1.3f;
+            // 5% wider than the built validator's corridor: built geometry (easing,
+            // banking offsets, S-bend realization) drifts a couple of meters from this
+            // 2D model, and a plan that passes at the raw edge dies at build time —
+            // after paying for the full mesh.
+            float minClear = cfg.RoadWidth * 1.3f * 1.05f;
             float minClearSq = minClear * minClear;
             float verticalOk = Mathf.Max(1f, cfg.VerticalClearance);
             const float alongWindow = 600f;
@@ -1478,7 +2186,8 @@ namespace TrackGeneration.Planning
                         var ownerType = defs[owners[i]].SectionType;
                         if (ownerType == TrackMacroSectionType.Loop ||
                             ownerType == TrackMacroSectionType.Spiral ||
-                            ownerType == TrackMacroSectionType.HalfLoopTwist)
+                            ownerType == TrackMacroSectionType.HalfLoopTwist ||
+                            ownerType == TrackMacroSectionType.RotationalEvent)
                             continue;
                     }
 
@@ -1492,10 +2201,10 @@ namespace TrackGeneration.Planning
         // ═══════════════════════════ 7. Elevation plan ═══════════════════════════
 
         /// <summary>
-        /// Assigns intentional vertical content AFTER lengths are final: major climbs and
-        /// drops (a level walk that must return to zero for closure), then bridges,
-        /// underpasses and crests on remaining straights. All elevation lives inside
-        /// straight sections with flat ends, so weld contracts and corners stay untouched.
+        /// Assigns intentional vertical content AFTER closure: major climbs and drops
+        /// (a level walk that must return to zero), then bridges, underpasses and crests.
+        /// A spiral/corkscrew may subsequently absorb the complete run and elevation of
+        /// its own recovery when legal; every resulting feature still has flat welds.
         /// </summary>
         private void PlanElevation(ResolvedTrackGenerationConfig cfg, TopologyPlan plan, ref Unity.Mathematics.Random rng)
         {
@@ -1504,7 +2213,9 @@ namespace TrackGeneration.Planning
             float fixedElevation = 0f;
             foreach (var d in defs)
             {
-                if (d.SectionType == TrackMacroSectionType.Spiral || d.SectionType == TrackMacroSectionType.HalfLoopTwist)
+                if (d.SectionType == TrackMacroSectionType.Spiral ||
+                    d.SectionType == TrackMacroSectionType.HalfLoopTwist ||
+                    d.SectionType == TrackMacroSectionType.RotationalEvent)
                     fixedElevation += d.ElevationChange;
             }
             bool needCompensation = Mathf.Abs(fixedElevation) > 1f;
@@ -1682,6 +2393,128 @@ namespace TrackGeneration.Planning
             else if (cfg.Underpasses.Enabled && underPlaced < cfg.Underpasses.MinimumCount)
                 plan.Fail(GenerationFailureReason.RequiredFeatureMissing,
                     $"Required {cfg.Underpasses.MinimumCount} underpasses, placed {underPlaced} — not enough long straights.");
+
+            if (!plan.Failed)
+                IntegrateFeatureRecoveries(cfg, plan);
+        }
+
+        /// <summary>
+        /// Gives a spiral/corkscrew first refusal on elevation assigned to its own
+        /// immediately-following recovery. The recovery is removed only when the whole
+        /// horizontal run and vertical delta fit inside legal feature geometry.
+        /// </summary>
+        internal static int IntegrateFeatureRecoveries(ResolvedTrackGenerationConfig cfg, TopologyPlan plan)
+        {
+            var defs = plan.Defs;
+            int integrated = 0;
+
+            for (int i = 0; i + 1 < defs.Count; i++)
+            {
+                var feature = defs[i];
+                var recovery = defs[i + 1];
+                if (recovery.SectionType != TrackMacroSectionType.RecoveryStraight ||
+                    Mathf.Abs(recovery.ElevationChange) < 1f ||
+                    string.IsNullOrEmpty(feature.PatternId) ||
+                    feature.PatternId != recovery.PatternId)
+                    continue;
+
+                bool absorbed = feature.SectionType == TrackMacroSectionType.Spiral
+                    ? TryIntegrateSpiralRecovery(cfg, feature, recovery)
+                    : feature.SectionType == TrackMacroSectionType.Corkscrew &&
+                      TryIntegrateCorkscrewRecovery(cfg, feature, recovery);
+                if (!absorbed) continue;
+
+                plan.Warnings.Add($"Feature integration: '{feature.DebugName}' absorbed " +
+                                  $"'{recovery.DebugName}' ({recovery.ElevationChange:+0;-0}m); " +
+                                  "the next road section now connects directly.");
+                defs.RemoveAt(i + 1);
+                integrated++;
+            }
+
+            return integrated;
+        }
+
+        private static bool TryIntegrateSpiralRecovery(ResolvedTrackGenerationConfig cfg,
+            TrackMacroSectionDefinition spiral, TrackMacroSectionDefinition recovery)
+        {
+            // Do not flatten or reverse an authored spiral merely to eliminate a piece.
+            // Integration is for a same-direction continuation of its climb/drop.
+            if (Mathf.Abs(spiral.ElevationChange) < 1f ||
+                Mathf.Sign(spiral.ElevationChange) != Mathf.Sign(recovery.ElevationChange))
+                return false;
+
+            float targetClimb = spiral.ElevationChange + recovery.ElevationChange;
+            int existingRevs = Mathf.Max(1, Mathf.RoundToInt(Mathf.Abs(spiral.TurnAngle) / 360f));
+            int requiredRevs = Mathf.CeilToInt(Mathf.Abs(targetClimb) /
+                                               Mathf.Max(1f, cfg.MaxSpiralClimbPerRevolution));
+            int revs = Mathf.Max(existingRevs, requiredRevs);
+            if (revs > cfg.MaxSpiralRevolutions) return false;
+
+            float radius = Mathf.Max(spiral.Width, spiral.Radius);
+            float maxAngle = targetClimb >= 0f ? cfg.MaxClimbAngle : cfg.MaxDropAngle;
+            float requiredCircularLength = Mathf.Abs(targetClimb) * 1.5f /
+                                           Mathf.Max(0.01f, Mathf.Tan(maxAngle * Mathf.Deg2Rad));
+            radius = Mathf.Max(radius, requiredCircularLength / (2f * Mathf.PI * revs));
+            float maxRadius = Mathf.Max(spiral.Width, cfg.MaxSpiralRadius);
+            if (radius > maxRadius + 0.01f) return false;
+
+            float forwardDrift = recovery.HorizontalRun;
+            float turnAngle = 360f * revs;
+            spiral.Radius = radius;
+            spiral.TurnAngle = turnAngle;
+            spiral.ElevationChange = targetClimb;
+            spiral.PlanHorizontalLength = forwardDrift;
+            spiral.Length = SectionFrameBuilders.EstimateDriftingSpiralLength(
+                radius, turnAngle, forwardDrift, targetClimb);
+            spiral.RequiresRecoveryAfter = false;
+            spiral.DebugName = $"Spiral_{revs}rev_{(targetClimb >= 0f ? "Up" : "Down")}_{spiral.Direction}_IntegratedExit";
+            var contract = spiral.Contract;
+            contract.ElevationDelta = targetClimb;
+            spiral.Contract = contract;
+            return true;
+        }
+
+        private static bool TryIntegrateCorkscrewRecovery(ResolvedTrackGenerationConfig cfg,
+            TrackMacroSectionDefinition corkscrew, TrackMacroSectionDefinition recovery)
+        {
+            float targetDelta = corkscrew.ElevationChange + recovery.ElevationChange;
+            float minRadius = cfg.MinCorkscrewRadius;
+            float maxRadius = Mathf.Max(minRadius, cfg.MaxCorkscrewRadius);
+            if (Mathf.Abs(targetDelta) > 2f * (maxRadius - minRadius) + 0.01f)
+                return false;
+
+            // For two half-turns, net elevation is 2*(firstRadius-secondRadius).
+            // Start centered on the authored radius, then translate both radii together
+            // if either side hits a rulebook bound; their difference stays exact.
+            float firstRadius = Mathf.Clamp(corkscrew.Radius + targetDelta * 0.25f, minRadius, maxRadius);
+            float secondRadius = firstRadius - targetDelta * 0.5f;
+            if (secondRadius < minRadius)
+            {
+                float shift = minRadius - secondRadius;
+                firstRadius += shift;
+                secondRadius += shift;
+            }
+            if (secondRadius > maxRadius)
+            {
+                float shift = secondRadius - maxRadius;
+                firstRadius -= shift;
+                secondRadius -= shift;
+            }
+            if (firstRadius < minRadius - 0.01f || firstRadius > maxRadius + 0.01f ||
+                secondRadius < minRadius - 0.01f || secondRadius > maxRadius + 0.01f)
+                return false;
+
+            corkscrew.Radius = firstRadius;
+            corkscrew.SecondaryRadius = secondRadius;
+            corkscrew.ElevationChange = targetDelta;
+            corkscrew.Length += recovery.HorizontalRun;
+            corkscrew.RequiresRecoveryAfter = false;
+            corkscrew.DebugName = $"Corkscrew_{(corkscrew.RollChange >= 0f ? "R" : "L")}_" +
+                                  $"H1R{firstRadius:F0}_H2R{secondRadius:F0}_IntegratedExit";
+            var contract = corkscrew.Contract;
+            contract.ElevationDelta = targetDelta;
+            corkscrew.Contract = contract;
+            return true;
         }
 
         private static void Shuffle<T>(List<T> list, ref Unity.Mathematics.Random rng)

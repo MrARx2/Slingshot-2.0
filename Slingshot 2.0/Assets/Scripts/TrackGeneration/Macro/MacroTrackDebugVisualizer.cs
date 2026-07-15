@@ -4,6 +4,19 @@ using UnityEngine;
 namespace TrackGeneration.Macro
 {
     /// <summary>
+    /// How much scene-view debug drawing a generated track performs. Higher levels
+    /// draw more per-sample detail; the per-lap displayed-sample cap always applies.
+    /// </summary>
+    public enum TrackDebugVisualizationLevel
+    {
+        Off,
+        Summary,   // quarter boundaries + road identity
+        Normal,    // + open edges, jump targets, turn direction, pattern/section labels
+        Detailed,  // + banking, cross-sections, blend zones, wall masks, lap progress, closure
+        Full       // + every boundary frame axis
+    }
+
+    /// <summary>
     /// Scene-view debug visualization for a generated macro track. Added to the track root
     /// by <see cref="TrackGeneration.TrackGenerator"/> so a generated track stays inspectable:
     /// section labels, entry/exit frames, banking and turn direction, jump landing targets,
@@ -12,11 +25,23 @@ namespace TrackGeneration.Macro
     [AddComponentMenu("Track Generation/Macro Track Debug Visualizer")]
     public class MacroTrackDebugVisualizer : MonoBehaviour
     {
+        [Header("Visualization Level")]
+        [Tooltip("Master detail level. Individual toggles below still apply within the level; the sample cap always applies. Editor responsiveness first: Summary/Normal for everyday work.")]
+        public TrackDebugVisualizationLevel Level = TrackDebugVisualizationLevel.Normal;
+
+        [Tooltip("Hard cap on displayed per-sample gizmos across the whole lap — per-section strides scale up to honor it on huge tracks.")]
+        [Range(200, 20000)] public int MaxDisplayedSamples = 1500;
+
+        [Tooltip("Scene labels draw only within this distance of the scene camera (thousands of Handles.Label calls stall the editor).")]
+        [Range(100f, 10000f)] public float LabelDrawDistance = 1500f;
         [Header("Track Data (Read Only)")]
         [Tooltip("Seed the layout was generated from.")]
         public int Seed;
 
-        [Tooltip("The generated macro section list, in track order.")]
+        // Serialized so the track survives scene reload/play-mode adoption, but HIDDEN:
+        // default-inspector traversal of tens of thousands of ring frames would stall
+        // the editor whenever this component is selected.
+        [HideInInspector]
         public List<GeneratedTrackSection> Sections = new List<GeneratedTrackSection>();
 
         [Tooltip("The resolved half-pipe road profile the mesh was built with (for cross-section debug drawing).")]
@@ -35,26 +60,27 @@ namespace TrackGeneration.Macro
         public bool ShowCrossSection = true;
         [Tooltip("Draw bank angle and half-pipe depth over distance (blend zone visualization).")]
         public bool ShowBlendZones = false;
-        [Tooltip("Label the staged route split zones (lateral separation, vertical divergence, ...).")]
-        public bool ShowRouteZones = true;
 
-        [Tooltip("Draw per-side wall multipliers along split routes and highlight suppressed inner-wall (open throat) zones.")]
+        [Tooltip("Draw per-side wall multipliers and highlight suppressed inner-wall zones.")]
         public bool ShowWallMasks = true;
 
         [Tooltip("Mark OPEN boundaries: jump lip, landing mouth, and air-gap edges where no cap/wall may cross the flight path.")]
         public bool ShowOpenEdges = true;
 
-        [Header("Branch / Pattern / Progress Debug")]
+        [Header("Quarter / Pattern / Progress Debug")]
         [Tooltip("Label feature-pattern groups (Loop→Corkscrew, HalfLoopToCorkscrew, …).")]
         public bool ShowPatternLabels = true;
 
-        [Tooltip("Label branch groups and draw their entry/merge gates.")]
-        public bool ShowBranchGates = true;
+        [Tooltip("Mark logical 90-degree control stations inside continuous rotational events.")]
+        public bool ShowRotationalControlStations = true;
 
-        [Tooltip("Color branch route centerlines per route (A cyan / B orange).")]
+        [Tooltip("Draw the 4 quarter boundaries with their type labels (SingleRoad / DualRoad).")]
+        public bool ShowQuarterBoundaries = true;
+
+        [Tooltip("Color dual-quarter road centerlines per road (A cyan / B orange).")]
         public bool ShowRouteColors = true;
 
-        [Tooltip("Display the estimated route-time table of each branch group.")]
+        [Tooltip("Display the estimated road-time table of each dual quarter.")]
         public bool ShowRouteTimes = true;
 
         [Tooltip("Mark logical lap progress every 10% along the driving line.")]
@@ -63,8 +89,8 @@ namespace TrackGeneration.Macro
         [Tooltip("Highlight closure-reserve sections (adjustable straights the closure solver used).")]
         public bool ShowClosureSections = false;
 
-        [Tooltip("Estimated route-time tables per branch group (filled by the generator).")]
-        public List<TrackGeneration.Branching.BranchBalanceMetrics> BranchBalances = new List<TrackGeneration.Branching.BranchBalanceMetrics>();
+        [Tooltip("The authoritative quarter records of the generated lap (filled by the generator).")]
+        public List<TrackGeneration.Planning.GeneratedTrackQuarter> Quarters = new List<TrackGeneration.Planning.GeneratedTrackQuarter>();
 
         [Header("Colors")]
         public Color FrameForwardColor = Color.blue;
@@ -88,13 +114,30 @@ namespace TrackGeneration.Macro
             RoadProfile = roadProfile;
         }
 
-        /// <summary>Stores branch balance tables from the authoritative layout for scene display.</summary>
+        /// <summary>Stores the quarter records from the authoritative layout for scene display.</summary>
         public void SetLayout(TrackGeneration.Planning.GeneratedTrackLayout layout)
         {
-            BranchBalances.Clear();
+            Quarters.Clear();
             if (layout == null) return;
-            foreach (var group in layout.BranchGroups)
-                if (group.Balance != null) BranchBalances.Add(group.Balance);
+            Quarters.AddRange(layout.Quarters);
+        }
+
+        /// <summary>Extra stride multiplier that keeps the WHOLE lap under MaxDisplayedSamples.</summary>
+        private float _strideBoost = 1f;
+
+        private void UpdateStrideBoost()
+        {
+            float totalArc = Sections.Count > 0 ? Sections[Sections.Count - 1].EndFrame.ArcLength : 0f;
+            // The densest per-feature stride targets ~10 m between gizmo samples.
+            _strideBoost = Mathf.Max(1f, totalArc / 10f / Mathf.Max(200, MaxDisplayedSamples));
+        }
+
+        /// <summary>True when a scene label at this world position is close enough to draw.</summary>
+        private bool LabelVisible(Vector3 worldPos)
+        {
+            var cam = Camera.current;
+            if (cam == null) return true;
+            return (cam.transform.position - worldPos).sqrMagnitude <= LabelDrawDistance * LabelDrawDistance;
         }
 
         /// <summary>
@@ -103,8 +146,9 @@ namespace TrackGeneration.Macro
         /// fixed index stride multiplies the gizmo line count (and tanks editor FPS on
         /// big tracks) every time the density is raised.
         /// </summary>
-        private static int StrideFor(GeneratedTrackSection sec, float meters)
+        private int StrideFor(GeneratedTrackSection sec, float targetMeters)
         {
+            float meters = targetMeters * _strideBoost;
             int rings = sec.SubdivisionFrames?.Length ?? 0;
             if (rings < 2) return 1;
             float ds = (sec.EndFrame.ArcLength - sec.StartFrame.ArcLength) / (rings - 1);
@@ -113,9 +157,33 @@ namespace TrackGeneration.Macro
 
         private void OnDrawGizmos()
         {
+            if (Level == TrackDebugVisualizationLevel.Off) return;
             if (Sections == null || Sections.Count == 0) return;
 
+            UpdateStrideBoost();
+
+            // Level gates: a toggle draws only when its detail tier is active.
+            bool tierNormal = Level >= TrackDebugVisualizationLevel.Normal;
+            bool tierDetailed = Level >= TrackDebugVisualizationLevel.Detailed;
+            bool tierFull = Level >= TrackDebugVisualizationLevel.Full;
+
+            bool showFrames = ShowFrames && tierFull;
+            bool showBounds = ShowBounds && tierDetailed;
+            bool showTurnDirection = ShowTurnDirection && tierNormal;
+            bool showBanking = ShowBanking && tierDetailed;
+            bool showCrossSection = ShowCrossSection && tierDetailed;
+            bool showBlendZones = ShowBlendZones && tierDetailed;
+            bool showWallMasks = ShowWallMasks && tierDetailed;
+            bool showOpenEdges = ShowOpenEdges && tierNormal;
+            bool showClosure = ShowClosureSections && tierDetailed;
+            bool showLapProgress = ShowLapProgress && tierDetailed;
+            bool showPatternLabels = ShowPatternLabels && tierNormal;
+            bool showJumpTargets = ShowJumpTargets && tierNormal;
+            bool showSectionLabels = ShowLabels && tierNormal;
+
             Matrix4x4 toWorld = transform.localToWorldMatrix;
+
+            DrawQuarterBoundaries(toWorld);
 
             for (int i = 0; i < Sections.Count; i++)
             {
@@ -125,13 +193,13 @@ namespace TrackGeneration.Macro
                 Vector3 startPos = toWorld.MultiplyPoint3x4(section.StartFrame.Position);
                 Vector3 endPos = toWorld.MultiplyPoint3x4(section.EndFrame.Position);
 
-                if (ShowFrames)
+                if (showFrames)
                 {
                     DrawFrame(section.StartFrame, toWorld, 4f);
                     DrawFrame(section.EndFrame, toWorld, 2.5f);
                 }
 
-                if (ShowBounds)
+                if (showBounds)
                 {
                     Gizmos.color = BoundsColor;
                     Bounds b = section.SectionBounds;
@@ -140,7 +208,7 @@ namespace TrackGeneration.Macro
                     Gizmos.matrix = Matrix4x4.identity;
                 }
 
-                if (ShowTurnDirection && section.Definition.TurnSign != 0 &&
+                if (showTurnDirection && section.Definition.TurnSign != 0 &&
                     section.SubdivisionFrames != null && section.SubdivisionFrames.Length > 2)
                 {
                     // Arrow from the mid frame toward the inside of the turn.
@@ -152,7 +220,7 @@ namespace TrackGeneration.Macro
                     Gizmos.DrawSphere(midPos + Vector3.up + inward * 6f, 0.6f);
                 }
 
-                if (ShowBanking && section.SubdivisionFrames != null)
+                if (showBanking && section.SubdivisionFrames != null)
                 {
                     Gizmos.color = BankingColor;
                     for (int f = 0; f < section.SubdivisionFrames.Length; f += StrideFor(section, 20f))
@@ -164,7 +232,7 @@ namespace TrackGeneration.Macro
                     }
                 }
 
-                if (ShowCrossSection && RoadProfile != null && RoadProfile.IsHalfPipe &&
+                if (showCrossSection && RoadProfile != null && RoadProfile.IsHalfPipe &&
                     section.SubdivisionFrames != null)
                 {
                     // Half-pipe cross-section polylines: center baseline + rising side walls.
@@ -175,7 +243,7 @@ namespace TrackGeneration.Macro
                     }
                 }
 
-                if (ShowBlendZones && section.SubdivisionFrames != null)
+                if (showBlendZones && section.SubdivisionFrames != null)
                 {
                     // Bank angle (orange) and half-pipe depth (green) over distance — makes
                     // blend zones and any abrupt transitions immediately visible.
@@ -191,12 +259,12 @@ namespace TrackGeneration.Macro
                     }
                 }
 
-                if (ShowWallMasks && section.SubdivisionFrames != null &&
-                    section.Definition.SectionType == TrackMacroSectionType.SplitRoute)
+                if (showWallMasks && section.SubdivisionFrames != null && section.QuarterIndex >= 0 &&
+                    section.RoadId == 1)
                 {
-                    // Per-side wall multiplier bars at each road edge: green = full wall,
-                    // red = suppressed (open throat). Bar height tracks the multiplier, so
-                    // the fade in/out of the inner wall is directly visible in the scene.
+                    // Per-side wall multiplier bars at each road edge of the alternate
+                    // road: green = full wall, red = suppressed. Bar height tracks the
+                    // multiplier, so wall fades are directly visible in the scene.
                     for (int f = 0; f < section.SubdivisionFrames.Length; f += StrideFor(section, 12f))
                     {
                         var fr = section.SubdivisionFrames[f];
@@ -207,7 +275,7 @@ namespace TrackGeneration.Macro
                     }
                 }
 
-                if (ShowOpenEdges)
+                if (showOpenEdges)
                 {
                     // Open boundaries: a bright crossbar at the boundary marks "nothing may
                     // block this direction" — jump lip (exit), landing mouth (entry), air gap.
@@ -224,10 +292,13 @@ namespace TrackGeneration.Macro
                     }
                 }
 
-                if (ShowRouteColors && section.RouteId >= 0 && section.SubdivisionFrames != null && section.SubdivisionFrames.Length > 1)
+                bool inDualQuarter = section.QuarterIndex >= 0 && section.QuarterIndex < Quarters.Count &&
+                                     Quarters[section.QuarterIndex] != null &&
+                                     Quarters[section.QuarterIndex].QuarterType == TrackGeneration.Design.TrackQuarterType.DualRoad;
+                if (ShowRouteColors && inDualQuarter /* Summary+ */ && section.SubdivisionFrames != null && section.SubdivisionFrames.Length > 1)
                 {
-                    // Distinct route colors: A cyan, B orange.
-                    Gizmos.color = section.RouteId == 0 ? new Color(0.2f, 0.9f, 1f) : new Color(1f, 0.6f, 0.15f);
+                    // Distinct road colors: A cyan, B orange.
+                    Gizmos.color = section.RoadId == 0 ? new Color(0.2f, 0.9f, 1f) : new Color(1f, 0.6f, 0.15f);
                     int routeStride = StrideFor(section, 10f);
                     for (int f = routeStride; f < section.SubdivisionFrames.Length; f += routeStride)
                     {
@@ -237,7 +308,7 @@ namespace TrackGeneration.Macro
                     }
                 }
 
-                if (ShowClosureSections && section.Definition.IsClosure && section.SubdivisionFrames != null)
+                if (showClosure && section.Definition.IsClosure && section.SubdivisionFrames != null)
                 {
                     Gizmos.color = Color.yellow;
                     int closureStride = StrideFor(section, 10f);
@@ -249,7 +320,7 @@ namespace TrackGeneration.Macro
                     }
                 }
 
-                if (ShowLapProgress && section.SubdivisionFrames != null)
+                if (showLapProgress && section.SubdivisionFrames != null)
                 {
                     Gizmos.color = new Color(1f, 1f, 1f, 0.8f);
                     for (int f = 1; f < section.SubdivisionFrames.Length; f++)
@@ -269,27 +340,32 @@ namespace TrackGeneration.Macro
                     }
                 }
 
-#if UNITY_EDITOR
-                if (ShowBranchGates && section.RouteId == 0 && section.BranchGroupId >= 0)
+                if (ShowRotationalControlStations &&
+                    section.Definition.SectionType == TrackMacroSectionType.RotationalEvent &&
+                    section.SubdivisionFrames != null && section.SubdivisionFrames.Length > 1)
                 {
-                    Gizmos.color = new Color(0.4f, 1f, 0.4f);
-                    Gizmos.DrawWireSphere(startPos + Vector3.up * 2f, 2.5f);
-                    Gizmos.DrawWireSphere(endPos + Vector3.up * 2f, 2.5f);
-                    UnityEditor.Handles.Label(startPos + Vector3.up * 8f, $"Branch {section.BranchGroupId} ENTRY GATE");
-                    UnityEditor.Handles.Label(endPos + Vector3.up * 8f, $"Branch {section.BranchGroupId} MERGE GATE");
-
-                    if (ShowRouteTimes && BranchBalances != null)
+                    float startVertical = section.SubdivisionFrames[0].AccumulatedVerticalRotation;
+                    float startRoll = section.SubdivisionFrames[0].AccumulatedRoadRoll;
+                    int previousStation = 0;
+                    for (int f = 1; f < section.SubdivisionFrames.Length; f++)
                     {
-                        foreach (var balance in BranchBalances)
-                        {
-                            if (balance.BranchGroupId != section.BranchGroupId) continue;
-                            UnityEditor.Handles.Label(startPos + Vector3.up * 12f, balance.ToString());
-                            break;
-                        }
+                        var fr = section.SubdivisionFrames[f];
+                        int station = Mathf.Max(
+                            Mathf.FloorToInt(Mathf.Abs(fr.AccumulatedVerticalRotation - startVertical) / 90f + 0.001f),
+                            Mathf.FloorToInt(Mathf.Abs(fr.AccumulatedRoadRoll - startRoll) / 90f + 0.001f));
+                        if (station <= previousStation) continue;
+                        previousStation = station;
+                        Vector3 p = toWorld.MultiplyPoint3x4(fr.Position);
+                        Gizmos.color = new Color(1f, 0.25f, 1f, 0.9f);
+                        Gizmos.DrawWireSphere(p, 2f);
+#if UNITY_EDITOR
+                        if (LabelVisible(p)) UnityEditor.Handles.Label(p + Vector3.up * 3f, $"{station}u");
+#endif
                     }
                 }
 
-                if (ShowPatternLabels && !string.IsNullOrEmpty(section.Definition.PatternId) &&
+#if UNITY_EDITOR
+                if (showPatternLabels && !string.IsNullOrEmpty(section.Definition.PatternId) &&
                     section.SubdivisionFrames != null && section.SubdivisionFrames.Length > 2)
                 {
                     // Label once per pattern: only on the first section of the group.
@@ -298,34 +374,14 @@ namespace TrackGeneration.Macro
                     if (firstOfPattern)
                     {
                         var mid = section.SubdivisionFrames[section.SubdivisionFrames.Length / 2];
-                        UnityEditor.Handles.Label(
-                            toWorld.MultiplyPoint3x4(mid.Position) + Vector3.up * 10f,
-                            $"◆ {section.Definition.PatternId}");
+                        Vector3 labelWorld = toWorld.MultiplyPoint3x4(mid.Position) + Vector3.up * 10f;
+                        if (LabelVisible(labelWorld))
+                            UnityEditor.Handles.Label(labelWorld, $"◆ {section.Definition.PatternId}");
                     }
                 }
 #endif
 
-#if UNITY_EDITOR
-                if (ShowRouteZones && section.Definition.SectionType == TrackMacroSectionType.SplitRoute &&
-                    section.Definition.RouteZoneBoundaries != null &&
-                    section.Definition.RouteZoneBoundaries.Length >= 6 &&
-                    section.SubdivisionFrames != null && section.SubdivisionFrames.Length > 2)
-                {
-                    var zb = section.Definition.RouteZoneBoundaries;
-                    string[] zoneNames = { "Lateral Separation ends", "Vertical Divergence starts", "Vertical Divergence ends", "Vertical Convergence starts", "Vertical Convergence ends", "Lateral Merge starts" };
-                    Gizmos.color = RouteZoneColor;
-                    for (int z = 0; z < 6; z++)
-                    {
-                        int fi = Mathf.Clamp(Mathf.RoundToInt(zb[z] * (section.SubdivisionFrames.Length - 1)), 0, section.SubdivisionFrames.Length - 1);
-                        var fr = section.SubdivisionFrames[fi];
-                        Vector3 p = toWorld.MultiplyPoint3x4(fr.Position);
-                        Gizmos.DrawLine(p, p + Vector3.up * 5f);
-                        UnityEditor.Handles.Label(p + Vector3.up * 5.5f, zoneNames[z]);
-                    }
-                }
-#endif
-
-                if (ShowJumpTargets && section.Definition.SectionType == TrackMacroSectionType.AirGap)
+                if (showJumpTargets && section.Definition.SectionType == TrackMacroSectionType.AirGap)
                 {
                     Gizmos.color = JumpTargetColor;
                     Gizmos.DrawLine(startPos, endPos);
@@ -333,61 +389,90 @@ namespace TrackGeneration.Macro
                 }
 
 #if UNITY_EDITOR
-                if (ShowLabels)
+                if (showSectionLabels)
                 {
                     Vector3 labelPos = startPos + toWorld.MultiplyVector(section.StartFrame.Up) * 3f;
-                    string label = $"[{i:D2}] {section.Definition.DebugName}";
-                    if (section.Definition.TurnSign != 0)
-                        label += $"  R={section.Definition.Radius:F0} bank={section.Definition.BankingAngle:F0}°";
-                    UnityEditor.Handles.Label(labelPos, label);
+                    if (LabelVisible(labelPos))
+                    {
+                        string label = $"[{i:D2}] {section.Definition.DebugName}";
+                        if (section.Definition.TurnSign != 0)
+                            label += $"  R={section.Definition.Radius:F0} bank={section.Definition.BankingAngle:F0}°";
+                        UnityEditor.Handles.Label(labelPos, label);
+                    }
                 }
 #endif
             }
 
 #if UNITY_EDITOR
-            if (ShowLabels)
+            if (showSectionLabels)
             {
                 Vector3 seedPos = toWorld.MultiplyPoint3x4(Sections[0].StartFrame.Position) + Vector3.up * 8f;
-                UnityEditor.Handles.Label(seedPos, $"Seed: {Seed}   Sections: {Sections.Count}   Length: {Sections[Sections.Count - 1].EndFrame.ArcLength:F0}m");
+                if (LabelVisible(seedPos))
+                    UnityEditor.Handles.Label(seedPos, $"Seed: {Seed}   Sections: {Sections.Count}   Length: {Sections[Sections.Count - 1].EndFrame.ArcLength:F0}m");
             }
 #endif
         }
 
+        // Scratch buffer for the parametric cross-section polyline.
+        private Vector2[] _profileScratch;
+
         /// <summary>
-        /// Draws one half-pipe cross-section profile polyline at a frame: center floor at
-        /// the baseline, curved side walls rising, plus the safety lip at the top edges.
+        /// Draws one cross-section profile polyline at a frame using THE SAME
+        /// parametric chain as the mesh and collider (turn rounding, catch-wall curls,
+        /// wallride support and pipe closure all draw exactly as they will build).
         /// </summary>
         private void DrawCrossSection(TrackConnectionFrame frame, Matrix4x4 toWorld)
         {
-            int n = RoadProfile.ProfilePointCount;
+            int n = TrackCrossSection.PointCount(RoadProfile);
             if (n < 2) return;
+            if (_profileScratch == null || _profileScratch.Length < n)
+                _profileScratch = new Vector2[n];
 
-            float halfW = frame.Width * 0.5f;
-            float sideH = frame.SideHeight > 0.001f ? frame.SideHeight : RoadProfile.SideHeight;
+            TrackCrossSection.Evaluate(RoadProfile, frame, _profileScratch);
 
             Vector3 prev = Vector3.zero;
             for (int i = 0; i < n; i++)
             {
-                float xNorm = RoadProfile.ProfileXAt(i, n);
-                // Per-side wall multipliers: suppressed inner walls (split/merge throats)
-                // draw flattened, exactly matching the generated mesh.
-                float mult = xNorm < 0f ? frame.LeftWallMultiplier : frame.RightWallMultiplier;
-                float h = RoadProfile.HeightAt(xNorm, halfW, sideH) * mult;
-                Vector3 p = toWorld.MultiplyPoint3x4(frame.Position + frame.Right * (xNorm * halfW) + frame.Up * h);
+                Vector3 p = toWorld.MultiplyPoint3x4(frame.Position
+                    + frame.Right * _profileScratch[i].x + frame.Up * _profileScratch[i].y);
                 if (i > 0) Gizmos.DrawLine(prev, p);
                 prev = p;
             }
+        }
 
-            // Safety lip markers at the top edges (scaled per side like the mesh).
-            float hEdge = RoadProfile.HeightAt(1f, halfW, sideH);
-            float hEdgeL = hEdge * frame.LeftWallMultiplier;
-            float hEdgeR = hEdge * frame.RightWallMultiplier;
-            Vector3 lipL = toWorld.MultiplyPoint3x4(frame.Position - frame.Right * halfW + frame.Up * (hEdgeL + RoadProfile.SafetyLipHeight * frame.LeftWallMultiplier));
-            Vector3 lipR = toWorld.MultiplyPoint3x4(frame.Position + frame.Right * halfW + frame.Up * (hEdgeR + RoadProfile.SafetyLipHeight * frame.RightWallMultiplier));
-            Vector3 edgeL = toWorld.MultiplyPoint3x4(frame.Position - frame.Right * halfW + frame.Up * hEdgeL);
-            Vector3 edgeR = toWorld.MultiplyPoint3x4(frame.Position + frame.Right * halfW + frame.Up * hEdgeR);
-            Gizmos.DrawLine(edgeL, lipL);
-            Gizmos.DrawLine(edgeR, lipR);
+        /// <summary>
+        /// The 4 quarter boundaries: a crossbar + label at each quarter's entry frame,
+        /// plus the estimated road-time table on dual quarters.
+        /// </summary>
+        private void DrawQuarterBoundaries(Matrix4x4 toWorld)
+        {
+            if (!ShowQuarterBoundaries || Quarters == null || Quarters.Count == 0) return;
+
+            foreach (var q in Quarters)
+            {
+                if (q == null || q.RouteA == null) continue;
+                var f = q.EntryFrame;
+                Vector3 p = toWorld.MultiplyPoint3x4(f.Position);
+                Vector3 right = toWorld.MultiplyVector(f.Right);
+                float halfW = Mathf.Max(6f, f.Width * 0.75f);
+
+                bool dual = q.QuarterType == TrackGeneration.Design.TrackQuarterType.DualRoad;
+                Gizmos.color = dual ? new Color(1f, 0.55f, 0.1f) : new Color(0.35f, 0.85f, 1f);
+                Gizmos.DrawLine(p - right * halfW, p + right * halfW);
+                Gizmos.DrawLine(p - right * halfW, p - right * halfW + Vector3.up * 10f);
+                Gizmos.DrawLine(p + right * halfW, p + right * halfW + Vector3.up * 10f);
+
+#if UNITY_EDITOR
+                if (LabelVisible(p))
+                {
+                    UnityEditor.Handles.Label(p + Vector3.up * 12f,
+                        $"Q{q.QuarterIndex + 1} {(dual ? "DUAL ROAD" : "SingleRoad")} " +
+                        $"({q.LogicalProgressStart:P0}–{q.LogicalProgressEnd:P0})");
+                    if (dual && ShowRouteTimes && q.Balance != null)
+                        UnityEditor.Handles.Label(p + Vector3.up * 16f, q.Balance.ToString());
+                }
+#endif
+            }
         }
 
         /// <summary>

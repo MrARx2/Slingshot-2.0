@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace TrackGeneration.Macro
@@ -10,30 +11,120 @@ namespace TrackGeneration.Macro
     /// </summary>
     public enum TrackMacroSectionType
     {
-        Straight,
-        WideStraight,
-        BoostStraight,
-        BankedCurve,
-        BankedHairpin,
-        SCurve,
-        Chicane,
-        JumpRamp,
-        AirGap,
-        LandingRamp,
-        RecoveryStraight,
-        SplitEntry,
-        SplitRoute,
-        MergeExit,
-        Loop,
-        Corkscrew,
-        TunnelVariant,
-        BridgeVariant,
+        // Explicit values: GeneratedTrackSection lists are scene-serialized, so removed
+        // members (the old 11–13 split/merge trio) must leave holes, never shift values.
+        Straight = 0,
+        WideStraight = 1,
+        BoostStraight = 2,
+        BankedCurve = 3,
+        BankedHairpin = 4,
+        SCurve = 5,
+        Chicane = 6,
+        JumpRamp = 7,
+        AirGap = 8,
+        LandingRamp = 9,
+        RecoveryStraight = 10,
+        Loop = 14,
+        Corkscrew = 15,
+        TunnelVariant = 16,
+        BridgeVariant = 17,
 
         /// <summary>Full-revolution climbing/descending helix (parking-garage spiral). Exits directly above/below its entry.</summary>
-        Spiral,
+        Spiral = 18,
 
         /// <summary>Half loop up to inverted + half twist back upright (Immelmann). Reverses heading, exits at the loop top height.</summary>
-        HalfLoopTwist
+        HalfLoopTwist = 19,
+
+        /// <summary>Fully closed pipe road: the cross-section closes gradually into a tube the craft can ride around, then reopens. Straight centerline in V1.</summary>
+        FullPipe = 20,
+
+        /// <summary>Intentional wallride corner: fully rounded bowl with the boosted, over-curled outside wall as the primary driving surface.</summary>
+        WallrideTurn = 21,
+
+        /// <summary>One continuous, quantized sequence of vertical-centerline and road-roll phases.</summary>
+        RotationalEvent = 22
+    }
+
+    /// <summary>The independently accumulated rotational channel owned by one event phase.</summary>
+    public enum RotationalPhaseAxis
+    {
+        VerticalCenterline,
+        RoadRoll
+    }
+
+    /// <summary>Sign of a quantized phase. The semantic name is supplied by the phase axis.</summary>
+    public enum RotationalPhaseDirection
+    {
+        Negative = -1,
+        Positive = 1
+    }
+
+    /// <summary>Approved overlap between adjacent phase envelopes.</summary>
+    public enum RotationalBlendPreset
+    {
+        None,
+        Short,
+        Medium,
+        Long
+    }
+
+    /// <summary>
+    /// One ordered phase inside a continuous rotational road event. Intentional rotation
+    /// is stored only as integer 90-degree units; the two halves are shaping regions, not
+    /// path/mesh boundaries.
+    /// </summary>
+    [Serializable]
+    public class RotationalPhaseDefinition
+    {
+        public RotationalPhaseAxis Axis;
+        public RotationalPhaseDirection Direction = RotationalPhaseDirection.Positive;
+
+        [Min(1)] public int RotationUnits = 4;
+
+        [Min(1f)] public float FirstHalfLength = 100f;
+        [Min(1f)] public float SecondHalfLength = 100f;
+
+        [Min(1f)] public float FirstHalfRadius = 100f;
+        [Min(1f)] public float SecondHalfRadius = 100f;
+
+        [Tooltip("Independent plan-view heading change accumulated during this phase.")]
+        public float HorizontalTurnDegrees;
+
+        [Tooltip("Smooth temporary plan-view yaw in the first shaping half. Returns to zero at the midpoint, offsetting folded geometry without forcing the exit heading.")]
+        public float FirstHalfYawBiasDegrees;
+
+        [Tooltip("Smooth temporary plan-view yaw in the second shaping half. Returns to zero at phase exit.")]
+        public float SecondHalfYawBiasDegrees;
+
+        [Tooltip("Independent non-inversion pitch drift accumulated during this phase.")]
+        public float VerticalDriftDegrees;
+
+        [Tooltip("Smooth temporary pitch bias in the first shaping half. Returns to zero at the midpoint, changing elevation without forcing the exit pitch.")]
+        public float FirstHalfPitchBiasDegrees;
+
+        [Tooltip("Smooth temporary pitch bias in the second shaping half. Returns to zero at phase exit.")]
+        public float SecondHalfPitchBiasDegrees;
+
+        [Tooltip("Peak synchronized centerline-orbit tangent angle for a road-roll phase. Zero is a flat barrel roll; a positive value makes a true rising/falling corkscrew whose curvature rotates with the road surface and returns to a level exit.")]
+        [Min(0f)] public float CenterlineOrbitDegrees;
+
+        [Tooltip("Horizontal curvature carried out of the complete rotational event, in radians per meter. Only the final phase's value is used.")]
+        public float ExitHorizontalCurvature;
+
+        [Tooltip("Vertical curvature carried out of the complete rotational event, in radians per meter. Only the final phase's value is used.")]
+        public float ExitVerticalCurvature;
+
+        [Tooltip("Intentional road-roll rate carried out of the complete rotational event, in degrees per meter. Only the final phase's value is used.")]
+        public float ExitRoadRollRate;
+
+        [Tooltip("Road width reached at the end of this phase. Zero preserves the incoming width.")]
+        public float ExitWidth;
+
+        public RotationalBlendPreset BlendToNext = RotationalBlendPreset.Medium;
+
+        public float Length => Mathf.Max(1f, FirstHalfLength) + Mathf.Max(1f, SecondHalfLength);
+        public int Sign => Direction == RotationalPhaseDirection.Positive ? 1 : -1;
+        public float Degrees(float unitDegrees) => Sign * Mathf.Max(1, RotationUnits) * unitDegrees;
     }
 
     /// <summary>Turn direction of a section (None for straight-family pieces).</summary>
@@ -125,6 +216,9 @@ namespace TrackGeneration.Macro
         [Tooltip("Turn radius in meters (curves only).")]
         public float Radius;
 
+        [Tooltip("Corkscrew only: radius of the second half. Zero uses Radius for both halves.")]
+        public float SecondaryRadius;
+
         [Tooltip("Full-hold banking angle in degrees (curves only).")]
         public float BankingAngle;
 
@@ -164,14 +258,14 @@ namespace TrackGeneration.Macro
         [Tooltip("Net-zero vertical bump inside this section (meters): + = hill/bridge crest, - = dip/underpass. Ends return to entry height.")]
         public float HillHeight;
 
-        [Tooltip("SplitRoute only: lateral offset from the group centerline at the split end (meters).")]
-        public float RouteLateralStart;
+        [Tooltip("Quarter of the lap this def belongs to (0..3), stamped by the planner. -1 before stamping.")]
+        public int QuarterIndex = -1;
 
-        [Tooltip("SplitRoute only: lateral offset from the group centerline at the merge end (meters). Different sign from start = routes cross over/under.")]
-        public float RouteLateralEnd;
+        [Tooltip("Road within the quarter: 0 = canonical road (route A), 1 = alternate road (route B) of a Dual Road Quarter.")]
+        public int RoadId;
 
-        [Tooltip("SplitRoute only: normalized zone breakpoints set by the layout — [lateralSepEnd, vertDivStart, vertDivEnd, vertConvStart, vertConvEnd, lateralMergeStart]. Used by debug visualization.")]
-        public float[] RouteZoneBoundaries;
+        [Tooltip("AirGap only: signed lateral displacement of the landing relative to the launch lip, along the lip's right vector (meters). Dual-quarter choice jumps land offset from the flight midline; ordinary jumps leave this 0.")]
+        public float PlanLateralOffset;
 
         [Tooltip("Feature pattern instance this section belongs to (empty for plain sections). Sections sharing a PatternId form one atomic group that bypasses ordinary spacing internally.")]
         public string PatternId;
@@ -179,8 +273,14 @@ namespace TrackGeneration.Macro
         [Tooltip("Jump chain only: ballistic airtime of the gap in seconds (AirGap) — the gap distance is derived from the trajectory, never random.")]
         public float AirtimeSeconds;
 
-        [Tooltip("Jump ramps only: the steeper mid-ramp climb/descent pitch (degrees). PitchChange holds the launch/arrival pitch at the open lip.")]
+        [Tooltip("Jump ramps only: the intermediate launch/landing shaping pitch (degrees). Launch ramps keep this between level and PitchChange so pitch never falls before the lip.")]
         public float SecondaryPitchDeg;
+
+        [Tooltip("Corkscrew only: normalized straight shoulder held before the roll begins (0..0.08). Zero preserves the classic immediate roll-in.")]
+        public float FeatureEntryStraightFraction;
+
+        [Tooltip("Corkscrew only: normalized straight shoulder held after the roll completes (0..0.08). Zero preserves the classic immediate roll-out.")]
+        public float FeatureExitStraightFraction;
 
         [Tooltip("Horizontal (plan-view) run of this section along its entry heading, for pitched sections whose arc length exceeds their footprint (ramps, air gaps). 0 = same as Length.")]
         public float PlanHorizontalLength;
@@ -188,8 +288,29 @@ namespace TrackGeneration.Macro
         [Tooltip("True for sections created by the closure solver (adjustable straights, closure curves).")]
         public bool IsClosure;
 
+        [Tooltip("FullPipe only: normalized position along the section where the closure completes (0..1). The cross-section morphs half-pipe → tube over this span — never over one or two samples.")]
+        public float PipeCloseFraction;
+
+        [Tooltip("FullPipe only: normalized position where the reopening begins (0..1).")]
+        public float PipeOpenFraction;
+
+        [Tooltip("Connector classification set by the connector analysis (meaningful for straight-family sections between content). Default BlendNeighbours is assigned by the analyzer.")]
+        public ConnectorBehavior ConnectorBehavior;
+
+        [Tooltip("GRADED turn-complex carry 0..1 set by the connector analysis: 1 = short link, neighbours' support holds fully through it; fades smoothly to 0 as the connector approaches ~2.5× the bridge window. Never a binary cliff — a 795m link must not behave differently from a 793m one.")]
+        public float BridgeCarry;
+
+        [Tooltip("Minimum legal length for this section (meters). The closure solver and budget fitter never shrink it below this. 0 = generic floor.")]
+        public float MinimumLength;
+
+        [Tooltip("Turn-complex this section belongs to (same-direction turn bridges group their two corners + connector). Empty for standalone sections. Reporting/surface-pass metadata — does NOT change pattern atomicity.")]
+        public string TurnComplexId;
+
         [Tooltip("Orientation/heading contract of this section, used by the sequence-grammar validator.")]
         public SectionConnectionContract Contract;
+
+        [Tooltip("RotationalEvent only: ordered quantized phases integrated as one continuous road/frame stream.")]
+        public List<RotationalPhaseDefinition> RotationalPhases = new List<RotationalPhaseDefinition>();
 
         /// <summary>Horizontal plan-view run (falls back to Length for flat sections).</summary>
         public float HorizontalRun => PlanHorizontalLength > 0.001f ? PlanHorizontalLength : Length;

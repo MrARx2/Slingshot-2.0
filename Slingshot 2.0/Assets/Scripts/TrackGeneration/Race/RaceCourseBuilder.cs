@@ -8,16 +8,16 @@ namespace TrackGeneration.Race
     /// <summary>
     /// Builds the race course onto a generated track: a start/finish arch at a small arc
     /// offset past the spawn point, and N LOGICAL checkpoint groups evenly spaced around
-    /// the lap. Checkpoints falling inside a branch group get one gate PER ROUTE sharing
-    /// the same logical index — crossing either advances the lap, so a player is never
-    /// required to drive both routes. Gate visuals are decoration (no colliders);
+    /// the lap. Checkpoints falling inside a Dual Road Quarter get one gate PER ROAD
+    /// sharing the same logical index — crossing either advances the lap, so a player is
+    /// never required to drive both roads. Gate visuals are decoration (no colliders);
     /// detection is handled by <see cref="RaceCourse"/>.
     /// </summary>
     public static class RaceCourseBuilder
     {
         private const float MinGateSeparation = 60f;
 
-        /// <summary>Builds the branch-aware course under the track root. Returns null on failure.</summary>
+        /// <summary>Builds the quarter-aware course under the track root. Returns null on failure.</summary>
         public static RaceCourse Build(
             Transform trackRoot,
             GeneratedTrackLayout layout,
@@ -49,9 +49,9 @@ namespace TrackGeneration.Race
                 return null;
             }
             course.StartFinishGate = BuildGate(courseObj.transform, startFrame, roadProfile, isStartFinish: true,
-                logicalIndex: -1, branchGroupId: -1, routeId: -1, mats);
+                logicalIndex: -1, quarterIndex: -1, roadId: -1, mats);
 
-            // Logical checkpoints: evenly spaced arcs; branch spans emit one gate per route.
+            // Logical checkpoints: evenly spaced arcs; dual-quarter spans emit one gate per road.
             float spacing = total / (checkpointCount + 1);
             float lastArc = 0f;
             int logicalIndex = 0;
@@ -66,24 +66,22 @@ namespace TrackGeneration.Race
 
                 var group = new CheckpointGroup();
 
-                GeneratedTrackSection branchA = FindBranchRouteAt(sections, arc, routeId: 0);
-                if (branchA != null)
+                var dual = FindDualWindowAt(layout, arc);
+                if (dual != null)
                 {
-                    // Route A gate at the arc, route B gate at the matching progress.
-                    var frameA = SampleSectionFrame(branchA, arc);
+                    // Road A gate at the arc, road B gate at the matching normalized
+                    // position along its own chain (both roads agree on gate progress).
+                    if (!MacroTrackSampler.TrySampleFrame(sections, arc, out TrackConnectionFrame frameA)) continue;
                     var gateA = BuildGate(courseObj.transform, frameA, roadProfile, false, logicalIndex,
-                        branchA.BranchGroupId, 0, mats);
+                        dual.QuarterIndex, 0, mats);
                     group.Gates.Add(gateA);
 
-                    GeneratedTrackSection branchB = FindBranchSibling(sections, branchA);
-                    if (branchB != null)
-                    {
-                        float t = Mathf.InverseLerp(branchA.StartFrame.ArcLength, branchA.EndFrame.ArcLength, arc);
-                        var frameB = SampleSectionFrameNormalized(branchB, t);
-                        var gateB = BuildGate(courseObj.transform, frameB, roadProfile, false, logicalIndex,
-                            branchB.BranchGroupId, 1, mats);
-                        group.Gates.Add(gateB);
-                    }
+                    float t = Mathf.InverseLerp(dual.WindowStartArc, dual.WindowEndArc, arc);
+                    var frameB = SampleChainFrameNormalized(sections,
+                        dual.Quarter.RouteB.FirstSectionIndex, dual.Quarter.RouteB.LastSectionIndex, t);
+                    var gateB = BuildGate(courseObj.transform, frameB, roadProfile, false, logicalIndex,
+                        dual.QuarterIndex, 1, mats);
+                    group.Gates.Add(gateB);
                 }
                 else
                 {
@@ -117,41 +115,62 @@ namespace TrackGeneration.Race
             else Object.DestroyImmediate(obj);
         }
 
-        // ─────────────────────────── Branch-aware sampling ───────────────────────────
+        // ─────────────────────────── Quarter-aware sampling ───────────────────────────
 
-        private static GeneratedTrackSection FindBranchRouteAt(List<GeneratedTrackSection> sections, float arc, int routeId)
+        private class DualWindow
         {
-            foreach (var s in sections)
+            public GeneratedTrackQuarter Quarter;
+            public int QuarterIndex;
+            public float WindowStartArc; // road A's landing mouth
+            public float WindowEndArc;   // road A's launch lip end
+        }
+
+        /// <summary>
+        /// The dual-road window an arc falls inside, if any: from the quarter's landing
+        /// mouths to its launch lips (the span where the player is committed to a road).
+        /// </summary>
+        private static DualWindow FindDualWindowAt(GeneratedTrackLayout layout, float arc)
+        {
+            var sections = layout.Sections;
+            foreach (var q in layout.Quarters)
             {
-                if (s.BranchGroupId < 0 || s.RouteId != routeId) continue;
-                if (arc >= s.StartFrame.ArcLength + 1f && arc <= s.EndFrame.ArcLength - 1f)
-                    return s;
+                if (!q.IsDual || q.RouteB == null || q.RouteB.FirstSectionIndex < 1) continue;
+
+                // Road B's chain starts at the shared mouth arc; road A's lip is the
+                // canonical section right before the chain in the list.
+                float windowStart = sections[q.RouteB.FirstSectionIndex].StartFrame.ArcLength;
+                float windowEnd = sections[q.RouteB.FirstSectionIndex - 1].EndFrame.ArcLength;
+                if (arc >= windowStart + 1f && arc <= windowEnd - 1f)
+                    return new DualWindow
+                    {
+                        Quarter = q,
+                        QuarterIndex = q.QuarterIndex,
+                        WindowStartArc = windowStart,
+                        WindowEndArc = windowEnd
+                    };
             }
             return null;
         }
 
-        private static GeneratedTrackSection FindBranchSibling(List<GeneratedTrackSection> sections, GeneratedTrackSection route)
+        /// <summary>Samples a frame at normalized t along a contiguous run of sections (an alternate road chain).</summary>
+        private static TrackConnectionFrame SampleChainFrameNormalized(List<GeneratedTrackSection> sections,
+            int firstSection, int lastSection, float t)
         {
-            foreach (var s in sections)
+            float chainStart = sections[firstSection].StartFrame.ArcLength;
+            float chainEnd = sections[lastSection].EndFrame.ArcLength;
+            float targetArc = Mathf.Lerp(chainStart, chainEnd, Mathf.Clamp01(t));
+
+            for (int i = firstSection; i <= lastSection; i++)
             {
-                if (s.BranchGroupId == route.BranchGroupId && s.RouteId == 1 - route.RouteId)
-                    return s;
+                var frames = sections[i].SubdivisionFrames;
+                if (frames == null || frames.Length == 0) continue;
+                if (targetArc > sections[i].EndFrame.ArcLength && i < lastSection) continue;
+
+                float segT = Mathf.InverseLerp(sections[i].StartFrame.ArcLength, sections[i].EndFrame.ArcLength, targetArc);
+                int idx = Mathf.Clamp(Mathf.RoundToInt(segT * (frames.Length - 1)), 0, frames.Length - 1);
+                return frames[idx];
             }
-            return null;
-        }
-
-        private static TrackConnectionFrame SampleSectionFrame(GeneratedTrackSection section, float arc)
-        {
-            float t = Mathf.InverseLerp(section.StartFrame.ArcLength, section.EndFrame.ArcLength, arc);
-            return SampleSectionFrameNormalized(section, t);
-        }
-
-        private static TrackConnectionFrame SampleSectionFrameNormalized(GeneratedTrackSection section, float t)
-        {
-            var frames = section.SubdivisionFrames;
-            if (frames == null || frames.Length == 0) return section.StartFrame;
-            int idx = Mathf.Clamp(Mathf.RoundToInt(t * (frames.Length - 1)), 0, frames.Length - 1);
-            return frames[idx];
+            return sections[firstSection].StartFrame;
         }
 
         // ─────────────────────────────── Gates ───────────────────────────────
@@ -162,12 +181,12 @@ namespace TrackGeneration.Race
             TrackRoadProfileSettings roadProfile,
             bool isStartFinish,
             int logicalIndex,
-            int branchGroupId,
-            int routeId,
+            int quarterIndex,
+            int roadId,
             Materials mats)
         {
-            string routeSuffix = routeId == 0 ? "A" : routeId == 1 ? "B" : "";
-            GameObject go = new GameObject(isStartFinish ? "StartFinishLine" : $"Checkpoint_{logicalIndex + 1}{routeSuffix}");
+            string roadSuffix = roadId == 0 ? "A" : roadId == 1 ? "B" : "";
+            GameObject go = new GameObject(isStartFinish ? "StartFinishLine" : $"Checkpoint_{logicalIndex + 1}{roadSuffix}");
             go.transform.SetParent(parent, false);
             go.transform.localPosition = frame.Position;
             go.transform.localRotation = Quaternion.LookRotation(frame.Forward, frame.Up);
@@ -176,8 +195,8 @@ namespace TrackGeneration.Race
             gate.IsStartFinish = isStartFinish;
             gate.CheckpointIndex = logicalIndex;
             gate.ArcLength = frame.ArcLength;
-            gate.BranchGroupId = branchGroupId;
-            gate.RouteId = routeId;
+            gate.QuarterIndex = quarterIndex;
+            gate.RoadId = roadId;
             gate.DetectionHalfWidth = frame.Width * 0.75f;
             gate.DetectionBottom = -6f;
             gate.DetectionTop = 60f;

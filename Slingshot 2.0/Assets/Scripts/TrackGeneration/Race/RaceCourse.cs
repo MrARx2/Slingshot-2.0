@@ -67,11 +67,11 @@ namespace TrackGeneration.Race
         /// <summary>Index of the next LOGICAL checkpoint that must be crossed.</summary>
         public int NextCheckpointIndex { get; private set; }
 
-        /// <summary>Branch group the player most recently entered via a route gate (-1 = main line).</summary>
-        public int CurrentBranchGroupId { get; private set; } = -1;
+        /// <summary>Dual quarter the player most recently entered via a road gate (-1 = single road).</summary>
+        public int CurrentQuarterIndex { get; private set; } = -1;
 
-        /// <summary>Route the player chose in the current branch group (0 = A, 1 = B, -1 = unknown).</summary>
-        public int CurrentRouteId { get; private set; } = -1;
+        /// <summary>Road the player chose in the current dual quarter (0 = A, 1 = B, -1 = unknown).</summary>
+        public int CurrentRoadId { get; private set; } = -1;
 
         /// <summary>The last gate crossed in order — the respawn anchor (null before the first crossing).</summary>
         public RaceGate LastValidGate { get; private set; }
@@ -120,8 +120,8 @@ namespace TrackGeneration.Race
         {
             LapInProgress = false;
             NextCheckpointIndex = 0;
-            CurrentBranchGroupId = -1;
-            CurrentRouteId = -1;
+            CurrentQuarterIndex = -1;
+            CurrentRoadId = -1;
             LastValidGate = null;
             _tracking = false;
         }
@@ -221,8 +221,8 @@ namespace TrackGeneration.Race
                 LapInProgress = true;
                 CurrentLapNumber = _laps.Count + 1;
                 NextCheckpointIndex = 0;
-                CurrentBranchGroupId = -1;
-                CurrentRouteId = -1;
+                CurrentQuarterIndex = -1;
+                CurrentRoadId = -1;
                 LastValidGate = gate;
                 _lapStartTime = crossTime;
                 return;
@@ -230,13 +230,13 @@ namespace TrackGeneration.Race
 
             if (!LapInProgress) return;
 
-            // Any gate of the NEXT logical group advances the lap — either branch route counts.
+            // Any gate of the NEXT logical group advances the lap — either quarter road counts.
             if (gate.CheckpointIndex == NextCheckpointIndex)
             {
                 NextCheckpointIndex++;
                 LastValidGate = gate;
-                CurrentBranchGroupId = gate.BranchGroupId;
-                CurrentRouteId = gate.RouteId;
+                CurrentQuarterIndex = gate.QuarterIndex;
+                CurrentRoadId = gate.RoadId;
                 CheckpointPassed?.Invoke(gate.CheckpointIndex);
             }
             // Out-of-order or repeat crossings are ignored — the lap simply

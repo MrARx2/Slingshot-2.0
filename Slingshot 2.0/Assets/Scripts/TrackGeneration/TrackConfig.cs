@@ -16,6 +16,10 @@ namespace TrackGeneration.Core
     [CreateAssetMenu(fileName = "TrackConfig", menuName = "Track/Generation Config")]
     public class TrackConfig : ScriptableObject
     {
+        private const int CurrentSchemaVersion = 2;
+
+        [SerializeField, HideInInspector] private int schemaVersion;
+
         // ══════════════════ Global technical limits ══════════════════
 
         [Header("Global Technical Limits")]
@@ -36,7 +40,7 @@ namespace TrackGeneration.Core
         [SerializeField] private float minTrackLength = 6000f;
 
         [Tooltip("Absolute maximum lap length (meters).")]
-        [SerializeField] private float maxTrackLength = 60000f;
+        [SerializeField] private float maxTrackLength = 90000f;
 
         [Tooltip("Minimum road width (meters).")]
         [SerializeField] private float minRoadWidth = 12f;
@@ -48,7 +52,10 @@ namespace TrackGeneration.Core
         [SerializeField] private float minCurveRadius = 180f;
 
         [Tooltip("Absolute maximum curve radius (meters).")]
-        [SerializeField] private float maxCurveRadius = 6000f;
+        [SerializeField] private float maxCurveRadius = 1200f;
+
+        [Tooltip("Absolute maximum radius for solver-only closure curves. These do not affect the styled corner range.")]
+        [SerializeField] private float maxClosureCurveRadius = 6000f;
 
         [Tooltip("Maximum bank angle (degrees).")]
         [Range(0f, 85f)]
@@ -77,9 +84,25 @@ namespace TrackGeneration.Core
         [SerializeField] private bool allowCorkscrews = true;
         [SerializeField] private bool allowSpirals = true;
         [SerializeField] private bool allowHalfLoops = true;
-        [SerializeField] private bool allowBranches = true;
         [SerializeField] private bool allowBridges = true;
         [SerializeField] private bool allowUnderpasses = true;
+        [SerializeField] private bool allowFullPipes = true;
+        [SerializeField] private bool allowWallRides = true;
+
+        // ══════════════════ Full pipe limits ══════════════════
+
+        [Header("Full Pipe Limits")]
+
+        [Tooltip("Full-pipe body duration window (seconds at design speed).")]
+        [SerializeField] private float minFullPipeSeconds = 2f;
+        [SerializeField] private float maxFullPipeSeconds = 12f;
+
+        [Tooltip("Pipe closure/opening transition window (seconds).")]
+        [SerializeField] private float minPipeTransitionSeconds = 0.6f;
+        [SerializeField] private float maxPipeTransitionSeconds = 3f;
+
+        [Tooltip("Minimum full-pipe interior radius (meters) — craft envelope + camera clearance.")]
+        [SerializeField] private float minFullPipeRadius = 12f;
 
         // ══════════════════ Straight & pacing limits (seconds) ══════════════════
 
@@ -135,6 +158,18 @@ namespace TrackGeneration.Core
         [Range(2f, 15f)]
         [SerializeField] private float maxBankRampAngle = 6f;
 
+        [Tooltip("Legal window for the designer's Minimum Connector Duration (seconds). Connectors shorter than the resolved minimum are lengthened, absorbed into a turn complex, or bridged.")]
+        [SerializeField] private float minConnectorSeconds = 0.1f;
+        [SerializeField] private float maxConnectorSeconds = 2.5f;
+
+        [Tooltip("Legal window for the designer's Minimum Bank-Reversal Duration (seconds): the shortest time the banking field may take to swing from one side through zero to the other.")]
+        [SerializeField] private float minBankReversalSeconds = 0.3f;
+        [SerializeField] private float maxBankReversalSeconds = 3.5f;
+
+        [Tooltip("Legal window for the designer's Same-Direction Bridge Duration (seconds): a straight between related turns SHORTER than this is treated as one turn complex — bank, wall support, depth and rounding carry through instead of dipping and rebuilding.")]
+        [SerializeField] private float minBridgeSeconds = 0.5f;
+        [SerializeField] private float maxBridgeSeconds = 5f;
+
         // ══════════════════ Loop limits ══════════════════
 
         [Header("Loop Limits")]
@@ -176,15 +211,16 @@ namespace TrackGeneration.Core
 
         [Tooltip("Corkscrew duration window (seconds). 1.5 s ≈ 542 m, 5.5 s ≈ 1986 m at 1300 km/h.")]
         [SerializeField] private float minCorkscrewSeconds = 1.5f;
-        [SerializeField] private float maxCorkscrewSeconds = 5.5f;
+        [SerializeField] private float maxCorkscrewSeconds = 9f;
 
         [Tooltip("Corkscrew helix radius window (meters).")]
         [SerializeField] private float minCorkscrewRadius = 60f;
         [SerializeField] private float maxCorkscrewRadius = 260f;
 
-        [Tooltip("Allowed total roll through a corkscrew (degrees).")]
-        [SerializeField] private float minCorkscrewRollDegrees = 180f;
-        [SerializeField] private float maxCorkscrewRollDegrees = 720f;
+        // Deprecated V1 migration inputs. Keep their serialized names/data, but do not
+        // expose arbitrary degree targets in the V2 inspector.
+        [SerializeField, HideInInspector] private float minCorkscrewRollDegrees = 180f;
+        [SerializeField, HideInInspector] private float maxCorkscrewRollDegrees = 1080f;
 
         [Tooltip("Maximum roll rate anywhere on the track (degrees per second at design speed).")]
         [SerializeField] private float maxRollRateDegreesPerSecond = 220f;
@@ -196,6 +232,44 @@ namespace TrackGeneration.Core
 
         [Tooltip("Minimum clear space around a corkscrew volume (meters).")]
         [SerializeField] private float minCorkscrewClearance = 40f;
+
+        // Legacy degree fields above remain serialized so existing assets are never
+        // corrupted. Procedural selection uses the quantized grammar below.
+        [Header("Rotational Road Grammar")]
+        [Tooltip("Logical inversion unit in degrees. Version 2 uses 90 degrees.")]
+        [SerializeField] private int rotationUnitDegrees = 90;
+
+        [Tooltip("Allowed total vertical-rotation units for loop events.")]
+        [SerializeField] private int[] allowedLoopRotationUnits = { 2, 4, 8, 12 };
+
+        [Tooltip("Allowed total road-roll units for corkscrew events.")]
+        [SerializeField] private int[] allowedCorkscrewRotationUnits = { 2, 4, 8, 12 };
+
+        [SerializeField] private bool allowHalfRotations = true;
+        [SerializeField] private bool allowQuarterTurnTransitions = true;
+        [SerializeField] private int maxLoopRotationUnits = 12;
+        [SerializeField] private int maxCorkscrewRotationUnits = 12;
+
+        [Tooltip("Approved normal-bank target increment. Transitional samples remain smooth.")]
+        [SerializeField] private float normalBankStepDegrees = 15f;
+
+        [Tooltip("Approved phase overlap preset used by procedural mixed inversions.")]
+        [SerializeField] private TrackGeneration.Macro.RotationalBlendPreset defaultRotationalBlend = TrackGeneration.Macro.RotationalBlendPreset.Medium;
+
+        [Tooltip("Maximum centerline distance between source samples inside rotational events.")]
+        [SerializeField] private float maxRotationalSampleDistance = 4f;
+
+        [Tooltip("Maximum forward-direction change per source sample.")]
+        [SerializeField] private float maxRotationalForwardAngle = 0.75f;
+
+        [Tooltip("Maximum intentional road-roll change per source sample.")]
+        [SerializeField] private float maxRotationalRollAngle = 1f;
+
+        [Tooltip("Minimum source intervals generated inside every logical 90-degree unit.")]
+        [SerializeField] private int minSamplesPerRotationUnit = 16;
+
+        [Tooltip("Minimum travel distance allocated to every logical 90-degree unit.")]
+        [SerializeField] private float minDistancePerRotationUnit = 25f;
 
         // ══════════════════ Spiral limits ══════════════════
 
@@ -250,53 +324,19 @@ namespace TrackGeneration.Core
         [Tooltip("Tolerance between the predicted ballistic arrival and the landing surface (meters).")]
         [SerializeField] private float jumpLandingTolerance = 4f;
 
-        // ══════════════════ Branch limits ══════════════════
+        // ══════════════════ Quarter limits ══════════════════
 
-        [Header("Branch Limits")]
+        [Header("Quarter Limits")]
 
-        [Tooltip("Maximum branch groups per track.")]
-        [SerializeField] private int maxBranchGroupsPerTrack = 5;
+        [Tooltip("Whether Dual Road Quarters (two alternative roads through one quarter, entered and left by jumps) are allowed at all.")]
+        [SerializeField] private bool allowDualRoadQuarters = true;
 
-        [SerializeField] private float minDecisionPreviewSeconds = 1.5f;
-        [SerializeField] private float maxDecisionPreviewSeconds = 4.0f;
+        [Tooltip("Maximum number of Dual Road Quarters per track (0–4).")]
+        [SerializeField] private int maxDualQuartersPerTrack = 4;
 
-        [Tooltip("Branch route duration window from fork to merge (seconds).")]
-        [SerializeField] private float minBranchRouteSeconds = 4.0f;
-        [SerializeField] private float maxBranchRouteSeconds = 18.0f;
-
-        [SerializeField] private float minLateralSplitSeconds = 0.8f;
-        [SerializeField] private float maxLateralSplitSeconds = 3.0f;
-
-        [SerializeField] private float minVerticalDivergenceDelaySeconds = 0.3f;
-        [SerializeField] private float maxVerticalDivergenceDelaySeconds = 1.5f;
-
-        [SerializeField] private float minVerticalDivergenceSeconds = 0.8f;
-        [SerializeField] private float maxVerticalDivergenceSeconds = 3.5f;
-
-        [SerializeField] private float minMergeSeconds = 0.8f;
-        [SerializeField] private float maxMergeSeconds = 3.0f;
-
-        [SerializeField] private float minPostMergeRecoverySeconds = 1.0f;
-        [SerializeField] private float maxPostMergeRecoverySeconds = 3.0f;
-
-        [Tooltip("Route centerline separation window (meters). Dynamically increased for road half-widths, wall heights, banking, lips, slab thickness, craft envelope and safety margin.")]
-        [SerializeField] private float minRouteCenterlineSeparation = 40f;
-        [SerializeField] private float maxRouteCenterlineSeparation = 300f;
-
-        [Tooltip("Route vertical separation window for stacked/crossing patterns (meters).")]
-        [SerializeField] private float minRouteVerticalSeparation = 35f;
-        [SerializeField] private float maxRouteVerticalSeparation = 300f;
-
-        [Tooltip("Neutral-craft route time balance tolerance window (fraction).")]
-        [SerializeField] private float minTimeBalanceTolerance = 0.01f;
-        [SerializeField] private float maxTimeBalanceTolerance = 0.06f;
-
-        [Tooltip("Specialization advantage target window (fraction).")]
-        [SerializeField] private float minSpecializationAdvantage = 0.01f;
-        [SerializeField] private float maxSpecializationAdvantage = 0.10f;
-
-        [Tooltip("Maximum paired-route interactions (crossovers, exchanges) per branch group.")]
-        [SerializeField] private int maxPairedRouteInteractions = 5;
+        [Tooltip("Lane separation window between the two landing mouths / exit lips of a dual quarter (meters). The floor keeps the roads physically clear of each other's walls; the ceiling keeps both lanes reachable by mid-air aiming at design speed.")]
+        [SerializeField] private float minLaneSeparation = 16f;
+        [SerializeField] private float maxLaneSeparation = 80f;
 
         // ══════════════════ Half-pipe limits ══════════════════
 
@@ -320,6 +360,14 @@ namespace TrackGeneration.Core
         [SerializeField] private float minSafetyLipHeight = 0.5f;
         [SerializeField] private float maxSafetyLipHeight = 2.5f;
 
+        [Tooltip("Hard ceiling for how far past vertical any wall may curl (catch walls, wallride roofs). Clamped further by cross-section self-intersection validation.")]
+        [Range(0f, 45f)]
+        [SerializeField] private float maxOverhangAngleLimit = 32f;
+
+        [Tooltip("Legal window for the capture-curl radius (meters).")]
+        [SerializeField] private float minOverhangRadius = 2f;
+        [SerializeField] private float maxOverhangRadius = 60f;
+
         // ══════════════════ Mesh & collision limits ══════════════════
 
         [Header("Mesh & Collision Limits")]
@@ -341,6 +389,13 @@ namespace TrackGeneration.Core
 
         [Tooltip("Maximum rings for the whole track.")]
         [SerializeField] private int maxTotalTrackRings = 150000;
+
+        [Tooltip("Approved subdivision ladder: every independent physical road region (an anchored retopology segment) uses an interval count from this ascending list, selected as the first tier ≥ its raw geometric requirement. Never rounds down below the physical requirement.")]
+        [SerializeField] private int[] subdivisionLadder =
+        {
+            8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768,
+            1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384, 24576, 32768
+        };
 
         // ══════════════════ Validation tolerances ══════════════════
 
@@ -409,6 +464,7 @@ namespace TrackGeneration.Core
         public float MaxRoadWidth => maxRoadWidth;
         public float MinCurveRadius => minCurveRadius;
         public float MaxCurveRadius => maxCurveRadius;
+        public float MaxClosureCurveRadius => maxClosureCurveRadius;
         public float MaxBankAngle => maxBankAngle;
         public float MaxClimbAngle => maxClimbAngle;
         public float MaxDropAngle => maxDropAngle;
@@ -420,9 +476,16 @@ namespace TrackGeneration.Core
         public bool AllowCorkscrews => allowCorkscrews;
         public bool AllowSpirals => allowSpirals;
         public bool AllowHalfLoops => allowHalfLoops;
-        public bool AllowBranches => allowBranches;
         public bool AllowBridges => allowBridges;
         public bool AllowUnderpasses => allowUnderpasses;
+        public bool AllowFullPipes => allowFullPipes;
+        public bool AllowWallRides => allowWallRides;
+
+        public float MinFullPipeSeconds => minFullPipeSeconds;
+        public float MaxFullPipeSeconds => maxFullPipeSeconds;
+        public float MinPipeTransitionSeconds => minPipeTransitionSeconds;
+        public float MaxPipeTransitionSeconds => maxPipeTransitionSeconds;
+        public float MinFullPipeRadius => minFullPipeRadius;
 
         public float MinStraightSeconds => minStraightSeconds;
         public float MaxStraightSeconds => maxStraightSeconds;
@@ -450,6 +513,12 @@ namespace TrackGeneration.Core
         public float MinCrossSectionTransitionSeconds => minCrossSectionTransitionSeconds;
         public float MaxCrossSectionTransitionSeconds => maxCrossSectionTransitionSeconds;
         public float MaxBankRampAngle => maxBankRampAngle;
+        public float MinConnectorSeconds => minConnectorSeconds;
+        public float MaxConnectorSeconds => maxConnectorSeconds;
+        public float MinBankReversalSeconds => minBankReversalSeconds;
+        public float MaxBankReversalSeconds => maxBankReversalSeconds;
+        public float MinBridgeSeconds => minBridgeSeconds;
+        public float MaxBridgeSeconds => maxBridgeSeconds;
 
         public float MinLoopRadius => minLoopRadius;
         public float MaxLoopRadius => maxLoopRadius;
@@ -480,6 +549,21 @@ namespace TrackGeneration.Core
         public float MinCorkscrewRecoverySeconds => minCorkscrewRecoverySeconds;
         public float MaxCorkscrewRecoverySeconds => maxCorkscrewRecoverySeconds;
         public float MinCorkscrewClearance => minCorkscrewClearance;
+        public int SchemaVersion => schemaVersion;
+        public int RotationUnitDegrees => rotationUnitDegrees;
+        public int[] AllowedLoopRotationUnits => allowedLoopRotationUnits;
+        public int[] AllowedCorkscrewRotationUnits => allowedCorkscrewRotationUnits;
+        public bool AllowHalfRotations => allowHalfRotations;
+        public bool AllowQuarterTurnTransitions => allowQuarterTurnTransitions;
+        public int MaxLoopRotationUnits => maxLoopRotationUnits;
+        public int MaxCorkscrewRotationUnits => maxCorkscrewRotationUnits;
+        public float NormalBankStepDegrees => normalBankStepDegrees;
+        public TrackGeneration.Macro.RotationalBlendPreset DefaultRotationalBlend => defaultRotationalBlend;
+        public float MaxRotationalSampleDistance => maxRotationalSampleDistance;
+        public float MaxRotationalForwardAngle => maxRotationalForwardAngle;
+        public float MaxRotationalRollAngle => maxRotationalRollAngle;
+        public int MinSamplesPerRotationUnit => minSamplesPerRotationUnit;
+        public float MinDistancePerRotationUnit => minDistancePerRotationUnit;
 
         public float MinSpiralRadius => minSpiralRadius;
         public float MaxSpiralRadius => maxSpiralRadius;
@@ -507,30 +591,10 @@ namespace TrackGeneration.Core
         public float MaxJumpHeight => maxJumpHeight;
         public float JumpLandingTolerance => jumpLandingTolerance;
 
-        public int MaxBranchGroupsPerTrack => maxBranchGroupsPerTrack;
-        public float MinDecisionPreviewSeconds => minDecisionPreviewSeconds;
-        public float MaxDecisionPreviewSeconds => maxDecisionPreviewSeconds;
-        public float MinBranchRouteSeconds => minBranchRouteSeconds;
-        public float MaxBranchRouteSeconds => maxBranchRouteSeconds;
-        public float MinLateralSplitSeconds => minLateralSplitSeconds;
-        public float MaxLateralSplitSeconds => maxLateralSplitSeconds;
-        public float MinVerticalDivergenceDelaySeconds => minVerticalDivergenceDelaySeconds;
-        public float MaxVerticalDivergenceDelaySeconds => maxVerticalDivergenceDelaySeconds;
-        public float MinVerticalDivergenceSeconds => minVerticalDivergenceSeconds;
-        public float MaxVerticalDivergenceSeconds => maxVerticalDivergenceSeconds;
-        public float MinMergeSeconds => minMergeSeconds;
-        public float MaxMergeSeconds => maxMergeSeconds;
-        public float MinPostMergeRecoverySeconds => minPostMergeRecoverySeconds;
-        public float MaxPostMergeRecoverySeconds => maxPostMergeRecoverySeconds;
-        public float MinRouteCenterlineSeparation => minRouteCenterlineSeparation;
-        public float MaxRouteCenterlineSeparation => maxRouteCenterlineSeparation;
-        public float MinRouteVerticalSeparation => minRouteVerticalSeparation;
-        public float MaxRouteVerticalSeparation => maxRouteVerticalSeparation;
-        public float MinTimeBalanceTolerance => minTimeBalanceTolerance;
-        public float MaxTimeBalanceTolerance => maxTimeBalanceTolerance;
-        public float MinSpecializationAdvantage => minSpecializationAdvantage;
-        public float MaxSpecializationAdvantage => maxSpecializationAdvantage;
-        public int MaxPairedRouteInteractions => maxPairedRouteInteractions;
+        public bool AllowDualRoadQuarters => allowDualRoadQuarters;
+        public int MaxDualQuartersPerTrack => maxDualQuartersPerTrack;
+        public float MinLaneSeparation => minLaneSeparation;
+        public float MaxLaneSeparation => maxLaneSeparation;
 
         public float MinHalfPipeSideHeight => minHalfPipeSideHeight;
         public float MaxHalfPipeSideHeight => maxHalfPipeSideHeight;
@@ -544,6 +608,9 @@ namespace TrackGeneration.Core
         public int MaxHalfPipeProfileResolution => maxHalfPipeProfileResolution;
         public float MinSafetyLipHeight => minSafetyLipHeight;
         public float MaxSafetyLipHeight => maxSafetyLipHeight;
+        public float MaxOverhangAngleLimit => maxOverhangAngleLimit;
+        public float MinOverhangRadius => minOverhangRadius;
+        public float MaxOverhangRadius => maxOverhangRadius;
 
         public float MinMetersPerRing => minMetersPerRing;
         public float MaxMetersPerRing => maxMetersPerRing;
@@ -553,6 +620,7 @@ namespace TrackGeneration.Core
         public float MaxFacetAngle => maxFacetAngle;
         public int MaxRingsPerMacroSection => maxRingsPerMacroSection;
         public int MaxTotalTrackRings => maxTotalTrackRings;
+        public System.Collections.Generic.IReadOnlyList<int> SubdivisionLadder => subdivisionLadder;
 
         public float ClosurePositionTolerance => closurePositionTolerance;
         public float ClosureForwardTolerance => closureForwardTolerance;
@@ -575,6 +643,8 @@ namespace TrackGeneration.Core
         /// <summary>Clamps interdependent fields so rulebook invariants remain valid.</summary>
         public void Validate()
         {
+            MigrateIfNeeded();
+
             void Order(ref float min, ref float max) { if (min > max) min = max; }
             void OrderInt(ref int min, ref int max) { if (min > max) min = max; }
 
@@ -583,6 +653,7 @@ namespace TrackGeneration.Core
             Order(ref minTrackLength, ref maxTrackLength);
             Order(ref minRoadWidth, ref maxRoadWidth);
             Order(ref minCurveRadius, ref maxCurveRadius);
+            maxClosureCurveRadius = Mathf.Max(maxCurveRadius, maxClosureCurveRadius);
 
             Order(ref minStraightSeconds, ref maxStraightSeconds);
             Order(ref minBoostStraightSeconds, ref maxBoostStraightSeconds);
@@ -626,17 +697,7 @@ namespace TrackGeneration.Core
             Order(ref minJumpRecoverySeconds, ref maxJumpRecoverySeconds);
             Order(ref minJumpHeight, ref maxJumpHeight);
 
-            Order(ref minDecisionPreviewSeconds, ref maxDecisionPreviewSeconds);
-            Order(ref minBranchRouteSeconds, ref maxBranchRouteSeconds);
-            Order(ref minLateralSplitSeconds, ref maxLateralSplitSeconds);
-            Order(ref minVerticalDivergenceDelaySeconds, ref maxVerticalDivergenceDelaySeconds);
-            Order(ref minVerticalDivergenceSeconds, ref maxVerticalDivergenceSeconds);
-            Order(ref minMergeSeconds, ref maxMergeSeconds);
-            Order(ref minPostMergeRecoverySeconds, ref maxPostMergeRecoverySeconds);
-            Order(ref minRouteCenterlineSeparation, ref maxRouteCenterlineSeparation);
-            Order(ref minRouteVerticalSeparation, ref maxRouteVerticalSeparation);
-            Order(ref minTimeBalanceTolerance, ref maxTimeBalanceTolerance);
-            Order(ref minSpecializationAdvantage, ref maxSpecializationAdvantage);
+            Order(ref minLaneSeparation, ref maxLaneSeparation);
 
             Order(ref minHalfPipeSideHeight, ref maxHalfPipeSideHeight);
             Order(ref minHalfPipeCurveStrength, ref maxHalfPipeCurveStrength);
@@ -644,17 +705,34 @@ namespace TrackGeneration.Core
             Order(ref minHalfPipeCenterFlatRatio, ref maxHalfPipeCenterFlatRatio);
             OrderInt(ref minHalfPipeProfileResolution, ref maxHalfPipeProfileResolution);
             Order(ref minSafetyLipHeight, ref maxSafetyLipHeight);
+            Order(ref minOverhangRadius, ref maxOverhangRadius);
 
             Order(ref minMetersPerRing, ref maxMetersPerRing);
             Order(ref minFeatureMetersPerRing, ref maxFeatureMetersPerRing);
             Order(ref minFacetAngle, ref maxFacetAngle);
+            Order(ref minConnectorSeconds, ref maxConnectorSeconds);
+            Order(ref minBankReversalSeconds, ref maxBankReversalSeconds);
+            Order(ref minBridgeSeconds, ref maxBridgeSeconds);
+            Order(ref minFullPipeSeconds, ref maxFullPipeSeconds);
+            Order(ref minPipeTransitionSeconds, ref maxPipeTransitionSeconds);
+            minFullPipeRadius = Mathf.Max(5f, minFullPipeRadius);
+
+            // Subdivision ladder must be a validated ascending list starting at ≥ 8
+            // (below eight intervals an independent road region reads as low-poly).
+            if (subdivisionLadder == null || subdivisionLadder.Length == 0)
+                subdivisionLadder = new[] { 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768,
+                    1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384, 24576, 32768 };
+            subdivisionLadder[0] = Mathf.Max(8, subdivisionLadder[0]);
+            for (int i = 1; i < subdivisionLadder.Length; i++)
+                subdivisionLadder[i] = Mathf.Max(subdivisionLadder[i - 1] + 1, subdivisionLadder[i]);
 
             minTrackLength = Mathf.Max(500f, minTrackLength);
             minRoadWidth = Mathf.Max(4f, minRoadWidth);
             minCurveRadius = Mathf.Max(20f, minCurveRadius);
             minVerticalClearance = Mathf.Max(5f, minVerticalClearance);
-            maxBranchGroupsPerTrack = Mathf.Clamp(maxBranchGroupsPerTrack, 0, 8);
-            maxPairedRouteInteractions = Mathf.Clamp(maxPairedRouteInteractions, 0, 8);
+            maxDualQuartersPerTrack = Mathf.Clamp(maxDualQuartersPerTrack, 0, 4);
+            minLaneSeparation = Mathf.Max(8f, minLaneSeparation);
+            maxLaneSeparation = Mathf.Max(minLaneSeparation, maxLaneSeparation);
             minSpiralRevolutions = Mathf.Max(1, minSpiralRevolutions);
             maxSpiralRevolutions = Mathf.Clamp(maxSpiralRevolutions, minSpiralRevolutions, 6);
             maxRingsPerMacroSection = Mathf.Max(32, maxRingsPerMacroSection);
@@ -663,6 +741,18 @@ namespace TrackGeneration.Core
             maxHalfPipeProfileResolution = Mathf.Clamp(maxHalfPipeProfileResolution, minHalfPipeProfileResolution, 96);
             referenceGravity = Mathf.Max(0.1f, referenceGravity);
             referenceTopSpeedKph = Mathf.Max(50f, referenceTopSpeedKph);
+
+            rotationUnitDegrees = 90;
+            maxLoopRotationUnits = Mathf.Clamp(maxLoopRotationUnits, 2, 12);
+            maxCorkscrewRotationUnits = Mathf.Clamp(maxCorkscrewRotationUnits, 2, 12);
+            normalBankStepDegrees = Mathf.Clamp(normalBankStepDegrees, 5f, 45f);
+            maxRotationalSampleDistance = Mathf.Clamp(maxRotationalSampleDistance, 0.5f, 20f);
+            maxRotationalForwardAngle = Mathf.Clamp(maxRotationalForwardAngle, 0.1f, 5f);
+            maxRotationalRollAngle = Mathf.Clamp(maxRotationalRollAngle, 0.1f, 8f);
+            minSamplesPerRotationUnit = Mathf.Clamp(minSamplesPerRotationUnit, 4, 128);
+            minDistancePerRotationUnit = Mathf.Clamp(minDistancePerRotationUnit, 5f, 500f);
+            allowedLoopRotationUnits = SanitizeUnits(allowedLoopRotationUnits, maxLoopRotationUnits, allowHalfRotations);
+            allowedCorkscrewRotationUnits = SanitizeUnits(allowedCorkscrewRotationUnits, maxCorkscrewRotationUnits, allowHalfRotations);
 
             closurePositionTolerance = Mathf.Max(0.001f, closurePositionTolerance);
             closureForwardTolerance = Mathf.Max(0.001f, closureForwardTolerance);
@@ -675,6 +765,51 @@ namespace TrackGeneration.Core
         private void OnValidate()
         {
             Validate();
+        }
+
+        private void MigrateIfNeeded()
+        {
+            if (schemaVersion >= CurrentSchemaVersion) return;
+
+            // V1 assets selected one full loop and a degree-clamped corkscrew. Preserve
+            // those effective choices while retaining the old serialized degree ranges
+            // for inspection/rollback. Designers can then opt into additional units.
+            rotationUnitDegrees = 90;
+            allowedLoopRotationUnits = new[] { 4 };
+            int minUnits = Mathf.Max(2, Mathf.CeilToInt(minCorkscrewRollDegrees / 90f));
+            int maxUnits = Mathf.Clamp(Mathf.FloorToInt(maxCorkscrewRollDegrees / 90f), minUnits, 12);
+            var migrated = new System.Collections.Generic.List<int>();
+            int[] candidates = { 2, 4, 8, 12 };
+            foreach (int units in candidates)
+                if (units >= minUnits && units <= maxUnits) migrated.Add(units);
+            allowedCorkscrewRotationUnits = migrated.Count > 0 ? migrated.ToArray() : new[] { 4 };
+            schemaVersion = CurrentSchemaVersion;
+        }
+
+        private void Reset()
+        {
+            schemaVersion = CurrentSchemaVersion;
+            allowedLoopRotationUnits = new[] { 2, 4, 8, 12 };
+            allowedCorkscrewRotationUnits = new[] { 2, 4, 8, 12 };
+            Validate();
+        }
+
+        private static int[] SanitizeUnits(int[] values, int maximum, bool allowHalf)
+        {
+            var clean = new System.Collections.Generic.List<int>();
+            if (values != null)
+            {
+                foreach (int raw in values)
+                {
+                    int units = Mathf.Clamp(raw, 1, maximum);
+                    bool major = units == 4 || units == 8 || units == 12;
+                    bool half = allowHalf && units == 2;
+                    if ((major || half) && !clean.Contains(units)) clean.Add(units);
+                }
+            }
+            if (clean.Count == 0) clean.Add(Mathf.Min(4, maximum));
+            clean.Sort();
+            return clean.ToArray();
         }
     }
 }

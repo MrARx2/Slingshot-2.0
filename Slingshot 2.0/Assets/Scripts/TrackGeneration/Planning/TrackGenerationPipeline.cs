@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using TrackGeneration.Branching;
 using TrackGeneration.Core;
 using TrackGeneration.Design;
 using TrackGeneration.Macro;
@@ -24,8 +23,13 @@ namespace TrackGeneration.Planning
             public int AttemptIndex;
         }
 
-        /// <summary>Runs generation for one resolved config. Never throws; the result explains itself.</summary>
-        public TrackGenerationResult Run(ResolvedTrackGenerationConfig cfg, TrackSeed seed)
+        /// <summary>
+        /// Runs generation for one resolved config. Never throws; the result explains
+        /// itself. When <paramref name="streams"/> is provided, each planning subsystem
+        /// draws from its own independent seed stream (partial regeneration); otherwise
+        /// all streams derive from the base seed.
+        /// </summary>
+        public TrackGenerationResult Run(ResolvedTrackGenerationConfig cfg, TrackSeed seed, TrackSeedStreams streams = null)
         {
             var result = new TrackGenerationResult
             {
@@ -48,7 +52,8 @@ namespace TrackGeneration.Planning
             }
 
             // Dedicated candidate-variation stream: mesh density or validation changes
-            // can never alter which attempt seeds are drawn.
+            // can never alter which attempt seeds are drawn. With explicit seed streams,
+            // every subsystem gets its own per-attempt RNG instead.
             var attemptSeedRng = seed.CreateSubsystemRandom("CandidateVariation");
 
             var planner = new TrackTopologyPlanner();
@@ -62,7 +67,17 @@ namespace TrackGeneration.Planning
                 if (attemptSeed == 0) attemptSeed = 1;
                 var attemptRng = new Unity.Mathematics.Random(attemptSeed);
 
-                TopologyPlan plan = planner.Plan(cfg, ref attemptRng);
+                PlanRandomStreams rngs = streams != null
+                    ? new PlanRandomStreams
+                    {
+                        Layout = streams.AttemptRandom(SeedStream.Layout, attempts),
+                        Feature = streams.AttemptRandom(SeedStream.Feature, attempts),
+                        Elevation = streams.AttemptRandom(SeedStream.Elevation, attempts),
+                        Quarter = streams.AttemptRandom(SeedStream.Quarter, attempts)
+                    }
+                    : PlanRandomStreams.FromSingle(ref attemptRng);
+
+                TopologyPlan plan = planner.Plan(cfg, rngs);
                 if (plan.Failed)
                 {
                     result.Report.AddFailure(attempts, plan.Failure, "TopologyPlanner", plan.FailureMessage);
@@ -123,8 +138,14 @@ namespace TrackGeneration.Planning
             result.Success = true;
             result.Report.Success = true;
             result.Report.SelectedCandidateScore = best.Score;
-            foreach (var group in best.Layout.BranchGroups)
-                if (group.Balance != null) result.Report.BranchBalance.Add(group.Balance);
+            foreach (var quarter in best.Layout.Quarters)
+                if (quarter.Balance != null) result.Report.QuarterBalance.Add(quarter.Balance);
+
+            // Connector and subdivision decisions of the SELECTED candidate only,
+            // plus any planning notes (dual-quarter demotions).
+            result.Report.ConnectorDecisions.AddRange(best.Plan.ConnectorDecisions);
+            result.Report.SubdivisionRegions.AddRange(best.Layout.SubdivisionRegions);
+            result.Report.Warnings.AddRange(best.Plan.Warnings);
 
             return result;
         }
@@ -136,7 +157,9 @@ namespace TrackGeneration.Planning
             var m = layout.Metrics;
             m.LapLengthMeters = layout.LapLength;
             m.TurnCount = plan.TurnCount;
-            m.BranchGroupCount = layout.BranchGroups.Count;
+            m.DualRoadQuarterCount = 0;
+            foreach (var q in layout.Quarters)
+                if (q.IsDual) m.DualRoadQuarterCount++;
 
             float minY = float.MaxValue, maxY = float.MinValue;
             float maxFacet = 0f;
@@ -150,10 +173,34 @@ namespace TrackGeneration.Planning
                     case TrackMacroSectionType.Corkscrew: m.CorkscrewCount++; break;
                     case TrackMacroSectionType.Spiral: m.SpiralCount++; break;
                     case TrackMacroSectionType.HalfLoopTwist: m.HalfLoopCount++; break;
-                    case TrackMacroSectionType.JumpRamp: m.JumpCount++; break;
+                    case TrackMacroSectionType.RotationalEvent:
+                    {
+                        bool halfLoop = !string.IsNullOrEmpty(sec.PatternId) && sec.PatternId.StartsWith("HalfLoop");
+                        int verticalUnits = 0, rollUnits = 0;
+                        if (sec.Definition.RotationalPhases != null)
+                        foreach (var phase in sec.Definition.RotationalPhases)
+                        {
+                            if (phase == null) continue;
+                            if (phase.Axis == RotationalPhaseAxis.VerticalCenterline) verticalUnits += phase.RotationUnits;
+                            else rollUnits += phase.RotationUnits;
+                        }
+                        if (halfLoop) m.HalfLoopCount++;
+                        else if (verticalUnits > 0) m.LoopCount++;
+                        if (rollUnits > 0)
+                            m.CorkscrewCount += !string.IsNullOrEmpty(sec.PatternId) &&
+                                                  sec.PatternId.StartsWith("DoubleCorkscrew") ? 2 : 1;
+                        break;
+                    }
+                    case TrackMacroSectionType.JumpRamp:
+                        // Structural quarter gate jumps are not designer jump features.
+                        if (string.IsNullOrEmpty(sec.PatternId) || !sec.PatternId.StartsWith("Quarter_"))
+                            m.JumpCount++;
+                        break;
                     case TrackMacroSectionType.BankedHairpin: m.HairpinCount++; break;
                     case TrackMacroSectionType.Chicane: m.ChicaneCount++; break;
                     case TrackMacroSectionType.SCurve: m.SCurveCount++; break;
+                    case TrackMacroSectionType.FullPipe: m.FullPipeCount++; break;
+                    case TrackMacroSectionType.WallrideTurn: m.WallrideCount++; break;
                 }
 
                 var frames = sec.SubdivisionFrames;
@@ -188,12 +235,12 @@ namespace TrackGeneration.Planning
             m.MaxFacetAngleObserved = maxFacet;
             m.TotalRings = rings;
 
-            // Neutral lap time estimate over the main chain (route A canonical).
+            // Neutral lap time estimate over the canonical road.
             var neutral = CraftArchetypeProfile.Defaults()[0];
             float time = 0f;
             foreach (var sec in layout.Sections)
             {
-                if (sec.RouteId == 1) continue;
+                if (sec.RoadId == 1) continue;
                 if (sec.SubdivisionFrames == null || sec.SubdivisionFrames.Length < 3)
                 {
                     // Air gaps traverse at design speed for their airtime.
@@ -201,7 +248,7 @@ namespace TrackGeneration.Planning
                         time += sec.Definition.AirtimeSeconds;
                     continue;
                 }
-                time += RoutePerformanceEstimator.EstimateTime(sec.SubdivisionFrames, cfg, neutral);
+                time += RouteTimeEstimator.EstimateTime(sec.SubdivisionFrames, cfg, neutral);
             }
             m.EstimatedNeutralLapTimeSeconds = time;
             layout.EstimatedNeutralLapTime = time;
@@ -235,13 +282,17 @@ namespace TrackGeneration.Planning
                 score -= Mathf.Min(15f, elevError * 20f);
             }
 
-            // Branch quality (up to -12): tight balance and real specialization score well.
-            foreach (var group in layout.BranchGroups)
+            // Dual-quarter quality (up to -12): tight balance and real archetype
+            // differentiation score well; demotions cost a little.
+            foreach (var quarter in layout.Quarters)
             {
-                if (group.Balance == null) continue;
-                score -= Mathf.Min(6f, group.Balance.NeutralTimeDifference / Mathf.Max(0.001f, cfg.TimeBalanceTolerance) * 3f);
-                if (!group.Balance.SpecializationValid) score -= 4f;
+                if (quarter.Balance == null) continue;
+                score -= Mathf.Min(6f, quarter.Balance.NeutralTimeDifferencePercent /
+                                       Mathf.Max(0.1f, cfg.NeutralTimeTolerance * 100f) * 3f);
+                if (!(quarter.Balance.RouteAPreferredBySomeArchetype && quarter.Balance.RouteBPreferredBySomeArchetype))
+                    score -= 4f;
             }
+            score -= Mathf.Min(6f, plan.Warnings.Count * 2f);
 
             // Feature richness toward the requested group window (up to -8).
             int featureGroups = m.LoopCount + m.CorkscrewCount + m.SpiralCount + m.HalfLoopCount + m.JumpCount;

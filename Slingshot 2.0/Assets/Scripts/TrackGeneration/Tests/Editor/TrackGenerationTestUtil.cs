@@ -17,8 +17,9 @@ namespace TrackGeneration.Tests
             return config;
         }
 
-        /// <summary>Runs the full pipeline for one seed and settings.</summary>
-        public static TrackGenerationResult Generate(TrackDesignerSettings settings, int seed, TrackConfig config = null)
+        /// <summary>Runs the full pipeline for one seed and settings (optionally with explicit seed streams).</summary>
+        public static TrackGenerationResult Generate(TrackDesignerSettings settings, int seed, TrackConfig config = null,
+            TrackSeedStreams streams = null)
         {
             bool ownsConfig = config == null;
             if (ownsConfig) config = CreateConfig();
@@ -27,7 +28,7 @@ namespace TrackGeneration.Tests
                 settings.Sanitize();
                 var resolved = ResolvedTrackGenerationConfig.Resolve(config, settings);
                 var pipeline = new TrackGenerationPipeline();
-                return pipeline.Run(resolved, TrackSeed.CreateNew(seed));
+                return pipeline.Run(resolved, TrackSeed.CreateNew(seed), streams);
             }
             finally
             {
@@ -49,7 +50,27 @@ namespace TrackGeneration.Tests
         {
             int n = 0;
             foreach (var s in layout.Sections)
-                if (s.Definition.SectionType == type) n++;
+            {
+                if (s.Definition.SectionType == type) { n++; continue; }
+                if (s.Definition.SectionType != TrackMacroSectionType.RotationalEvent ||
+                    s.Definition.RotationalPhases == null) continue;
+
+                bool halfLoop = !string.IsNullOrEmpty(s.PatternId) && s.PatternId.StartsWith("HalfLoop");
+                int vertical = 0, roll = 0;
+                foreach (var phase in s.Definition.RotationalPhases)
+                {
+                    if (phase == null) continue;
+                    if (phase.Axis == RotationalPhaseAxis.VerticalCenterline) vertical += phase.RotationUnits;
+                    else roll += phase.RotationUnits;
+                }
+                if (type == TrackMacroSectionType.Loop && !halfLoop && vertical > 0)
+                    n++;
+                else if (type == TrackMacroSectionType.Corkscrew && roll > 0)
+                    n += !string.IsNullOrEmpty(s.PatternId) &&
+                         s.PatternId.StartsWith("DoubleCorkscrew") ? 2 : 1;
+                else if (type == TrackMacroSectionType.HalfLoopTwist && halfLoop)
+                    n++;
+            }
             return n;
         }
 
@@ -64,13 +85,19 @@ namespace TrackGeneration.Tests
                 sb.Append(s.Definition.SectionType).Append(',');
                 sb.Append(s.Definition.Length.ToString("F3")).Append(',');
                 sb.Append(s.Definition.TurnAngle.ToString("F1")).Append(',');
+                sb.Append(s.QuarterIndex).Append(',');
+                sb.Append(s.RoadId).Append(',');
                 sb.Append(s.StartFrame.Position.x.ToString("F3")).Append(',');
                 sb.Append(s.StartFrame.Position.y.ToString("F3")).Append(',');
                 sb.Append(s.StartFrame.Position.z.ToString("F3")).Append(';');
             }
-            foreach (var g in layout.BranchGroups)
+            foreach (var q in layout.Quarters)
             {
-                sb.Append('B').Append(g.BranchGroupId).Append(g.PairingMode).Append(g.InteractionPattern).Append(';');
+                sb.Append('Q').Append(q.QuarterIndex).Append(q.QuarterType)
+                  .Append(q.RouteA?.PhysicalLengthMeters.ToString("F1") ?? "0")
+                  .Append('/')
+                  .Append(q.RouteB?.PhysicalLengthMeters.ToString("F1") ?? "0")
+                  .Append(';');
             }
             return sb.ToString();
         }

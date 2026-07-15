@@ -66,6 +66,9 @@ namespace TrackGeneration.Core
             set => useRandomSeed = value;
         }
 
+        /// <summary>Diagnostic count for the generator inspector; bookmarks grow only through SaveCurrentSeed.</summary>
+        public int SavedSeedCount => savedSeeds?.Count ?? 0;
+
         // ──────────────────────────────────────────────
         //  Public Methods
         // ──────────────────────────────────────────────
