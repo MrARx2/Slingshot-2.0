@@ -656,7 +656,7 @@ namespace TrackGeneration.Planning
             var heights = new List<float>(256);
             SampleChain2D(chain, start, startHeading, startElevation, pts, heights);
 
-            float minClear = cfg.RoadWidth * 1.3f;
+            float minClear = cfg.UnrelatedCorridor * 1.05f;
             float minClearSq = minClear * minClear;
             float verticalOk = Mathf.Max(1f, cfg.VerticalClearance);
 
@@ -692,8 +692,11 @@ namespace TrackGeneration.Planning
             SampleChain2D(chain, start, startHeading, startElevation, pts, heights);
             if (pts.Count < 3) return true;
 
+            // +3 m over the built validator's requirement: built geometry drifts ~1-2 m
+            // from this 2D model, and the validator's own tolerance is only ~0.5 m —
+            // a chain approved at the exact threshold dies after paying for the build.
             float requiredLateral = Mathf.Max(cfg.RoadWidth, cfg.DualRoadWidth)
-                                  + cfg.RoadProfile.SideHeight * 2f + cfg.WallMaskSafetyMargin;
+                                  + cfg.RoadProfile.SideHeight * 2f + cfg.WallMaskSafetyMargin + 3f;
             float requiredVertical = cfg.VerticalClearance * 0.85f;
             float requiredSq = requiredLateral * requiredLateral;
 

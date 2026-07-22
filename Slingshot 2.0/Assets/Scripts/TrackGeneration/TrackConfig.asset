@@ -19,14 +19,14 @@ MonoBehaviour:
   maxTargetLapTime: 180
   minTrackLength: 6000
   maxTrackLength: 90000
-  minRoadWidth: 64
-  maxRoadWidth: 128
+  minRoadWidth: 32
+  maxRoadWidth: 64
   minCurveRadius: 180
   maxCurveRadius: 1200
   maxClosureCurveRadius: 6000
   maxBankAngle: 85
-  maxClimbAngle: 22
-  maxDropAngle: 22
+  maxClimbAngle: 36
+  maxDropAngle: 38
   maxElevationRange: 1200
   minVerticalClearance: 20
   allowJumps: 1
@@ -43,7 +43,7 @@ MonoBehaviour:
   minPipeTransitionSeconds: 0.6
   maxPipeTransitionSeconds: 3
   minFullPipeRadius: 32
-  minStraightSeconds: 0.8
+  minStraightSeconds: 0.4
   maxStraightSeconds: 3
   minBoostStraightSeconds: 0.8
   maxBoostStraightSeconds: 6
@@ -144,7 +144,7 @@ MonoBehaviour:
   minLaneSeparation: 16
   maxLaneSeparation: 80
   minHalfPipeSideHeight: 24
-  maxHalfPipeSideHeight: 32
+  maxHalfPipeSideHeight: 48
   minHalfPipeCurveStrength: 0.45
   maxHalfPipeCurveStrength: 2
   minHalfPipeWallAngle: 45

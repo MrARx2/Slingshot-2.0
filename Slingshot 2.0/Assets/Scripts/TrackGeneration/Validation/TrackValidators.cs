@@ -686,7 +686,7 @@ namespace TrackGeneration.Validation
 
             if (pts.Count < 8) return;
 
-            float minClearance = cfg.RoadWidth * 1.6f;
+            float minClearance = cfg.UnrelatedCorridor;
             float minClearanceSq = minClearance * minClearance;
             float verticalOk = Mathf.Max(1f, cfg.VerticalClearance);
 

@@ -319,7 +319,11 @@ public class TrackSectionSensor : MonoBehaviour
 
     private static bool IsOrientationType(TrackMacroSectionType type)
     {
-        return type == TrackMacroSectionType.Loop
+        // RotationalEvent is how the current generator emits ALL loops, corkscrews
+        // and half-loops (the legacy Loop/Corkscrew/HalfLoopTwist types survive only
+        // for hand-built content and tests).
+        return type == TrackMacroSectionType.RotationalEvent
+            || type == TrackMacroSectionType.Loop
             || type == TrackMacroSectionType.Corkscrew
             || type == TrackMacroSectionType.HalfLoopTwist;
     }

@@ -245,10 +245,10 @@ namespace TrackGeneration.Design
     public class TrackRoadSettings
     {
         [Tooltip("Road width in meters (the drivable half-pipe floor + rising sides).")]
-        [Range(8f, 80f)] public float RoadWidth = 26f;
+        [Range(32f, 64f)] public float RoadWidth = 40f;
 
         [Tooltip("How high the half-pipe sides rise above the center floor (meters). Sides rise FROM the stable center baseline — they never dip below it.")]
-        [Range(1f, 20f)] public float HalfPipeSideHeight = 6f;
+        [Range(24f, 48f)] public float HalfPipeSideHeight = 24f;
 
         [Tooltip("Ratio of the road width kept flat in the center for stable driving.")]
         [Range(0.1f, 0.7f)] public float CenterFlatWidthRatio = 0.35f;

@@ -15,6 +15,14 @@ namespace TrackGeneration.Planning
     /// </summary>
     public class TrackGenerationPipeline
     {
+        /// <summary>
+        /// Extra Elevation-stream rolls tried when a planned layout fails ONLY the 2D
+        /// self-proximity walk. Each retry keeps the attempt's layout/feature/quarter
+        /// streams untouched, so it purely searches for a climb placement that
+        /// vertically separates the folded legs.
+        /// </summary>
+        private const int ElevationRerollsPerAttempt = 6;
+
         private class Candidate
         {
             public GeneratedTrackLayout Layout;
@@ -78,6 +86,28 @@ namespace TrackGeneration.Planning
                     : PlanRandomStreams.FromSingle(ref attemptRng);
 
                 TopologyPlan plan = planner.Plan(cfg, rngs);
+
+                // Elevation re-roll: a layout that closed but folds onto itself in plan
+                // view is usually rescuable by a different climb/drop placement — planned
+                // vertical separation is what legalizes folded legs. Re-rolling ONLY the
+                // Elevation stream keeps the corner skeleton, features and quarter picks
+                // (Plan runs its core from stream copies), and a plan is orders of
+                // magnitude cheaper than the build the full attempt loop would spend
+                // discovering a fresh layout.
+                for (int reroll = 1;
+                     plan.Failed && plan.Failure == GenerationFailureReason.SelfIntersection &&
+                     reroll <= ElevationRerollsPerAttempt;
+                     reroll++)
+                {
+                    // Deterministic retry seeds: stream indices beyond MaxAttempts can
+                    // never collide with regular attempt draws; the single-seed path
+                    // mixes the attempt seed with the re-roll index.
+                    rngs.Elevation = streams != null
+                        ? streams.AttemptRandom(SeedStream.Elevation, attempts + reroll * cfg.MaxAttempts)
+                        : new Unity.Mathematics.Random((attemptSeed ^ (0x9E3779B9u * (uint)reroll)) | 1u);
+                    plan = planner.Plan(cfg, rngs);
+                }
+
                 if (plan.Failed)
                 {
                     result.Report.AddFailure(attempts, plan.Failure, "TopologyPlanner", plan.FailureMessage);

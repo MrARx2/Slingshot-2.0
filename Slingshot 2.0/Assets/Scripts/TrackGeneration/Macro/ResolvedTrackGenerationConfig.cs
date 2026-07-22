@@ -252,6 +252,15 @@ namespace TrackGeneration.Macro
         // ── Clearance (wall-aware) ──
         public float VerticalClearance;         // rulebook clearance + wall/slab envelope
 
+        /// <summary>
+        /// Centerline distance UNRELATED track segments must keep in plan view unless
+        /// they are vertically separated. Single source of truth: the built
+        /// self-intersection validator rejects below exactly this value, and every
+        /// plan-stage pre-check must test against AT LEAST this (plus a margin for
+        /// 2D-model drift) or doomed plans pay for a full build before dying.
+        /// </summary>
+        public float UnrelatedCorridor => RoadWidth * 1.6f;
+
         // ── Mesh ──
         public float MeshMetersPerRing;
         public float FeatureMetersPerRing;
@@ -589,9 +598,13 @@ namespace TrackGeneration.Macro
             // Dynamic separation floor: the two landing lanes are FULL half-pipe roads —
             // their mouths must clear each other's walls no matter what the designer or
             // rulebook window says (a 100 m road cannot land 24 m from its sibling).
-            float laneFloor = (r.RoadWidth + r.DualRoadWidth) * 0.5f   // both half-widths
+            // Must sit ABOVE the road-pair clearance checks' thresholds: intentionally
+            // parallel lanes placed exactly at the floor were failing those checks by
+            // centimeters. +4 m clears the fitter's plan-time demand (validator + 3 m
+            // drift margin) with room to spare for build drift at the throats.
+            float laneFloor = Mathf.Max(r.RoadWidth, r.DualRoadWidth)  // wider road's full envelope
                             + r.RoadProfile.SideHeight * 2f            // rising walls
-                            + r.WallMaskSafetyMargin;
+                            + r.WallMaskSafetyMargin + 4f;
             float requestedLaneSep = r.ClampReport(settings.Quarters.LaneSeparationMeters,
                 limits.MinLaneSeparation, limits.MaxLaneSeparation, "Quarters.LaneSeparation");
             r.LaneSeparation = Mathf.Max(requestedLaneSep, laneFloor);

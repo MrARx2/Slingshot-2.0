@@ -2159,11 +2159,12 @@ namespace TrackGeneration.Planning
             float totalArc = arc;
             if (totalArc < 1f || pts.Count < 8) return "degenerate walk";
 
-            // 5% wider than the built validator's corridor: built geometry (easing,
+            // 5% wider than the built validator's corridor (cfg.UnrelatedCorridor —
+            // the SAME constant the validator rejects below): built geometry (easing,
             // banking offsets, S-bend realization) drifts a couple of meters from this
             // 2D model, and a plan that passes at the raw edge dies at build time —
             // after paying for the full mesh.
-            float minClear = cfg.RoadWidth * 1.3f * 1.05f;
+            float minClear = cfg.UnrelatedCorridor * 1.05f;
             float minClearSq = minClear * minClear;
             float verticalOk = Mathf.Max(1f, cfg.VerticalClearance);
             const float alongWindow = 600f;
