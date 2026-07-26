@@ -187,6 +187,14 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 7611988404917721429, guid: de1100ac0a0c40848b878c6ff5b128e7, type: 3}
+      propertyPath: lateralGrip
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 7611988404917721429, guid: de1100ac0a0c40848b878c6ff5b128e7, type: 3}
+      propertyPath: longitudinalGrip
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
