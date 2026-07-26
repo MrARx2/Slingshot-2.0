@@ -1,0 +1,127 @@
+# Hovercraft V2 — Diagnostics
+
+Generated 2026-07-23 17:00 UTC. All values computed from the live configuration.
+
+- note: Computed from the active configuration. 'NoDrag' estimates ignore aero drag and traction; 'PowerLimited' additionally accounts for the reactor budget at hover equilibrium.
+- **weight**:
+  - massKg: 7,500
+  - gravityMs2: 9.81
+  - downwardAssistMs2: 0
+  - normalWeightForceN: 73,575
+  - effectiveWeightForceN_withAssist: 73,575
+- **hover**:
+  - nodeCount: 4
+  - **perNode**:
+    - name: Hover_FL
+    - continuousMaxForceN: 55,000
+    - overdriveMaxForceN: 165,000
+    - name: Hover_FR
+    - continuousMaxForceN: 55,000
+    - overdriveMaxForceN: 165,000
+    - name: Hover_RL
+    - continuousMaxForceN: 55,000
+    - overdriveMaxForceN: 165,000
+    - name: Hover_RR
+    - continuousMaxForceN: 55,000
+    - overdriveMaxForceN: 165,000
+  - continuousTotalForceN: 220,000
+  - overdriveTotalForceN: 660,000
+  - continuousToNormalWeightRatio: 2.99
+  - continuousToEffectiveWeightRatio: 2.99
+  - reserveAboveEffectiveWeightN: 146,425
+  - equilibriumThrottle01: 0.334
+  - maxSurfaceNormalAccelMs2_continuous: 29.333
+  - maxSurfaceNormalAccelMs2_overdrive: 88
+- **propulsion**:
+  - mainContinuousForceN: 180,000
+  - mainOverdriveForceN: 270,000
+  - brakeForceN: 120,000
+  - roofTotalForceN: 160,000
+  - forwardAccelMs2: 24
+  - forwardAccelG: 2.446
+  - brakeDecelMs2: 16
+  - brakeDecelG: 1.631
+- **strafe**:
+  - installedForceN: 240,000
+  - usableLeftForceN: 120,000
+  - usableRightForceN: 120,000
+  - usableLateralAccelG: 1.631
+  - yawCoupleLeftNm: 288,000
+  - yawCoupleRightNm: 288,000
+  - _note: Only the thrusters oriented for a direction can push it — usable one-direction force is a subset of installed capacity. Tuning gains (strafeSensitivity etc.) reduce it further.
+- **power**:
+  - budget: 800
+  - hoverEquilibriumPower: 73.575
+  - mainFullThrottlePower: 180
+  - mainPowerScaleAtFullThrottle_hoverProtected: 1
+  - priorityActive: True
+- **accelerationEstimates**:
+  - _note: Straight line, no drag/traction. HardwareOnly uses full main force; PowerLimited assumes hover holds equilibrium first.
+  - **hardwareOnly**:
+    - to100Kmh_s: 1.158
+    - to300Kmh_s: 3.472
+    - to500Kmh_s: 5.787
+    - to1000Kmh_s: 11.575
+  - **powerLimited**:
+    - to100Kmh_s: 1.158
+    - to300Kmh_s: 3.472
+    - to500Kmh_s: 5.787
+    - to1000Kmh_s: 11.575
+- **brakingEstimates**:
+  - _note: Brake thruster only — aero drag and traction coasting grip add substantial extra deceleration at speed and are NOT included here.
+  - **from300Kmh**:
+    - stopTime_s: 5.208
+    - stopDistance_m: 216.997
+  - **from500Kmh**:
+    - stopTime_s: 8.681
+    - stopDistance_m: 602.913
+  - **from1000Kmh**:
+    - stopTime_s: 17.362
+    - stopDistance_m: 2,412
+- **aerodynamics**:
+  - airDensityKgM3: 1.225
+  - dragCdA_m2: 0.2
+  - wingDownforceClA_m2: 8
+  - groundEffectClA_m2: 8
+  - maxDownforceG: 4
+  - dragLimitedTopSpeedKmh_isotropicNoPowerLimit: 4,364
+- **forceRatios**:
+  - mainThrustToNormalWeight: 2.446
+  - mainThrustToEffectiveWeight: 2.446
+  - brakeToNormalWeight: 1.631
+  - usableStrafeToNormalWeight: 1.631
+  - hoverContinuousToNormalWeight: 2.99
+  - hoverContinuousToEffectiveWeight: 2.99
+  - brakeToMainThrust: 0.667
+- **physicalScale**:
+  - massKg: 7,500
+  - colliderCount: 3
+  - **colliderLocalSize_m**:
+    - x: 4.167
+    - y: 1.4
+    - z: 7.396
+  - **colliderLocalCenter_m**:
+    - x: 0
+    - y: 0
+    - z: -0.044
+  - **authoritativeDimensions_m**:
+    - length: 6.5
+    - width: 3.2
+    - bodyHeight: 1.4
+    - groundClearance: 2.5
+    - craftClass: Medium
+  - **centerOfMassLocal_m**:
+    - x: 0
+    - y: -0.35
+    - z: 0
+  - centerOfMassSource: CraftPhysicalDefinition (manual + ballast)
+  - inertia: automatic (derived from colliders)
+  - hoverFootprintWidth_m: 2.6
+  - hoverFootprintLength_m: 4.8
+  - avgPitchLeverArm_m: 2.4
+  - avgRollLeverArm_m: 1.3
+  - targetGroundClearance_m: 2.5
+- **warnings**:
+  - 4 thruster node(s) are not in the serialized bus list (added at runtime by autoDiscover). Diagnostics count them; per-entry command gains for them only exist after Play. Consider running Discover Thrusters on the bus and saving.
+  - Installed strafe capacity exceeds main propulsion — verify this is intended.
+  - info: surface-alignment and yaw-damping torques use ForceMode.Acceleration (inertia/mass-independent by design decision — see baseline report).

@@ -1,0 +1,1129 @@
+{
+  "metadata": {
+    "configVersion": 1,
+    "craftName": "Hovercraft V3 Apex Hyperclass — Phase-Vector Rings",
+    "craftId": "hovercraft_v2_apex_hyperclass",
+    "craftClass": "ApexHyperclass",
+    "description": "Apex Hyperclass 11T prototype - top-tier racing class, 1,300-2,000+ km/h envelope. DirectionalBodyV3 aero, no surfaces.",
+    "author": "",
+    "exportedUtc": "2026-07-24 12:42:48 UTC",
+    "unityVersion": "6000.5.0f1",
+    "projectGravityY_ms2": -9.8100004196167,
+    "fixedTimestep_s": 0.00999999325722456,
+    "sourceObject": "HovercraftRootV3_ApexHyperclass_PhaseVector",
+    "sourceScene": "SampleScene",
+    "units": "SI unless stated: kg, m, s, N, m/s, m/s2. Throttle/multiplier fields are dimensionless. Display speeds km/h.",
+    "notes": ""
+  },
+  "rigidbody": {
+    "massKg": 11000,
+    "linearDamping": 0,
+    "angularDamping": 2,
+    "useGravity": true,
+    "maxAngularVelocity_rads": 50,
+    "interpolation": "Interpolate",
+    "collisionDetection": "ContinuousDynamic",
+    "constraints": 0,
+    "automaticCenterOfMass": false,
+    "automaticInertiaTensor": true,
+    "centerOfMass_m": {
+      "x": 0,
+      "y": -0.5,
+      "z": 0
+    }
+  },
+  "thrusterBus": {
+    "masterCommandGain": 1,
+    "autoDiscover": true
+  },
+  "thrusters": [
+    {
+      "gameObject": "Hover_FL",
+      "label": "Hover_FL",
+      "role": "Hover",
+      "localPosition_m": {
+        "x": -1.5,
+        "y": -0.72500002384185791,
+        "z": 3
+      },
+      "localEulerAngles_deg": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "settings": {
+        "role": 0,
+        "maxForce": 160000,
+        "overdriveForceMultiplier": 7,
+        "throttleRiseRate": 0,
+        "throttleFallRate": 0,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 0,
+        "gimbalEnabled": true,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Hover_FL",
+        "groundDetectionRange": 7,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 256
+        },
+        "probeMode": 1,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0.045000001788139343
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Roof_FL",
+      "label": "Roof_FL",
+      "role": "Roof",
+      "localPosition_m": {
+        "x": -1.5,
+        "y": -0.66500002145767212,
+        "z": 3
+      },
+      "localEulerAngles_deg": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "settings": {
+        "role": 4,
+        "maxForce": 160000,
+        "overdriveForceMultiplier": 7,
+        "throttleRiseRate": 50,
+        "throttleFallRate": 50,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 1,
+        "gimbalEnabled": true,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Roof_FL",
+        "groundDetectionRange": 7,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 256
+        },
+        "probeMode": 1,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0.045000001788139343
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Hover_FR",
+      "label": "Hover_FR",
+      "role": "Hover",
+      "localPosition_m": {
+        "x": 1.5,
+        "y": -0.72500002384185791,
+        "z": 3
+      },
+      "localEulerAngles_deg": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "settings": {
+        "role": 0,
+        "maxForce": 160000,
+        "overdriveForceMultiplier": 7,
+        "throttleRiseRate": 0,
+        "throttleFallRate": 0,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 0,
+        "gimbalEnabled": true,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Hover_FR",
+        "groundDetectionRange": 7,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 256
+        },
+        "probeMode": 1,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0.045000001788139343
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Roof_FR",
+      "label": "Roof_FR",
+      "role": "Roof",
+      "localPosition_m": {
+        "x": 1.5,
+        "y": -0.66500002145767212,
+        "z": 3
+      },
+      "localEulerAngles_deg": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "settings": {
+        "role": 4,
+        "maxForce": 160000,
+        "overdriveForceMultiplier": 7,
+        "throttleRiseRate": 50,
+        "throttleFallRate": 50,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 1,
+        "gimbalEnabled": true,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Roof_FR",
+        "groundDetectionRange": 7,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 256
+        },
+        "probeMode": 1,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0.045000001788139343
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Hover_RL",
+      "label": "Hover_RL",
+      "role": "Hover",
+      "localPosition_m": {
+        "x": -1.5,
+        "y": -0.72500002384185791,
+        "z": -3
+      },
+      "localEulerAngles_deg": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "settings": {
+        "role": 0,
+        "maxForce": 160000,
+        "overdriveForceMultiplier": 7,
+        "throttleRiseRate": 0,
+        "throttleFallRate": 0,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 0,
+        "gimbalEnabled": true,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Hover_RL",
+        "groundDetectionRange": 7,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 256
+        },
+        "probeMode": 1,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0.045000001788139343
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Roof_RL",
+      "label": "Roof_RL",
+      "role": "Roof",
+      "localPosition_m": {
+        "x": -1.5,
+        "y": -0.66500002145767212,
+        "z": -3
+      },
+      "localEulerAngles_deg": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "settings": {
+        "role": 4,
+        "maxForce": 160000,
+        "overdriveForceMultiplier": 7,
+        "throttleRiseRate": 50,
+        "throttleFallRate": 50,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 1,
+        "gimbalEnabled": true,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Roof_RL",
+        "groundDetectionRange": 7,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 256
+        },
+        "probeMode": 1,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0.045000001788139343
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Hover_RR",
+      "label": "Hover_RR",
+      "role": "Hover",
+      "localPosition_m": {
+        "x": 1.5,
+        "y": -0.72500002384185791,
+        "z": -3
+      },
+      "localEulerAngles_deg": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "settings": {
+        "role": 0,
+        "maxForce": 160000,
+        "overdriveForceMultiplier": 7,
+        "throttleRiseRate": 0,
+        "throttleFallRate": 0,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 0,
+        "gimbalEnabled": true,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Hover_RR",
+        "groundDetectionRange": 7,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 256
+        },
+        "probeMode": 1,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0.045000001788139343
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Roof_RR",
+      "label": "Roof_RR",
+      "role": "Roof",
+      "localPosition_m": {
+        "x": 1.5,
+        "y": -0.66500002145767212,
+        "z": -3
+      },
+      "localEulerAngles_deg": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "settings": {
+        "role": 4,
+        "maxForce": 160000,
+        "overdriveForceMultiplier": 7,
+        "throttleRiseRate": 50,
+        "throttleFallRate": 50,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 1,
+        "gimbalEnabled": true,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Roof_RR",
+        "groundDetectionRange": 7,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 256
+        },
+        "probeMode": 1,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0.045000001788139343
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Main_Rear",
+      "label": "Main_Rear",
+      "role": "Main",
+      "localPosition_m": {
+        "x": 0,
+        "y": 0,
+        "z": -3.9000000953674316
+      },
+      "localEulerAngles_deg": {
+        "x": 270,
+        "y": 0,
+        "z": 0
+      },
+      "settings": {
+        "role": 1,
+        "maxForce": 480000,
+        "overdriveForceMultiplier": 1.5,
+        "throttleRiseRate": 0,
+        "throttleFallRate": 0,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 1,
+        "gimbalEnabled": false,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Main_Rear",
+        "groundDetectionRange": 4,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 4294967295
+        },
+        "probeMode": 0,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Brake_Front",
+      "label": "Brake_Front",
+      "role": "Brake",
+      "localPosition_m": {
+        "x": 0,
+        "y": 0,
+        "z": 3.9000000953674316
+      },
+      "localEulerAngles_deg": {
+        "x": 90,
+        "y": 0,
+        "z": 0
+      },
+      "settings": {
+        "role": 2,
+        "maxForce": 380000,
+        "overdriveForceMultiplier": 1,
+        "throttleRiseRate": 0,
+        "throttleFallRate": 0,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 1,
+        "gimbalEnabled": false,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Brake_Front",
+        "groundDetectionRange": 4,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 4294967295
+        },
+        "probeMode": 0,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Strafe_Front_Left",
+      "label": "Strafe_Front_Left",
+      "role": "Strafe",
+      "localPosition_m": {
+        "x": -1.7999999523162842,
+        "y": 0,
+        "z": 3
+      },
+      "localEulerAngles_deg": {
+        "x": 0,
+        "y": 0,
+        "z": 270
+      },
+      "settings": {
+        "role": 3,
+        "maxForce": 250000,
+        "overdriveForceMultiplier": 1,
+        "throttleRiseRate": 12,
+        "throttleFallRate": 12,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 0,
+        "gimbalEnabled": false,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Strafe_Front_Left",
+        "groundDetectionRange": 4,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 4294967295
+        },
+        "probeMode": 0,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Strafe_Back_Left",
+      "label": "Strafe_Back_Left",
+      "role": "Strafe",
+      "localPosition_m": {
+        "x": -1.7999999523162842,
+        "y": 0,
+        "z": -3
+      },
+      "localEulerAngles_deg": {
+        "x": 0,
+        "y": 0,
+        "z": 270
+      },
+      "settings": {
+        "role": 3,
+        "maxForce": 250000,
+        "overdriveForceMultiplier": 1,
+        "throttleRiseRate": 12,
+        "throttleFallRate": 12,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 0,
+        "gimbalEnabled": false,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Strafe_Back_Left",
+        "groundDetectionRange": 4,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 4294967295
+        },
+        "probeMode": 0,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Strafe_Front_Right",
+      "label": "Strafe_Front_Right",
+      "role": "Strafe",
+      "localPosition_m": {
+        "x": 1.7999999523162842,
+        "y": 0,
+        "z": 3
+      },
+      "localEulerAngles_deg": {
+        "x": 0,
+        "y": 0,
+        "z": 90
+      },
+      "settings": {
+        "role": 3,
+        "maxForce": 250000,
+        "overdriveForceMultiplier": 1,
+        "throttleRiseRate": 12,
+        "throttleFallRate": 12,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 0,
+        "gimbalEnabled": false,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Strafe_Front_Right",
+        "groundDetectionRange": 4,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 4294967295
+        },
+        "probeMode": 0,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    },
+    {
+      "gameObject": "Strafe_Back_Right",
+      "label": "Strafe_Back_Right",
+      "role": "Strafe",
+      "localPosition_m": {
+        "x": 1.7999999523162842,
+        "y": 0,
+        "z": -3
+      },
+      "localEulerAngles_deg": {
+        "x": 0,
+        "y": 0,
+        "z": 90
+      },
+      "settings": {
+        "role": 3,
+        "maxForce": 250000,
+        "overdriveForceMultiplier": 1,
+        "throttleRiseRate": 12,
+        "throttleFallRate": 12,
+        "efficiency": 1,
+        "powerDrawMultiplier": 1,
+        "thrustAxis": 0,
+        "gimbalEnabled": false,
+        "maxGimbalAngleDeg": 45,
+        "gimbalResponseDegPerSec": 360,
+        "drawForceDirectionDebug": true,
+        "forceDirectionDebugLength": 4,
+        "label": "Strafe_Back_Right",
+        "groundDetectionRange": 4,
+        "groundLayers": {
+          "serializedVersion": "2",
+          "m_Bits": 4294967295
+        },
+        "probeMode": 0,
+        "sphereCastRadius": 0.10000000149011612,
+        "probeLossGraceTime": 0
+      },
+      "busEntry": {
+        "enabled": true,
+        "commandGain": 1
+      }
+    }
+  ],
+  "aeroSurfaces": [],
+  "components": {
+    "CraftPhysicalDefinition": {
+      "craftClass": "ApexHyperclass",
+      "lengthM": 7.8000001907348633,
+      "widthM": 3.5999999046325684,
+      "bodyHeightM": 1.5499999523162842,
+      "targetGroundClearanceM": 2.7999999523162842,
+      "hoverFootprintLengthM": 6,
+      "hoverFootprintWidthM": 3,
+      "chassisReferenceHeightM": 0,
+      "visualScaleReference": 1.9951751232147217,
+      "useManualCenterOfMass": true,
+      "centerOfMassLocalM": {
+        "x": 0,
+        "y": -0.5,
+        "z": 0
+      },
+      "ballastOffsetLocalM": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "ballastMassKg": 0,
+      "perAxisInertiaMultiplier": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "drawGizmos": true
+    },
+    "CraftCore": {
+      "downwardAssistMs2": 0
+    },
+    "EnergyCore": {
+      "totalPowerOutput": 4500,
+      "powerCostPerForce": 0.0010000000474974513,
+      "protectBaseHover": true,
+      "protectStabilizer": false,
+      "priorityPowerDistribution": true,
+      "vectoringPriorityBias": 1.5,
+      "enableHoverDriveShedding": true,
+      "driveSheddingStart01": 0.34999999403953552,
+      "driveSheddingFull01": 0.699999988079071,
+      "driveSheddingAttackRate": 8,
+      "driveSheddingRecoveryRate": 2,
+      "overchargeChargeThrottleEquivalent": 1,
+      "overchargeChargeCostMultiplier": 1
+    },
+    "HoverStabilizerArray": {
+      "stabilizerDisengageThrottleDecaySpeed": 30,
+      "useRoofThrustersForStabilizer": true,
+      "roofStabilizerMaxCommand": 0.60000002384185791,
+      "roofReboundVelocityStart": 0.34999999403953552,
+      "roofReboundVelocityFull": 3,
+      "roofHeightErrorStart": 0.15000000596046448,
+      "roofHeightErrorFull": 1,
+      "roofStabilizerResponseSpeed": 18,
+      "hoverHeight": 2.7999999523162842,
+      "hoverKp": 2.5,
+      "hoverKd": 0.30000001192092896,
+      "hoverMaxCommand": 5,
+      "hoverThrusterResponseSpeed": 24,
+      "hoverThrottleFallResponseSpeed": 30,
+      "airborneHoverThrottleDecaySpeed": 40,
+      "automaticHoverLossDecayTime": 0.075000002980232239,
+      "hoverOscillationAmount": 0.035000000149011612,
+      "hoverOscillationSpeed": 1.25,
+      "hoverOscillationPhaseSpread": 0.699999988079071,
+      "landingDampingMultiplier": 3.5,
+      "reboundDampingMultiplier": 5,
+      "hardLandingSpeedForMaxDamping": 18,
+      "hardLandingExtraDamping": 2.5,
+      "cutThrottleOnRebound": false,
+      "reboundThrottleCutVelocity": 0.75,
+      "reboundFullCutVelocity": 4,
+      "reboundThrottleCutHeightError": 0.05000000074505806,
+      "maxCushionRecoverySpeed": 3.5,
+      "emergencyCatchStartSpeed": 8,
+      "emergencyCatchFullSpeed": 22,
+      "dynamicSuspension": true,
+      "stiffenStartSpeed": 80,
+      "stiffenFullSpeed": 600,
+      "maxSpeedStiffness": 3.5,
+      "compensateSurfaceCurvature": true,
+      "maxCurvatureAccel": 600,
+      "curvatureSmoothing": 24,
+      "curvatureReleaseSmoothing": 100,
+      "lookAheadCurvatureRelease": 0.800000011920929,
+      "enableSurfaceAdhesion": true,
+      "maxSurfaceAdhesionAccel": 450,
+      "minimumSurfaceAdhesionProbes": 2,
+      "surfaceAdhesionHeightGain": 30,
+      "surfaceAdhesionVelocityGain": 10,
+      "surfaceAdhesionResponse": 50,
+      "surfaceRetentionMaxRoofCommand": 7,
+      "rearDampingMultiplier": 1.3500000238418579,
+      "rearSpringMultiplier": 1,
+      "surfaceNormalSmoothing": 12,
+      "highSpeedNoseUpBias": 2.5,
+      "heightErrorDeadband": 0.05000000074505806,
+      "hoverActivationHeightBuffer": 1.25,
+      "hoverFullPowerHeightBuffer": 0.25,
+      "fadeHoverForcesNearActivationEdge": true,
+      "playerRollHeightOffset": 0.44999998807907104,
+      "playerPitchHeightOffset": 0.18000000715255737,
+      "maxPlayerRollTarget": 30,
+      "maxPlayerPitchTarget": 15,
+      "rollResponseSpeed": 6,
+      "pitchResponseSpeed": 6,
+      "pitchInputGain": 18,
+      "attitudeReturnSpeed": 7,
+      "autoLevelRollStrength": 0.0040000001899898052,
+      "autoLevelPitchStrength": 0.0040000001899898052,
+      "autoLevelMaxHeightOffset": 0.2199999988079071,
+      "autoLevelSuppressionByRollInput": 0.89999997615814209,
+      "autoLevelSuppressionByPitchInput": 0.89999997615814209,
+      "invertGroundedRollHeightOffset": false,
+      "invertGroundedPitchHeightOffset": false,
+      "maxLeanBias": 0.34999999403953552,
+      "airRollSensitivity": 10,
+      "airRollAuthority": 2.5,
+      "airKeyboardRollInfluence": 1,
+      "airControlSensitivity": 1.3500000238418579,
+      "airPitchAuthority": 0.75,
+      "airPitchInputGain": 5,
+      "invertAirRollControl": false,
+      "invertAirPitchControl": false,
+      "enableAirborneStability": false,
+      "airborneStabilityDelay": 0.079999998211860657,
+      "airborneStabilityBlendTime": 0.25,
+      "airborneAngularDamping": 4.5,
+      "airborneFlightAlignStrength": 8,
+      "maxAirborneStabilityAccel": 30,
+      "minimumAirborneAlignSpeed": 25,
+      "alignToSurface": true,
+      "vectorHoverThrustersToSurface": true,
+      "maxPhysicalAlignmentCommand": 1.5,
+      "surfaceAlignStrength": 4,
+      "surfaceAlignDamping": 0.800000011920929,
+      "maxSurfaceAlignTorque": 12,
+      "surfaceLookAheadTime": 0.25,
+      "maxSurfaceLookAheadDistance": 80,
+      "surfaceLookAheadBlend": 1,
+      "surfaceProbeLayers": {
+        "serializedVersion": "2",
+        "m_Bits": 256
+      }
+    },
+    "DriveCore": {
+      "throttleRiseRate": 4.5,
+      "throttleFallRate": 5
+    },
+    "VectorThrusterArray": {
+      "steerSensitivity": 0.23999999463558197,
+      "steeringYawAuthority": 2.7999999523162842,
+      "edgeShiftCanAssistYaw": false,
+      "edgeShiftCanFireStrafeThrusters": true,
+      "carveYawAssistFromLean": 0.34999999403953552,
+      "lateralAssistAuthority": 1,
+      "strafeSensitivity": 0.89999997615814209,
+      "strafeSafetyStartAngle": 18,
+      "strafeSafetyFullAngle": 42,
+      "minimumStrafeAuthorityWhenTilted": 0.20000000298023224,
+      "strafeSafetyStartRollRate": 120,
+      "strafeSafetyFullRollRate": 300,
+      "yawDamping": 3.2000000476837158,
+      "gripBreakerYawDampingMultiplier": 0.25
+    },
+    "VectoringComputer": {
+      "mouseYawIntentGain": 1,
+      "mousePitchIntentGain": 1,
+      "edgeShiftLeanGain": 0.85000002384185791,
+      "yawToLeanGain": 0.44999998807907104,
+      "invertCarveLeanDirection": false,
+      "stabilizerStartsArmed": true,
+      "stabilizerVerticalLockGroundedFactor": 0.699999988079071,
+      "overchargeThrottleSelectionDeadZone": 0.20000000298023224
+    },
+    "TractionCore": {
+      "lateralGrip": 4,
+      "longitudinalGrip": 7,
+      "coastingGrip": 0.30000001192092896,
+      "lateralGripBreaker": 0.25,
+      "longitudinalGripBreaker": 0.18000000715255737,
+      "coastingGripBreaker": 0.039999999105930328,
+      "gripBreakRate": 8,
+      "gripRecoveryRate": 5,
+      "gripRecoverySpeedPenalty": 0.039999999105930328,
+      "gripRecoveryExponent": 1.7000000476837158,
+      "counterTrajectoryMinSpeed": 0.40000000596046448,
+      "counterTrajectoryGripMultiplier": 1,
+      "gripBreakerSteerMultiplier": 1.3500000238418579,
+      "maxGripAcceleration": 120,
+      "driftSpeedConservation": 0.20000000298023224,
+      "carveBiteNormal": 6,
+      "carveBiteGripBreaker": 0.15000000596046448
+    },
+    "AttitudeControlArray": {
+      "manualRoofThrottle": 1,
+      "manualBottomThrottle": 0.85000002384185791,
+      "roofThrottleMultiplierWhenGrounded": 0.34999999403953552,
+      "bottomThrottleMultiplierWhenGrounded": 0.75
+    },
+    "OverchargeCore": {
+      "chargeRate": 1.5,
+      "minimumReleaseCharge": 0.20000000298023224,
+      "allowRetargetWhileCharging": true,
+      "stabilizerBlocksRoofOvercharge": true,
+      "minBurstCommand01": 1,
+      "maxBurstCommand01": 1,
+      "minBurstDuration": 0.20000000298023224,
+      "maxBurstDuration": 0.5,
+      "burstEndTaper01": 0.64999997615814209
+    },
+    "TelemetryMainframe": {
+      "autoConfigureGroundedContactDistance": true,
+      "groundedContactDistance": 3.2999999523162842,
+      "requiredGroundedHoverNodes": 1,
+      "groundedFactorRiseSpeed": 12,
+      "groundedFactorFallSpeed": 10
+    },
+    "PilotCommandInterface": {
+      "mouseSensitivityX": 0.039999999105930328,
+      "mouseSensitivityY": 0.029999999329447746,
+      "invertMouseX": false,
+      "invertMouseY": false,
+      "roofThrusterKey": 31,
+      "bottomThrusterKey": 19,
+      "overchargeKey": 1,
+      "stabilizerToggleKey": 32,
+      "gripBreakerKey": 51,
+      "sampleInputInternally": false
+    },
+    "CraftAerodynamics": {
+      "mode": 1,
+      "dragCoefficientTimesArea": 2.5,
+      "wingDownforceCoefficientTimesArea": 2,
+      "groundEffectCoefficientTimesArea": 2,
+      "maxDownforceG": 3,
+      "bodyDefinition": {
+        "referenceLengthM": 7.8000001907348633,
+        "referenceWidthM": 3.5999999046325684,
+        "referenceHeightM": 1.5499999523162842,
+        "forwardCdA": 2.2000000476837158,
+        "reverseCdA": 3.7999999523162842,
+        "sideCdA": 8,
+        "topCdA": 5.5,
+        "bottomCdA": 6,
+        "centerOfPressureLocalM": {
+          "x": 0,
+          "y": 0.15000000596046448,
+          "z": -1
+        },
+        "pitchStability": 0,
+        "yawStability": 0,
+        "rollStability": 0,
+        "enableBodyLift": false,
+        "bodyLiftCoefficientTimesArea": 0,
+        "bodyLiftVsAngleOfAttack": {
+          "serializedVersion": "2",
+          "m_Curve": [],
+          "m_PreInfinity": 2,
+          "m_PostInfinity": 2,
+          "m_RotationOrder": 4
+        },
+        "bodyStallAngleDeg": 18
+      },
+      "useLegacyGroundEffectInBodyMode": true,
+      "useLegacyWingDownforceInBodyMode": true,
+      "autoDiscoverSurfaces": true,
+      "minimumAirflowSpeedMs": 2,
+      "maximumAeroAccelerationG": 14,
+      "maximumAeroTorqueNm": 0
+    }
+  },
+  "worldAtmosphere": {
+    "airDensityKgM3": 1.2250000238418579,
+    "windVelocityWorldMs": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "temperatureC": 15,
+    "pressureKPa": 101.32499694824219,
+    "altitudeM": 0,
+    "globalDragMultiplier": 1,
+    "globalLiftMultiplier": 1,
+    "globalDownforceMultiplier": 1,
+    "globalGroundEffectMultiplier": 1,
+    "globalControlSurfaceMultiplier": 1,
+    "enableTurbulence": false,
+    "turbulenceStrengthMs": 3,
+    "turbulenceScaleM": 40,
+    "turbulenceChangeRate": 0.5,
+    "turbulenceSeed": 0,
+    "preset": 1,
+    "_note": "World-scoped values, exported for reference. Applied on import only if Apply World Atmosphere Section is enabled."
+  },
+  "dimensions": {
+    "_note": "Computed, read-only. World-axis-aligned bounds at export pose.",
+    "colliderCount": 3,
+    "colliderBoundsSize_m": {
+      "x": 3.5546875,
+      "y": 1.9562902450561523,
+      "z": 8.0078125
+    },
+    "colliderBoundsCenterLocal_m": {
+      "x": 7.1801696321927011E-05,
+      "y": -3.8093374314485118E-05,
+      "z": -0.0039057501126080751
+    },
+    "visualBoundsSize_m": {
+      "x": 4.73046875,
+      "y": 2.2626113891601563,
+      "z": 7.3125
+    }
+  },
+  "diagnostics": {
+    "note": "Computed from the active configuration. 'NoDrag' estimates ignore aero drag and traction; 'PowerLimited' additionally accounts for the reactor budget at hover equilibrium.",
+    "weight": {
+      "massKg": 11000,
+      "gravityMs2": 9.8100004196167,
+      "downwardAssistMs2": 0,
+      "normalWeightForceN": 107910.0078125,
+      "effectiveWeightForceN_withAssist": 107910.0078125
+    },
+    "hover": {
+      "nodeCount": 4,
+      "perNode": [
+        {
+          "name": "Hover_FL",
+          "continuousMaxForceN": 160000,
+          "overdriveMaxForceN": 1120000
+        },
+        {
+          "name": "Hover_FR",
+          "continuousMaxForceN": 160000,
+          "overdriveMaxForceN": 1120000
+        },
+        {
+          "name": "Hover_RL",
+          "continuousMaxForceN": 160000,
+          "overdriveMaxForceN": 1120000
+        },
+        {
+          "name": "Hover_RR",
+          "continuousMaxForceN": 160000,
+          "overdriveMaxForceN": 1120000
+        }
+      ],
+      "continuousTotalForceN": 640000,
+      "overdriveTotalForceN": 4480000,
+      "continuousToNormalWeightRatio": 5.9308678868046947,
+      "continuousToEffectiveWeightRatio": 5.9308678868046947,
+      "reserveAboveEffectiveWeightN": 532090,
+      "equilibriumThrottle01": 0.16860938720703125,
+      "maxSurfaceNormalAccelMs2_continuous": 58.18181818181818,
+      "maxSurfaceNormalAccelMs2_overdrive": 407.27272727272725
+    },
+    "propulsion": {
+      "mainContinuousForceN": 480000,
+      "mainOverdriveForceN": 720000,
+      "brakeForceN": 380000,
+      "roofTotalForceN": 640000,
+      "forwardAccelMs2": 43.6363639831543,
+      "forwardAccelG": 4.4481510822258734,
+      "brakeDecelMs2": 34.545455932617188,
+      "brakeDecelG": 3.5214530535124036
+    },
+    "strafe": {
+      "installedForceN": 1000000,
+      "usableLeftForceN": 500000,
+      "usableRightForceN": 500000,
+      "usableLateralAccelG": 4.6334905324253626,
+      "yawCoupleLeftNm": 1500198.5,
+      "yawCoupleRightNm": 1499926.5,
+      "_note": "Only the thrusters oriented for a direction can push it — usable one-direction force is a subset of installed capacity. Tuning gains (strafeSensitivity etc.) reduce it further."
+    },
+    "power": {
+      "budget": 4500,
+      "hoverEquilibriumPower": 107.91001129150391,
+      "mainFullThrottlePower": 480.00003051757813,
+      "mainPowerScaleAtFullThrottle_hoverProtected": 1,
+      "priorityActive": true
+    },
+    "accelerationEstimates": {
+      "_note": "Straight line, no drag/traction. HardwareOnly uses full main force; PowerLimited assumes hover holds equilibrium first.",
+      "hardwareOnly": {
+        "to100Kmh_s": 0.63662501067618515,
+        "to300Kmh_s": 1.9096458601185016,
+        "to500Kmh_s": 3.1831248348305636,
+        "to1000Kmh_s": 6.3662496696611273
+      },
+      "powerLimited": {
+        "to100Kmh_s": 0.63662501067618515,
+        "to300Kmh_s": 1.9096458601185016,
+        "to500Kmh_s": 3.1831248348305636,
+        "to1000Kmh_s": 6.3662496696611273
+      }
+    },
+    "brakingEstimates": {
+      "_note": "Brake thruster only — aero drag and traction coasting grip add substantial extra deceleration at speed and are NOT included here.",
+      "from300Kmh": {
+        "stopTime_s": 2.4121841666699795,
+        "stopDistance_m": 100.50365551272526
+      },
+      "from500Kmh": {
+        "stopTime_s": 4.0207891355498813,
+        "stopDistance_m": 279.24379319346457
+      },
+      "from1000Kmh": {
+        "stopTime_s": 8.0415782710997625,
+        "stopDistance_m": 1116.9751727738583
+      }
+    },
+    "aerodynamics": {
+      "mode": "DirectionalBodyV3",
+      "airDensityKgM3": 1.2250000238418579,
+      "dragCdA_m2": 2.5,
+      "wingDownforceClA_m2": 2,
+      "groundEffectClA_m2": 2,
+      "maxDownforceG": 3,
+      "dragLimitedTopSpeedKmh_forwardNoPowerLimit": 2148.6154704248765,
+      "bodyForwardCdA_m2": 2.2000000476837158,
+      "bodyReverseCdA_m2": 3.7999999523162842,
+      "bodySideCdA_m2": 8,
+      "bodyTopCdA_m2": 5.5,
+      "bodyBottomCdA_m2": 6,
+      "centerOfPressureLocal_m": {
+        "x": 0,
+        "y": 0.15000000596046448,
+        "z": -1
+      },
+      "surfaceCount": 0,
+      "surfaceTotalArea_m2": 0,
+      "groundEffectSurfaceCount": 0
+    },
+    "forceRatios": {
+      "mainThrustToNormalWeight": 4.448150915103521,
+      "mainThrustToEffectiveWeight": 4.448150915103521,
+      "brakeToNormalWeight": 3.5214528077902876,
+      "usableStrafeToNormalWeight": 4.6334905365661676,
+      "hoverContinuousToNormalWeight": 5.9308678868046947,
+      "hoverContinuousToEffectiveWeight": 5.9308678868046947,
+      "brakeToMainThrust": 0.79166666666666663
+    },
+    "physicalScale": {
+      "massKg": 11000,
+      "colliderCount": 3,
+      "colliderLocalSize_m": {
+        "x": 3.8477272987365723,
+        "y": 2.378983736038208,
+        "z": 8.0693025588989258
+      },
+      "colliderLocalCenter_m": {
+        "x": -6.198883056640625E-06,
+        "y": -5.1617622375488281E-05,
+        "z": -0.0071206092834472656
+      },
+      "authoritativeDimensions_m": {
+        "length": 7.8000001907348633,
+        "width": 3.5999999046325684,
+        "bodyHeight": 1.5499999523162842,
+        "groundClearance": 2.7999999523162842,
+        "craftClass": "ApexHyperclass"
+      },
+      "centerOfMassLocal_m": {
+        "x": 0,
+        "y": -0.5,
+        "z": 0
+      },
+      "centerOfMassSource": "CraftPhysicalDefinition (manual + ballast)",
+      "inertia": "automatic (derived from colliders)",
+      "hoverFootprintWidth_m": 3.000252366065979,
+      "hoverFootprintLength_m": 6.0002498626708984,
+      "avgPitchLeverArm_m": 2.9998857975006104,
+      "avgRollLeverArm_m": 1.4998788833618164,
+      "targetGroundClearance_m": 2.7999999523162842
+    },
+    "warnings": [
+      "Installed strafe capacity exceeds main propulsion — verify this is intended.",
+      "No physics material on any craft collider — wall scrapes use Unity default friction 0.6 (violent at speed).",
+      "info: surface-alignment and yaw-damping torques use ForceMode.Acceleration (inertia/mass-independent by design decision — see baseline report)."
+    ]
+  }
+}

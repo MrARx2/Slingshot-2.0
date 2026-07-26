@@ -51,6 +51,9 @@ MonoBehaviour:
   thrustAxis: 1
   label: Brake_Front
   groundDetectionRange: 4
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &977398793945077140
 GameObject:
   m_ObjectHideFlags: 0
@@ -102,6 +105,9 @@ MonoBehaviour:
   thrustAxis: 0
   label: Strafe_Front_Right
   groundDetectionRange: 4
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &1155777329996893049
 GameObject:
   m_ObjectHideFlags: 0
@@ -153,6 +159,9 @@ MonoBehaviour:
   thrustAxis: 1
   label: Hover_FR
   groundDetectionRange: 6
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &1350891334223953835
 GameObject:
   m_ObjectHideFlags: 0
@@ -204,6 +213,9 @@ MonoBehaviour:
   thrustAxis: 0
   label: Hover_RL
   groundDetectionRange: 6
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &1978749299738575144
 GameObject:
   m_ObjectHideFlags: 0
@@ -255,6 +267,9 @@ MonoBehaviour:
   thrustAxis: 0
   label: Strafe_Front_Left
   groundDetectionRange: 4
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &2264119526090480385
 GameObject:
   m_ObjectHideFlags: 0
@@ -295,7 +310,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2264119526090480385}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: 0.6735237, z: -0, w: 0.73916566}
+  m_LocalRotation: {x: 0, y: 0.67352223, z: 0, w: 0.73916703}
   m_LocalPosition: {x: -47.978542, y: 18.9, z: -390.8}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -364,7 +379,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7ec9c4226845aa489333f5b9dfa5c81, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ThrusterBus
-  masterThrottleMultiplier: 0.5
+  masterThrottleMultiplier: 1
   autoDiscover: 1
   thrusters:
   - node: {fileID: 6781551644200174694}
@@ -446,7 +461,7 @@ MonoBehaviour:
   - node: {fileID: 1772959971914346583}
     label: Main_Rear
     enabled: 1
-    forceMultiplier: 1
+    forceMultiplier: 1.5
     baseHoverThrottle: 0
     driveThrottle: 0
     vectoringThrottle: 0
@@ -580,7 +595,7 @@ MonoBehaviour:
   overcharge: {fileID: 6491891254945394316}
   energy: {fileID: 1480833927898353629}
   feedback: {fileID: 7302965889752632134}
-  extraGravity: 35
+  extraGravity: 75
 --- !u!114 &1480833927898353629
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -599,6 +614,39 @@ MonoBehaviour:
   vectoringPriorityBias: 1.35
   overchargeChargeThrottleEquivalent: 1
   overchargeChargeCostMultiplier: 1
+  currentEnergy:
+    totalBudget: 100
+    totalRequested: 0
+    totalGranted: 0
+    overload01: 0
+    baseHoverRequest: 0
+    baseHoverGranted: 0
+    driveRequest: 0
+    vectoringRequest: 0
+    roofRequest: 0
+    bottomRequest: 0
+    overchargeRequest: 0
+    stabilizerRequest: 0
+    otherRequest: 0
+    driveGranted: 0
+    vectoringGranted: 0
+    roofGranted: 0
+    bottomGranted: 0
+    overchargeGranted: 0
+    stabilizerGranted: 0
+    otherGranted: 0
+    baseHoverPower01: 1
+    drivePower01: 1
+    vectoringPower01: 1
+    roofPower01: 1
+    bottomPower01: 1
+    overchargePower01: 1
+    overchargeChargePower01: 1
+    overchargeBurstPower01: 1
+    stabilizerPower01: 1
+    otherPower01: 1
+    performancePowerScale01: 1
+    baseHoverProtected: 1
 --- !u!114 &585946567544012928
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -611,14 +659,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b46b14950d47b98439e85d7493378dd2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PilotCommandInterface
-  mouseSensitivityX: 0.02
-  mouseSensitivityY: 0.01
+  mouseSensitivityX: 0.04
+  mouseSensitivityY: 0.03
   invertMouseX: 0
   invertMouseY: 0
   roofThrusterKey: 31
   bottomThrusterKey: 19
   overchargeKey: 1
   stabilizerToggleKey: 32
+  gripBreakerKey: 51
   sampleInputInternally: 0
 --- !u!114 &322373496870813449
 MonoBehaviour:
@@ -713,20 +762,19 @@ MonoBehaviour:
   roofRR: {fileID: 0}
   stabilizerDisengageThrottleDecaySpeed: 30
   useRoofThrustersForStabilizer: 1
-  roofStabilizerMaxThrottle: 0.85
+  roofStabilizerMaxThrottle: 10
   roofReboundVelocityStart: 0.35
   roofReboundVelocityFull: 3
   roofHeightErrorStart: 0.15
   roofHeightErrorFull: 1
   roofStabilizerResponseSpeed: 18
-  hoverHeight: 2
+  hoverHeight: 3
   hoverKp: 1
   hoverKd: 0.28
   hoverMaxThrottle: 2.25
-  hoverThrusterResponseSpeed: 10
+  hoverThrusterResponseSpeed: 20
   hoverThrottleFallResponseSpeed: 24
   airborneHoverThrottleDecaySpeed: 32
-  jumpBypassesHoverSmoothing: 1
   hoverOscillationAmount: 0.035
   hoverOscillationSpeed: 1.25
   hoverOscillationPhaseSpread: 0.7
@@ -738,6 +786,23 @@ MonoBehaviour:
   reboundThrottleCutVelocity: 0.75
   reboundFullCutVelocity: 4
   reboundThrottleCutHeightError: 0.05
+  maxCushionRecoverySpeed: 2.5
+  emergencyCatchStartSpeed: 6
+  emergencyCatchFullSpeed: 15
+  dynamicSuspension: 1
+  stiffenStartSpeed: 60
+  stiffenFullSpeed: 400
+  maxSpeedStiffness: 3
+  compensateSurfaceCurvature: 1
+  maxCurvatureAccel: 4000
+  curvatureSmoothing: 20
+  curvatureReleaseSmoothing: 80
+  lookAheadCurvatureRelease: 0.8
+  rearDampingMultiplier: 1.35
+  rearSpringMultiplier: 1
+  surfaceNormalSmoothing: 12
+  highSpeedNoseUpBias: 2.5
+  heightErrorDeadband: 0.05
   hoverActivationHeightBuffer: 1.25
   hoverFullPowerHeightBuffer: 0.25
   fadeHoverForcesNearActivationEdge: 1
@@ -765,9 +830,16 @@ MonoBehaviour:
   airPitchInputGain: 5
   invertAirRollControl: 0
   invertAirPitchControl: 0
-  jumpBurstMultiplier: 3
-  jumpBurstDuration: 0.15
-  jumpCooldown: 1.5
+  alignToSurface: 1
+  surfaceAlignStrength: 9
+  surfaceAlignDamping: 1.6
+  maxSurfaceAlignTorque: 40
+  surfaceLookAheadTime: 0.4
+  maxSurfaceLookAheadDistance: 50
+  surfaceLookAheadBlend: 1
+  surfaceProbeLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!114 &6108087102260050663
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1031,6 +1103,9 @@ MonoBehaviour:
   thrustAxis: 1
   label: Hover_FL
   groundDetectionRange: 6
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &3391041165497229928
 GameObject:
   m_ObjectHideFlags: 0
@@ -1082,6 +1157,9 @@ MonoBehaviour:
   thrustAxis: 1
   label: Hover_RL
   groundDetectionRange: 6
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &3701427417385727872
 GameObject:
   m_ObjectHideFlags: 0
@@ -1133,6 +1211,9 @@ MonoBehaviour:
   thrustAxis: 0
   label: Hover_FR
   groundDetectionRange: 6
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &3814375342071071608
 GameObject:
   m_ObjectHideFlags: 0
@@ -1274,6 +1355,9 @@ MonoBehaviour:
   thrustAxis: 1
   label: Hover_RR
   groundDetectionRange: 6
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &4951019551624839685
 GameObject:
   m_ObjectHideFlags: 0
@@ -1325,6 +1409,9 @@ MonoBehaviour:
   thrustAxis: 0
   label: Hover_FL
   groundDetectionRange: 6
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &5022871467396368895
 GameObject:
   m_ObjectHideFlags: 0
@@ -1466,6 +1553,9 @@ MonoBehaviour:
   thrustAxis: 0
   label: Strafe_Back_Left
   groundDetectionRange: 4
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &5952493956111169225
 GameObject:
   m_ObjectHideFlags: 0
@@ -1517,6 +1607,9 @@ MonoBehaviour:
   thrustAxis: 1
   label: Main_Rear
   groundDetectionRange: 4
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &6048813405962871642
 GameObject:
   m_ObjectHideFlags: 0
@@ -1953,6 +2046,9 @@ MonoBehaviour:
   thrustAxis: 0
   label: Hover_RR
   groundDetectionRange: 6
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &8500856202275344060
 GameObject:
   m_ObjectHideFlags: 0
@@ -2004,6 +2100,9 @@ MonoBehaviour:
   thrustAxis: 0
   label: Strafe_Back_Right
   groundDetectionRange: 4
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &9023670367369155749
 GameObject:
   m_ObjectHideFlags: 0

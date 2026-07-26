@@ -17,8 +17,7 @@ namespace TrackGeneration.Tests
         {
             Shape = RoadCrossSectionShape.HalfPipe,
             SideHeight = 6f,
-            CurveStrength = 0.75f,
-            WallAngle = 60f,
+            WallCurve01 = 1f,
             CenterFlatWidthRatio = 0.35f,
             ProfileResolution = 32,
             SafetyLipHeight = 1f,

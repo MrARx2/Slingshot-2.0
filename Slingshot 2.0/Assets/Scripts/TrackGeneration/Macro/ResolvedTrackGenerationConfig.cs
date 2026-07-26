@@ -386,19 +386,38 @@ namespace TrackGeneration.Macro
             r.VisualPreviewLength = S(r.ClampReport(settings.Transitions.VisualPreviewSeconds, limits.MinVisualPreviewSeconds, limits.MaxVisualPreviewSeconds, "Transitions.VisualPreview"));
 
             // ══ Road & half-pipe ══
-            r.RoadWidth = r.ClampReport(settings.Road.RoadWidth, limits.MinRoadWidth, limits.MaxRoadWidth, "Road.RoadWidth");
+            // The cross-section is authored as FLAT CENTER + WALL SIZE + WALL CURVE +
+            // SCALE. Total road width is DERIVED, and the rulebook width window is
+            // enforced by UNIFORM rescale (never by reshaping) so the authored
+            // center/wall ratio — and the quarter-circle wall — survive every clamp.
+            float roadScale = Mathf.Clamp(settings.Road.RoadScale, 0.25f, 5f);
+            float flatCenter = Mathf.Max(2f, settings.Road.FlatCenterWidth);
+            float wallSize = r.ClampReport(settings.Road.WallHeight, limits.MinHalfPipeSideHeight, limits.MaxHalfPipeSideHeight, "Road.WallHeight");
+            float wallCurve = Mathf.Clamp01(settings.Road.WallCurve);
+
+            float totalWidth = roadScale * (flatCenter + 2f * wallSize);
+            if (totalWidth < limits.MinRoadWidth || totalWidth > limits.MaxRoadWidth)
+            {
+                float clampedTotal = Mathf.Clamp(totalWidth, limits.MinRoadWidth, limits.MaxRoadWidth);
+                r.Issue(ResolvedIssueSeverity.Warning, "Road.RoadScale",
+                    $"Derived road width {totalWidth:F0} m is outside the rulebook window " +
+                    $"({limits.MinRoadWidth:F0}–{limits.MaxRoadWidth:F0} m) — uniformly rescaled to {clampedTotal:F0} m (ratio preserved).");
+                roadScale *= clampedTotal / totalWidth;
+                totalWidth = clampedTotal;
+            }
+
+            r.RoadWidth = totalWidth;
             r.RoadProfile = new TrackRoadProfileSettings
             {
                 Shape = RoadCrossSectionShape.HalfPipe,
-                SideHeight = r.ClampReport(settings.Road.HalfPipeSideHeight, limits.MinHalfPipeSideHeight, limits.MaxHalfPipeSideHeight, "Road.HalfPipeSideHeight"),
-                CurveStrength = r.ClampReport(settings.Road.WallCurveStrength, limits.MinHalfPipeCurveStrength, limits.MaxHalfPipeCurveStrength, "Road.WallCurveStrength"),
-                WallAngle = r.ClampReport(settings.Road.MaxWallAngle, limits.MinHalfPipeWallAngle, limits.MaxHalfPipeWallAngle, "Road.MaxWallAngle"),
-                CenterFlatWidthRatio = r.ClampReport(settings.Road.CenterFlatWidthRatio, limits.MinHalfPipeCenterFlatRatio, limits.MaxHalfPipeCenterFlatRatio, "Road.CenterFlatWidthRatio"),
+                SideHeight = wallSize * roadScale,
+                WallCurve01 = wallCurve,
+                CenterFlatWidthRatio = flatCenter / (flatCenter + 2f * wallSize),
                 ProfileResolution = Mathf.Clamp(settings.Road.ProfileResolution, limits.MinHalfPipeProfileResolution, limits.MaxHalfPipeProfileResolution),
-                SafetyLipHeight = r.ClampReport(settings.Road.SafetyLipHeight, limits.MinSafetyLipHeight, limits.MaxSafetyLipHeight, "Road.SafetyLipHeight"),
+                SafetyLipHeight = r.ClampReport(settings.Road.SafetyLipHeight, limits.MinSafetyLipHeight, limits.MaxSafetyLipHeight, "Road.SafetyLipHeight") * roadScale,
                 MinTurnCenterFlatRatio = Mathf.Clamp(settings.Road.MinimumTurnCenterFlatRatio, 0f, limits.MaxHalfPipeCenterFlatRatio),
                 MaxOverhangAngleDeg = r.ClampReport(settings.Road.MaxOverhangAngle, 0f, limits.MaxOverhangAngleLimit, "Road.MaxOverhangAngle"),
-                OverhangRadius = r.ClampReport(settings.Road.OverhangRadius, limits.MinOverhangRadius, limits.MaxOverhangRadius, "Road.OverhangRadius")
+                OverhangRadius = r.ClampReport(settings.Road.OverhangRadius, limits.MinOverhangRadius, limits.MaxOverhangRadius, "Road.OverhangRadius") * roadScale
             };
 
             r.DynamicTurnRoundingEnabled = settings.Road.DynamicTurnRounding;

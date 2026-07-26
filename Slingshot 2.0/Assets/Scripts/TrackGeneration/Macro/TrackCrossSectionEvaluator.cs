@@ -50,9 +50,10 @@ namespace TrackGeneration.Macro
             float rounding = Mathf.Clamp01(f.TurnRounding);
             float flat = Mathf.Lerp(Mathf.Clamp01(p.CenterFlatWidthRatio),
                 Mathf.Clamp01(p.MinTurnCenterFlatRatio), rounding);
-            float power = Mathf.Lerp(p.CurvePower, Mathf.Max(1.2f, p.CurvePower * 0.7f), rounding);
+            // Turn rounding pulls the wall bend toward a full quarter circle.
+            float curve = Mathf.Lerp(Mathf.Clamp01(p.WallCurve01), 1f, rounding);
             float sideH = f.SideHeight > 0.001f ? f.SideHeight : p.SideHeight;
-            float baseH = p.ClampedSideHeight(halfW, sideH, flat, power);
+            float baseH = p.ClampedSideHeight(halfW, sideH, flat, curve);
             float closure = Mathf.Clamp01(f.PipeClosure);
             float closureW = closure * closure * (3f - 2f * closure); // smoothstep
 
@@ -61,7 +62,7 @@ namespace TrackGeneration.Macro
             {
                 float xNorm = p.ProfileXAt(i, bowl, flat);
                 float mult = xNorm < 0f ? f.LeftWallMultiplier : f.RightWallMultiplier;
-                float h = p.HeightAt(xNorm, halfW, sideH, flat, power) * mult;
+                float h = p.HeightAt(xNorm, halfW, sideH, flat, curve) * mult;
                 points[ext + i] = new Vector2(xNorm * halfW, h);
                 if (crossParams != null)
                     crossParams[ext + i] = Mathf.Sign(xNorm) * Mathf.Min(2f, Mathf.Abs(xNorm) / Mathf.Max(flat, 0.02f));
@@ -70,10 +71,24 @@ namespace TrackGeneration.Macro
             // ── Wall extensions: safety-lip curl → catch wall → wallride support ──
             if (ext > 0)
             {
-                EvaluateExtension(p, ext, halfW, flat, power, baseH,
+                EvaluateExtension(p, ext, halfW, flat, curve, sideH, baseH,
                     f.LeftWallMultiplier, Mathf.Clamp01(f.LeftOverhang), closureW, left: true, points, crossParams);
-                EvaluateExtension(p, ext, halfW, flat, power, baseH,
+                EvaluateExtension(p, ext, halfW, flat, curve, sideH, baseH,
                     f.RightWallMultiplier, Mathf.Clamp01(f.RightOverhang), closureW, left: false, points, crossParams);
+            }
+
+            // ── Wallride morph: fold the whole chain onto the OUTSIDE wall. ──
+            // A wallride is JUST the outside wall of the turn — no flat center, no
+            // inside wall. The chain keeps its fixed topology; every point is
+            // resampled along the outside-wall polyline (wall base → curl tip), so
+            // entry/exit blend smoothly and slow craft fall off the wall's lower
+            // edge into the turn interior.
+            float wallrideW = Mathf.Clamp01(f.WallrideMorph);
+            if (wallrideW > 0.0001f)
+            {
+                bool rideLeft = f.LeftOverhang >= f.RightOverhang;
+                MorphOntoWall(points, total, ext, bowl, halfW, flat, rideLeft,
+                    wallrideW * wallrideW * (3f - 2f * wallrideW));
             }
 
             // ── Pipe closure: morph the whole chain toward a circle whose tips meet
@@ -103,17 +118,15 @@ namespace TrackGeneration.Macro
         /// Points run TIP→base for the left side, base→TIP for the right side.
         /// </summary>
         private static void EvaluateExtension(TrackRoadProfileSettings p, int ext, float halfW,
-            float flat, float power, float baseH, float wallMult, float engagement, float closureW,
+            float flat, float curve, float sideH, float baseH, float wallMult, float engagement, float closureW,
             bool left, Vector2[] points, float[] crossParams)
         {
             float mult = Mathf.Clamp(wallMult, 0f, 3f);
             float presence = Mathf.Clamp01(mult);         // suppressed walls lose their curl
             float hTop = baseH * mult;
 
-            // Wall-top tangent angle from the profile's top slope (scaled by the wall multiplier).
-            float risingSpan = Mathf.Max(0.01f, halfW * (1f - flat));
-            float topSlope = power * baseH / risingSpan * mult;
-            float thetaTop = Mathf.Atan(Mathf.Min(topSlope, 60f)); // radians, < 89°
+            // Wall-top tangent angle from the arc model (vertical at full curve).
+            float thetaTop = p.TipTangentRad(halfW, sideH * mult, flat, curve);
             float thetaTopDeg = thetaTop * Mathf.Rad2Deg;
 
             // Safety lip: a minimal capture curl (same mechanism, small engagement).
@@ -150,6 +163,68 @@ namespace TrackGeneration.Macro
                 int idx = left ? ext - k : ext + p.ProfilePointCount - 1 + k;
                 points[idx] = pt;
                 if (crossParams != null) crossParams[idx] = left ? -2f : 2f;
+            }
+        }
+
+        // Scratch buffers for the wallride morph (generation is single-threaded and
+        // the buffers are fully consumed within one Evaluate call).
+        private static Vector2[] _wallPoly = new Vector2[512];
+        private static float[] _wallCum = new float[512];
+
+        /// <summary>
+        /// Folds the whole chain onto the riding-side wall: collects that wall's
+        /// polyline (flat-center boundary → bowl wall → extension curl tip), then
+        /// resamples every chain point uniformly along it, oriented so the wall-side
+        /// end of the chain barely moves. Weight blends from the ordinary road.
+        /// </summary>
+        private static void MorphOntoWall(Vector2[] points, int total, int ext, int bowl,
+            float halfW, float flat, bool left, float weight)
+        {
+            if (_wallPoly.Length < total) { _wallPoly = new Vector2[total * 2]; _wallCum = new float[total * 2]; }
+
+            float flatX = flat * halfW;
+            int count = 0;
+            int center = ext + bowl / 2;
+
+            // Wall polyline in base→tip order.
+            if (left)
+            {
+                for (int i = center; i >= ext; i--)
+                    if (points[i].x <= -flatX + 0.001f) _wallPoly[count++] = points[i];
+                for (int k = ext - 1; k >= 0; k--) _wallPoly[count++] = points[k];
+            }
+            else
+            {
+                for (int i = center; i < ext + bowl; i++)
+                    if (points[i].x >= flatX - 0.001f) _wallPoly[count++] = points[i];
+                for (int k = ext + bowl; k < total; k++) _wallPoly[count++] = points[k];
+            }
+            if (count < 2) return;
+
+            _wallCum[0] = 0f;
+            for (int i = 1; i < count; i++)
+                _wallCum[i] = _wallCum[i - 1] + Vector2.Distance(_wallPoly[i - 1], _wallPoly[i]);
+
+            float totalLen = _wallCum[count - 1];
+            if (totalLen < 0.001f) return;
+
+            int seg = 1;
+            for (int k = 0; k < total; k++)
+            {
+                float u = total > 1 ? (float)k / (total - 1) : 0f;
+                // Orient so the riding-side chain end lands on the wall tip: for a
+                // LEFT wall the chain starts at the left tip (s = 1 at k = 0).
+                float s = left ? 1f - u : u;
+                float d = s * totalLen;
+
+                // d is monotonic per orientation; simple forward scan per point.
+                seg = 1;
+                while (seg < count - 1 && _wallCum[seg] < d) seg++;
+                float segLen = Mathf.Max(0.0001f, _wallCum[seg] - _wallCum[seg - 1]);
+                float t = Mathf.Clamp01((d - _wallCum[seg - 1]) / segLen);
+                Vector2 target = Vector2.Lerp(_wallPoly[seg - 1], _wallPoly[seg], t);
+
+                points[k] = Vector2.Lerp(points[k], target, weight);
             }
         }
     }

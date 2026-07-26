@@ -44,7 +44,7 @@ namespace TrackGeneration.Design
                     break;
             }
 
-            s.Road.RoadWidth *= roadWidth;
+            s.Road.FlatCenterWidth *= roadWidth; // difficulty narrows/widens the drivable floor, not the walls
             s.Corners.MinCurveRadius *= minRadius;
             s.Corners.MaxCurveRadius = Mathf.Max(s.Corners.MaxCurveRadius, s.Corners.MinCurveRadius);
 

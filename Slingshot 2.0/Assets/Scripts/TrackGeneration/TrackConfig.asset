@@ -19,8 +19,8 @@ MonoBehaviour:
   maxTargetLapTime: 180
   minTrackLength: 6000
   maxTrackLength: 90000
-  minRoadWidth: 32
-  maxRoadWidth: 64
+  minRoadWidth: 16
+  maxRoadWidth: 720
   minCurveRadius: 180
   maxCurveRadius: 1200
   maxClosureCurveRadius: 6000
@@ -74,8 +74,8 @@ MonoBehaviour:
   maxBankReversalSeconds: 3.5
   minBridgeSeconds: 0.5
   maxBridgeSeconds: 5
-  minLoopRadius: 300
-  maxLoopRadius: 400
+  minLoopRadius: 500
+  maxLoopRadius: 600
   minLoopApproachSeconds: 1.5
   maxLoopApproachSeconds: 3
   minLoopRecoverySeconds: 1

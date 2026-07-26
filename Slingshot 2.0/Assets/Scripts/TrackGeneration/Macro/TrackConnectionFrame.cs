@@ -84,6 +84,9 @@ namespace TrackGeneration.Macro
         [Tooltip("Pipe closure 0..1: 0 = open half-pipe road, 1 = fully closed tube. Set by full-pipe feature sections; the cross-section morphs smoothly between them.")]
         public float PipeClosure;
 
+        [Tooltip("Wallride morph 0..1: 0 = ordinary road, 1 = the cross-section IS the outside wall only (no flat center, no inside wall). Set by the wallride builder; the riding side is the side with the higher overhang engagement.")]
+        public float WallrideMorph;
+
         /// <summary>Left wall height multiplier (1 = full half-pipe wall, 0 = open edge, above 1 = banked outside wall).</summary>
         public float LeftWallMultiplier => Mathf.Clamp(1f - LeftWallSuppression, 0f, 3f);
 

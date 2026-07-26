@@ -1,0 +1,117 @@
+{
+  "metadata": {
+    "configVersion": 1,
+    "craftName": "Hovercraft V2 Medium 7.5T Baseline",
+    "craftId": "hovercraft_v2",
+    "craftClass": "Medium",
+    "description": "First medium-class physical baseline: 7,500 kg, 6.5 x 3.2 x 1.4 m, Earth gravity only (downward assist 0), manual low COM, forces DERIVED from acceleration targets (2.45g main, 1.63g mechanical brake, 1.22g usable strafe, hover equilibrium 0.41 with 3x emergency overdrive). Apply AFTER running 'Apply Physical Definition To Craft' so the collider layout and node positions match.",
+    "exportedUtc": "2026-07-23 (authored)",
+    "units": "SI unless stated: kg, m, s, N, m/s, m/s2. Throttle/gain fields dimensionless.",
+    "notes": "Force derivations (rev 2 after hover-collapse fix): weight = 7500 x 9.81 = 73,575 N. Hover 4 x 55 kN = 220 kN -> equilibrium 0.334, overdrive 3x -> 660 kN emergency (88 m/s2 surface-normal for landings/loops/downforce load). hoverMaxCommand = 3 matches the overdrive rating so PD demand can actually unlock it (rev 1 capped demand at 1.0, which locked the emergency force out and let downforce + roof pull-down overwhelm the suspension -> belly scrape). roofStabilizerMaxCommand 0.6 keeps roof pull-down (96 kN) well under hover authority. Main 180 kN = 2.45g, overdrive 1.5x -> 270 kN burst. Brake 120 kN = 1.63g mechanical. Strafe usable 90 kN = 1.22g. Roof 40 kN/node. Power budget 800: covers emergency hover at full overdrive (660) so protected hover is never starved in the moments that matter; cruise load (74 hover + 180 main + steering) leaves wide margin."
+  },
+  "rigidbody": {
+    "massKg": 7500,
+    "linearDamping": 0,
+    "angularDamping": 2,
+    "useGravity": true,
+    "maxAngularVelocity_rads": 50,
+    "interpolation": "Interpolate",
+    "collisionDetection": "ContinuousDynamic",
+    "constraints": 0
+  },
+  "thrusterBus": {
+    "masterCommandGain": 1,
+    "autoDiscover": true
+  },
+  "thrusters": [
+    { "gameObject": "Hover_FL", "role": "Hover", "localPosition_m": { "x": -1.3, "y": -0.65, "z": 2.4 },
+      "settings": { "label": "Hover_FL", "maxForce": 55000, "overdriveForceMultiplier": 3, "throttleRiseRate": 0, "throttleFallRate": 0, "efficiency": 1, "powerDrawMultiplier": 1, "groundDetectionRange": 6 },
+      "busEntry": { "enabled": true, "commandGain": 1 } },
+    { "gameObject": "Hover_FR", "role": "Hover", "localPosition_m": { "x": 1.3, "y": -0.65, "z": 2.4 },
+      "settings": { "label": "Hover_FR", "maxForce": 55000, "overdriveForceMultiplier": 3, "throttleRiseRate": 0, "throttleFallRate": 0, "efficiency": 1, "powerDrawMultiplier": 1, "groundDetectionRange": 6 },
+      "busEntry": { "enabled": true, "commandGain": 1 } },
+    { "gameObject": "Hover_RL", "role": "Hover", "localPosition_m": { "x": -1.3, "y": -0.65, "z": -2.4 },
+      "settings": { "label": "Hover_RL", "maxForce": 55000, "overdriveForceMultiplier": 3, "throttleRiseRate": 0, "throttleFallRate": 0, "efficiency": 1, "powerDrawMultiplier": 1, "groundDetectionRange": 6 },
+      "busEntry": { "enabled": true, "commandGain": 1 } },
+    { "gameObject": "Hover_RR", "role": "Hover", "localPosition_m": { "x": 1.3, "y": -0.65, "z": -2.4 },
+      "settings": { "label": "Hover_RR", "maxForce": 55000, "overdriveForceMultiplier": 3, "throttleRiseRate": 0, "throttleFallRate": 0, "efficiency": 1, "powerDrawMultiplier": 1, "groundDetectionRange": 6 },
+      "busEntry": { "enabled": true, "commandGain": 1 } },
+    { "gameObject": "Roof_FL", "role": "Roof", "localPosition_m": { "x": -1.3, "y": -0.59, "z": 2.4 },
+      "settings": { "label": "Roof_FL", "maxForce": 40000, "overdriveForceMultiplier": 1.5, "throttleRiseRate": 10, "throttleFallRate": 10, "efficiency": 1, "powerDrawMultiplier": 1, "groundDetectionRange": 6 } },
+    { "gameObject": "Roof_FR", "role": "Roof", "localPosition_m": { "x": 1.3, "y": -0.59, "z": 2.4 },
+      "settings": { "label": "Roof_FR", "maxForce": 40000, "overdriveForceMultiplier": 1.5, "throttleRiseRate": 10, "throttleFallRate": 10, "efficiency": 1, "powerDrawMultiplier": 1, "groundDetectionRange": 6 } },
+    { "gameObject": "Roof_RL", "role": "Roof", "localPosition_m": { "x": -1.3, "y": -0.59, "z": -2.4 },
+      "settings": { "label": "Roof_RL", "maxForce": 40000, "overdriveForceMultiplier": 1.5, "throttleRiseRate": 10, "throttleFallRate": 10, "efficiency": 1, "powerDrawMultiplier": 1, "groundDetectionRange": 6 } },
+    { "gameObject": "Roof_RR", "role": "Roof", "localPosition_m": { "x": 1.3, "y": -0.59, "z": -2.4 },
+      "settings": { "label": "Roof_RR", "maxForce": 40000, "overdriveForceMultiplier": 1.5, "throttleRiseRate": 10, "throttleFallRate": 10, "efficiency": 1, "powerDrawMultiplier": 1, "groundDetectionRange": 6 } },
+    { "gameObject": "Main_Rear", "role": "Main", "localPosition_m": { "x": 0, "y": 0, "z": -3.25 },
+      "settings": { "label": "Main_Rear", "maxForce": 180000, "overdriveForceMultiplier": 1.5, "throttleRiseRate": 0, "throttleFallRate": 0, "efficiency": 1, "powerDrawMultiplier": 1 },
+      "busEntry": { "enabled": true, "commandGain": 1 } },
+    { "gameObject": "Brake_Front", "role": "Brake", "localPosition_m": { "x": 0, "y": 0, "z": 3.25 },
+      "settings": { "label": "Brake_Front", "maxForce": 120000, "overdriveForceMultiplier": 1, "throttleRiseRate": 0, "throttleFallRate": 0, "efficiency": 1, "powerDrawMultiplier": 1 },
+      "busEntry": { "enabled": true, "commandGain": 1 } },
+    { "gameObject": "Strafe_Front_Left", "role": "Strafe", "localPosition_m": { "x": -1.6, "y": 0, "z": 2.4 },
+      "settings": { "label": "Strafe_Front_Left", "maxForce": 60000, "overdriveForceMultiplier": 1, "throttleRiseRate": 8, "throttleFallRate": 8, "efficiency": 1, "powerDrawMultiplier": 1 },
+      "busEntry": { "enabled": true, "commandGain": 1 } },
+    { "gameObject": "Strafe_Front_Right", "role": "Strafe", "localPosition_m": { "x": 1.6, "y": 0, "z": 2.4 },
+      "settings": { "label": "Strafe_Front_Right", "maxForce": 60000, "overdriveForceMultiplier": 1, "throttleRiseRate": 8, "throttleFallRate": 8, "efficiency": 1, "powerDrawMultiplier": 1 },
+      "busEntry": { "enabled": true, "commandGain": 1 } },
+    { "gameObject": "Strafe_Back_Left", "role": "Strafe", "localPosition_m": { "x": -1.6, "y": 0, "z": -2.4 },
+      "settings": { "label": "Strafe_Back_Left", "maxForce": 60000, "overdriveForceMultiplier": 1, "throttleRiseRate": 8, "throttleFallRate": 8, "efficiency": 1, "powerDrawMultiplier": 1 },
+      "busEntry": { "enabled": true, "commandGain": 1 } },
+    { "gameObject": "Strafe_Back_Right", "role": "Strafe", "localPosition_m": { "x": 1.6, "y": 0, "z": -2.4 },
+      "settings": { "label": "Strafe_Back_Right", "maxForce": 60000, "overdriveForceMultiplier": 1, "throttleRiseRate": 8, "throttleFallRate": 8, "efficiency": 1, "powerDrawMultiplier": 1 },
+      "busEntry": { "enabled": true, "commandGain": 1 } }
+  ],
+  "components": {
+    "CraftPhysicalDefinition": {
+      "craftClass": "Medium",
+      "lengthM": 6.5,
+      "widthM": 3.2,
+      "bodyHeightM": 1.4,
+      "targetGroundClearanceM": 2.5,
+      "hoverFootprintLengthM": 4.8,
+      "hoverFootprintWidthM": 2.6,
+      "chassisReferenceHeightM": 0,
+      "useManualCenterOfMass": true,
+      "centerOfMassLocalM": { "x": 0, "y": -0.35, "z": 0 },
+      "ballastOffsetLocalM": { "x": 0, "y": 0, "z": 0 },
+      "ballastMassKg": 0,
+      "perAxisInertiaMultiplier": { "x": 1, "y": 1, "z": 1 }
+    },
+    "CraftCore": { "downwardAssistMs2": 0 },
+    "EnergyCore": {
+      "totalPowerOutput": 800,
+      "powerCostPerForce": 0.001,
+      "protectBaseHover": true,
+      "protectStabilizer": true,
+      "priorityPowerDistribution": true,
+      "vectoringPriorityBias": 1.35
+    },
+    "HoverStabilizerArray": {
+      "hoverHeight": 2.5,
+      "hoverKp": 2.5,
+      "hoverKd": 0.3,
+      "hoverMaxCommand": 3,
+      "roofStabilizerMaxCommand": 0.6,
+      "maxCurvatureAccel": 80,
+      "stiffenFullSpeed": 400,
+      "maxSpeedStiffness": 3
+    },
+    "DriveCore": { "throttleRiseRate": 3, "throttleFallRate": 4 },
+    "OverchargeCore": {
+      "minBurstCommand01": 0.5,
+      "maxBurstCommand01": 1,
+      "minBurstDuration": 0.1,
+      "maxBurstDuration": 0.35,
+      "burstEndTaper01": 0.65,
+      "minimumReleaseCharge": 0.2
+    },
+    "CraftAerodynamics": {
+      "dragCoefficientTimesArea": 2.5,
+      "wingDownforceCoefficientTimesArea": 8,
+      "groundEffectCoefficientTimesArea": 8,
+      "maxDownforceG": 4
+    }
+  }
+}

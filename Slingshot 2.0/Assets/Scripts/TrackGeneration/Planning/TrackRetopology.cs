@@ -460,7 +460,8 @@ namespace TrackGeneration.Planning
                 TurnRounding = Mathf.Lerp(f0.TurnRounding, f1.TurnRounding, t),
                 LeftOverhang = Mathf.Lerp(f0.LeftOverhang, f1.LeftOverhang, t),
                 RightOverhang = Mathf.Lerp(f0.RightOverhang, f1.RightOverhang, t),
-                PipeClosure = Mathf.Lerp(f0.PipeClosure, f1.PipeClosure, t)
+                PipeClosure = Mathf.Lerp(f0.PipeClosure, f1.PipeClosure, t),
+                WallrideMorph = Mathf.Lerp(f0.WallrideMorph, f1.WallrideMorph, t)
             };
         }
     }

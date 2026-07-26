@@ -87,9 +87,8 @@ namespace TrackGeneration.Design
             s.Scale.DesignSpeedKph = 1300f;
             s.Scale.MaxTrackLengthMeters = 45000f;
 
-            s.Road.CenterFlatWidthRatio = 0.35f;
-            s.Road.WallCurveStrength = 0.75f;
-            s.Road.MaxWallAngle = 60f;
+            s.Road.WallCurve = 1f;   // perfect quarter-circle walls
+            s.Road.RoadScale = 1f;
             s.Road.SafetyLipHeight = 1f;
             s.Road.ProfileResolution = 32;
 
@@ -132,8 +131,8 @@ namespace TrackGeneration.Design
             s.Corners.BankingStrength = 0.9f;
             s.Corners.MaxBankAngle = 75f;
 
-            s.Road.RoadWidth = 28f;
-            s.Road.HalfPipeSideHeight = 6f;
+            s.Road.FlatCenterWidth = 12f;
+            s.Road.WallHeight = 24f;
 
             s.Transitions.BankTransitionSeconds = 1.2f;
             s.Transitions.PitchTransitionSeconds = 1.3f;
@@ -185,8 +184,8 @@ namespace TrackGeneration.Design
             s.Corners.BankingStrength = 0.8f;
             s.Corners.MaxBankAngle = 72f;
 
-            s.Road.RoadWidth = 26f;
-            s.Road.HalfPipeSideHeight = 6f;
+            s.Road.FlatCenterWidth = 10f;
+            s.Road.WallHeight = 24f;
 
             s.Transitions.BankTransitionSeconds = 0.9f;
             s.Transitions.PitchTransitionSeconds = 1f;
@@ -241,8 +240,8 @@ namespace TrackGeneration.Design
             // Dense multi-turn layouts self-collide often; attempts are cheap plan math.
             s.Generation.MaxAttempts = 384;
 
-            s.Road.RoadWidth = 22f;
-            s.Road.HalfPipeSideHeight = 5.5f;
+            s.Road.FlatCenterWidth = 8f;
+            s.Road.WallHeight = 24f;
 
             s.Transitions.BankTransitionSeconds = 0.55f;
             s.Transitions.PitchTransitionSeconds = 0.75f;
@@ -295,8 +294,8 @@ namespace TrackGeneration.Design
             s.Corners.BankingStrength = 1f;
             s.Corners.MaxBankAngle = 82f;
 
-            s.Road.RoadWidth = 38f;
-            s.Road.HalfPipeSideHeight = 7f;
+            s.Road.FlatCenterWidth = 20f;
+            s.Road.WallHeight = 28f;
 
             s.Transitions.BankTransitionSeconds = 1.8f;
             s.Transitions.PitchTransitionSeconds = 2f;
@@ -349,8 +348,8 @@ namespace TrackGeneration.Design
             s.Corners.BankingStrength = 0.95f;
             s.Corners.MaxBankAngle = 80f;
 
-            s.Road.RoadWidth = 32f;
-            s.Road.HalfPipeSideHeight = 6.5f;
+            s.Road.FlatCenterWidth = 16f;
+            s.Road.WallHeight = 26f;
 
             s.Transitions.BankTransitionSeconds = 1.4f;
             s.Transitions.PitchTransitionSeconds = 1.6f;
@@ -414,8 +413,8 @@ namespace TrackGeneration.Design
             s.Generation.ClosureReserveFraction = 0.25f;
             s.Scale.MaxTrackLengthMeters = 60000f;
 
-            s.Road.RoadWidth = 24f;
-            s.Road.HalfPipeSideHeight = 5.5f;
+            s.Road.FlatCenterWidth = 10f;
+            s.Road.WallHeight = 24f;
 
             s.Transitions.BankTransitionSeconds = 0.7f;
             s.Transitions.PitchTransitionSeconds = 0.9f;

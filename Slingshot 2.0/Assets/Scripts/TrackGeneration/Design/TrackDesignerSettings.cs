@@ -244,20 +244,17 @@ namespace TrackGeneration.Design
     [Serializable]
     public class TrackRoadSettings
     {
-        [Tooltip("Road width in meters (the drivable half-pipe floor + rising sides).")]
-        [Range(32f, 64f)] public float RoadWidth = 40f;
+        [Tooltip("Width of the flat center floor in meters (before Road Scale). Total road width is DERIVED: (FlatCenterWidth + 2 × WallHeight) × RoadScale.")]
+        [Range(4f, 48f)] public float FlatCenterWidth = 16f;
 
-        [Tooltip("How high the half-pipe sides rise above the center floor (meters). Sides rise FROM the stable center baseline — they never dip below it.")]
-        [Range(24f, 48f)] public float HalfPipeSideHeight = 24f;
+        [Tooltip("Wall size in meters (before Road Scale): the wall's horizontal footprint, and at Wall Curve = 1 also its exact height — a perfect quarter circle of this radius.")]
+        [Range(24f, 48f)] public float WallHeight = 24f;
 
-        [Tooltip("Ratio of the road width kept flat in the center for stable driving.")]
-        [Range(0.1f, 0.7f)] public float CenterFlatWidthRatio = 0.35f;
+        [Tooltip("Wall bend 0..1. 0 = walls lie flat as straight extensions of the center floor. 1 = perfect quarter circle: vertical tip, exactly Wall Height tall. In between the wall is a circular arc over the same footprint (tip height = WallHeight × tan(curve × 45°)).")]
+        [Range(0f, 1f)] public float WallCurve = 1f;
 
-        [Tooltip("How aggressively the sides curve upward (higher = flatter center, steeper late rise).")]
-        [Range(0.2f, 2f)] public float WallCurveStrength = 0.75f;
-
-        [Tooltip("Maximum side wall tilt angle in degrees. Side height is clamped so the profile never exceeds this slope.")]
-        [Range(20f, 85f)] public float MaxWallAngle = 60f;
+        [Tooltip("Uniform scale on the whole cross-section (flat center, walls, safety lip and curl together). Keeps the authored ratio exact — the road just gets bigger.")]
+        [Range(1f, 5f)] public float RoadScale = 1f;
 
         [Tooltip("Height of the solid safety lip at the very top edge of the half-pipe (meters).")]
         [Range(0f, 4f)] public float SafetyLipHeight = 1f;
@@ -293,11 +290,10 @@ namespace TrackGeneration.Design
 
         public void Sanitize()
         {
-            RoadWidth = Mathf.Max(4f, RoadWidth);
-            HalfPipeSideHeight = Mathf.Max(0.5f, HalfPipeSideHeight);
-            CenterFlatWidthRatio = Mathf.Clamp(CenterFlatWidthRatio, 0.05f, 0.9f);
-            WallCurveStrength = Mathf.Clamp(WallCurveStrength, 0.1f, 3f);
-            MaxWallAngle = Mathf.Clamp(MaxWallAngle, 10f, 85f);
+            FlatCenterWidth = Mathf.Max(2f, FlatCenterWidth);
+            WallHeight = Mathf.Max(0.5f, WallHeight);
+            WallCurve = Mathf.Clamp01(WallCurve);
+            RoadScale = Mathf.Clamp(RoadScale, 0.25f, 5f);
             SafetyLipHeight = Mathf.Max(0f, SafetyLipHeight);
             ProfileResolution = Mathf.Clamp(ProfileResolution, 3, 96);
             TurnRoundingStrength = Mathf.Clamp01(TurnRoundingStrength);

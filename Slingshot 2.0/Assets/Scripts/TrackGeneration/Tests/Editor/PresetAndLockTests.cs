@@ -145,13 +145,13 @@ namespace TrackGeneration.Tests
             var settings = TrackStylePresetLibrary.Create(TrackStylePresetLibrary.Balanced);
             float originalBank = settings.Corners.MaxBankAngle;
             settings.Corners.MaxBankAngle = 55f;
-            settings.Road.RoadWidth = 40f;
+            settings.Road.FlatCenterWidth = 40f;
 
             var locks = new SettingsLockState { RoadShape = true };
             PresetApplicator.ResetUnlockedGroups(settings, locks);
 
             Assert.AreEqual(originalBank, settings.Corners.MaxBankAngle, 0.01f, "Unlocked group was not reset.");
-            Assert.AreEqual(40f, settings.Road.RoadWidth, 0.01f, "Locked group was reset.");
+            Assert.AreEqual(40f, settings.Road.FlatCenterWidth, 0.01f, "Locked group was reset.");
         }
     }
 

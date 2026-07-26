@@ -115,7 +115,7 @@ namespace TrackGeneration.Tests
             var config = AssetDatabase.LoadAssetAtPath<TrackConfig>(configPath);
             Assert.IsNotNull(config, $"Missing project config at {configPath}.");
             EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
-            var generator = Object.FindFirstObjectByType<TrackGenerator>();
+            var generator = Object.FindAnyObjectByType<TrackGenerator>();
             Assert.IsNotNull(generator, $"No TrackGenerator found in {scenePath}.");
 
             var result = TrackGenerationTestUtil.Generate(generator.Designer.Clone(), reportedSeed, config);
@@ -140,7 +140,7 @@ namespace TrackGeneration.Tests
             var config = AssetDatabase.LoadAssetAtPath<TrackConfig>(configPath);
             Assert.IsNotNull(config);
             EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
-            var generator = Object.FindFirstObjectByType<TrackGenerator>();
+            var generator = Object.FindAnyObjectByType<TrackGenerator>();
             Assert.IsNotNull(generator);
 
             var result = TrackGenerationTestUtil.Generate(generator.Designer.Clone(), reportedSeed, config);

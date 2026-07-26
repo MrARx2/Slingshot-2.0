@@ -1,0 +1,481 @@
+HOVERCRAFT V2 - PHYSICS SYSTEMS VERIFICATION REPORT
+====================================================
+
+Generated 2026-07-23. Verification-only audit; NO craft behavior was changed.
+Evidence base: seven code-trace audits across Assets/Scripts/Hovercraft_Setup/,
+Assets/Scripts/World/, Assets/Scripts/TrackGeneration/; prefab/scene YAML
+extraction; the exported config hovercraft_v2.json (2026-07-23 14:37 UTC);
+project settings.
+
+Status legend (from the spec):
+  F  = Exists and functions
+  I  = Exists but incomplete
+  NA = Exists but not active
+  HC = Exists but hardcoded
+  NC = Exists but not configurable
+  NE = Exists but not exported
+  DX = Exists but diagnostics incorrect
+  BD = Exists but behavior differs from naming/Inspector
+  M  = Missing entirely
+  UV = Unable to verify
+
+====================================================
+12.1 EXECUTIVE SUMMARY
+====================================================
+
+EXISTS AND WORKS: a fully force-based craft (zero kinematic writes; every
+effect traced to AddForce/AddForceAtPosition/AddTorque), hard-limit thruster
+hardware in true newtons, hover PD with curvature feed-forward and landing
+damping, surface-alignment torque with predictive look-ahead (works airborne),
+yaw damping, traction/drift profile blending, overcharge charge/burst, energy
+budget with per-channel accounting, isotropic quadratic drag, wing downforce
+(airborne-capable), ground effect, config export/import with change logging,
+computed diagnostics.
+
+EXISTS BUT INCOMPLETE/MISLEADING: several tuning fields are dead headroom
+above the throttle=1 hard clamp (hoverMaxThrottle 2.25, roofStabilizerMax-
+Throttle 10, minBurstThrottle 10 / maxBurstThrottle 50, forceMultiplier > 1);
+priority power distribution is ON but selects nothing because both protect
+flags are OFF; roof diagnostics read 0 in edit mode; strafe diagnostics report
+installed capacity (2,000,000 N) not usable one-direction force (<=1,000,000 N).
+
+INACTIVE / NOT INSTALLED: WorldAtmosphere (script exists, not in scene ->
+Earth defaults), CraftDebugHUD (not in scene), SectionAdaptiveSuspension (not
+on craft), boost pads (no force code at all), gravity zones (craft doesn't
+implement the receiver interface), SceneBootstrapper's physics materials (test
+scene only).
+
+GENUINELY MISSING: physics materials on craft & generated track (engine
+defaults, 0.6 friction), any collision/contact behavior code, directional
+drag, center of pressure & aerodynamic torque, lift/angle-of-attack, explicit
+craft-dimension fields, explicit COM/ballast tooling, per-axis inertia
+control, thermal/duty-cycle systems, per-node thruster response times, energy
+storage (battery).
+
+BIGGEST SURPRISE: the 10,000 kg / 500 kN "current state" exists ONLY as
+unsaved editor tuning - the prefab and scene on disk still hold the older
+values. The exported JSON in Downloads is currently the only persistent record
+of that tuning (see 12.4).
+
+WHAT BLOCKS THE MEDIUM-BASELINE TUNING PASS: dimension/COM/inertia decisions
+(Part 1 items are all implicit today), the dead-headroom throttle fields (they
+make Inspector numbers lie), the 4-node hardcode (blocks adding hover nodes),
+and diagnostics corrections (12.7) so the numbers you tune against are
+trustworthy.
+
+====================================================
+12.2 VERIFICATION MATRIX
+====================================================
+Columns: System | Status | Where found | Active? | Configurable? | Exported? |
+Diagnostics correct? | Notes
+
+--- PART 1: PHYSICAL SCALE AND BODY ---
+
+1.1 Explicit craft dimensions | M | computed only: CraftConfigManager.Capture-
+Dimensions + diagnostics | - | no | record-only | world-AABB caveat |
+No authoritative fields; source of truth = 2x0.5x3 BoxCollider + node
+positions. Nothing auto-updates on visual rescale (visual "Meshy" mesh scale
+189.27 is cosmetic only).
+
+1.2 Collider structure | F (single box, undocumented) | prefab root
+BoxCollider 2x0.5x3, center (0,0,0) | yes | prefab only | record-only | yes |
+One collider total; no compound layout; no triggers on craft; no layer
+effects; legacy visual cubes inactive with colliders destroyed at creation.
+
+1.3 Explicit COM / ballast | I | Rigidbody automaticCenterOfMass=true; config
+rigidbody section supports manual COM | auto only | via config/inspector |
+yes | COM reported ~(0,0,0); UV in edit mode | Export+import+runtime support
+exists (CraftConfigManager.ApplyRigidbody); NO ballast/per-part mass system;
+nothing on the craft uses a manual COM today.
+
+1.4 Inertia tensor | I | automaticInertiaTensor=true (from the single box);
+config supports manual tensor+rotation | auto only | via config/inspector |
+yes | not surfaced in diagnostics | Unity derives pitch/yaw/roll inertia
+purely from the 2x0.5x3 box + mass; no other system modifies it; no per-axis
+scaling exists.
+
+--- PART 2: SURFACE CONTACT AND PHYSICS MATERIALS ---
+
+2.1 Craft physics material | M | none - collider m_Material {fileID: 0} |
+- | - | not exported (gap) | flagged in first audit | Unity defaults:
+friction 0.6/0.6, bounce 0, Average combine.
+
+2.2 Track physics materials | M | BoxPrismTrackMeshBuilder.cs:285-286 creates
+bare MeshColliders (only track collider; 5 m shell, 2000-ring chunks) | - |
+- | - | - | Zero .physicMaterial assets in project; SceneBootstrapper's
+runtime materials (ground 0.3 / craft 0.15-Minimum) apply to its test scene
+only, never to generated track.
+
+2.3 Contact-friction behavior | M | exhaustive grep: no OnCollision*, no
+ContactModify, no scrape/adhesion/impact code anywhere | - | - | - | - |
+Contact handling = raycast telemetry only; friction affects the craft only
+during physical scrapes, at default 0.6.
+
+--- PART 3: HOVER SYSTEM ---
+
+3.1 Hover force tiers | I / HC | HoverStabilizerArray + ThrusterNode.maxForce
+| yes | partly | yes | partly | One maxForce serves equilibrium, suspension,
+curvature, landing, emergency, burst. No continuous/burst/thermal ratings.
+Tiering exists only as DEMAND math (Kp/Kd/curvature/damping) that all funnels
+into the same clamped throttle.
+
+3.2 Throttle saturation | BD | clamps at EnergyCore saturation scales,
+EnergyCore final Min(1,...), ThrusterBus.cs:346, ThrusterNode
+(Min(Throttle,1) x maxForce; power draw also clamped) | yes | - | - | ghost
+bars show saturated demand | See 12.6 table. Values > 1 are never meaningful
+at the hardware; forceMultiplier > 1 moves the saturation point only.
+
+3.3 Four-node assumptions | HC | HoverStabilizerArray "4f" at curvature
+(~1324), damper (~1337-1339), anti-launch (~1389); explicit FL/FR/RL/RR node
+fields; front/rear + left/right pair logic throughout; ComputeGravityThrottle
+uses actual valid-node count (OK) | yes | no | - | - | 5th/6th node: bus +
+energy + diagnostics handle it; stabilizer PD would over-estimate per-node
+share (forces mis-scaled by 4/N) and the new node would get no PD drive (only
+the 4 named corner fields are driven). Fix derivable from HoverNodes.Count
+without changing 4-node behavior.
+
+3.4 Lost-ground behavior | F | ThrusterNode.CastGroundRay miss ->
+IsGrounded=false, GroundDistance=-1, Normal=up; consumers gate on it | yes |
+partly | - | - | No stale compression/distance reuse; no integral state;
+throttle VALUE decays via smoothing at 32/s (< ~100 ms) - the only force-
+without-surface window, by design (anti-pop). Roof stabilizer hard-gates on
+surface contact.
+
+3.5 Hover height / probe geometry | F | hoverHeight 3, groundDetectionRange 6,
+activation/full-power buffers 1.25/0.25, groundedContactDistance auto (3.25)
+| yes | yes | yes | yes | All independently configurable; probes are raycasts
+(no radius/spherecast option - probe type/radius: MISSING). Coherence: nodes
+at y -0.2, collider bottom -0.25 -> ~2.95 m clearance; detection 6 m >
+height 3 + buffer 1.25 OK.
+
+--- PART 4: THRUSTER HARDWARE ---
+
+4.1 Thruster ratings | M (beyond maxForce) | ThrusterNode | - | - | yes | - |
+Only maxForce + efficiency + powerDrawMultiplier. No continuous/burst/
+emergency/thermal/duty/damage ratings.
+
+4.2 Per-node response time | M (except drive) | DriveCore.throttleRampSpeed 3
+(main+brake, shared); hover smoothing lives in the CONTROLLER
+(hoverThrusterResponseSpeed etc.), not the node | drive only | drive only |
+yes | - | Strafe (VectorThrusterArray), attitude Q/E, overcharge burst:
+instantaneous. No per-node ramp fields exist.
+
+4.3 Positions as physical inputs | F | ThrusterNode.ApplyThrust ->
+AddForceAtPosition (torque from placement is real) | yes | prefab only |
+record-only | used for footprint/lever arms | Confirmed: config records
+positions, never applies them; no symmetry validation on import (diagnostics
+warn on lateral asymmetry only); no dedicated editing tool.
+
+4.4 Labels & bus registration | BD / DX | Roof labels duplicate Hover labels
+(prefab); roof nodes absent from serialized bus list; autoDiscover adds them
+at Awake | runtime yes | - | thrusters array: yes; busEntry: missing for
+roof | roofTotalForceN=0 EXPLAINED | Root cause: diagnostics iterate
+bus.thrusters (serialized = 10 entries, no roof) in edit mode. Runtime: roof
+nodes work (discovered; hierarchy order keeps hover-first so
+FindByLabel("Hover_*") still resolves to hover nodes - fragile). No duplicate
+registration; per-entry multipliers exist only for serialized entries.
+
+--- PART 5: PROPULSION / BRAKING / STRAFE ---
+
+5.1 Main propulsion | F / I | one Main node (100 kN prefab / 500 kN unsaved),
+DriveCore | yes | yes | yes | yes | Multiple mains supported by role summation
+(bus/energy/diagnostics) but DriveCore wires exactly one mainThruster by
+label. No speed-dependent thrust, no atmospheric effect on thrust, no damage
+model. Reverse from main = none (Clamp01).
+
+5.2 Braking | F / I | Brake_Front thruster only (DriveCore); + passive: aero
+drag 1/2*rho*v^2*CdA; traction coastingGrip 0.25 /s; longitudinalGrip opposes
+counter-trajectory motion | yes | yes | yes | partly | Brake 40 kN = 8% of
+500 kN main (export) -> 4 m/s^2; drag at 300 km/h ~6.4 kN (0.64 m/s^2) at
+CdA 1.5; coasting grip ~0.25*v m/s^2 (21 m/s^2 at 300 km/h - actually the
+dominant decel). No added damping/velocity cancellation. Brake is also the
+only reverse producer (fires from standstill, no speed gate); W->S
+transitions can overlap both thrusters ~1/3 s (shared ramp).
+
+5.3 Strafe accounting | DX (naming) | VectorThrusterArray.cs:169-203;
+geometry: left pair pushes right, right pair pushes left | yes | yes | yes |
+misleading | LEFT input fires FR+BR; RIGHT fires FL+BL; YAW fires diagonals
+(FL+BR or FR+BL) - a pure couple. One-direction usable ceiling = 2 nodes =
+50% of installed (1,000,000 N of the reported 2,000,000); at current tuning
+0.75 throttle -> 750 kN; yaw couple <= 2 x maxForce x 1.1 m. Diagnostics
+report installed capacity - needs renaming + a per-direction figure.
+
+--- PART 6: GRAVITY / DOWNFORCE / AIRBORNE ---
+
+6.1 Extra gravity | F / BD | CraftCore.FixedUpdate: AddForce(Vector3.down x
+extraGravity, Acceleration) - world-down, mass-independent, always on
+(grounded + airborne), skipped only if <= 0 | yes | yes | yes | included in
+effectiveWeight | Current 25 m/s^2 (unsaved; scene on disk = 75, prefab = 0).
+Effect at 10 t: +250 kN constant world-down pull = 3.55x real gravity total;
+hover pays for it (equilibrium throttle 0.174 instead of 0.049); it fights
+the "no fake multipliers" direction.
+
+6.2 Aerodynamic drag | F | CraftAerodynamics.ApplyDrag: F = 1/2 * rho * v^2 *
+CdA * mult opposing the FULL velocity vector, AddForce at COM, no torque, no
+clamp, gated at speed >= 0.5 m/s | yes | yes | yes | top-speed estimate
+correct for straight-line | Isotropic by design (single CdA 1.5); rho from
+WorldAtmosphere (defaults - none in scene).
+
+6.3 Directional drag | M | - | - | - | placeholder only | - | No frontal/
+side/vertical/reverse split, no angle-of-attack.
+
+6.4 Wing downforce | F | CraftAerodynamics.ApplyDownforce: F = 1/2 * rho *
+v_planar^2 * ClA(2) * mult along MINUS transform.up; planar speed = velocity
+projected off craft-up; works airborne, no ground needed | yes | yes | yes |
+yes | Inverted flight: force pushes toward the craft's belly-side sky - i.e.
+it reverses with the craft (correct wing physics; no auto-flip). Applied at
+COM: no reference area separate from Cl*A, no center of pressure, no pitch
+torque. Capped only via combined maxDownforceG.
+
+6.5 Ground effect | F / I | same method: F = 1/2 * rho * v_planar^2 * ClA(2)
+* mult * groundedFactor along MINUS telemetry.groundNormal | yes | yes | yes
+| yes | Distance falloff = smoothed groundedFactor (binary-ish, rise 12/s
+fall 10/s), not a continuous height curve; range = grounded cushion (contact
+distance 3.25 m); works on walls/loops/inverted because groundNormal resolves
+there; it is aerodynamic downforce along the normal, not suction (needs
+planar speed > 1 m/s); overlaps hover suspension load and curvature
+compensation by design (they must pay for it).
+
+6.6 Center of pressure / aero torque | M | all aero via AddForce at COM | - |
+- | - | - | No CP, no aero pitch/yaw/roll torque, no weathercock/velocity-
+alignment torque, no spin recovery.
+
+6.7 Lift / angle of attack | M (V3) | - | - | - | - | - | No lift, no AoA,
+no stall; jump trajectory unaffected by pitch (except wing downforce
+direction following craft-up).
+
+--- PART 7: STABILIZATION ---
+
+7.1 Stabilizer force paths | F | see 12.3 | yes | yes | yes | - | Fully
+traced; every path force/torque-based. Surface alignment: AddTorque
+Acceleration, cap maxSurfaceAlignTorque x stiffness. Roll/pitch: hover height
+offsets (forces). Yaw damping: AddTorque Acceleration, always on. Roof
+stabilization: thruster forces, gated on surface contact. Air control: hover-
+node force differentials. Auto-level: height offsets inside grounded PD only.
+
+7.2 Airborne stabilizer authority | I / BD | no explicit airborne authority
+value; emergent mix | yes | partial | yes | - | Armed + airborne: alignment
+torque still fires ONLY when predictive probes hit an upcoming surface
+(weight = surfaceLookAheadBlend-scaled; gate at HoverStabilizerArray:956-963);
+NO self-level toward world-up exists (airborne base target is the craft's own
+up); manual air control = hover-node force differentials capped by
+maxLeanBias x airRoll/PitchAuthority; yaw damping always on.
+
+7.3 Torque inertia-independence | BD (intentional) | HSA:1032 and VTA:270
+both ForceMode.Acceleration | yes | - | - | - | Both torques ignore mass AND
+inertia - effectively angular-acceleration commands; craft size/mass do not
+change rotation response. Thruster placement torques (AddForceAtPosition,
+Force mode) DO scale with mass/inertia. Mixed model, currently intentional.
+
+--- PART 8: ENERGY ---
+
+8.1 Energy limitation | F | EnergyCore.ResolvePower: per-node saturation ->
+channel demand (power = throttle x maxForce x 0.001 / efficiency) -> budget
+1500 -> per-channel scales -> granted throttle | yes | yes | yes | HUD group
+bars correct | Energy CAN reduce hover: with protect flags off, hover shares
+proportionally - full main (500) + strafes (up to ~900) + hover equilibrium
+(348) can exceed 1500 -> hover scaled -> sag. Protected-channel saturation
+ordering (hover-first on shared nodes) is implemented but INACTIVE while
+protect flags are off.
+
+8.2 Priority distribution | NA / BD | priorityPowerDistribution=true but
+protectBaseHover/protectStabilizer=false | no | yes | yes | overload01
+correct | With both flags off, priority mode selects ZERO channels -> pure
+proportional sharing; vectoringPriorityBias 1.35 still weights steering up
+inside the shared pool (that part works); overcharge charging and roof
+stabilization can starve hover under overload.
+
+8.3 Energy / heat / duty | M (beyond budget) | EnergyCore is a per-tick power
+cap, not storage | - | - | - | - | No battery, no recharge state, no heat, no
+cooling, no duty cycles, no reserve. "Total Power Output does not drain" per
+its own tooltip.
+
+--- PART 10: COMPONENTS NOT ACTIVE ON THE CRAFT ---
+
+WorldAtmosphere        | script exists | not in scene | effect if enabled:
+tunable rho/multipliers (defaults identical until changed) | never added.
+CraftDebugHUD          | script exists | not in scene | F2 debug + per-
+thruster force panel | never added to scene.
+SectionAdaptiveSuspension | script exists | not on craft | per-section
+suspension multipliers (needs TrackSectionSensor) | not wired.
+CraftConfigManager + diagnostics | script exists | ON PREFAB (evidenced by
+the export) | installed OK.
+Ballast/COM tool, inertia tool, physics-material tool, dimension component,
+aero debug component | DO NOT EXIST (missing, not inactive).
+Force-vector gizmos    | partial: CraftConfigManager.OnDrawGizmosSelected
+(COM/bounds/nodes/thrust directions) + ThrusterNode's own selected gizmo.
+BoostPadActor          | script exists | spawned by track | NOTHING happens -
+no OnTrigger/force code exists; dead gameplay.
+GravityZone/GravityField | scripts exist | spawned by track | forces only on
+IGravityReceiver; the craft does NOT implement it -> no effect on craft.
+
+====================================================
+12.3 CURRENT PHYSICAL IDENTITY (unsaved live state)
+====================================================
+
+- Mass 10,000 kg; angular damping 0 (was 2 on disk), linear damping 0; COM &
+  inertia AUTOMATIC from the single 2x0.5x3 m root BoxCollider. Continuous
+  Dynamic, Interpolate, 100 Hz physics.
+- Dimensions: collider 2.49x0.5x3.30 m world-AABB at export pose (craft yawed
+  10 deg; true local 2x0.5x3); visual bounds 2.81x0.83x3.91 m; hover
+  footprint 1.6x2.2 m; target clearance 3 m (hoverHeight).
+- Effective gravity: 9.81 (project) + 25 (extraGravity, world-down, mass-
+  independent, always on) = 34.81 m/s^2 -> effective weight 348,100 N.
+- Installed forces (true newtons, hard-clamped at throttle 1): 4x hover
+  500 kN (2 MN total; equilibrium throttle 0.174, reserve 4.75x effective
+  weight); 4x roof 500 kN; main 500 kN (50 m/s^2, TWR 5.1); brake 40 kN
+  (4 m/s^2); 4x strafe 500 kN installed / <= 1 MN usable per lateral
+  direction / <= 1.1 MN*m yaw couple.
+- Aero: rho 1.225 (defaults; no WorldAtmosphere in scene), isotropic drag
+  CdA 1.5 (drag-limited top speed ~ sqrt(2*500000/(1.225*1.5)) ~ 738 m/s ~
+  2656 km/h at current thrust - drag is no longer the practical limiter,
+  power is), wing Cl*A 2 along -craft-up (airborne too), ground effect Cl*A 2
+  along -groundNormal x groundedFactor, combined clamp 6 g (= 588.6 kN at
+  10 t).
+- Energy: budget 1500 units/tick; cost 0.001/N; NO priority active (both
+  protect flags off); full-load demand (hover equilibrium 348 + main 500 +
+  strafe + roof/overcharge) exceeds budget -> proportional scaling, hover
+  included.
+- Contact: default friction 0.6 everywhere (no physics materials); no
+  collision-event code; boost pads and gravity zones do not act on the craft.
+
+====================================================
+12.4 PREFAB vs SCENE vs EXPORT DIFFERENCES
+====================================================
+
+Value               | First audit | Prefab (disk) | Scene (disk)      | Export (live)
+--------------------|------------:|--------------:|------------------:|-------------:
+Mass                |       1,000 | 1,000 (same)  | -                 | 10,000
+Angular damping     |           2 | 2             | -                 | 0
+Hover maxForce x4   |      40,000 | 40,000        | -                 | 500,000
+Roof maxForce x4    |      40,000 | 40,000        | -                 | 500,000
+Main maxForce       |     100,000 | 100,000       | forceMult 1.5 (no peak effect) | 500,000
+Brake maxForce      |      40,000 | 40,000        | -                 | 40,000
+Strafe maxForce x4  |      30,000 | 30,000        | -                 | 500,000
+extraGravity        |  0 (prefab) | 0             | 75                | 25
+totalPowerOutput    | 100 (prefab)| 100 (UV this pass) | -            | 1500
+
+CAUSE: the prefab and scene FILES ON DISK ARE UNCHANGED since the first
+audit. Every difference in the export comes from MANUAL INSPECTOR TUNING
+AFTER THE FIRST AUDIT THAT HAS NOT BEEN SAVED (or was applied in play mode).
+Evidence: prefab YAML grep (mass 1000, old forces), scene grep (extraGravity
+still 75 on disk vs 25 exported), and the export's roof nodes having NO
+busEntry - the serialized bus list still lacks roof entries, proving the
+export ran against edit-mode component state, not a runtime-discovered bus.
+Not a stale audit, not a config import, not a different craft.
+
+WARNING: if the scene/prefab isn't saved, the 10 t / 500 kN state lives only
+in Downloads/hovercraft_v2.json (which can restore it via Import).
+
+====================================================
+12.5 MISSING SYSTEMS
+====================================================
+
+1. Physics materials (craft + generated track) - wall scrapes at default 0.6
+   friction grab violently at speed; landing bounce undefined. V2. Needed
+   before medium baseline: YES.
+2. Explicit dimensions / authoritative size fields - "resize the craft"
+   currently means hand-editing collider + 14 node positions + visual scale
+   with nothing linked. V2 decision. Needed: YES (decision).
+3. COM/ballast control - weight distribution is a stated design goal; COM
+   currently locked to collider center. V2. Needed: YES.
+4. Per-axis inertia / inertia policy - rotation feel currently from a
+   2x0.5x3 box; torques bypass inertia anyway (Acceleration mode) - decide
+   which model wins. V2 decision. Needed: YES (decision).
+5. Thruster continuous/burst/duty ratings - one maxForce serves 8 roles;
+   headroom philosophy currently unenforceable per-rating. V2/V3.
+6. Per-node response time - only main/brake ramp; strafe/attitude/burst are
+   instant. V2 (feel).
+7. Directional drag - side-slides brake like head-on airflow. V3.
+8. Center of pressure + aero torque, lift/AoA, weathercock - high-speed
+   flight realism, spin recovery. V3.
+9. Heat / duty cycle / battery storage - strategic energy gameplay. V3.
+10. Contact behavior (scrape damage, boost pad force, gravity on craft) -
+    boost pads & gravity zones are built but inert on the craft. V2 gameplay
+    (cheap wins).
+
+====================================================
+12.6 MISLEADING OR NONFUNCTIONAL CONTROLS
+====================================================
+
+Field (current value)            | Suggests            | Actually does
+---------------------------------|---------------------|------------------------------
+hoverMaxThrottle = 2.25          | hover pushes 2.25x  | clips at 1.0 at the node
+roofStabilizerMaxThrottle = 10   | 10x roof authority  | acts as 1.0
+minBurstThrottle 10 / max 50     | burst scales w/charge| both clamp to 1.0 - charge changes only duration (0.2 -> 0.5 s)
+ThrusterBus forceMultiplier 1.5  | +50% thrust         | peak unchanged; only saturates at lower input
+masterThrottleMultiplier 0-2     | up to 2x            | > 1 never raises peak force
+priorityPowerDistribution = true | hover protected     | selects nothing while both protect* flags are false
+maxSpeedStiffness 3 / maxCurvatureAccel 4000 | 3x stiffening, 4000 m/s^2 | clips at throttle 1: curvature support caps at 4 x 50 = 200 m/s^2 (5% of configured)
+emergencyCatchStartSpeed 6/15    | catch beyond full power | bypasses smoothing only; force still <= maxForce (arrest <= ~2 m/s per tick at current state)
+steeringYawAuthority 2.25        | 2.25x steering      | with steerSensitivity 0.2, max corner demand = 0.45 -> uses <= 45% of strafe hardware for yaw; mostly reshapes the curve
+strafeTotalForceN (diagnostics)  | usable side force   | installed capacity; usable one-direction <= 50%
+roofTotalForceN = 0 (diagnostics)| no roof thrusters   | edit-mode artifact (serialized bus lacks roof); roof works at runtime
+Roof node labels = "Hover_*"     | roof identity       | duplicate labels; FindByLabel works by hierarchy-order luck
+TractionState.Normal fallback    | current defaults    | drifted duplicate (carveBite 1 vs tuned 5); used only if TractionCore absent
+extraGravity (25 live/75 scene/0 prefab) | gravity setting | non-physical world-down accelerator, always on, hover must pay for it
+Config thrusters[].localPosition | applied on import   | record-only by design (mismatch logged)
+angularDamping 0 (live) vs 2 (disk) | -               | unsaved change; yaw damping separately provided by VectorThrusterArray
+
+====================================================
+12.7 DIAGNOSTIC CORRECTIONS NEEDED (later)
+====================================================
+
+1. roofTotalForceN - count from child ThrusterNodes (or EnsureInitialized)
+   instead of the serialized bus list. (Broken in edit mode)
+2. strafeTotalForceN - rename to strafeInstalledForceN; add
+   strafeUsableOneDirectionN (2 nodes x maxForce x tuning) and yawCoupleNm.
+   (Correct but misleading)
+3. Ratio naming - hover.forceToWeightRatio divides by EFFECTIVE weight (incl.
+   extraGravity) while forceRatios.*ToWeight divide by REAL weight. Name both
+   explicitly. (Ambiguously named)
+4. Acceleration/braking estimates - also note they ignore the POWER budget
+   (full main throttle alone costs 500/1500 units; combined load power-limits
+   real acceleration). (Missing context)
+5. Braking estimate ignores coasting-grip decel (0.25*v - dominant at speed)
+   and drag. (Missing context)
+6. Top-speed estimate is straight-line, isotropic-drag, power-unlimited.
+   (Label it)
+7. centerOfMassLocal_m with automatic COM in edit mode - verify against play
+   mode; may read stale/zero. (UV -> label "automatic (derived)")
+8. worldAabbSize_m rotates with the craft (export shows 2.49x3.30 for the
+   2x3 collider at 10 deg yaw) - compute in root-local space. (Misleading)
+9. Add roof capacity + brake-vs-main + power-vs-demand warnings (brake at 8%
+   of main deserves a warning; nothing fires today).
+
+====================================================
+12.8 RECOMMENDED DECISION ORDER
+====================================================
+
+1.  SAVE OR DISCARD the current unsaved tuning (10 t / 500 kN / extraGravity
+    25). Everything below assumes a known baseline on disk.
+2.  Craft dimensions & visual identity - declare authoritative length/width/
+    height for the medium craft; decide whether collider drives dimensions or
+    vice versa.
+3.  Collider layout - single box vs compound shell matching the visual; this
+    fixes automatic COM/inertia inputs.
+4.  Center of mass policy - automatic vs manual + ballast; place it
+    deliberately (COM height drives roll/pitch feel and hover lever arms).
+5.  Inertia policy - automatic vs manual tensor; AND decide whether
+    alignment/yaw torques stay Acceleration (size-independent feel) or become
+    Force (physical). This changes how mass/size feel for every craft class.
+6.  Baseline mass (medium ~7.5 t per spec) and gravity policy - with wing
+    downforce working, decide extraGravity's fate (0 for pure physics, or a
+    small documented assist).
+7.  Hover force architecture - set hover maxForce from desired equilibrium
+    throttle (~0.3-0.5) + reserve; fix the 4-node hardcode before adding
+    nodes.
+8.  Thruster ratings - continuous vs burst semantics (or explicitly accept
+    clamp-at-1 and retire the dead > 1 fields).
+9.  Propulsion/brake/strafe targets - TWR, stopping distance (brake is 8% of
+    main today), usable lateral g.
+10. Directional aero & center of pressure (V3 gate) - only after 1-9.
+11. Stabilizer authority normalization - re-tune stiffness/curvature/catch
+    numbers to live inside throttle <= 1 at the new masses.
+12. Energy priorities - re-enable protect flags (or redesign priority), set
+    budget vs full-load demand deliberately.
+13. Diagnostics cleanup - items in 12.7, so the tuning pass reads true
+    numbers.
+14. Craft-class variation - only after the medium baseline exists.
+
+END OF REPORT

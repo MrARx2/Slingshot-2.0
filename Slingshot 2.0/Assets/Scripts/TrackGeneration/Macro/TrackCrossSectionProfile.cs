@@ -80,17 +80,14 @@ namespace TrackGeneration.Macro
         [Tooltip("The global road shape. HalfPipe by default — FlatWithWalls is legacy/debug only.")]
         public RoadCrossSectionShape Shape = RoadCrossSectionShape.HalfPipe;
 
-        [Tooltip("How high the sides rise above the center floor (meters). Per-frame SideHeight overrides this when set.")]
-        public float SideHeight = 3.5f;
+        [Tooltip("Wall SIZE in meters: the wall's horizontal footprint, and at WallCurve = 1 also its exact height (quarter-circle radius). Per-frame SideHeight overrides this when set.")]
+        public float SideHeight = 24f;
 
-        [Tooltip("Curve power controlling how smoothly/aggressively the road curves upward (higher = flatter center, steeper sides).")]
-        public float CurveStrength = 0.75f;
+        [Tooltip("Wall bend 0..1. 0 = walls lie flat, straight extensions of the floor. 1 = perfect quarter circle (vertical tip). In between: a circular arc over the same footprint, tip height = SideHeight × tan(curve × 45°).")]
+        public float WallCurve01 = 1f;
 
-        [Tooltip("Maximum side wall tilt angle in degrees. Side height is clamped so the profile never exceeds this slope.")]
-        public float WallAngle = 55f;
-
-        [Tooltip("Ratio of the road width that stays flat in the center for stable driving.")]
-        public float CenterFlatWidthRatio = 0.35f;
+        [Tooltip("Ratio of the road width that stays flat in the center for stable driving. Derived by the resolver from FlatCenterWidth / (FlatCenterWidth + 2 × WallHeight).")]
+        public float CenterFlatWidthRatio = 0.25f;
 
         [Tooltip("Number of cross-section sample points per SIDE (total profile points = 2*resolution + 1). Points are distributed toward the curved walls, where the resolution is actually visible.")]
         public int ProfileResolution = 32;
@@ -120,45 +117,82 @@ namespace TrackGeneration.Macro
         };
 
         /// <summary>
-        /// Curve exponent from CurveStrength: strength 0.35 → gentle bowl (power ~1.6),
-        /// strength 1.5 → sharp late rise (power ~3.9). Power ≥ 1 keeps the center flat-ish.
-        /// </summary>
-        public float CurvePower => Mathf.Max(1.1f, 1f + CurveStrength * 2f);
-
-        /// <summary>
         /// Height of the rideable side profile at a normalized cross position.
         /// x in [-1, 1] (0 = center). Center stays AT baseline; sides rise upward.
         /// Never returns a negative value — no hidden dips below the section baseline.
         /// </summary>
         public float HeightAt(float normalizedX, float halfWidth, float sideHeight)
-            => HeightAt(normalizedX, halfWidth, sideHeight, Mathf.Clamp01(CenterFlatWidthRatio), CurvePower);
+            => HeightAt(normalizedX, halfWidth, sideHeight, Mathf.Clamp01(CenterFlatWidthRatio), WallCurve01);
 
-        /// <summary>Height with explicit flat ratio and curve power (dynamic turn rounding varies both per frame).</summary>
-        public float HeightAt(float normalizedX, float halfWidth, float sideHeight, float flat, float power)
+        /// <summary>
+        /// Circular-arc wall height with explicit flat ratio and wall curve (dynamic
+        /// turn rounding varies both per frame).
+        ///
+        /// The wall is a CIRCULAR ARC of sweep θ = curve·90° spanning the rising span
+        /// E = halfWidth·(1−flat): radius r = E/sinθ, h(x) = r − √(r² − x²). When
+        /// sideHeight == E (the resolver guarantees this at the designed width) the
+        /// wall is a true circle — at curve 1 a perfect quarter circle with a vertical
+        /// tip. Frames with boosted/overridden side heights scale the arc vertically
+        /// (a quarter ellipse), keeping the same footprint and flat-tangent base.
+        /// </summary>
+        public float HeightAt(float normalizedX, float halfWidth, float sideHeight, float flat, float curve01)
         {
             if (!IsHalfPipe || sideHeight <= 0f) return 0f;
 
             float absX = Mathf.Abs(Mathf.Clamp(normalizedX, -1f, 1f));
             if (absX <= flat) return 0f;
 
-            float t = (absX - flat) / Mathf.Max(0.0001f, 1f - flat);
-            float h = Mathf.Pow(t, power) * ClampedSideHeight(halfWidth, sideHeight, flat, power);
-            return Mathf.Max(0f, h);
+            float curve = Mathf.Clamp01(curve01);
+            if (curve <= 0.0001f) return 0f; // flat wall: a straight extension of the floor
+
+            float t = (absX - flat) / Mathf.Max(0.0001f, 1f - flat); // 0..1 across the wall span
+            float theta = curve * Mathf.PI * 0.5f;
+            float sinT = Mathf.Sin(theta);
+
+            // Unit-footprint arc: r = 1/sinθ, h(t) = r − √(r² − t²), tip = tan(θ/2).
+            float r = 1f / sinT;
+            float unitH = r - Mathf.Sqrt(Mathf.Max(0f, r * r - t * t));
+
+            // Vertical scale so the designed wall (sideHeight == footprint) is a true
+            // circle and boosted walls become taller ellipses with the same footprint.
+            float footprint = Mathf.Max(0.01f, halfWidth * (1f - flat));
+            float scale = sideHeight * ShapeDepthScale / footprint;
+
+            return Mathf.Max(0f, unitH * footprint * scale);
+        }
+
+        /// <summary>Wall TIP height for the profile's own flat ratio and curve.</summary>
+        public float ClampedSideHeight(float halfWidth, float sideHeight)
+            => ClampedSideHeight(halfWidth, sideHeight, Mathf.Clamp01(CenterFlatWidthRatio), WallCurve01);
+
+        /// <summary>
+        /// Wall TIP height (name kept from the legacy wall-angle clamp API). The arc
+        /// model has no hidden clamps: tip = sideHeight·tan(θ/2) — exactly sideHeight
+        /// at full curve, smoothly down to 0 as the wall flattens.
+        /// </summary>
+        public float ClampedSideHeight(float halfWidth, float sideHeight, float flat, float curve01)
+        {
+            float curve = Mathf.Clamp01(curve01);
+            if (curve <= 0.0001f) return 0f;
+            return sideHeight * ShapeDepthScale * Mathf.Tan(curve * Mathf.PI * 0.25f);
         }
 
         /// <summary>
-        /// Side height clamped so the steepest profile slope never exceeds WallAngle.
-        /// Max slope of h = H·t^p over the rising span W·(1-flat) is p·H / (W·(1-flat)).
+        /// Wall tangent angle at the TIP (radians from horizontal), for the given
+        /// effective side height (frame override × wall multiplier). At full curve the
+        /// tip is exactly vertical for any positive height (a vertically scaled circle
+        /// keeps a vertical endpoint tangent).
         /// </summary>
-        public float ClampedSideHeight(float halfWidth, float sideHeight)
-            => ClampedSideHeight(halfWidth, sideHeight, Mathf.Clamp01(CenterFlatWidthRatio), CurvePower);
-
-        /// <summary>Clamped side height with explicit flat ratio and curve power.</summary>
-        public float ClampedSideHeight(float halfWidth, float sideHeight, float flat, float power)
+        public float TipTangentRad(float halfWidth, float effectiveSideHeight, float flat, float curve01)
         {
-            float risingSpan = Mathf.Max(0.01f, halfWidth * (1f - flat));
-            float maxBySlope = Mathf.Tan(Mathf.Clamp(WallAngle, 5f, 85f) * Mathf.Deg2Rad) * risingSpan / Mathf.Max(1.05f, power);
-            return Mathf.Min(sideHeight * ShapeDepthScale, maxBySlope);
+            float curve = Mathf.Clamp01(curve01);
+            if (curve <= 0.0001f || effectiveSideHeight <= 0f) return 0f;
+            if (curve >= 0.9999f) return Mathf.PI * 0.5f;
+
+            float theta = curve * Mathf.PI * 0.5f;
+            float footprint = Mathf.Max(0.01f, halfWidth * (1f - flat));
+            float scale = effectiveSideHeight * ShapeDepthScale / footprint;
+            return Mathf.Atan(Mathf.Tan(theta) * scale);
         }
 
         /// <summary>Total top-surface profile point count across the road width.</summary>

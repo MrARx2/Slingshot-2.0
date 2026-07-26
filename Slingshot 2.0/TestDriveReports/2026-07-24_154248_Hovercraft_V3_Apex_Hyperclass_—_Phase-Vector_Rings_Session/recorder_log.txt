@@ -1,0 +1,5 @@
+[8.37] Clearance model: hover-node to collider-bottom offset 0.465 m.
+[8.37] Operating-band scheme: ApexHyperclass (Continuous/Performance/Extreme/Emergency/Saturated), hover max command 5.
+[8.37] Load budget capacities: continuous 640000 N, high-load 1280000 N, emergency 4480000 N.
+[0.00] Recording started: mode StandardTestDrive, core 50 Hz.
+[101.23] Recording stopped: 101.2s, 5062 core frames, 197 events, 0 dropped, recorder overhead 0.019 ms/sampled step.

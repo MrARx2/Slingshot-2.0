@@ -47,6 +47,7 @@ public class TrackSectionSensor : MonoBehaviour
     private Transform _trackRoot;
     private float _totalLength;
     private float _nextAcquireAttempt;
+    private float _nextGlobalSearchTime;
 
     void Update()
     {
@@ -121,6 +122,12 @@ public class TrackSectionSensor : MonoBehaviour
         if (_sections != null && _sections.Count > 0 && _trackRoot != null)
             return true;
 
+        // Track root destroyed (regeneration): invalidate immediately so the
+        // acquire throttle below doesn't blank the sensor for up to a second
+        // after every regen.
+        if (_sections != null && _trackRoot == null)
+            InvalidateTrack();
+
         if (Time.unscaledTime < _nextAcquireAttempt)
             return false;
 
@@ -148,9 +155,15 @@ public class TrackSectionSensor : MonoBehaviour
 
     private void AdoptTrack(IReadOnlyList<GeneratedTrackSection> sections, Transform root)
     {
+        float totalLength = sections[sections.Count - 1].EndFrame.ArcLength;
+
+        // A degenerate track would poison the wrap math: Mathf.Repeat(x, 0) is NaN.
+        if (totalLength <= 0.01f)
+            return;
+
         _sections = sections;
         _trackRoot = root;
-        _totalLength = sections[sections.Count - 1].EndFrame.ArcLength;
+        _totalLength = totalLength;
         HasTrack = true;
         IsTracking = false;
     }
@@ -187,6 +200,14 @@ public class TrackSectionSensor : MonoBehaviour
         }
         else
         {
+            // A global search projects the craft onto EVERY segment of every
+            // section — thousands of dot products on a km-scale track. While
+            // continuously lost (long jumps, respawns, pre-acquire) a few Hz is
+            // plenty; the craft re-latches within 0.2 s of coming back in range.
+            if (Time.unscaledTime < _nextGlobalSearchTime)
+                return;
+
+            _nextGlobalSearchTime = Time.unscaledTime + 0.2f;
             SearchNearestFrame(localPosition, 0f, float.PositiveInfinity, out bestArc, out bestDistanceSqr);
         }
 

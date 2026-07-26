@@ -55,6 +55,9 @@ public class SectionAdaptiveSuspension : MonoBehaviour
         new SectionTuning { sectionType = TrackMacroSectionType.BankedHairpin, stiffnessMultiplier = 1.15f, dampingMultiplier = 1.1f,  alignmentMultiplier = 1.3f },
         new SectionTuning { sectionType = TrackMacroSectionType.HalfLoopTwist, stiffnessMultiplier = 1.3f,  dampingMultiplier = 1f,    alignmentMultiplier = 1.6f,  extraNoseUpDegrees = 1.5f },
         new SectionTuning { sectionType = TrackMacroSectionType.Spiral,        stiffnessMultiplier = 1.15f, dampingMultiplier = 1f,    alignmentMultiplier = 1.3f },
+        // RotationalEvent is how the CURRENT generator emits all loops, corkscrews
+        // and half-loops — without this entry, generated tracks get no tuning at all.
+        new SectionTuning { sectionType = TrackMacroSectionType.RotationalEvent, stiffnessMultiplier = 1.3f, dampingMultiplier = 1f,   alignmentMultiplier = 1.55f, extraNoseUpDegrees = 1.5f },
     };
 
     [Header("Blending")]
@@ -107,6 +110,14 @@ public class SectionAdaptiveSuspension : MonoBehaviour
         {
             if (tuning != null) _tuningByType[tuning.sectionType] = tuning;
         }
+
+        // Scenes serialized before the generator switched to RotationalEvent carry
+        // only the legacy Loop entry — alias it so generated tracks still tune.
+        if (!_tuningByType.ContainsKey(TrackMacroSectionType.RotationalEvent) &&
+            _tuningByType.TryGetValue(TrackMacroSectionType.Loop, out SectionTuning legacyLoop))
+        {
+            _tuningByType[TrackMacroSectionType.RotationalEvent] = legacyLoop;
+        }
     }
 
     private void Update()
@@ -134,7 +145,11 @@ public class SectionAdaptiveSuspension : MonoBehaviour
             float orientation01 = Sensor.GetOrientationWeight(orientationBlendInDistance, orientationBlendOutDistance);
             if (orientation01 > 0.001f)
             {
-                SectionTuning loop = _tuningByType.TryGetValue(TrackMacroSectionType.Loop, out SectionTuning l) ? l : null;
+                // Generated tracks emit orientation sections as RotationalEvent;
+                // fall back to the legacy Loop entry for hand-built content.
+                SectionTuning loop =
+                    _tuningByType.TryGetValue(TrackMacroSectionType.RotationalEvent, out SectionTuning rotational) ? rotational
+                    : _tuningByType.TryGetValue(TrackMacroSectionType.Loop, out SectionTuning l) ? l : null;
                 if (loop != null)
                 {
                     stiffness = Mathf.Max(stiffness, Mathf.Lerp(1f, loop.stiffnessMultiplier, orientation01));

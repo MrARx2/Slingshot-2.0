@@ -197,8 +197,12 @@ namespace TrackGeneration.Macro
 
         // PhysX's BVH34 midphase is broken above 2,097,152 (2^21) triangles per mesh —
         // Unity warns and collisions can be MISSED (the craft falls through the road).
-        // Chunk size is chosen so a chunk stays far below the limit.
-        private const int MaxRingsPerColliderChunk = 2000;
+        // Size chunks from the active cross-section resolution instead of assuming
+        // a fixed number of rings: a 241-point half-pipe emits 964 triangles for
+        // every longitudinal ring span, so the old 2,000-span chunk sat near the
+        // failure threshold. Staying below one million also satisfies the integrity
+        // test's "less than half the PhysX limit" margin.
+        private const int MaxTrianglesPerColliderChunk = 1000000;
 
         private void BuildChainCollider(List<GeneratedTrackSection> chain, int index, Transform root)
         {
@@ -213,11 +217,13 @@ namespace TrackGeneration.Macro
             // boundary). Chunks share their boundary ring EXACTLY, so the collision
             // surface is geometrically continuous across every chunk.
             int lastRing = circular ? frames.Count : frames.Count - 1;
-            int chunkCount = Mathf.CeilToInt(lastRing / (float)MaxRingsPerColliderChunk);
+            int trianglesPerRingSpan = Mathf.Max(1, 4 * InnerPointCount);
+            int maxRingSpansPerChunk = Mathf.Max(1, MaxTrianglesPerColliderChunk / trianglesPerRingSpan);
+            int chunkCount = Mathf.CeilToInt(lastRing / (float)maxRingSpansPerChunk);
             for (int c = 0; c < chunkCount; c++)
             {
-                int r0 = c * MaxRingsPerColliderChunk;
-                int r1 = Mathf.Min(lastRing, r0 + MaxRingsPerColliderChunk);
+                int r0 = c * maxRingSpansPerChunk;
+                int r1 = Mathf.Min(lastRing, r0 + maxRingSpansPerChunk);
                 bool capHead = c == 0 && !circular && head.CapStart && !head.OpenStart;
                 bool capTail = c == chunkCount - 1 && !circular && tail.CapEnd && !tail.OpenEnd;
                 BuildColliderChunk(frames, r0, r1, $"TrackCollider_{index:D2}_{c:D2}", root, capHead, capTail);
@@ -282,8 +288,21 @@ namespace TrackGeneration.Macro
             var obj = new GameObject(name);
             obj.transform.SetParent(root, false);
             obj.transform.localPosition = origin;
+            // Drivable-surface layer so hover/surface probes can filter to real
+            // track only (Rev1.1 probe continuity: no Everything-mask probing).
+            obj.layer = TrackSurfacePhysics.SurfaceLayer;
             var collider = obj.AddComponent<MeshCollider>();
+            // Do not use BVH34/Fast Midphase for generated racing surfaces. If an
+            // unusually dense profile ever slips past the chunk budget, the safer
+            // midphase still gives correct contacts instead of silently missing them.
+            // Cooking options must be assigned before sharedMesh triggers cooking.
+            collider.cookingOptions = MeshColliderCookingOptions.CookForFasterSimulation
+                                    | MeshColliderCookingOptions.EnableMeshCleaning
+                                    | MeshColliderCookingOptions.WeldColocatedVertices;
             collider.sharedMesh = mesh;
+            // Track-wide surface material: Minimum combine lets the craft's
+            // low-friction hull win at contacts (no violent wall grabs).
+            collider.sharedMaterial = TrackSurfacePhysics.Surface;
         }
 
         /// <summary>Cap closing an exposed boundary: an annulus between the inner chain and the outer shell.</summary>

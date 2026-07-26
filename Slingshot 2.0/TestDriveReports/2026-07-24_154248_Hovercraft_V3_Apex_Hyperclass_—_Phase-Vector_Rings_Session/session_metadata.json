@@ -1,0 +1,301 @@
+{
+  "sessionId": "82a17ffbeb72",
+  "recorderSchemaVersion": "1.4",
+  "startUtc": "2026-07-24 12:42:48 UTC",
+  "mode": "StandardTestDrive",
+  "testerNotes": "",
+  "unityVersion": "6000.5.0f1",
+  "platform": "WindowsEditor",
+  "fixedTimestep_s": 0.00999999325722456,
+  "coreSampleHz": 50.000033713899931,
+  "nodeSampleHz": 50.000033713899931,
+  "thrusterSampleHz": 50.000033713899931,
+  "extendedSampleHz": 12.500008428474983,
+  "timeScale": 1,
+  "solverIterations": 6,
+  "solverVelocityIterations": 1,
+  "gravity": -9.8100004196167,
+  "craft": {
+    "name": "Hovercraft V3 Apex Hyperclass — Phase-Vector Rings",
+    "craftId": "hovercraft_v2_apex_hyperclass",
+    "class": "ApexHyperclass",
+    "configHash": "496ecee193f16660",
+    "massKg": 11000,
+    "downwardAssistMs2": 0,
+    "airDensity": 1.2250000238418579,
+    "thrusterCount": 14,
+    "aeroMode": "DirectionalBodyV3",
+    "aeroSurfaceCount": 0,
+    "lengthM": 7.8000001907348633,
+    "widthM": 3.5999999046325684,
+    "bodyHeightM": 1.5499999523162842,
+    "groundClearanceM": 2.7999999523162842,
+    "footprint": "3 x 6",
+    "manualCom": true
+  },
+  "track": {
+    "scene": "SampleScene",
+    "sensorAvailable": true,
+    "note": "section index / arc length / centerline offset recorded"
+  },
+  "operatingBands": {
+    "scheme": "ApexHyperclass",
+    "hoverMaxCommand": 5,
+    "bands": [
+      {
+        "index": 0,
+        "name": "Continuous",
+        "upperCommandEdge": 1
+      },
+      {
+        "index": 1,
+        "name": "Performance",
+        "upperCommandEdge": 2
+      },
+      {
+        "index": 2,
+        "name": "Extreme",
+        "upperCommandEdge": 3.5
+      },
+      {
+        "index": 3,
+        "name": "Emergency",
+        "upperCommandEdge": "hoverMaxCommand"
+      },
+      {
+        "index": 4,
+        "name": "Saturated",
+        "upperCommandEdge": "saturated"
+      }
+    ]
+  },
+  "worldAtmosphere": {
+    "instancePresent": true,
+    "preset": "EarthStandard",
+    "airDensityKgM3": 1.2250000238418579,
+    "windVelocityWorldMs": "0,0,0",
+    "globalDragMultiplier": 1,
+    "globalLiftMultiplier": 1,
+    "globalDownforceMultiplier": 1,
+    "globalGroundEffectMultiplier": 1,
+    "globalControlSurfaceMultiplier": 1,
+    "turbulenceEnabled": false
+  },
+  "phaseVector": {
+    "craftClass": "ApexHyperclass",
+    "stableCouplingNodeCount": 2,
+    "assistDrainRateAtFullDemand": 25,
+    "airborneVerticalDrainRateAtFullDemand": 40,
+    "airborneAttitudeDrainRateAtFullDemand": 12,
+    "airborneAutomaticDrainRateAtFullDemand": 15,
+    "reserveCapacity": 100,
+    "reserveRechargeRate": 60,
+    "rings": [
+      {
+        "index": 0,
+        "ringId": "PVR_FrontLeft",
+        "localPosition": "-1.5,-0.75,3",
+        "targetRideHeightM": 2.7999999523162842,
+        "captureRangeM": 8,
+        "maximumPhaseRepulsionN": 420000,
+        "maximumPhaseAttractionN": 300000,
+        "maximumThrusterForceN": 260000,
+        "maximumGimbalAngleDeg": 90,
+        "gimbalResponseDegPerSec": 420
+      },
+      {
+        "index": 1,
+        "ringId": "PVR_FrontRight",
+        "localPosition": "1.5,-0.75,3",
+        "targetRideHeightM": 2.7999999523162842,
+        "captureRangeM": 8,
+        "maximumPhaseRepulsionN": 420000,
+        "maximumPhaseAttractionN": 300000,
+        "maximumThrusterForceN": 260000,
+        "maximumGimbalAngleDeg": 90,
+        "gimbalResponseDegPerSec": 420
+      },
+      {
+        "index": 2,
+        "ringId": "PVR_RearLeft",
+        "localPosition": "-1.5,-0.75,-3",
+        "targetRideHeightM": 2.7999999523162842,
+        "captureRangeM": 8,
+        "maximumPhaseRepulsionN": 420000,
+        "maximumPhaseAttractionN": 300000,
+        "maximumThrusterForceN": 260000,
+        "maximumGimbalAngleDeg": 90,
+        "gimbalResponseDegPerSec": 420
+      },
+      {
+        "index": 3,
+        "ringId": "PVR_RearRight",
+        "localPosition": "1.5,-0.75,-3",
+        "targetRideHeightM": 2.7999999523162842,
+        "captureRangeM": 8,
+        "maximumPhaseRepulsionN": 420000,
+        "maximumPhaseAttractionN": 300000,
+        "maximumThrusterForceN": 260000,
+        "maximumGimbalAngleDeg": 90,
+        "gimbalResponseDegPerSec": 420
+      }
+    ]
+  },
+  "input": {
+    "device": "keyboard+mouse",
+    "mouseSensitivityX": 0.039999999105930328,
+    "mouseSensitivityY": 0.029999999329447746,
+    "stabilizerStartsArmed": true
+  },
+  "duration_s": 101.22843933105469,
+  "coreFrames": 5062,
+  "hoverFrames": 20248,
+  "thrusterFrames": 70868,
+  "aeroFrames": 5062,
+  "aeroSurfaceFrames": 0,
+  "events": 197,
+  "droppedSamples": 0,
+  "recorderOverheadMsPerSample": 0.018872382457526669,
+  "thrusters": [
+    {
+      "label": "Hover_FL",
+      "role": "Hover",
+      "continuousN": 160000,
+      "overdrive": 7,
+      "riseRate": 0,
+      "fallRate": 0,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Roof_FL",
+      "role": "Roof",
+      "continuousN": 160000,
+      "overdrive": 7,
+      "riseRate": 50,
+      "fallRate": 50,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Hover_FR",
+      "role": "Hover",
+      "continuousN": 160000,
+      "overdrive": 7,
+      "riseRate": 0,
+      "fallRate": 0,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Roof_FR",
+      "role": "Roof",
+      "continuousN": 160000,
+      "overdrive": 7,
+      "riseRate": 50,
+      "fallRate": 50,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Hover_RL",
+      "role": "Hover",
+      "continuousN": 160000,
+      "overdrive": 7,
+      "riseRate": 0,
+      "fallRate": 0,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Roof_RL",
+      "role": "Roof",
+      "continuousN": 160000,
+      "overdrive": 7,
+      "riseRate": 50,
+      "fallRate": 50,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Hover_RR",
+      "role": "Hover",
+      "continuousN": 160000,
+      "overdrive": 7,
+      "riseRate": 0,
+      "fallRate": 0,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Roof_RR",
+      "role": "Roof",
+      "continuousN": 160000,
+      "overdrive": 7,
+      "riseRate": 50,
+      "fallRate": 50,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Main_Rear",
+      "role": "Main",
+      "continuousN": 480000,
+      "overdrive": 1.5,
+      "riseRate": 0,
+      "fallRate": 0,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Brake_Front",
+      "role": "Brake",
+      "continuousN": 380000,
+      "overdrive": 1,
+      "riseRate": 0,
+      "fallRate": 0,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Strafe_Front_Left",
+      "role": "Strafe",
+      "continuousN": 250000,
+      "overdrive": 1,
+      "riseRate": 12,
+      "fallRate": 12,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Strafe_Back_Left",
+      "role": "Strafe",
+      "continuousN": 250000,
+      "overdrive": 1,
+      "riseRate": 12,
+      "fallRate": 12,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Strafe_Front_Right",
+      "role": "Strafe",
+      "continuousN": 250000,
+      "overdrive": 1,
+      "riseRate": 12,
+      "fallRate": 12,
+      "commandGain": 1,
+      "enabled": true
+    },
+    {
+      "label": "Strafe_Back_Right",
+      "role": "Strafe",
+      "continuousN": 250000,
+      "overdrive": 1,
+      "riseRate": 12,
+      "fallRate": 12,
+      "commandGain": 1,
+      "enabled": true
+    }
+  ]
+}

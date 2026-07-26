@@ -77,6 +77,9 @@ namespace TrackGeneration.Tests
                     colliderTris += tris;
                     Assert.Less(tris, physxTriangleLimit / 2,
                         $"{mc.name} has {tris} triangles — too close to the PhysX 2^21 midphase limit.");
+                    Assert.IsFalse(
+                        (mc.cookingOptions & MeshColliderCookingOptions.UseFastMidphase) != 0,
+                        $"{mc.name} uses Fast Midphase — large generated track meshes can miss contacts.");
                 }
                 Debug.Log($"[IntegrityTest] {colliders.Length} collider chunks, {colliderTris} collision triangles total.");
                 Assert.Greater(colliders.Length, 0, "No chain colliders were built at all.");

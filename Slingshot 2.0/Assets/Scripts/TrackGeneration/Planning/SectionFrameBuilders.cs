@@ -825,10 +825,12 @@ namespace TrackGeneration.Planning
 
                 var f = frames[i];
                 f.TurnRounding = e;
-                // Outside wall becomes the primary surface: boosted high (multiplier
-                // up to 3) with a full catch-curl; inside wall trimmed for visibility.
+                // Outside wall becomes THE surface: boosted high (multiplier up to 3)
+                // with a full catch-curl. The WallrideMorph then folds the whole
+                // cross-section onto that wall — no flat center, no inside wall: a
+                // slow craft drops off the wall's lower edge into the turn interior.
                 float outsideSupp = -2f * e;   // multiplier 1 → 3
-                float insideSupp = 0.55f * e;  // multiplier 1 → 0.45 (KeepLow policy)
+                float insideSupp = 1f * e;     // inside wall fully open at engagement
                 if (rightTurn) // right turn rides the LEFT wall
                 {
                     f.LeftWallSuppression = outsideSupp;
@@ -841,6 +843,7 @@ namespace TrackGeneration.Planning
                     f.LeftWallSuppression = insideSupp;
                     f.RightOverhang = e;
                 }
+                f.WallrideMorph = e;
                 f.BankAngle = def.TurnSign * def.BankingAngle * e;
                 frames[i] = f;
             }
@@ -849,10 +852,12 @@ namespace TrackGeneration.Planning
             var first = frames[0];
             first.TurnRounding = 0f; first.LeftOverhang = 0f; first.RightOverhang = 0f;
             first.LeftWallSuppression = 0f; first.RightWallSuppression = 0f; first.BankAngle = 0f;
+            first.WallrideMorph = 0f;
             frames[0] = first;
             var last = frames[frames.Length - 1];
             last.TurnRounding = 0f; last.LeftOverhang = 0f; last.RightOverhang = 0f;
             last.LeftWallSuppression = 0f; last.RightWallSuppression = 0f; last.BankAngle = 0f;
+            last.WallrideMorph = 0f;
             frames[frames.Length - 1] = last;
 
             return frames;
