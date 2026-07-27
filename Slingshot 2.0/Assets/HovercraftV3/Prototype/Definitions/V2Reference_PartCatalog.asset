@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a65ee488df7bc04ba0db8ab943d8367, type: 3}
+  m_Name: V2Reference_PartCatalog
+  m_EditorClassIdentifier: Lunarlight.Hovercraft.V3::Lunarlight.Hovercraft.V3.PartCatalog
+  parts:
+  - {fileID: 11400000, guid: 9184fca4c539c9f49a31a5f38a40a54a, type: 2}
+  - {fileID: 11400000, guid: 99861e4ef55cfdd45931547bd662aa3d, type: 2}
+  - {fileID: 11400000, guid: 934817217bbe8104d9cc35560866c997, type: 2}
+  - {fileID: 11400000, guid: 4942857a834b3ef4c82282cf6497f2d4, type: 2}
+  - {fileID: 11400000, guid: 4a17e98df9350214bad4c5f0891b2bb5, type: 2}
+  - {fileID: 11400000, guid: b28a3393ef820ee4698cb258527248d0, type: 2}
+  - {fileID: 11400000, guid: 3c15cbf5903cd764683400eeaf68077a, type: 2}
+  - {fileID: 11400000, guid: 43c59020464cb144c839fb9f5bae0b45, type: 2}
+  - {fileID: 11400000, guid: 378e835b969990a498781c19ab1986a4, type: 2}
+  - {fileID: 11400000, guid: 5f1db310f1b7afb4093496248bdd6eb9, type: 2}

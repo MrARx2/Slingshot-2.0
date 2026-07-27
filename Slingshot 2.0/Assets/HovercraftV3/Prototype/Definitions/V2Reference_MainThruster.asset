@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40c5c43fcc3173b4cbb069a7d344265a, type: 3}
+  m_Name: V2Reference_MainThruster
+  m_EditorClassIdentifier: Lunarlight.Hovercraft.V3::Lunarlight.Hovercraft.V3.ThrusterDefinition
+  stableId: Thruster.Main.V2Reference
+  displayName: V2Reference MainThruster
+  manufacturer: {fileID: 0}
+  productFamily: V2 Reference
+  description: Prototype parity asset generated from the Apex Hyperclass V2 Rev1.1
+    baseline.
+  role: 0
+  size: 2
+  prefab: {fileID: 4916316906744639597, guid: 4d74468fe1e66534998d17bf28d0e765, type: 3}
+  prototype: 1
+  physical:
+    massKg: 300
+    localCenterOfMass: {x: 0, y: 0, z: 0}
+    maximumStructuralLoadN: 0
+    maximumSupportedForceN: 0
+  power:
+    domain: 1
+    idleDemand: 9.599999
+    maximumDemand: 480
+    disabledDemand: 0
+    efficiency: 1
+    overloadDemandMultiplier: 1.55
+  thermal:
+    enabled: 1
+    ambientTemperatureC: 20
+    maximumSafeTemperatureC: 90
+    overheatTemperatureC: 120
+    restartTemperatureC: 75
+    hotOutputLimitAtOverheat: 0.92
+    coolingLockoutSeconds: 2
+    thermalCapacity: 20
+    passiveCoolingPerSecond: 0.38
+    idleHeatPerSecond: 0.5
+    maximumOutputHeatPerSecond: 25
+    overloadHeatMultiplier: 2.2
+  compatibleParentFamilies: 00000000
+  requiresPower: 1
+  requiresData: 1
+  providedCapabilities: 16
+  requiredCapabilities: 0
+  maximumForwardForceN: 480000
+  maximumReverseForceN: 0
+  minimumControllableOutput: 0
+  thrustRisePerSecond: 0
+  thrustFallPerSecond: 0
+  normalOutputMultiplier: 1.5
+  overloadOutputMultiplier: 1.875
+  localThrustDirection: {x: 0, y: 0, z: 1}
+  localForceOrigin: {x: 0, y: 0, z: 0}

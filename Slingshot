@@ -1,11 +1,37 @@
 [Licensing::Module] Trying to connect to existing licensing client channel...
 Built from '6000.5/staging' branch; Version is '6000.5.0f1 (88b47c5e7076) revision 8959100'; Using compiler version '194234433'; Build Type 'Release'
-[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Jack_" at "2026-07-15T08:39:24.5309035Z"
 OS: 'Windows 11  (10.0.26200) Professional' Language: 'en' Physical Memory: 65173 MB
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Jack_" at "2026-07-27T15:32:53.5059435Z"
 BatchMode: 1, IsHumanControllingUs: 0, StartBugReporterOnCrash: 0, Is64bit: 1
 System  architecture: x64
 Process architecture: x64
-Date: 2026-07-15T08:39:24Z
+Date: 2026-07-27T15:32:53Z
+[Licensing::Client] Error: HandshakeResponse reported an error:
+	ResponseCode: 505
+	ResponseStatus: Unsupported protocol version '1.18.1'.
+[Licensing::Module] Error: Failed to handshake to channel: "LicenseClient-Jack_"
+[Licensing::IpcConnector] LicenseClient-Jack_ channel disconnected successfully.
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Jack_-6000.5.0" at "2026-07-27T15:32:54.8646391Z"
+[Licensing::Client] Code 10 while verifying Licensing Client signature (process Id: 483660, path: "C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/Resources/Licensing/Client/Unity.Licensing.Client.exe")
+[Licensing::Module] LicensingClient has failed validation; ignoring
+[Licensing::Client] Handshaking with LicensingClient:
+  Version:                 1.18.1+9fbee8e
+  Session Id:              6872d55706244ffca1b968b7e0f782f2
+  Correlation Id:          19c48bfb2b003cd81c6b49d08f7f673a
+  External correlation Id: 401326386112829181
+  Machine Id:              /GJp5GQQrC1dJ9Sb/cVpXVkOuWs=
+[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-Jack_-6000.5.0" (connect: 0.00s, validation: 0.00s, handshake: 0.01s)
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Jack_-6000.5.0-notifications" at "2026-07-27T15:32:54.8776149Z"
+[Licensing::Module] Error: Access token is unavailable; failed to update
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] License group:
+  Id: 18967160142921-UnityPersXXXX
+  Product: Unity Personal
+  Type: Assigned
+  Expiration: Unlimited
+[Licensing::Client] Successfully updated license, isAsync: True, time: 0.00
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] Licensing Background thread has ended after 1.38s
 
 COMMAND LINE ARGUMENTS:
 C:\Program Files\Unity\Hub\Editor\6000.5.0f1\Editor\Unity.exe
@@ -13,18 +39,12 @@ C:\Program Files\Unity\Hub\Editor\6000.5.0f1\Editor\Unity.exe
 -nographics
 -projectPath
 D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot
-2.0\Temp\RotationalUnityTestProject
--runTests
--testPlatform
-EditMode
--testFilter
-TrackGeneration.Tests.QuantizationTests
--testResults
-D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot
-2.0\Temp\RotationalUnityTestResults.xml
+2.0\Temp\CodexV3UnityProject
+-executeMethod
+Lunarlight.Hovercraft.V3.Editor.V2ReferencePrototypeGenerator.GenerateFromCommandLine
+-quit
 -logFile
 D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot
-2.0\Temp\RotationalUnityTest.log
--quit
+2.0\Temp\CodexV3UnityProject\GeneratePrototype-external-hardware.log
 Couldn't set project path to: D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0/D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot
 Exiting without the bug reporter. Application will terminate with return code 1

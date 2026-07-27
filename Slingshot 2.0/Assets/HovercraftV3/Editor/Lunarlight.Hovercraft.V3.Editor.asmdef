@@ -1,0 +1,18 @@
+{
+  "name": "Lunarlight.Hovercraft.V3.Editor",
+  "rootNamespace": "Lunarlight.Hovercraft.V3.Editor",
+  "references": [
+    "Lunarlight.Hovercraft.V3"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

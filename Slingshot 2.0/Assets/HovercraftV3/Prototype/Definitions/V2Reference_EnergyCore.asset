@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c09e8498e76915e469f8f4a60db98edb, type: 3}
+  m_Name: V2Reference_EnergyCore
+  m_EditorClassIdentifier: Lunarlight.Hovercraft.V3::Lunarlight.Hovercraft.V3.EnergyCoreDefinition
+  stableId: EnergyCore.Main.V2Reference
+  displayName: V2 Reference EnergyCore
+  manufacturer: {fileID: 0}
+  productFamily: V2 Reference
+  description: Prototype parity asset generated from the Apex Hyperclass V2 Rev1.1
+    baseline.
+  role: 4
+  size: 2
+  prefab: {fileID: 1266736332210810818, guid: cf1c9f8ac1c099a428d36e731cdda67c, type: 3}
+  prototype: 1
+  physical:
+    massKg: 600
+    localCenterOfMass: {x: 0, y: 0, z: 0}
+    maximumStructuralLoadN: 0
+    maximumSupportedForceN: 0
+  power:
+    domain: 2
+    idleDemand: 25
+    maximumDemand: 25
+    disabledDemand: 0
+    efficiency: 1
+    overloadDemandMultiplier: 1.55
+  thermal:
+    enabled: 1
+    ambientTemperatureC: 20
+    maximumSafeTemperatureC: 90
+    overheatTemperatureC: 120
+    restartTemperatureC: 75
+    hotOutputLimitAtOverheat: 0.5
+    coolingLockoutSeconds: 2
+    thermalCapacity: 100
+    passiveCoolingPerSecond: 2
+    idleHeatPerSecond: 0.5
+    maximumOutputHeatPerSecond: 25
+    overloadHeatMultiplier: 2.2
+  compatibleParentFamilies: 04000000
+  requiresPower: 0
+  requiresData: 0
+  providedCapabilities: 48
+  requiredCapabilities: 0
+  continuousOutput: 4500
+  propulsionChannelCeiling: 4500
+  systemsChannelCeiling: 1000
+  temporaryPeakOutput: 0
