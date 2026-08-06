@@ -208,6 +208,51 @@ namespace TrackGeneration.Planning
         public static float BumpDerivative(float u) => 24f * u * (1f - u) * (Smooth01(1f - u) - Smooth01(u));
 
         /// <summary>Ease 0→1 over easeFrac, hold, 1→0 over the exit easeFrac.</summary>
+        /// <summary>
+        /// Node slopes for monotone cubic Hermite interpolation of a CDF
+        /// (Fritsch–Carlson). Returns dy/dx at each node, limited so the resulting
+        /// cubic cannot overshoot or reverse between nodes — essential here because
+        /// the interpolated value is rotation PROGRESS: any non-monotonic wobble
+        /// would briefly unroll the road mid-feature.
+        /// </summary>
+        private static float[] BuildMonotoneSlopes(float[] y, int intervals)
+        {
+            var m = new float[intervals + 1];
+            var d = new float[intervals];
+            float h = 1f / intervals;
+
+            for (int k = 0; k < intervals; k++)
+                d[k] = (y[k + 1] - y[k]) / h;
+
+            m[0] = d[0];
+            m[intervals] = d[intervals - 1];
+            for (int k = 1; k < intervals; k++)
+                m[k] = (d[k - 1] + d[k]) * 0.5f;
+
+            for (int k = 0; k < intervals; k++)
+            {
+                if (Mathf.Abs(d[k]) < 1e-12f)
+                {
+                    // Flat span: pin both ends or the cubic bulges off the plateau.
+                    m[k] = 0f;
+                    m[k + 1] = 0f;
+                    continue;
+                }
+
+                float a = m[k] / d[k];
+                float b = m[k + 1] / d[k];
+                float s = a * a + b * b;
+                if (s > 9f)
+                {
+                    float scale = 3f / Mathf.Sqrt(s);
+                    m[k] = scale * a * d[k];
+                    m[k + 1] = scale * b * d[k];
+                }
+            }
+
+            return m;
+        }
+
         public static float HoldProfile(float u, float easeFrac, TrackBlendCurve curve)
         {
             if (u < easeFrac) return TrackBlend.Evaluate(curve, u / easeFrac);
@@ -807,6 +852,19 @@ namespace TrackGeneration.Planning
         /// channels follow one smooth hold envelope, so entry and exit migrate the
         /// racing line on and off the wall gradually.
         /// </summary>
+        /// <summary>
+        /// Shortest wallride climb-on / climb-off ramp, as a fraction of the section.
+        /// </summary>
+        public const float MinWallrideEaseFraction = 0.15f;
+
+        /// <summary>
+        /// Longest wallride climb-on / climb-off ramp, as a fraction of the section.
+        /// Spent at BOTH ends, so full wall engagement lasts (1 − 2×) of the section:
+        /// 0.40 leaves 20%, 0.45 leaves 10%. Raise only if smoother welds are worth
+        /// more than time on the wall — lengthening the wallride itself is better.
+        /// </summary>
+        public const float MaxWallrideEaseFraction = 0.4f;
+
         public static TrackConnectionFrame[] BuildWallrideTurn(TrackConnectionFrame entry, TrackMacroSectionDefinition def,
             in FrameBuildContext ctx)
         {
@@ -814,8 +872,16 @@ namespace TrackGeneration.Planning
 
             // Envelope ease spans: entry/exit fractions from the arc length vs the
             // roll transition (the craft needs real distance to climb the wall).
+            //
+            // This fraction is spent TWICE (once climbing on, once coming off), so
+            // the wallride only holds full engagement over (1 − 2·easeFrac) of its
+            // length. At the 0.40 cap that leaves just 20% of the section actually
+            // riding the wall. Raising the cap buys smoother welds but spends the
+            // part of the feature that is worth having — prefer lengthening the
+            // section over raising this.
             float arcLen = frames[frames.Length - 1].ArcLength - frames[0].ArcLength;
-            float easeFrac = Mathf.Clamp(ctx.BankTransitionLength / Mathf.Max(1f, arcLen), 0.15f, 0.4f);
+            float easeFrac = Mathf.Clamp(ctx.BankTransitionLength / Mathf.Max(1f, arcLen),
+                MinWallrideEaseFraction, MaxWallrideEaseFraction);
 
             bool rightTurn = def.TurnSign >= 0;
             for (int i = 0; i < frames.Length; i++)
@@ -927,6 +993,7 @@ namespace TrackGeneration.Planning
             var starts = new float[count];
             var ends = new float[count];
             var cdf = new float[count][];
+            var cdfSlope = new float[count][];
             const int profileSamples = 256;
 
             float cursor = 0f;
@@ -987,6 +1054,7 @@ namespace TrackGeneration.Planning
                 for (int k = 0; k <= profileSamples; k++) table[k] *= inv;
                 table[profileSamples] = 1f;
                 cdf[p] = table;
+                cdfSlope[p] = BuildMonotoneSlopes(table, profileSamples);
             }
 
             float lengthTotal = Mathf.Max(1f, cursor);
@@ -1022,7 +1090,32 @@ namespace TrackGeneration.Planning
                 if (x >= 1f) return 1f;
                 float tableX = x * profileSamples;
                 int lo = Mathf.Min((int)tableX, profileSamples - 1);
-                return Mathf.Lerp(cdf[p][lo], cdf[p][lo + 1], tableX - lo);
+                float t = tableX - lo;
+
+                // MONOTONE CUBIC, not Lerp.
+                //
+                // This table is a progress CDF, and its DERIVATIVE is the roll rate —
+                // which drives the centerline's orbit and therefore its curvature.
+                // Linear interpolation makes progress piecewise-linear, so that
+                // derivative is piecewise-CONSTANT and steps at every node. On a
+                // 2677 m corkscrew with 256 intervals that is a curvature jolt every
+                // 10.5 m; at 361 m/s the craft feels it as a ~35 Hz buzz through an
+                // otherwise perfectly smooth path. Cubic Hermite makes the rate
+                // continuous, so the road reads as smooth as its centerline is.
+                //
+                // The slopes are monotonicity-limited (Fritsch–Carlson), so progress
+                // can never overshoot or run backwards — a reversal here would roll
+                // the road the wrong way mid-feature.
+                float h = 1f / profileSamples;
+                float y0 = cdf[p][lo], y1 = cdf[p][lo + 1];
+                float m0 = cdfSlope[p][lo], m1 = cdfSlope[p][lo + 1];
+
+                float t2 = t * t;
+                float t3 = t2 * t;
+                return (2f * t3 - 3f * t2 + 1f) * y0
+                     + (t3 - 2f * t2 + t) * h * m0
+                     + (-2f * t3 + 3f * t2) * y1
+                     + (t3 - t2) * h * m1;
             }
 
             float accumulatedRoll = entry.AccumulatedRoadRoll;

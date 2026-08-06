@@ -506,6 +506,54 @@ namespace TrackGeneration.Planning
     /// <summary>Single corkscrew (full 360° roll around the travel axis).</summary>
     public sealed class CorkscrewPattern : ITrackFeaturePattern
     {
+        /// <summary>
+        /// Fraction of the design speed a corkscrew barrel is sized to hold the
+        /// craft at. Support scales with v², so a barrel sized at the full design
+        /// speed drops the craft out as soon as it arrives any slower — which it
+        /// always does. Lower = tighter, taller, more forgiving barrel at the cost
+        /// of higher peak load for a craft that does arrive at design speed.
+        /// </summary>
+        internal const float CorkscrewHoldSpeedFraction = 0.55f;
+
+        /// <summary>
+        /// Normal load (in g) the craft should still carry at the inverted station
+        /// of a corkscrew. Zero would be the exact drop-out threshold; this is the
+        /// margin kept above it.
+        /// </summary>
+        internal const float CorkscrewHoldG = 0.5f;
+
+        /// <summary>
+        /// Peak normal load (in g) a corkscrew aims to stay under for a craft that
+        /// does arrive at the full design speed. Exceeding it stretches the section
+        /// rather than shrinking the barrel, so the road never folds through its
+        /// own axis. Only ever applied within <c>MaxCorkscrewLength</c>.
+        /// </summary>
+        internal const float CorkscrewPeakLoadCeilingG = 12f;
+
+        /// <summary>
+        /// Corkscrew barrel radius as a multiple of the road's HALF-width.
+        /// Governs how uniformly the element drives: the curvature spread across the
+        /// road is (c + 1)/(c − 1) for clearance c, so 2.5 gives ≈2.3× and 1.2 (merely
+        /// clearing the road) gives a catastrophic 11×. Below about 2.0 the inner edge
+        /// closes on the axis and the corkscrew stops being drivable at any speed.
+        /// Raising it widens the barrel and the section stretches to match.
+        /// </summary>
+        internal const float CorkscrewBarrelClearance = 2.5f;
+
+        /// <summary>
+        /// Mean of the sin² envelope the builder applies to the centerline orbit
+        /// (<c>envelope = sin²(π·local)</c>, whose average over the section is exactly
+        /// ½). The orbit lean is scaled by that envelope ring by ring, so the barrel
+        /// the centerline ACTUALLY traces is this fraction of the one a naive
+        /// orbit = 2·π·N·r / L solve asks for.
+        ///
+        /// Ignoring it silently halves every corkscrew: a 140 m barrel request measured
+        /// 70.1 m on the built geometry. Every downstream number — clearance ratio,
+        /// inversion support, peak load — was being computed against a barrel twice the
+        /// size of the one the craft actually drives.
+        /// </summary>
+        internal const float CorkscrewOrbitEnvelopeMean = 0.5f;
+
         public TrackPatternType PatternType => TrackPatternType.Corkscrew;
 
         public FeaturePatternRequirements GetRequirements(ResolvedTrackGenerationConfig cfg) => new FeaturePatternRequirements
@@ -525,10 +573,68 @@ namespace TrackGeneration.Planning
             return true;
         }
 
+        /// <summary>
+        /// Caps the requested revolutions at what the length budget can actually
+        /// deliver AT THE TARGET BARREL RADIUS.
+        ///
+        /// The centerline tangent must lean off the travel axis by 2·π·N·r/L to trace
+        /// the barrel, and that lean is limited by the rulebook's climb/drop angle.
+        /// Requesting more revolutions than the available length can carry does NOT
+        /// produce a tighter corkscrew — the lean clamps, and the barrel silently
+        /// collapses back to whatever the clamp allows while the section still bills
+        /// for its full (locked, unshrinkable) length. A 3-revolution corkscrew at
+        /// 168 m road width came out with a 102 m barrel: a 10× curvature spread,
+        /// exactly the undrivable geometry the barrel sizing exists to prevent, but
+        /// now also consuming the maximum length budget.
+        ///
+        /// Fewer, correctly-shaped revolutions beat more degenerate ones.
+        /// </summary>
+        private static int ClampUnitsToAchievableBarrel(ResolvedTrackGenerationConfig cfg, int units)
+        {
+            float barrelRadius = Mathf.Clamp(
+                cfg.RoadWidth * 0.5f * CorkscrewBarrelClearance,
+                cfg.MinCorkscrewRadius, cfg.MaxCorkscrewRadius);
+
+            float orbitLimitRad = Mathf.Max(4f,
+                Mathf.Min(cfg.MaxClimbAngle, cfg.MaxDropAngle)) * Mathf.Deg2Rad;
+
+            // orbit = 2·π·N·r / (L · envelopeMean) ≤ limit, with L ≤ MaxCorkscrewLength
+            //   ⇒ N ≤ MaxCorkscrewLength · limit · envelopeMean / (2·π·r)
+            //
+            // The envelope belongs here too: without it this over-estimates how many
+            // revolutions fit, because it assumes a lean the builder never applies.
+            float maxRevolutions = cfg.MaxCorkscrewLength * orbitLimitRad * CorkscrewOrbitEnvelopeMean /
+                                   (2f * Mathf.PI * Mathf.Max(1f, barrelRadius));
+
+            // Clamp in WHOLE REVOLUTIONS, never to a bare integer unit count.
+            //
+            // A corkscrew only returns the road to upright after complete turns:
+            // 4u/8u/12u all finish at 0°, but 7u is 630° and leaves the road lying
+            // 270° over — the following section then inherits a surface on its side
+            // that cannot be driven. PickFullRotationUnits deliberately hands us a
+            // multiple of a full turn; flooring to an arbitrary integer here would
+            // silently break that invariant (8u → 7u).
+            int unitsPerRevolution = Mathf.Max(1, Mathf.RoundToInt(360f / Mathf.Max(1f, cfg.RotationUnitDegrees)));
+            int maxUnits = Mathf.FloorToInt(maxRevolutions) * unitsPerRevolution;
+
+            // Never below one full revolution: a corkscrew that cannot afford a whole
+            // turn is not a corkscrew, and half a turn would leave the road inverted.
+            maxUnits = Mathf.Max(unitsPerRevolution, maxUnits);
+
+            // Snap the request down to a whole revolution too, in case it arrived
+            // as a partial count from a compound pattern.
+            int wholeUnits = Mathf.Max(unitsPerRevolution,
+                (units / unitsPerRevolution) * unitsPerRevolution);
+
+            return Mathf.Min(wholeUnits, maxUnits);
+        }
+
         internal static TrackMacroSectionDefinition MakeCorkscrewDef(ResolvedTrackGenerationConfig cfg,
             ref Unity.Mathematics.Random rng, float signedRoll, string patternId)
         {
             int units = Mathf.Max(1, Mathf.RoundToInt(Mathf.Abs(signedRoll) / cfg.RotationUnitDegrees));
+            units = ClampUnitsToAchievableBarrel(cfg, units);
+            signedRoll = Mathf.Sign(signedRoll) * units * cfg.RotationUnitDegrees;
             signedRoll = Mathf.Sign(signedRoll) * units * cfg.RotationUnitDegrees;
             float minLen = Mathf.Max(Mathf.Max(cfg.MinCorkscrewLength,
                 units * cfg.MinDistancePerRotationUnit), Mathf.Abs(signedRoll) * 1.5f / Mathf.Max(0.001f, cfg.MaxRollRateDegPerMeter));
@@ -551,12 +657,77 @@ namespace TrackGeneration.Planning
             }
             firstPitchBias = 0f;
             secondPitchBias = 0f;
-            float[] orbitPresets = { 6f, 8f, 10f };
+            // ── Barrel sizing: derived from physics, not from cosmetic presets ──
+            //
+            // A corkscrew is a helix. The centerline orbits a barrel of radius r
+            // while the road rolls N revolutions across the section length L, so
+            // the centerline tangent leans off the travel axis by
+            //
+            //     orbit = 2·π·N·r / L                                  (radians)
+            //
+            // and the centripetal acceleration — which on a helix always points
+            // from the centerline toward the barrel axis, i.e. INTO the rolled
+            // road surface — is
+            //
+            //     a = v² · r · (2·π·N / L)²
+            //
+            // At the inverted station gravity opposes that support, so the craft
+            // only keeps contact while  a − g ≥ HoldG·g.
+            //
+            // The previous fixed { 6, 8, 10 }° presets ignored both v and L. At
+            // race scale they produced an ~18 m barrel inside a 168 m road: a
+            // ribbon twisting almost in place, with nothing holding the craft in
+            // through the inversion. Size the barrel first, then let the orbit
+            // angle follow from it.
+            float revolutions = Mathf.Max(0.25f, Mathf.Abs(signedRoll) / 360f);
+            float gravity = Mathf.Max(0.01f, Mathf.Abs(Physics.gravity.y));
+
+            // The barrel is sized from the road's HALF-WIDTH, not its full width.
+            //
+            // Only the centerline rides the nominal barrel: the road's inner edge
+            // orbits at (r − halfWidth) and its outer edge at (r + halfWidth), so the
+            // curvature the craft actually feels varies by (r + halfWidth)/(r − halfWidth)
+            // depending on where it sits across the road. Merely clearing the road
+            // (r just above halfWidth) is NOT enough — at r = 0.6·RoadWidth on a 168 m
+            // road the inner edge orbits 16.8 m from the axis against 184.8 m at the
+            // outer edge, an 11× spread. That is not one corkscrew, it is eleven,
+            // selected by lateral drift, and it is undriveable.
+            //
+            // Holding r at CorkscrewBarrelClearance × halfWidth keeps that spread near
+            // 2×, so the element behaves consistently wherever the craft is on the road.
+            // The length terms below scale with √r, so a wider barrel automatically
+            // stretches the section to stay under the peak-load ceiling.
+            float barrelRadius = Mathf.Clamp(
+                cfg.RoadWidth * 0.5f * CorkscrewBarrelClearance,
+                cfg.MinCorkscrewRadius, cfg.MaxCorkscrewRadius);
+
+            // Support scales with v², and the craft meets a corkscrew well below
+            // the generator's contract speed — sizing at full design speed is
+            // exactly what drops it out. Hold it down to this fraction instead.
+            float holdSpeed = Mathf.Max(1f, cfg.DesignSpeedMps * CorkscrewHoldSpeedFraction);
+
+            // a ≥ (1 + HoldG)·g   ⇒   L ≤ 2·π·N·v·√( r / ((1 + HoldG)·g) )
+            float maxLengthForSupport = 2f * Mathf.PI * revolutions * holdSpeed *
+                Mathf.Sqrt(barrelRadius / ((1f + CorkscrewHoldG) * gravity));
+
+            // The same relation run at the design speed gives the shortest barrel
+            // that stays under the peak-load ceiling. Relieve load by STRETCHING
+            // the corkscrew, never by shrinking the barrel: a smaller barrel would
+            // fold the road's inner edge back through its own axis.
+            float minLengthForComfort = 2f * Mathf.PI * revolutions * cfg.DesignSpeedMps *
+                Mathf.Sqrt(barrelRadius / (CorkscrewPeakLoadCeilingG * gravity));
+
+            float lowerLength = Mathf.Max(minLen, Mathf.Min(minLengthForComfort, cfg.MaxCorkscrewLength));
+            length = Mathf.Clamp(length, lowerLength, Mathf.Max(lowerLength, maxLengthForSupport));
+
+            // Solve the orbit for the barrel we actually want ON THE BUILT GEOMETRY.
+            // The builder scales this lean by a sin² envelope averaging ½, so the
+            // nominal figure has to be pre-divided by that mean or the realised barrel
+            // comes out half-size.
             float orbitLimit = Mathf.Max(4f, Mathf.Min(cfg.MaxClimbAngle, cfg.MaxDropAngle));
-            float radiusT = Mathf.InverseLerp(cfg.MinCorkscrewRadius, cfg.MaxCorkscrewRadius,
-                (radius + secondRadius) * 0.5f);
-            float centerlineOrbit = Mathf.Min(orbitLimit,
-                orbitPresets[Mathf.Clamp(Mathf.RoundToInt(radiusT * (orbitPresets.Length - 1)), 0, orbitPresets.Length - 1)]);
+            float nominalOrbitRad = 2f * Mathf.PI * revolutions * barrelRadius /
+                                    (Mathf.Max(1f, length) * CorkscrewOrbitEnvelopeMean);
+            float centerlineOrbit = Mathf.Min(orbitLimit, nominalOrbitRad * Mathf.Rad2Deg);
             float yawBias = 0f;
             if (rng.NextFloat() >= 0.55f)
                 yawBias = (rng.NextBool() ? 1f : -1f) * (rng.NextBool() ? 8f : 15f);

@@ -546,12 +546,55 @@ namespace TrackGeneration
         private static void DestroyObject(GameObject obj)
         {
             if (obj == null) return;
+            ReleaseGeneratedMeshes(obj);
             if (Application.isPlaying)
             {
                 obj.SetActive(false);
                 Destroy(obj);
             }
             else DestroyImmediate(obj);
+        }
+
+        /// <summary>
+        /// Frees the procedurally built meshes under <paramref name="root"/> before the
+        /// hierarchy goes away.
+        ///
+        /// Destroying a GameObject does NOT destroy the Mesh its MeshFilter/MeshCollider
+        /// points at: a mesh built with `new Mesh()` is a UnityEngine.Object that lives
+        /// until something destroys it or the scene reloads. A generate → clear → generate
+        /// loop would therefore strand a full track's worth of geometry (hundreds of MB)
+        /// every cycle — and now that Enter Play Mode keeps the domain and scene alive,
+        /// nothing sweeps those orphans up between sessions any more.
+        ///
+        /// Meshes saved as project assets are SKIPPED. They are shared, they belong to
+        /// the AssetDatabase, and destroying one would delete it from disk.
+        /// </summary>
+        private static void ReleaseGeneratedMeshes(GameObject root)
+        {
+            if (root == null) return;
+
+            foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>(true))
+            {
+                ReleaseMesh(filter.sharedMesh);
+                filter.sharedMesh = null;
+            }
+
+            foreach (MeshCollider collider in root.GetComponentsInChildren<MeshCollider>(true))
+            {
+                ReleaseMesh(collider.sharedMesh);
+                collider.sharedMesh = null;
+            }
+        }
+
+        private static void ReleaseMesh(UnityEngine.Mesh mesh)
+        {
+            if (mesh == null) return;
+#if UNITY_EDITOR
+            // An asset-backed mesh is owned by the project, not by this track.
+            if (UnityEditor.EditorUtility.IsPersistent(mesh)) return;
+#endif
+            if (Application.isPlaying) Destroy(mesh);
+            else DestroyImmediate(mesh);
         }
 
         // ─────────────────────────── Adoption / spawn ───────────────────────────
@@ -586,7 +629,14 @@ namespace TrackGeneration
         [ContextMenu("Place Hovercraft At Track Start")]
         public void PlaceHovercraftAtTrackStart()
         {
-            _craft ??= TrackCraftLocator.FindCraft();
+            // `??=` is a plain C# null check, so it cannot see a craft whose
+            // GameObject has been destroyed — the interface reference stays
+            // non-null and the cache goes stale. That matters now that Enter Play
+            // Mode keeps the domain alive: this field outlives a single session,
+            // so re-find whenever the cached craft has lost its transform.
+            if (_craft == null || _craft.CraftTransform == null)
+                _craft = TrackCraftLocator.FindCraft();
+
             if (_craft == null || _craft.CraftTransform == null)
             {
                 Debug.LogWarning("[TrackGenerator] Could not place hovercraft: no ITrackRaceCraft found in the scene.");

@@ -86,9 +86,22 @@ namespace TrackGeneration.Macro
             float wallrideW = Mathf.Clamp01(f.WallrideMorph);
             if (wallrideW > 0.0001f)
             {
-                bool rideLeft = f.LeftOverhang >= f.RightOverhang;
-                MorphOntoWall(points, total, ext, bowl, halfW, flat, rideLeft,
-                    wallrideW * wallrideW * (3f - 2f * wallrideW));
+                // Which wall is ridden. A bare >= tie-breaks to LEFT whenever the two
+                // overhangs are equal, so a tie occurring while the morph is already
+                // engaged would flip the entire cross-section from one wall to the
+                // other in a single ring. Break ties on the wall multiplier instead —
+                // during a wallride the riding wall is the boosted one, which is an
+                // unambiguous and continuously varying signal.
+                float overhangBias = f.LeftOverhang - f.RightOverhang;
+                bool rideLeft = Mathf.Abs(overhangBias) > 1e-4f
+                    ? overhangBias > 0f
+                    : f.LeftWallMultiplier >= f.RightWallMultiplier;
+                // NO extra easing here. WallrideMorph already arrives fully eased
+                // from the section builder's HoldProfile (SmootherStep, zero slope
+                // at both welds). Squaring a second smoothstep on top multiplied the
+                // peak engagement rate by 1.5× for nothing — the fold happened in the
+                // middle third of a ramp that was paid for in full length.
+                MorphOntoWall(points, total, ext, bowl, halfW, flat, rideLeft, wallrideW);
             }
 
             // ── Pipe closure: morph the whole chain toward a circle whose tips meet
@@ -172,60 +185,87 @@ namespace TrackGeneration.Macro
         private static float[] _wallCum = new float[512];
 
         /// <summary>
-        /// Folds the whole chain onto the riding-side wall: collects that wall's
-        /// polyline (flat-center boundary → bowl wall → extension curl tip), then
-        /// resamples every chain point uniformly along it, oriented so the wall-side
-        /// end of the chain barely moves. Weight blends from the ordinary road.
+        /// Folds the chain onto the riding-side wall by SLIDING THE SAMPLING WINDOW
+        /// along the real cross-section — never by lerping point positions.
+        ///
+        /// The chain already traces the true road profile, and a wallride is that
+        /// same profile with the inside floor simply no longer sampled. So the morph
+        /// is a reparametrisation: at weight 0 every point keeps its own arc position
+        /// (identically the ordinary road), at weight 1 the points spread evenly
+        /// across the riding wall's arc window, and in between each point sits at a
+        /// blend of the two. Every intermediate cross-section is therefore an EXACT
+        /// sub-arc of a genuine road profile.
+        ///
+        /// The previous version lerped each point straight toward its wall target.
+        /// Those chords cut across the profile's curvature, so the section deflated
+        /// mid-blend: chain length fell to 170 m between endpoints of 227 m and
+        /// 195 m — a 25 m collapse that reads as the pinch/crease at both welds.
+        /// Sliding the window keeps the length monotonic between its endpoints.
         /// </summary>
         private static void MorphOntoWall(Vector2[] points, int total, int ext, int bowl,
             float halfW, float flat, bool left, float weight)
         {
             if (_wallPoly.Length < total) { _wallPoly = new Vector2[total * 2]; _wallCum = new float[total * 2]; }
 
-            float flatX = flat * halfW;
-            int count = 0;
-            int center = ext + bowl / 2;
+            if (total < 2) return;
 
-            // Wall polyline in base→tip order.
-            if (left)
-            {
-                for (int i = center; i >= ext; i--)
-                    if (points[i].x <= -flatX + 0.001f) _wallPoly[count++] = points[i];
-                for (int k = ext - 1; k >= 0; k--) _wallPoly[count++] = points[k];
-            }
-            else
-            {
-                for (int i = center; i < ext + bowl; i++)
-                    if (points[i].x >= flatX - 0.001f) _wallPoly[count++] = points[i];
-                for (int k = ext + bowl; k < total; k++) _wallPoly[count++] = points[k];
-            }
-            if (count < 2) return;
-
+            // Arc length along the whole chain (left tip → right tip).
             _wallCum[0] = 0f;
-            for (int i = 1; i < count; i++)
-                _wallCum[i] = _wallCum[i - 1] + Vector2.Distance(_wallPoly[i - 1], _wallPoly[i]);
+            for (int k = 1; k < total; k++)
+                _wallCum[k] = _wallCum[k - 1] + Vector2.Distance(points[k - 1], points[k]);
 
-            float totalLen = _wallCum[count - 1];
-            if (totalLen < 0.001f) return;
+            float span = _wallCum[total - 1];
+            if (span < 0.001f) return;
 
+            // Arc position of the riding wall's base — the flat-center boundary.
+            //
+            // Placed by EXACT interpolation between the two samples straddling it.
+            // Snapping to a whole sample instead makes the window POP by a full
+            // sample spacing whenever `flat` (which moves every ring under dynamic
+            // turn rounding) crosses one: an 8.2 m shift in a single ~1 m ring —
+            // the stair-step that used to fling the craft.
+            float flatX = left ? -flat * halfW : flat * halfW;
+            float boundary = left ? 0f : span;
+            for (int k = 1; k < total; k++)
+            {
+                bool straddles = left
+                    ? points[k - 1].x <= flatX && points[k].x > flatX
+                    : points[k - 1].x < flatX && points[k].x >= flatX;
+                if (!straddles) continue;
+
+                float dx = points[k].x - points[k - 1].x;
+                float cross = Mathf.Abs(dx) > 1e-6f ? (flatX - points[k - 1].x) / dx : 0f;
+                boundary = Mathf.Lerp(_wallCum[k - 1], _wallCum[k], Mathf.Clamp01(cross));
+                break;
+            }
+
+            // Full-morph window = the riding wall alone. The left wall occupies the
+            // head of the chain (its tip at arc 0), the right wall the tail (tip at
+            // arc span), so the wall-side end of the chain stays put either way.
+            float winStart = left ? 0f : boundary;
+            float winEnd = left ? boundary : span;
+            if (winEnd - winStart < 0.001f) return;
+
+            // Resample into scratch: the source chain is still being read below.
             int seg = 1;
             for (int k = 0; k < total; k++)
             {
-                float u = total > 1 ? (float)k / (total - 1) : 0f;
-                // Orient so the riding-side chain end lands on the wall tip: for a
-                // LEFT wall the chain starts at the left tip (s = 1 at k = 0).
-                float s = left ? 1f - u : u;
-                float d = s * totalLen;
+                float u = (float)k / (total - 1);
 
-                // d is monotonic per orientation; simple forward scan per point.
+                // Blend this point's OWN arc position toward its position in the
+                // wall window. Weight 0 reproduces the ordinary road exactly; weight
+                // 1 spreads the chain evenly across the wall; everything between is
+                // a real sub-arc of the profile rather than a chord across it.
+                float s = Mathf.Lerp(_wallCum[k], Mathf.Lerp(winStart, winEnd, u), weight);
+
                 seg = 1;
-                while (seg < count - 1 && _wallCum[seg] < d) seg++;
-                float segLen = Mathf.Max(0.0001f, _wallCum[seg] - _wallCum[seg - 1]);
-                float t = Mathf.Clamp01((d - _wallCum[seg - 1]) / segLen);
-                Vector2 target = Vector2.Lerp(_wallPoly[seg - 1], _wallPoly[seg], t);
-
-                points[k] = Vector2.Lerp(points[k], target, weight);
+                while (seg < total - 1 && _wallCum[seg] < s) seg++;
+                float segLen = Mathf.Max(1e-6f, _wallCum[seg] - _wallCum[seg - 1]);
+                float t = Mathf.Clamp01((s - _wallCum[seg - 1]) / segLen);
+                _wallPoly[k] = Vector2.Lerp(points[seg - 1], points[seg], t);
             }
+
+            for (int k = 0; k < total; k++) points[k] = _wallPoly[k];
         }
     }
 }

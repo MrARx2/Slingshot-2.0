@@ -28,12 +28,53 @@ namespace TrackGeneration
     {
         // ─────────────────────────── Entry points ───────────────────────────
 
+        /// <summary>
+        /// Returns the live runtime section list, or — when that has been cleared by a
+        /// scene reload (e.g. after exiting play mode) — the copy serialized on the track
+        /// root's <see cref="Macro.MacroTrackDebugVisualizer"/>, which survives reloads.
+        /// </summary>
+        private static List<GeneratedTrackSection> ResolveSections(TrackGenerator generator)
+        {
+            var sections = generator.CurrentMacroSections;
+            if (sections != null && sections.Count > 0) return sections;
+
+            var root = generator.TrackRoot;
+            if (root == null) return sections;
+
+            var visualizer = root.GetComponent<Macro.MacroTrackDebugVisualizer>();
+            if (visualizer != null && visualizer.Sections != null && visualizer.Sections.Count > 0)
+                return visualizer.Sections;
+
+            return sections;
+        }
+
+        /// <summary>
+        /// Returns the live layout's quarter records, or — when the runtime layout has
+        /// been cleared (scene reload, or play-mode adoption which never restores it) —
+        /// the copy serialized on the track root's visualizer.
+        /// </summary>
+        private static List<Planning.GeneratedTrackQuarter> ResolveQuarters(TrackGenerator generator)
+        {
+            var layout = generator.CurrentLayout;
+            if (layout != null && layout.Quarters != null && layout.Quarters.Count > 0)
+                return layout.Quarters;
+
+            var root = generator.TrackRoot;
+            if (root == null) return null;
+
+            var visualizer = root.GetComponent<Macro.MacroTrackDebugVisualizer>();
+            if (visualizer != null && visualizer.Quarters != null && visualizer.Quarters.Count > 0)
+                return visualizer.Quarters;
+
+            return null;
+        }
+
         /// <summary>Builds the full report text for the generator's current track.</summary>
         public static string BuildReport(TrackGenerator generator)
         {
             var sb = new StringBuilder(1 << 21);
 
-            var sections = generator.CurrentMacroSections;
+            var sections = ResolveSections(generator);
             if (sections == null || sections.Count == 0)
             {
                 sb.AppendLine("NO TRACK: generate a track first (or the section list did not survive a scene reload).");
@@ -471,15 +512,15 @@ namespace TrackGeneration
             List<GeneratedTrackSection> sections)
         {
             sb.AppendLine("── QUARTER DISSECTION ──");
-            var layout = generator.CurrentLayout;
-            if (layout == null || layout.Quarters.Count == 0)
+            var quarters = ResolveQuarters(generator);
+            if (quarters == null || quarters.Count == 0)
             {
-                sb.AppendLine("(CurrentLayout unavailable — scene was reloaded; quarter records are not serialized on the sections)");
+                sb.AppendLine("(no quarter records available — generate a track first)");
                 sb.AppendLine();
                 return;
             }
 
-            foreach (var q in layout.Quarters)
+            foreach (var q in quarters)
             {
                 bool dual = q.IsDual && q.RouteB != null;
                 sb.AppendLine($"QUARTER {q.QuarterIndex + 1} ({q.LogicalProgressStart:P0}–{q.LogicalProgressEnd:P0}): {(dual ? "DUAL ROAD" : "SingleRoad")}");

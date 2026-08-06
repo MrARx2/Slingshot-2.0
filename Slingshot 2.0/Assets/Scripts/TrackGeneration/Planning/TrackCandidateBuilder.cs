@@ -630,6 +630,94 @@ namespace TrackGeneration.Planning
         }
 
         /// <summary>Frames of these sections may carry field banking (everything else keeps its authored orientation).</summary>
+        /// <summary>
+        /// Turn-rounding held through loops/corkscrews/half-loops — a PARTIAL bowl.
+        ///
+        /// The road still has to be a road inside a stunt. Driving it to 1 closes the
+        /// flat centre completely (a 48 m floor collapses to ~6 m), which turns the
+        /// cross-section into a near-semicircular trough: extruded with its outer shell
+        /// that reads as a convex bulge rather than a channel, and the craft loses the
+        /// flat surface it is meant to drive on.
+        ///
+        /// What actually holds a craft through a corkscrew is the BARREL's centripetal
+        /// acceleration, which the barrel sizing already guarantees; cross-section shape
+        /// is a secondary aid, so it is not worth trading the floor for. This value
+        /// keeps roughly half the configured flat centre while adding real curvature
+        /// where the stock profile is dead flat.
+        ///
+        /// Raise toward 0.7 for more containment at the cost of driving surface; drop
+        /// to 0 to carry the stock cross-section through stunts unchanged.
+        /// </summary>
+        private const float RotationalBowlRounding = 0.45f;
+
+        /// <summary>
+        /// Road width through a ROLLING rotational phase, as a fraction of the normal
+        /// road. Rolling sweeps a tube as thick as the road is wide, so this is the only
+        /// control over how bulky a corkscrew reads: 0.76 takes a 112 m road to 85 m and
+        /// its swept tube from ~102 m to ~77 m.
+        ///
+        /// It cannot remove the sweep — any rolling road sweeps its own width, so a
+        /// corkscrew will never look as thin as a loop without ceasing to be a corkscrew.
+        /// Lower it toward 0.6 for a markedly tighter, more dramatic barrel; raise to 1
+        /// to disable the taper entirely.
+        ///
+        /// Narrowing also RAISES the barrel-to-half-width ratio, so it makes the feature
+        /// more forgiving to drive, not less.
+        /// </summary>
+        private const float RotationalRollWidthScale = 0.76f;
+
+        /// <summary>
+        /// True when the event rolls the road about its own travel axis (a corkscrew),
+        /// as opposed to pitching its centreline (a loop).
+        ///
+        /// The distinction has to be made per PHASE, not per section type: both arrive
+        /// as <see cref="TrackMacroSectionType.RotationalEvent"/>, they behave completely
+        /// differently, and a mixed event can contain both.
+        /// </summary>
+        private static bool HasRollingPhase(GeneratedTrackSection sec)
+        {
+            var phases = sec?.Definition?.RotationalPhases;
+            if (phases == null) return false;
+
+            for (int i = 0; i < phases.Count; i++)
+            {
+                var p = phases[i];
+                if (p != null && p.Axis == RotationalPhaseAxis.RoadRoll && p.RotationUnits > 0)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 0..1 across a loop/corkscrew/half-loop: 1 through the body, easing to 0 at
+        /// both ends so the bowl and the wall symmetry blend into the neighbouring road
+        /// instead of stepping at the weld.
+        /// </summary>
+        private static float RotationalBowlWeight(GeneratedTrackSection sec,
+            in TrackConnectionFrame f, ResolvedTrackGenerationConfig cfg)
+        {
+            if (sec?.Definition == null) return 0f;
+
+            TrackMacroSectionType t = sec.Definition.SectionType;
+            bool rotational = t == TrackMacroSectionType.RotationalEvent
+                           || t == TrackMacroSectionType.Loop
+                           || t == TrackMacroSectionType.Corkscrew
+                           || t == TrackMacroSectionType.HalfLoopTwist;
+            if (!rotational) return 0f;
+
+            float start = sec.StartFrame.ArcLength;
+            float end = sec.EndFrame.ArcLength;
+            float length = Mathf.Max(1f, end - start);
+
+            // Ease over the bank-transition scale, but never eat more than a quarter of
+            // the section at each end (a short event would otherwise never reach full
+            // bowl in its middle).
+            float blend = Mathf.Min(length * 0.25f, Mathf.Max(50f, cfg.BankTransitionLength * 0.5f));
+            float fromEnd = Mathf.Min(f.ArcLength - start, end - f.ArcLength);
+
+            return SectionFrameBuilders.Smooth01(Mathf.Clamp01(fromEnd / Mathf.Max(1f, blend)));
+        }
+
         private static bool IsBankable(GeneratedTrackSection sec)
         {
             switch (sec.Definition.SectionType)
@@ -963,6 +1051,9 @@ namespace TrackGeneration.Planning
                 float side = Mathf.Sign(signed);
                 float sAbs = Mathf.Abs(signed);
 
+                // How much of this ring belongs to a loop/corkscrew/half-loop.
+                float rotational = RotationalBowlWeight(sec, f, cfg);
+
                 float bankDeg = sAbs * cfg.MaxBankAngle * cfg.BankingStrength;
                 f.BankAngle = side * bankDeg;
 
@@ -971,6 +1062,22 @@ namespace TrackGeneration.Planning
                 // the clamp point, which reads as a sudden roll-rate change (a bump) on
                 // every corner that reaches it when Floor Tilt Strength is set high.
                 float tilt = 18f * (float)System.Math.Tanh(bankDeg * cfg.FloorTiltFraction / 18f);
+
+                // ORIENTATION FEATURES OWN THEIR FRAME.
+                //
+                // A loop or corkscrew authors its Right/Up basis exactly — that IS the
+                // feature. This pass rewrites those axes, so applying it on top adds a
+                // second, unrelated roll to geometry that is already fully specified.
+                // Measured on a 7u corkscrew: ±33.7° of field bank injecting 6.4° of
+                // physical floor rotation, against 0.68° on a loop — which is precisely
+                // why loops looked right while corkscrews did not.
+                //
+                // The rings stay in the field for wall support and bank METADATA (both
+                // harmless, and the wall emphasis is symmetrised below); only the
+                // frame-rewriting tilt is withheld, faded out with the same eased weight
+                // so the boundary with ordinary road stays continuous.
+                tilt *= 1f - rotational;
+
                 if (tilt > 0.01f)
                 {
                     Quaternion tiltRot = Quaternion.AngleAxis(-side * tilt, f.Forward);
@@ -992,6 +1099,34 @@ namespace TrackGeneration.Planning
                 float newLeft = -0.75f * mag * wLeft + 0.35f * mag * (1f - wLeft) * commit;
                 float newRight = -0.75f * mag * (1f - wLeft) + 0.35f * mag * wLeft * commit;
 
+                // ── Rotational events keep the half-pipe, and keep it SYMMETRIC ──
+                //
+                // A loop or corkscrew rolls the road through every orientation, so the
+                // craft can be anywhere across the width with any part of the section
+                // pointing at the ground. Two things follow, and neither is true of an
+                // ordinary corner:
+                //
+                //  (1) The flat centre is dead weight. On a 120 m road with the stock
+                //      0.50 flat ratio, 30 m either side of centre has ZERO restoring
+                //      tilt — rolled onto its side there is simply nothing holding the
+                //      craft, and it slides off the low edge. The bowl has to stay a
+                //      bowl through the whole feature.
+                //
+                //  (2) There is no "inside" or "outside" wall to emphasise. The field
+                //      still sees the event's small residual yaw as a turn and trims one
+                //      wall while boosting the other — measured at 35 % shorter on one
+                //      side mid-corkscrew. That asymmetry is meaningless here and it is
+                //      exactly the wall a craft on that lane falls over.
+                //
+                // Both are eased in and out across the section ends, so the weld with
+                // the neighbouring road stays continuous.
+                if (rotational > 0.001f)
+                {
+                    float symmetric = 0.5f * (newLeft + newRight);
+                    newLeft = Mathf.Lerp(newLeft, symmetric, rotational);
+                    newRight = Mathf.Lerp(newRight, symmetric, rotational);
+                }
+
                 // Junction masks (positive suppression set by the split/merge throats)
                 // always win on their side.
                 f.LeftWallSuppression = f.LeftWallSuppression > 0.001f ? Mathf.Max(f.LeftWallSuppression, newLeft) : newLeft;
@@ -1002,7 +1137,17 @@ namespace TrackGeneration.Planning
                 // smooth in/out by construction — the field is C1). Bridges carry it
                 // through turn complexes because their fills feed the same signal.
                 if (cfg.DynamicTurnRoundingEnabled)
-                    f.TurnRounding = Mathf.Clamp01(mag * cfg.TurnRoundingStrength);
+                {
+                    float rounding = Mathf.Clamp01(mag * cfg.TurnRoundingStrength);
+
+                    // Hold the bowl through rotational events regardless of how little
+                    // turn signal they carry — never reduce what the corner field asked
+                    // for, only raise it.
+                    if (rotational > 0.001f)
+                        rounding = Mathf.Max(rounding, rotational * RotationalBowlRounding);
+
+                    f.TurnRounding = rounding;
+                }
 
                 // Outside catch wall: past a demand threshold, the OUTSIDE wall curls
                 // toward (and past) vertical to hold the craft in the bowl. Emphasis
@@ -1016,6 +1161,27 @@ namespace TrackGeneration.Planning
                         f.LeftOverhang = Mathf.Max(f.LeftOverhang, engage * wLeft * commit);
                         f.RightOverhang = Mathf.Max(f.RightOverhang, engage * (1f - wLeft) * commit);
                     }
+                }
+
+                // ── Narrow the road through ROLLING phases ──
+                //
+                // A road that rolls about its own travel axis sweeps a cylinder whose
+                // diameter is the road WIDTH. Measured on a 112 m road through a 360°
+                // corkscrew, the road edge reaches −50.8..+50.9 m vertically: a 101.7 m
+                // thick tube. The loop alongside it sweeps 2.6 m, because a loop pitches
+                // its centreline and never rolls its cross-section.
+                //
+                // That 39× difference is the whole of the "bulge". No cross-section
+                // change can touch it — not rounding, not the barrel radius — because
+                // the tube diameter IS the road width. Narrowing is the only lever.
+                //
+                // Applied ONLY to roll phases: loops are already correct and must keep
+                // full width. Eased on the same weight as everything else here, so the
+                // welds stay exactly as wide as the neighbouring road.
+                if (rotational > 0.001f && HasRollingPhase(sec))
+                {
+                    float narrowed = cfg.RoadWidth * RotationalRollWidthScale;
+                    f.Width = Mathf.Lerp(f.Width, Mathf.Min(f.Width, narrowed), rotational);
                 }
 
                 sec.SubdivisionFrames[ringOf[i]] = f;

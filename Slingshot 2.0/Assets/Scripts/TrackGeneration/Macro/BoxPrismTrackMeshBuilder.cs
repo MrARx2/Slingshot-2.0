@@ -46,7 +46,22 @@ namespace TrackGeneration.Macro
         // UV tiling length along the track in meters.
         private const float TileLength = 10f;
 
+        // Cross-section resolution used for COLLISION only. Collision does not need
+        // visual fidelity: it needs the right shape to within far less than the craft's
+        // ride height. Sampling the SAME parametric chain at fewer points yields an
+        // inscribed polyline whose worst deviation is the arc sagitta — at this
+        // resolution roughly 8 cm on a ~100 m wall radius, and smaller still on the
+        // walls themselves because the profile's warped distribution already
+        // concentrates samples where curvature is highest.
+        //
+        // This matters far more than it looks: collider triangles scale linearly with
+        // it, and PhysX must RE-COOK every one of them whenever Unity restores the
+        // scene (which it does on every Play Mode exit). At render resolution the
+        // track cooks ~8.7 M triangles per restore; this cuts it to ~3 M.
+        private const int ColliderProfileResolution = 10;
+
         private readonly TrackRoadProfileSettings _profile;
+        private readonly TrackRoadProfileSettings _colliderProfile;
         private bool _warnedMissingProfile;
 
         // Per-ring scratch buffers (builder is single-threaded).
@@ -54,15 +69,39 @@ namespace TrackGeneration.Macro
         private float[] _cross;
         private Vector2[] _outward;
 
+        // Separate buffers for the coarser collision chain.
+        private Vector2[] _colPts;
+        private Vector2[] _colOutward;
+
         public BoxPrismTrackMeshBuilder() : this(null) { }
 
         public BoxPrismTrackMeshBuilder(TrackRoadProfileSettings profile)
         {
             _profile = profile ?? new TrackRoadProfileSettings();
+
+            // Same shape, fewer samples. Never coarser than the render profile, so a
+            // deliberately low-resolution road cannot end up with a FINER collider.
+            _colliderProfile = new TrackRoadProfileSettings
+            {
+                Shape = _profile.Shape,
+                SideHeight = _profile.SideHeight,
+                WallCurve01 = _profile.WallCurve01,
+                CenterFlatWidthRatio = _profile.CenterFlatWidthRatio,
+                SafetyLipHeight = _profile.SafetyLipHeight,
+                MinTurnCenterFlatRatio = _profile.MinTurnCenterFlatRatio,
+                MaxOverhangAngleDeg = _profile.MaxOverhangAngleDeg,
+                OverhangRadius = _profile.OverhangRadius,
+                ProfileResolution = Mathf.Min(ColliderProfileResolution, _profile.ProfileResolution)
+            };
+
             int n = InnerPointCount;
             _pts = new Vector2[n];
             _cross = new float[n];
             _outward = new Vector2[n];
+
+            int cn = ColliderPointCount;
+            _colPts = new Vector2[cn];
+            _colOutward = new Vector2[cn];
         }
 
         /// <summary>
@@ -164,8 +203,11 @@ namespace TrackGeneration.Macro
         /// <summary>Render verts per ring: inner chain + offset outer shell + 4 duplicated tip-cap verts.</summary>
         private int VertsPerRing => InnerPointCount * 2 + 4;
 
+        /// <summary>Points of the COARSER collision chain (same shape, fewer samples).</summary>
+        private int ColliderPointCount => TrackCrossSection.PointCount(_colliderProfile);
+
         /// <summary>Collider verts per ring: inner chain + outer shell (no hard-edge duplicates needed).</summary>
-        private int ColliderVertsPerRing => InnerPointCount * 2;
+        private int ColliderVertsPerRing => ColliderPointCount * 2;
 
         /// <summary>
         /// Evaluates the parametric chain and its per-point OUTWARD 2D normals into the
@@ -174,22 +216,30 @@ namespace TrackGeneration.Macro
         /// closed pipes become real solids without self-intersection.
         /// </summary>
         private void EvaluateRing(in TrackConnectionFrame f)
+            => EvaluateChain(_profile, f, _pts, _cross, _outward);
+
+        /// <summary>Same evaluation against the coarser collision profile.</summary>
+        private void EvaluateColliderRing(in TrackConnectionFrame f)
+            => EvaluateChain(_colliderProfile, f, _colPts, null, _colOutward);
+
+        private static void EvaluateChain(TrackRoadProfileSettings profile, in TrackConnectionFrame f,
+            Vector2[] points, float[] crossParams, Vector2[] outward)
         {
-            int n = InnerPointCount;
-            TrackCrossSection.Evaluate(_profile, f, _pts, _cross);
+            int n = TrackCrossSection.PointCount(profile);
+            TrackCrossSection.Evaluate(profile, f, points, crossParams);
 
             Vector2 lastOutward = new Vector2(0f, -1f);
             for (int k = 0; k < n; k++)
             {
-                Vector2 t = _pts[Mathf.Min(k + 1, n - 1)] - _pts[Mathf.Max(k - 1, 0)];
+                Vector2 t = points[Mathf.Min(k + 1, n - 1)] - points[Mathf.Max(k - 1, 0)];
                 if (t.sqrMagnitude < 1e-10f)
                 {
-                    _outward[k] = lastOutward; // degenerate (collapsed extension) — carry on
+                    outward[k] = lastOutward; // degenerate (collapsed extension) — carry on
                     continue;
                 }
                 t.Normalize();
                 lastOutward = new Vector2(t.y, -t.x); // interior is on the LEFT of the chain direction
-                _outward[k] = lastOutward;
+                outward[k] = lastOutward;
             }
         }
 
@@ -217,7 +267,7 @@ namespace TrackGeneration.Macro
             // boundary). Chunks share their boundary ring EXACTLY, so the collision
             // surface is geometrically continuous across every chunk.
             int lastRing = circular ? frames.Count : frames.Count - 1;
-            int trianglesPerRingSpan = Mathf.Max(1, 4 * InnerPointCount);
+            int trianglesPerRingSpan = Mathf.Max(1, 4 * ColliderPointCount);
             int maxRingSpansPerChunk = Mathf.Max(1, MaxTrianglesPerColliderChunk / trianglesPerRingSpan);
             int chunkCount = Mathf.CeilToInt(lastRing / (float)maxRingSpansPerChunk);
             for (int c = 0; c < chunkCount; c++)
@@ -233,7 +283,7 @@ namespace TrackGeneration.Macro
         private void BuildColliderChunk(List<TrackConnectionFrame> frames, int r0, int r1,
             string name, Transform root, bool capHead, bool capTail)
         {
-            int n = InnerPointCount;
+            int n = ColliderPointCount;
             int vpr = ColliderVertsPerRing;
             int rings = r1 - r0 + 1;
             if (rings < 2) return;
@@ -243,12 +293,12 @@ namespace TrackGeneration.Macro
             for (int r = r0; r <= r1; r++)
             {
                 var f = frames[r % frames.Count];
-                EvaluateRing(f);
+                EvaluateColliderRing(f);
                 for (int k = 0; k < n; k++)
-                    vertices.Add(f.Position + f.Right * _pts[k].x + f.Up * _pts[k].y - origin);
+                    vertices.Add(f.Position + f.Right * _colPts[k].x + f.Up * _colPts[k].y - origin);
                 for (int k = 0; k < n; k++)
                 {
-                    Vector2 o = _pts[k] + _outward[k] * ColliderThickness;
+                    Vector2 o = _colPts[k] + _colOutward[k] * ColliderThickness;
                     vertices.Add(f.Position + f.Right * o.x + f.Up * o.y - origin);
                 }
             }
@@ -308,15 +358,15 @@ namespace TrackGeneration.Macro
         /// <summary>Cap closing an exposed boundary: an annulus between the inner chain and the outer shell.</summary>
         private void AddColliderCap(List<Vector3> vertices, List<int> tris, TrackConnectionFrame f, Vector3 origin, bool facingForward)
         {
-            int n = InnerPointCount;
-            EvaluateRing(f);
+            int n = ColliderPointCount;
+            EvaluateColliderRing(f);
 
             int b0 = vertices.Count;
             for (int k = 0; k < n; k++)
-                vertices.Add(f.Position + f.Right * _pts[k].x + f.Up * _pts[k].y - origin);
+                vertices.Add(f.Position + f.Right * _colPts[k].x + f.Up * _colPts[k].y - origin);
             for (int k = 0; k < n; k++)
             {
-                Vector2 o = _pts[k] + _outward[k] * ColliderThickness;
+                Vector2 o = _colPts[k] + _colOutward[k] * ColliderThickness;
                 vertices.Add(f.Position + f.Right * o.x + f.Up * o.y - origin);
             }
 

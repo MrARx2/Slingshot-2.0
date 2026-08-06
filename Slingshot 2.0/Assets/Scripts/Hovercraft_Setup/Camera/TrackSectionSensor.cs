@@ -166,7 +166,39 @@ public class TrackSectionSensor : MonoBehaviour
         _totalLength = totalLength;
         HasTrack = true;
         IsTracking = false;
+
+        // Derive the tracking radius from the ACTUAL road, never a fixed guess.
+        //
+        // Tracking is lost past this distance from the driving line, and losing it
+        // hands engagement to realtime orientation detection — which reads a plain
+        // half-pipe wall as a stunt and flips the camera into feature framing. On a
+        // 168 m road the craft is 84 m off the line just by riding the wall, so a
+        // fixed 60 m radius drops tracking during completely ordinary driving.
+        float widest = 0f;
+        for (int i = 0; i < sections.Count; i++)
+        {
+            GeneratedTrackSection s = sections[i];
+            if (s?.SubdivisionFrames == null) continue;
+            for (int f = 0; f < s.SubdivisionFrames.Length; f++)
+                widest = Mathf.Max(widest, s.SubdivisionFrames[f].Width);
+        }
+
+        // Half-width reaches the wall base; the wall itself then climbs away from the
+        // line, so allow the full width before declaring the craft genuinely lost.
+        _effectiveReacquireDistance = Mathf.Max(reacquireDistance, widest * TrackingRadiusWidthFactor);
     }
+
+    /// <summary>
+    /// Tracking radius as a multiple of the widest road section. 1.0 = half-width for
+    /// the road surface plus the same again for wall climb and airborne excursions.
+    /// </summary>
+    private const float TrackingRadiusWidthFactor = 1.0f;
+
+    private float _effectiveReacquireDistance;
+
+    /// <summary>Tracking radius actually in use (auto-widened for the road's width).</summary>
+    public float EffectiveReacquireDistance =>
+        _effectiveReacquireDistance > 0.01f ? _effectiveReacquireDistance : reacquireDistance;
 
     /// <summary>Drops the current track so it is re-acquired (call after regenerating).</summary>
     public void InvalidateTrack()
@@ -195,7 +227,7 @@ public class TrackSectionSensor : MonoBehaviour
             SearchNearestFrame(localPosition, CurrentArcLength, searchWindow, out bestArc, out bestDistanceSqr);
 
             // Lost (teleport/respawn/long jump off-line): fall back to global search.
-            if (bestDistanceSqr > reacquireDistance * reacquireDistance)
+            if (bestDistanceSqr > EffectiveReacquireDistance * EffectiveReacquireDistance)
                 SearchNearestFrame(localPosition, 0f, float.PositiveInfinity, out bestArc, out bestDistanceSqr);
         }
         else
@@ -212,7 +244,7 @@ public class TrackSectionSensor : MonoBehaviour
         }
 
         DistanceFromLine = Mathf.Sqrt(bestDistanceSqr);
-        IsTracking = DistanceFromLine <= reacquireDistance;
+        IsTracking = DistanceFromLine <= EffectiveReacquireDistance;
 
         if (!IsTracking)
         {
@@ -328,14 +360,29 @@ public class TrackSectionSensor : MonoBehaviour
         // Approaching: ramp up across blendIn before the span starts.
         float toStart = WrappedForward(arc, spanStart);
         if (blendIn > 0.01f && toStart <= blendIn)
-            return 1f - toStart / blendIn;
+            return Ease(1f - toStart / blendIn);
 
         // Leaving: ramp down across blendOut after the span ends.
         float pastEnd = WrappedForward(spanEnd, arc);
         if (blendOut > 0.01f && pastEnd <= blendOut)
-            return 1f - pastEnd / blendOut;
+            return Ease(1f - pastEnd / blendOut);
 
         return 0f;
+    }
+
+    /// <summary>
+    /// Smoothstep the approach/departure ramps.
+    ///
+    /// A linear ramp is continuous in value but NOT in slope: engagement starts and
+    /// stops changing instantly at both ends of the window, which the player reads as
+    /// a kick at the entry and again at the exit no matter how long the window is.
+    /// Smoothstep leaves and arrives with zero slope, so the framing eases into motion
+    /// and settles instead of snapping into and out of the blend.
+    /// </summary>
+    private static float Ease(float t)
+    {
+        t = Mathf.Clamp01(t);
+        return t * t * (3f - 2f * t);
     }
 
     private static bool IsOrientationType(TrackMacroSectionType type)

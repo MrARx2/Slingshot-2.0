@@ -1,0 +1,1 @@
+NO TRACK: generate a track first (or the section list did not survive a scene reload).

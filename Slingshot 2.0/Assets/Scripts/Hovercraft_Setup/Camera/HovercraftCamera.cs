@@ -187,11 +187,14 @@ public class HovercraftCamera : MonoBehaviour
     // ══════════════════════════════════════════════════════════════
 
     [Header("Speed Scaling")]
-    [Tooltip("Speed (m/s) at which all speed-driven camera effects reach maximum. 250 m/s ≈ 900 km/h.")]
-    public float speedForMaxEffects = 250f;
+    [Tooltip("Speed (m/s) where speed-driven camera effects START. Below this the camera sits at its base framing. Manoeuvring speed, not a standstill — the craft spends almost no time near 0, so anchoring the ramp at 0 spends most of the effect range before the car feels quick. 60 m/s ≈ 216 km/h.")]
+    public float speedForMinEffects = 60f;
 
-    [Tooltip("Response curve exponent for speed effects. <1 = effects ramp in early and taper off at the top end.")]
-    [Range(0.3f, 1f)] public float speedResponseExponent = 0.6f;
+    [Tooltip("Speed (m/s) at which all speed-driven camera effects reach maximum. Set this at or slightly above the craft's realistic top speed — anything faster looks IDENTICAL, so a low value silently flattens the whole high-speed range. 380 m/s ≈ 1370 km/h.")]
+    public float speedForMaxEffects = 380f;
+
+    [Tooltip("Response curve across the min→max band. 1 = linear. >1 holds the effect back and delivers it at the top end (speed keeps building as you go faster). <1 front-loads it into the low end.")]
+    [Range(0.3f, 2.5f)] public float speedResponseExponent = 1.25f;
 
     // ══════════════════════════════════════════════════════════════
     //  REFERENCE FRAME (shared by both perspectives)
@@ -213,14 +216,20 @@ public class HovercraftCamera : MonoBehaviour
     [Tooltip("Dynamic mode: CLIMB angle of the flight path (degrees up/down from horizontal) where following starts blending in. Loops climb steeply; banked corners produce zero climb, so they can never engage this.")]
     public float dynamicPitchStartAngle = 25f;
 
+    [Tooltip("Keep the horizon near-upright on surfaces that are steeply tilted but are NOT stunts — wallrides above all. A wallride stands the surface 75-90 deg over without being a feature, and the camera would otherwise follow it all the way and roll the horizon. Only loops/corkscrews/half-loops lift the cap.")]
+    public bool limitTiltOutsideFeatures = true;
+
+    [Tooltip("Maximum camera tilt from world up while NOT in a loop/corkscrew. Wallrides and banked corners are held to this; genuine features lift it smoothly to unrestricted. Set to 180 to disable the cap without unticking the toggle above.")]
+    [Range(0f, 180f)] public float maxUnengagedTiltAngle = 55f;
+
     [Tooltip("Dynamic mode: climb angle where following is fully engaged.")]
     public float dynamicPitchFullAngle = 50f;
 
     [Tooltip("Dynamic mode: surface BANK tilt (roll around the travel direction) where following starts blending in. Keep this ABOVE the track's maximum corner banking (75°).")]
     public float dynamicBankStartAngle = 76f;
 
-    [Tooltip("Dynamic mode: surface bank tilt where following is fully engaged.")]
-    public float dynamicBankFullAngle = 89f;
+    [Tooltip("Dynamic mode: surface bank tilt where following is fully engaged. Keep a WIDE gap from the start angle: the craft rolls through a corkscrew fast, so a narrow band is crossed in a fraction of a second and the camera snaps rather than blends.")]
+    public float dynamicBankFullAngle = 96f;
 
     [Tooltip("Dynamic mode: yaw rate (deg/sec) where bank-based engagement starts being suppressed. Turning + banked = a corner, not a corkscrew.")]
     public float dynamicYawSuppressStart = 10f;
@@ -228,8 +237,11 @@ public class HovercraftCamera : MonoBehaviour
     [Tooltip("Dynamic mode: yaw rate where bank-based engagement is fully suppressed.")]
     public float dynamicYawSuppressFull = 30f;
 
-    [Tooltip("How quickly dynamic framing (distance/height/look-up) blends in and out of loops/corkscrews.")]
+    [Tooltip("How quickly dynamic framing ENGAGES when entering a loop/corkscrew. The camera should arrive with the feature, so this stays reasonably brisk.")]
     public float dynamicFramingResponse = 3f;
+
+    [Tooltip("How quickly dynamic framing RELEASES when leaving a loop/corkscrew. Deliberately SLOWER than engaging: a feature briefly dipping below the engagement threshold (mid-corkscrew, between loop and rollout) would otherwise pop the camera all the way out and straight back in. Slow release rides through those dips.")]
+    public float dynamicFramingReleaseResponse = 1.1f;
 
     [Header("Track Section Data")]
     [Tooltip("Use the generated track's section metadata (authoritative Loop/Corkscrew knowledge with arc-based anticipation) as the primary engagement signal. Realtime detection remains active as refinement and as fallback off-track / without a generated track.")]
@@ -238,10 +250,16 @@ public class HovercraftCamera : MonoBehaviour
     [Tooltip("Track section sensor. Auto-created on this GameObject if missing.")]
     public TrackSectionSensor trackSensor;
 
-    [Tooltip("Meters BEFORE a loop/corkscrew section where engagement starts ramping in (anticipation).")]
+    [Tooltip("SECONDS of warning before a loop/corkscrew where engagement ramps in. This is the real anticipation control — a fixed metre distance cannot work across the craft's speed range (30 m is 0.6 s when crawling but only 0.08 s at design speed, which is a step, not a blend). The lead distance is derived from this and the current speed.")]
+    public float sectionBlendInSeconds = 0.8f;
+
+    [Tooltip("SECONDS after a loop/corkscrew where engagement ramps back out.")]
+    public float sectionBlendOutSeconds = 0.5f;
+
+    [Tooltip("Minimum metres BEFORE a loop/corkscrew for the ramp in, regardless of speed. Only binds at low speed, where the time-based lead would be shorter than the craft's own length.")]
     public float sectionBlendInDistance = 30f;
 
-    [Tooltip("Meters AFTER a loop/corkscrew section where engagement ramps back out.")]
+    [Tooltip("Minimum metres AFTER a loop/corkscrew for the ramp out, regardless of speed.")]
     public float sectionBlendOutDistance = 20f;
 
     [Tooltip("How quickly the reference up tracks the surface normal while grounded. Must be fast enough for loops.")]
@@ -754,7 +772,44 @@ public class HovercraftCamera : MonoBehaviour
         if (up.sqrMagnitude < 0.001f)
             return Vector3.up;
 
-        return ReduceSurfaceBanking(up.normalized);
+        return ClampTiltOutsideFeatures(ReduceSurfaceBanking(up.normalized));
+    }
+
+    /// <summary>
+    /// Caps how far the camera frame may tilt away from world up when the craft is NOT
+    /// in a loop/corkscrew.
+    ///
+    /// A wallride puts the surface normal 75–90° over without being a stunt, and
+    /// <see cref="ReduceSurfaceBanking"/> deliberately hands those cases straight
+    /// through ("treat as wall ride, not banking — follow fully"). That is what rolls
+    /// the horizon on top of a wall. Decomposing the bank there is not an option — with
+    /// the surface up near horizontal the in-plane component collapses and the frame
+    /// becomes noise-sensitive — so the tilt is clamped back toward world up instead,
+    /// which is stable at any surface angle.
+    ///
+    /// The cap lifts with engagement, so genuine orientation features still follow the
+    /// surface all the way round. Engagement comes from the track sensor, whose feature
+    /// list covers rotational events, loops, corkscrews and half-loops but deliberately
+    /// NOT WallrideTurn — so this reads "wall, not stunt" straight off the track data.
+    /// </summary>
+    private Vector3 ClampTiltOutsideFeatures(Vector3 up)
+    {
+        if (!limitTiltOutsideFeatures)
+            return up;
+
+        // Use the smoothed engagement so the cap opens and closes with the framing
+        // blend rather than snapping, but let the raw signal open it promptly.
+        float engaged = Mathf.Clamp01(Mathf.Max(_engagementRaw, _dynamicEngagement));
+        if (engaged >= 0.999f)
+            return up;
+
+        float maxTilt = Mathf.Lerp(maxUnengagedTiltAngle, 180f, engaged);
+        float tilt = Vector3.Angle(Vector3.up, up);
+        if (tilt <= maxTilt)
+            return up;
+
+        Vector3 limited = Vector3.RotateTowards(Vector3.up, up, maxTilt * Mathf.Deg2Rad, 0f);
+        return limited.sqrMagnitude > 0.001f ? limited.normalized : up;
     }
 
     /// <summary>
@@ -800,14 +855,46 @@ public class HovercraftCamera : MonoBehaviour
         if (useTrackSectionData && trackSensor != null
             && trackSensor.HasTrack && trackSensor.IsTracking)
         {
+            // Anticipation is a TIME budget, not a distance. The camera needs a
+            // roughly constant number of seconds to reframe regardless of how fast
+            // the craft is travelling, so convert the lead from seconds at the
+            // current speed and keep the metre values as low-speed floors.
+            float speed = Mathf.Max(1f, GetSpeed());
+            _engagementFromSensor = true;
+
             return trackSensor.GetOrientationWeight(
-                sectionBlendInDistance,
-                sectionBlendOutDistance
+                Mathf.Max(sectionBlendInDistance, sectionBlendInSeconds * speed),
+                Mathf.Max(sectionBlendOutDistance, sectionBlendOutSeconds * speed)
             );
         }
 
+        // A generated track exists but the craft is momentarily off the driving line
+        // (high on a wall, airborne over a jump). The authoritative answer is still
+        // "no orientation feature here" — falling through to realtime detection would
+        // let a plain half-pipe wall masquerade as a stunt, because surface tilt alone
+        // cannot tell a wall from a corkscrew. That is exactly what the section data
+        // exists to disambiguate, so trust it and stay disengaged.
+        if (useTrackSectionData && trackSensor != null && trackSensor.HasTrack)
+        {
+            _engagementFromSensor = true;
+            return 0f;
+        }
+
+        // No track data at all (hand-built scene, or before generation): realtime
+        // detection is the only signal available.
+        _engagementFromSensor = false;
         return GetDynamicOrientationWeight(surfaceUp);
     }
+
+    /// <summary>
+    /// True while engagement comes from the track sensor (authoritative section data)
+    /// rather than realtime orientation detection. The two want different smoothing:
+    /// the sensor already knows exactly where a feature begins and ends and hands over
+    /// a pre-eased, speed-correct ramp, so extra release damping only adds lag. The
+    /// realtime signal is inferred from a noisy surface normal and needs the damping
+    /// to stop it chattering around its thresholds.
+    /// </summary>
+    private bool _engagementFromSensor;
 
     /// <summary>
     /// Dynamic ground-orientation engagement (0 = stay world-up, 1 = follow surface).
@@ -863,7 +950,13 @@ public class HovercraftCamera : MonoBehaviour
             bankWeight *= 1f - turning;
         }
 
-        return Mathf.Max(pitchWeight, Mathf.Max(bankWeight, overheadWeight));
+        // Soft union rather than a hard Max. Max lets whichever signal spikes first own
+        // the result outright, so handing over between them (pitch fading as bank rises
+        // through a corkscrew) shows up as a visible step. This blends: any signal
+        // reaching 1 still forces full engagement, but partial evidence from several
+        // signals at once accumulates smoothly instead of one of them winning.
+        float notEngaged = (1f - pitchWeight) * (1f - bankWeight) * (1f - overheadWeight);
+        return Mathf.Clamp01(1f - notEngaged);
     }
 
     /// <summary>
@@ -935,10 +1028,25 @@ public class HovercraftCamera : MonoBehaviour
         _engagementRaw = ComputeEngagement(surfaceUp);
 
         float engagementTarget = (1f - _airBlend) * _engagementRaw;
+
+        // Asymmetric: engage briskly so the camera arrives WITH the feature, release
+        // slowly so a momentary dip below the threshold cannot pop the framing out and
+        // straight back in. A single symmetric rate has to choose between arriving late
+        // and chattering; splitting the two removes the compromise.
+        //
+        // Only the realtime signal needs that guard. When the sensor is driving, the
+        // ramp it produces is already eased and already scaled to speed, so damping
+        // the release again would just leave the camera in loop framing well down the
+        // following straight.
+        bool releasing = engagementTarget <= _dynamicEngagement;
+        float engagementResponse = releasing && !_engagementFromSensor
+            ? dynamicFramingReleaseResponse
+            : dynamicFramingResponse;
+
         _dynamicEngagement = Mathf.Lerp(
             _dynamicEngagement,
             engagementTarget,
-            ExpSmoothing(dynamicFramingResponse, dt)
+            ExpSmoothing(engagementResponse, dt)
         );
 
         Vector3 targetUp = GetTargetReferenceUp(surfaceUp);
@@ -1352,9 +1460,20 @@ public class HovercraftCamera : MonoBehaviour
         return targetRigidbody.linearVelocity.magnitude;
     }
 
+    /// <summary>
+    /// Normalised speed for every speed-driven camera effect.
+    ///
+    /// Measured across the band the craft actually races in, not from a standstill.
+    /// Anchoring at zero wastes the effect range: the craft is barely ever slow, so a
+    /// 0→max ramp spends most of its travel before the speed even feels notable, then
+    /// has nothing left where it matters. Ramping from <see cref="speedForMinEffects"/>
+    /// instead keeps the full range live over the speeds actually driven.
+    /// </summary>
     private float GetSpeedT(float speed)
     {
-        float t = Mathf.Clamp01(speed / Mathf.Max(1f, speedForMaxEffects));
+        float lo = Mathf.Max(0f, speedForMinEffects);
+        float hi = Mathf.Max(lo + 1f, speedForMaxEffects);
+        float t = Mathf.Clamp01((speed - lo) / (hi - lo));
         return Mathf.Pow(t, speedResponseExponent);
     }
 
