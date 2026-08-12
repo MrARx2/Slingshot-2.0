@@ -306,9 +306,13 @@ namespace TrackGeneration.Core
         [SerializeField] private float minLaunchTransitionSeconds = 0.35f;
         [SerializeField] private float maxLaunchTransitionSeconds = 1.2f;
 
+        [Tooltip("Launch-lip pitch window (degrees). Every air gap receives a progressive elevation ramp that reaches at least this pitch before the open edge.")]
+        [SerializeField] private float minJumpLaunchPitchDegrees = 3f;
+        [SerializeField] private float maxJumpLaunchPitchDegrees = 6f;
+
         [Tooltip("Target airtime window (seconds). Air-gap distance is derived from the ballistic trajectory at design speed, never chosen randomly.")]
         [SerializeField] private float minJumpAirtimeSeconds = 0.25f;
-        [SerializeField] private float maxJumpAirtimeSeconds = 1.2f;
+        [SerializeField] private float maxJumpAirtimeSeconds = 4f;
 
         [Tooltip("Landing transition duration window (seconds).")]
         [SerializeField] private float minLandingTransitionSeconds = 0.50f;
@@ -581,6 +585,8 @@ namespace TrackGeneration.Core
         public float MaxJumpApproachSeconds => maxJumpApproachSeconds;
         public float MinLaunchTransitionSeconds => minLaunchTransitionSeconds;
         public float MaxLaunchTransitionSeconds => maxLaunchTransitionSeconds;
+        public float MinJumpLaunchPitchDegrees => minJumpLaunchPitchDegrees;
+        public float MaxJumpLaunchPitchDegrees => maxJumpLaunchPitchDegrees;
         public float MinJumpAirtimeSeconds => minJumpAirtimeSeconds;
         public float MaxJumpAirtimeSeconds => maxJumpAirtimeSeconds;
         public float MinLandingTransitionSeconds => minLandingTransitionSeconds;
@@ -692,6 +698,9 @@ namespace TrackGeneration.Core
 
             Order(ref minJumpApproachSeconds, ref maxJumpApproachSeconds);
             Order(ref minLaunchTransitionSeconds, ref maxLaunchTransitionSeconds);
+            Order(ref minJumpLaunchPitchDegrees, ref maxJumpLaunchPitchDegrees);
+            minJumpLaunchPitchDegrees = Mathf.Clamp(minJumpLaunchPitchDegrees, 0.5f, 15f);
+            maxJumpLaunchPitchDegrees = Mathf.Clamp(maxJumpLaunchPitchDegrees, minJumpLaunchPitchDegrees, 15f);
             Order(ref minJumpAirtimeSeconds, ref maxJumpAirtimeSeconds);
             Order(ref minLandingTransitionSeconds, ref maxLandingTransitionSeconds);
             Order(ref minJumpRecoverySeconds, ref maxJumpRecoverySeconds);

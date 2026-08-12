@@ -27,7 +27,7 @@ namespace TrackGeneration.Macro
     {
         [Header("Visualization Level")]
         [Tooltip("Master detail level. Individual toggles below still apply within the level; the sample cap always applies. Editor responsiveness first: Summary/Normal for everyday work.")]
-        public TrackDebugVisualizationLevel Level = TrackDebugVisualizationLevel.Normal;
+        public TrackDebugVisualizationLevel Level = TrackDebugVisualizationLevel.Off;
 
         [Tooltip("Hard cap on displayed per-sample gizmos across the whole lap — per-section strides scale up to honor it on huge tracks.")]
         [Range(200, 20000)] public int MaxDisplayedSamples = 1500;

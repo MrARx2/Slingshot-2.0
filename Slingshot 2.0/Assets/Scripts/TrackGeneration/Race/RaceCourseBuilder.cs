@@ -23,7 +23,10 @@ namespace TrackGeneration.Race
             GeneratedTrackLayout layout,
             TrackRoadProfileSettings roadProfile,
             int checkpointCount,
-            float startLineArcOffset)
+            float startLineArcOffset,
+            Material startFinishMaterial = null,
+            Material startPillarMaterial = null,
+            Material checkpointMaterial = null)
         {
             var sections = layout.Sections;
             float total = MacroTrackSampler.GetTotalLength(sections);
@@ -39,7 +42,7 @@ namespace TrackGeneration.Race
             RaceCourse course = courseObj.AddComponent<RaceCourse>();
             course.TrackLength = total;
 
-            Materials mats = CreateMaterials();
+            Materials mats = ResolveMaterials(startFinishMaterial, startPillarMaterial, checkpointMaterial);
 
             float startArc = Mathf.Min(startLineArcOffset, total * 0.25f);
             if (!MacroTrackSampler.TrySampleFrame(sections, startArc, out TrackConnectionFrame startFrame))
@@ -330,21 +333,35 @@ namespace TrackGeneration.Race
             public Material Checkpoint;
         }
 
-        private static Materials CreateMaterials()
+        private static Materials ResolveMaterials(Material checker, Material pillar, Material checkpoint)
         {
+            if (checker != null && pillar != null && checkpoint != null)
+                return new Materials { Checker = checker, Pillar = pillar, Checkpoint = checkpoint };
+
             Shader lit = Shader.Find("Universal Render Pipeline/Lit");
+            if (lit == null)
+                lit = Shader.Find("Standard");
 
-            var checker = new Material(lit) { name = "RaceGate_Checker" };
-            checker.mainTexture = CreateCheckerTexture();
+            if (checker == null)
+            {
+                checker = new Material(lit) { name = "RaceGate_Checker_Fallback" };
+                checker.mainTexture = CreateCheckerTexture();
+            }
 
-            var pillar = new Material(lit) { name = "RaceGate_Pillar" };
-            pillar.color = new Color(0.12f, 0.13f, 0.16f);
+            if (pillar == null)
+            {
+                pillar = new Material(lit) { name = "RaceGate_Pillar_Fallback" };
+                pillar.color = new Color(0.12f, 0.13f, 0.16f);
+            }
 
-            var checkpoint = new Material(lit) { name = "RaceGate_Checkpoint" };
-            Color cyan = new Color(0.15f, 0.75f, 1f);
-            checkpoint.color = cyan;
-            checkpoint.EnableKeyword("_EMISSION");
-            checkpoint.SetColor("_EmissionColor", cyan * 1.6f);
+            if (checkpoint == null)
+            {
+                checkpoint = new Material(lit) { name = "RaceGate_Checkpoint_Fallback" };
+                Color cyan = new Color(0.15f, 0.75f, 1f);
+                checkpoint.color = cyan;
+                checkpoint.EnableKeyword("_EMISSION");
+                checkpoint.SetColor("_EmissionColor", cyan * 1.6f);
+            }
 
             return new Materials { Checker = checker, Pillar = pillar, Checkpoint = checkpoint };
         }

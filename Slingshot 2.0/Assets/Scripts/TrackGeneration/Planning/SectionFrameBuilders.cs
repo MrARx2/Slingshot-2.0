@@ -821,7 +821,8 @@ namespace TrackGeneration.Planning
         {
             float lip = Mathf.Max(0f, launchPitchDeg);
             float middle = Mathf.Clamp(intermediatePitchDeg, 0f, lip);
-            return new[] { (0f, 0f), (0.6f, middle), (1f, lip) };
+            float early = Mathf.Min(middle * 0.12f, lip * 0.08f);
+            return new[] { (0f, 0f), (0.22f, early), (0.62f, middle), (1f, lip) };
         }
 
         /// <summary>Keyframes for a jump landing ramp: shallow arrival pitch → descent pitch → level.</summary>

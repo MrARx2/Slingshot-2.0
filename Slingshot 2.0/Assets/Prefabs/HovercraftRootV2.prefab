@@ -998,6 +998,89 @@ MonoBehaviour:
   overchargeCoreColor: {r: 2.2, g: 2, b: 1.65, a: 1}
   overchargeTailColor: {r: 0.82, g: 0.34, b: 1.55, a: 1}
   overchargeEdgeColor: {r: 1.35, g: 0.16, b: 0.55, a: 1}
+  autoBuildCoronaOverlay: 1
+  coronaOverlayMaterial: {fileID: 2100000, guid: bbf46b66c43f40bfa37c4636714e571a, type: 2}
+  coronaSourceRoot: {fileID: 2850027237411572208}
+  coronaMainColor: {r: 0.28, g: 1.55, b: 2.2, a: 1}
+  coronaOverchargeColor: {r: 0.95, g: 0.18, b: 1.55, a: 1}
+  coronaSparkColor: {r: 0.25, g: 1.8, b: 2.2, a: 1}
+  coronaOuterFringeColor: {r: 1.2, g: 0.18, b: 1.55, a: 1}
+  coronaBrightness: 1
+  coronaOutlineWidth: 0.36
+  coronaOutlineCoverage: 1
+  coronaCoverageFade: 0.45
+  coronaChromaSeparation: 0.38
+  coronaWholeMeshCoverage: 0.12
+  coronaElectricalActivity: 0.42
+  coronaOverchargeImpact: 0.68
+  coronaStartKmh: 320
+  coronaFullKmh: 1800
+  coronaSpeedResponse:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 0.28
+      value: 0.08
+      inSlope: 0.35
+      outSlope: 0.35
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 0.62
+      value: 0.42
+      inSlope: 1.15
+      outSlope: 1.15
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0.75
+      outSlope: 0.75
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  coronaSaturation: 1.08
+  coronaEdgeTightness: 7.5
+  coronaBandWidth: 0.16
+  coronaOutlineStrength: 1.4
+  coronaOverchargeCoverage: 0.2
+  coronaLeadingEdgeBias: 1.35
+  coronaRearSuppression: 0.55
+  coronaShellExpansion: 0.004
+  coronaShellScale: 1
+  coronaSurfaceBreakup: 0.34
+  coronaNoiseScale: 5.5
+  coronaNoiseContrast: 2.2
+  coronaCrawlSpeed: 5.5
+  coronaFlickerAmount: 0.12
+  coronaFlickerSpeed: 13
+  coronaFlowStrength: 0.45
+  coronaFlowDensity: 3.4
+  coronaCruiseIntensity: 0.42
+  coronaOverchargeIntensity: 1.35
+  coronaResponse: 9
+  coronaOverchargeChromaExpansion: 0.32
+  coronaOverchargeElectricalMultiplier: 1.65
+  coronaIgnitionExpansion: 0.045
+  coronaIgnitionFlashStrength: 0.65
 --- !u!114 &879554670063209943
 MonoBehaviour:
   m_ObjectHideFlags: 0

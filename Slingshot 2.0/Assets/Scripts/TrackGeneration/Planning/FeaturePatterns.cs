@@ -103,29 +103,47 @@ namespace TrackGeneration.Planning
             // Callers with a hard airtime need (mid-air lane aim) raise the draw floor
             // instead of gambling on a high roll.
             float tFloor = Mathf.Max(cfg.MinJumpAirtimeSeconds, minAirtimeSeconds);
-            if (tFloor > cfg.MaxJumpAirtimeSeconds) return false;
+            const float minArrivalDescentFraction = 0.18f;
+            const float maxArrivalDescentFraction = 0.45f;
+            float minPitchRad = cfg.MinJumpLaunchPitchDegrees * Mathf.Deg2Rad;
+            float pitchAirtimeFloor = v * Mathf.Sin(minPitchRad) /
+                                      (g * (1f - minArrivalDescentFraction));
+            tFloor = Mathf.Max(tFloor, pitchAirtimeFloor);
+            float maxPitchRad = cfg.MaxJumpLaunchPitchDegrees * Mathf.Deg2Rad;
+            float pitchAirtimeCeiling = v * Mathf.Sin(maxPitchRad) /
+                                        (g * (1f - maxArrivalDescentFraction));
+            float tCeiling = Mathf.Min(cfg.MaxJumpAirtimeSeconds, pitchAirtimeCeiling);
+            if (tFloor > tCeiling) return false;
 
             for (int attempt = 0; attempt < 12; attempt++)
             {
-                float t = Mathf.Lerp(tFloor, cfg.MaxJumpAirtimeSeconds, rng.NextFloat());
+                float t = Mathf.Lerp(tFloor, tCeiling, Mathf.Sqrt(rng.NextFloat()));
 
                 // Descent fraction k: arrival vertical speed = -g·t·k, and the flight's
                 // net rise is g·t²·(0.5-k). The monotonic launch removed the old
                 // mid-ramp height hump. Keep k below 0.5 so the catch can sit above the
                 // lip and retain enough elevation for its long transition; k > 0 still
                 // guarantees that the craft arrives while descending.
-                float k = rng.NextFloat(0.18f, 0.45f);
+                float minPitchSin = Mathf.Sin(cfg.MinJumpLaunchPitchDegrees * Mathf.Deg2Rad);
+                float maxPitchSin = Mathf.Sin(cfg.MaxJumpLaunchPitchDegrees * Mathf.Deg2Rad);
+                float kForMinPitch = 1f - v * minPitchSin / (g * t);
+                float kForMaxPitch = 1f - v * maxPitchSin / (g * t);
+                float kMin = Mathf.Max(minArrivalDescentFraction, kForMaxPitch);
+                float kMax = Mathf.Min(maxArrivalDescentFraction, kForMinPitch);
+                if (kMax < kMin) continue;
+                float k = Mathf.Lerp(kMin, kMax, rng.NextFloat());
 
                 float vy0 = g * t * (1f - k);
                 float sinLaunch = vy0 / v;
-                if (sinLaunch > Mathf.Sin(6f * Mathf.Deg2Rad)) continue; // absurd pitch for this speed
+                if (sinLaunch > Mathf.Sin(cfg.MaxJumpLaunchPitchDegrees * Mathf.Deg2Rad) + 0.0001f)
+                    continue;
 
                 float launchPitch = Mathf.Asin(sinLaunch) * Mathf.Rad2Deg;
                 // The old ramp climbed at 5..9 degrees and then pitched DOWN to the
                 // ballistic launch angle at the open lip. That encoded the visible
                 // pre-jump flattening. Keep the intermediate key below the launch
                 // pitch so the surface continues pitching upward all the way out.
-                float climbPitch = launchPitch * rng.NextFloat(0.45f, 0.8f);
+                float climbPitch = launchPitch * rng.NextFloat(0.5f, 0.72f);
                 float launchLength = Mathf.Lerp(cfg.MinLaunchTransitionLength, cfg.MaxLaunchTransitionLength, rng.NextFloat());
 
                 var launchKeys = SectionFrameBuilders.LaunchRampKeys(climbPitch, launchPitch);

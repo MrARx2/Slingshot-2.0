@@ -127,6 +127,44 @@ namespace TrackGeneration.Race
         }
 
         /// <summary>
+        /// Rebuilds generated-object references after an editor cache restore. Cached
+        /// geometry can remain valid even when Unity drops an in-memory component
+        /// reference; the RaceGate identity fields are the durable source of truth.
+        /// </summary>
+        public bool RepairGeneratedReferences()
+        {
+            RaceGate[] gates = GetComponentsInChildren<RaceGate>(true);
+            if (gates == null || gates.Length == 0) return false;
+
+            RaceGate start = null;
+            int highestCheckpoint = -1;
+            foreach (RaceGate gate in gates)
+            {
+                if (gate == null) continue;
+                if (gate.IsStartFinish) start = gate;
+                else highestCheckpoint = Mathf.Max(highestCheckpoint, gate.CheckpointIndex);
+            }
+
+            if (start == null) return false;
+            StartFinishGate = start;
+
+            CheckpointGroups.Clear();
+            for (int i = 0; i <= highestCheckpoint; i++)
+                CheckpointGroups.Add(new CheckpointGroup());
+
+            foreach (RaceGate gate in gates)
+            {
+                if (gate == null || gate.IsStartFinish || gate.CheckpointIndex < 0 ||
+                    gate.CheckpointIndex >= CheckpointGroups.Count) continue;
+                CheckpointGroups[gate.CheckpointIndex].Gates.Add(gate);
+            }
+
+            _allGates.Clear();
+            _tracking = false;
+            return true;
+        }
+
+        /// <summary>
         /// Respawn pose on the player's chosen route: the last valid gate's frame (or
         /// the start/finish line before any crossing).
         /// </summary>

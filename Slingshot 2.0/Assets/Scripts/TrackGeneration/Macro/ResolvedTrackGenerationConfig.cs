@@ -210,6 +210,8 @@ namespace TrackGeneration.Macro
         public float JumpApproachLength;
         public float MinLaunchTransitionLength;
         public float MaxLaunchTransitionLength;
+        public float MinJumpLaunchPitchDegrees;
+        public float MaxJumpLaunchPitchDegrees;
         public float MinJumpAirtimeSeconds;
         public float MaxJumpAirtimeSeconds;
         public float MinLandingTransitionLength;
@@ -574,6 +576,8 @@ namespace TrackGeneration.Macro
             r.JumpApproachLength = Mathf.Max(r.DefaultApproachLength, S(limits.MinJumpApproachSeconds));
             r.MinLaunchTransitionLength = S(limits.MinLaunchTransitionSeconds);
             r.MaxLaunchTransitionLength = S(limits.MaxLaunchTransitionSeconds);
+            r.MinJumpLaunchPitchDegrees = limits.MinJumpLaunchPitchDegrees;
+            r.MaxJumpLaunchPitchDegrees = limits.MaxJumpLaunchPitchDegrees;
             r.MinJumpAirtimeSeconds = limits.MinJumpAirtimeSeconds;
             r.MaxJumpAirtimeSeconds = limits.MaxJumpAirtimeSeconds;
             r.MinLandingTransitionLength = S(limits.MinLandingTransitionSeconds);

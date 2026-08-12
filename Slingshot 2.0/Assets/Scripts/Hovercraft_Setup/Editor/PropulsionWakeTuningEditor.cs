@@ -6,19 +6,12 @@ public sealed class PropulsionWakeTuningEditor : Editor
 {
     private enum HandleElement
     {
-        HotCore,
-        PlasmaPlume,
-        IonFilaments,
-        MemoryRibbon,
-        PipeChamber,
-        PlasmaMotes,
-        ExpelledSparks
+        ExhaustPipe,
+        ExhaustEffect
     }
 
     private enum HandleSide { Left, Right }
 
-    private const string PlasmaPlacementPrefabPath =
-        "Assets/Prefabs/PlasmaFX_Rig.prefab";
     private SerializedProperty _overallLength;
     private SerializedProperty _bodyLength;
     private SerializedProperty _filamentLength;
@@ -41,8 +34,8 @@ public sealed class PropulsionWakeTuningEditor : Editor
     private SerializedProperty _ribbonSize;
     private SerializedProperty _particleStretch;
     private SerializedProperty _showSparks;
-    private SerializedProperty _leftPlasmaOffset;
-    private SerializedProperty _rightPlasmaOffset;
+    private SerializedProperty _leftExhaustEffectOffset;
+    private SerializedProperty _rightExhaustEffectOffset;
     private SerializedProperty _chamberColor;
     private SerializedProperty _chamberSize;
     private SerializedProperty _chamberIntensity;
@@ -59,12 +52,13 @@ public sealed class PropulsionWakeTuningEditor : Editor
     private SerializedProperty _density;
     private bool _showLayerPlacement;
     private bool _showMoteControls;
+    private bool _showChamberFinePlacement;
     private bool _showSparkPlacement = true;
     private bool _showSparkMotion;
     private bool _showSparkTrails;
     private bool _showSparkResponse;
     private bool _showAdvanced;
-    private HandleElement _handleElement = HandleElement.ExpelledSparks;
+    private HandleElement _handleElement = HandleElement.ExhaustPipe;
     private HandleSide _handleSide = HandleSide.Left;
 
     private void OnEnable()
@@ -91,8 +85,8 @@ public sealed class PropulsionWakeTuningEditor : Editor
         _ribbonSize = serializedObject.FindProperty("ribbonSize");
         _particleStretch = serializedObject.FindProperty("particleStretch");
         _showSparks = serializedObject.FindProperty("showPlasmaSparks");
-        _leftPlasmaOffset = serializedObject.FindProperty("leftPlasmaOffset");
-        _rightPlasmaOffset = serializedObject.FindProperty("rightPlasmaOffset");
+        _leftExhaustEffectOffset = serializedObject.FindProperty("leftExhaustEffectOffset");
+        _rightExhaustEffectOffset = serializedObject.FindProperty("rightExhaustEffectOffset");
         _chamberColor = serializedObject.FindProperty("plasmaChamberColor");
         _chamberSize = serializedObject.FindProperty("chamberSize");
         _chamberIntensity = serializedObject.FindProperty("chamberIntensity");
@@ -146,12 +140,18 @@ public sealed class PropulsionWakeTuningEditor : Editor
         EditorGUILayout.PropertyField(_particleStretch, new GUIContent("Particle Streak Length"));
         EditorGUILayout.Space(8f);
 
+        EditorGUILayout.LabelField("EXHAUST PIPE PLACEMENT", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "The LEFT/RIGHT exhaust transforms are the placement authority. Move them with the Exhaust Pipe Scene gizmo: trail, core, filaments, chamber, motes, and sparks all follow.",
+            MessageType.None);
+        EditorGUILayout.Space(8f);
+
         _showLayerPlacement = EditorGUILayout.Foldout(_showLayerPlacement,
-            "INDEPENDENT EXHAUST LAYER PLACEMENT", true);
+            "FINE INDIVIDUAL LAYER CORRECTIONS", true);
         if (_showLayerPlacement)
         {
             EditorGUILayout.HelpBox(
-                "Every value is local to its LEFT or RIGHT nozzle anchor. Position and aim layers independently without moving the others.",
+                "Normally leave these at zero. They adjust one visual layer relative to the whole trail placement above.",
                 MessageType.None);
             DrawLayerPlacement("Hot Core", "leftCoreOffset", "rightCoreOffset",
                 "leftCoreRotation", "rightCoreRotation", true);
@@ -173,25 +173,40 @@ public sealed class PropulsionWakeTuningEditor : Editor
             EditorGUILayout.Space(8f);
         }
 
-        EditorGUILayout.LabelField("PLASMA ELEMENTS", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("EXHAUST EFFECT", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(_showSparks,
             new GUIContent("Enable Expelled Sparks"));
-            EditorGUILayout.LabelField("Placement", EditorStyles.miniBoldLabel);
-            EditorGUILayout.PropertyField(_leftPlasmaOffset,
-                new GUIContent("Left Plasma Offset"));
-            EditorGUILayout.PropertyField(_rightPlasmaOffset,
-                new GUIContent("Right Plasma Offset"));
-            if (GUILayout.Button("Reset Plasma Offsets"))
-            {
-                _leftPlasmaOffset.vector3Value = Vector3.zero;
-                _rightPlasmaOffset.vector3Value = Vector3.zero;
-            }
+        EditorGUILayout.LabelField("Sparks / Glow Assembly Placement",
+            EditorStyles.miniBoldLabel);
+        EditorGUILayout.HelpBox(
+            "A fine adjustment relative to the exhaust pipe. The Exhaust Effect Scene gizmo moves chamber glow, motes, and sparks together.",
+            MessageType.None);
+        EditorGUILayout.PropertyField(_leftExhaustEffectOffset,
+            new GUIContent("Left Exhaust Effect Position"));
+        EditorGUILayout.PropertyField(_rightExhaustEffectOffset,
+            new GUIContent("Right Exhaust Effect Position"));
+        DrawProperty("leftExhaustEffectRotation", "Left Exhaust Effect Aim");
+        DrawProperty("rightExhaustEffectRotation", "Right Exhaust Effect Aim");
+        if (GUILayout.Button("Reset Exhaust Effect Placement"))
+        {
+            _leftExhaustEffectOffset.vector3Value = Vector3.zero;
+            _rightExhaustEffectOffset.vector3Value = Vector3.zero;
+            ResetVectors("leftExhaustEffectRotation", "rightExhaustEffectRotation");
+        }
 
             EditorGUILayout.Space(3f);
             EditorGUILayout.LabelField("Pipe Chamber", EditorStyles.miniBoldLabel);
             DrawProperty("showPlasmaChamber", "Enable Chamber Glow");
-            DrawProperty("leftChamberOffset", "Left Chamber Offset");
-            DrawProperty("rightChamberOffset", "Right Chamber Offset");
+            _showChamberFinePlacement = EditorGUILayout.Foldout(
+                _showChamberFinePlacement, "Fine Chamber Position (Relative)", true);
+            if (_showChamberFinePlacement)
+            {
+                EditorGUILayout.HelpBox(
+                    "Optional correction relative to Exhaust Effect Position. Leave at zero when moving the complete sparks/glow assembly.",
+                    MessageType.None);
+                DrawProperty("leftChamberOffset", "Left Fine Position");
+                DrawProperty("rightChamberOffset", "Right Fine Position");
+            }
             EditorGUILayout.PropertyField(_chamberColor, new GUIContent("Chamber Color"));
             EditorGUILayout.PropertyField(_chamberSize, new GUIContent("Chamber Size"));
             EditorGUILayout.PropertyField(_chamberIntensity,
@@ -268,41 +283,26 @@ public sealed class PropulsionWakeTuningEditor : Editor
 
             if (GUILayout.Button("Reset All Plasma Element Placement"))
             {
-                ResetVectors("leftPlasmaOffset", "rightPlasmaOffset",
+                ResetVectors("leftExhaustEffectOffset", "rightExhaustEffectOffset",
+                    "leftExhaustEffectRotation", "rightExhaustEffectRotation",
                     "leftChamberOffset", "rightChamberOffset", "leftMoteOffset",
                     "rightMoteOffset", "leftMoteRotation", "rightMoteRotation",
                     "leftSparkOffset", "rightSparkOffset", "leftSparkRotation",
                     "rightSparkRotation");
             }
-        using (new EditorGUI.DisabledScope(EditorApplication.isPlaying))
-        {
-            if (GUILayout.Button("Add / Select Separate Plasma FX Rig"))
-                AddOrSelectPlasmaRig();
-        }
-        if (EditorApplication.isPlaying)
-            EditorGUILayout.HelpBox("Stop Play Mode before adding the separate placement prefab.",
-                MessageType.None);
         EditorGUILayout.Space(8f);
 
-        EditorGUILayout.LabelField("NOZZLE PLACEMENT", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("SCENE PLACEMENT GIZMOS", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Move the named LEFT/RIGHT exhaust anchor transforms directly onto the pipe openings. " +
-            "There is no additional runtime offset.", MessageType.None);
-        EditorGUILayout.PropertyField(_pivot, new GUIContent("Particle Origin"));
+            "Exhaust Pipe moves the real nozzle and every effect. Exhaust Effect moves only sparks/glow relative to that pipe.",
+            MessageType.None);
         EditorGUILayout.Space(3f);
         EditorGUILayout.LabelField("Scene Placement Handle", EditorStyles.miniBoldLabel);
         _handleElement = (HandleElement)EditorGUILayout.EnumPopup("Element", _handleElement);
         _handleSide = (HandleSide)EditorGUILayout.EnumPopup("Side", _handleSide);
         EditorGUILayout.HelpBox(
-            "Select the hovercraft's Propulsion Wake Placement Rig, then use the colored Scene handle to position and aim this one element.",
+            "Select the hovercraft's Propulsion Wake Placement Rig, choose Exhaust Pipe or Exhaust Effect, then place each side directly in the Scene view.",
             MessageType.None);
-        if (GUILayout.Button("Reset Particle Origin"))
-        {
-            _leftOffset.vector3Value = Vector3.zero;
-            _rightOffset.vector3Value = Vector3.zero;
-            _pivot.floatValue = 0.5f;
-        }
-
         EditorGUILayout.Space(8f);
         _showAdvanced = EditorGUILayout.Foldout(_showAdvanced, "Advanced Layer Controls", true);
         if (_showAdvanced)
@@ -314,9 +314,41 @@ public sealed class PropulsionWakeTuningEditor : Editor
     private void OnSceneGUI()
     {
         PropulsionWakeTuning tuning = (PropulsionWakeTuning)target;
+        if (tuning == null || tuning.transform == null || serializedObject == null)
+            return;
+
+        if (_handleElement == HandleElement.ExhaustPipe)
+        {
+            Transform nozzle = ResolveExhaustAnchor(tuning, _handleSide == HandleSide.Left);
+            if (nozzle == null)
+                return;
+
+            Handles.color = _handleSide == HandleSide.Left
+                ? new Color(0.15f, 0.95f, 1f, 1f)
+                : new Color(0.78f, 0.35f, 1f, 1f);
+            EditorGUI.BeginChangeCheck();
+            Vector3 movedPipe = Handles.PositionHandle(nozzle.position, nozzle.rotation);
+            Quaternion aimedPipe = Handles.RotationHandle(nozzle.rotation, movedPipe);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(nozzle, "Place exhaust pipe effect anchor");
+                nozzle.SetPositionAndRotation(movedPipe, aimedPipe);
+                EditorUtility.SetDirty(nozzle);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(nozzle);
+            }
+            Handles.Label(movedPipe, $"  {_handleSide} Exhaust Pipe - ALL TRAILS",
+                EditorStyles.boldLabel);
+            return;
+        }
+
         if (!TryResolveHandleTarget(tuning, out Transform anchor,
             out string positionPropertyName, out string rotationPropertyName,
-            out Vector3 masterOffset))
+            out Vector3 masterOffset, out Vector3 masterEulerRotation))
+            return;
+
+        // Prefab refreshes, Undo and Play/Edit transitions can destroy an anchor
+        // between selection and the next SceneView repaint.
+        if (anchor == null)
             return;
 
         serializedObject.Update();
@@ -327,12 +359,14 @@ public sealed class PropulsionWakeTuningEditor : Editor
         if (positionProperty == null)
             return;
 
-        Vector3 totalLocalPosition = masterOffset + positionProperty.vector3Value;
+        Quaternion masterRotation = Quaternion.Euler(masterEulerRotation);
+        Vector3 totalLocalPosition = masterOffset +
+            masterRotation * positionProperty.vector3Value;
         Vector3 worldPosition = anchor.TransformPoint(totalLocalPosition);
         Quaternion localRotation = rotationProperty != null
             ? Quaternion.Euler(rotationProperty.vector3Value)
             : Quaternion.identity;
-        Quaternion worldRotation = anchor.rotation * localRotation;
+        Quaternion worldRotation = anchor.rotation * masterRotation * localRotation;
 
         Handles.color = _handleSide == HandleSide.Left
             ? new Color(1f, 0.28f, 0.60f, 1f)
@@ -345,11 +379,12 @@ public sealed class PropulsionWakeTuningEditor : Editor
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(tuning, "Place propulsion VFX element");
-            positionProperty.vector3Value = anchor.InverseTransformPoint(movedPosition)
-                - masterOffset;
+            positionProperty.vector3Value = Quaternion.Inverse(masterRotation) *
+                (anchor.InverseTransformPoint(movedPosition) - masterOffset);
             if (rotationProperty != null)
             {
-                Quaternion movedLocal = Quaternion.Inverse(anchor.rotation) * movedRotation;
+                Quaternion movedLocal = Quaternion.Inverse(anchor.rotation * masterRotation) *
+                    movedRotation;
                 rotationProperty.vector3Value = movedLocal.eulerAngles;
             }
             serializedObject.ApplyModifiedProperties();
@@ -357,66 +392,35 @@ public sealed class PropulsionWakeTuningEditor : Editor
         }
 
         Handles.Label(movedPosition,
-            $"  {_handleSide} {_handleElement}", EditorStyles.boldLabel);
+            $"  {_handleSide} Exhaust Effect - SPARKS + GLOW", EditorStyles.boldLabel);
     }
 
     private bool TryResolveHandleTarget(PropulsionWakeTuning tuning,
         out Transform anchor, out string positionProperty, out string rotationProperty,
-        out Vector3 masterOffset)
+        out Vector3 masterOffset, out Vector3 masterEulerRotation)
     {
+        anchor = null;
+        positionProperty = null;
+        rotationProperty = null;
+        masterOffset = Vector3.zero;
+        masterEulerRotation = Vector3.zero;
+        if (tuning == null || tuning.transform == null)
+            return false;
+
         bool left = _handleSide == HandleSide.Left;
-        bool plasmaElement = _handleElement == HandleElement.PipeChamber ||
-            _handleElement == HandleElement.PlasmaMotes ||
-            _handleElement == HandleElement.ExpelledSparks;
-        CraftFeedbackSystem feedback = tuning.GetComponentInParent<CraftFeedbackSystem>();
-        Transform searchRoot = plasmaElement && feedback != null
-            ? (feedback.plasmaEffectsPlacementRoot != null
-                ? feedback.plasmaEffectsPlacementRoot
-                : FindDescendant(feedback.transform, "PlasmaFX_Rig"))
-            : tuning.transform;
-        string anchorName = plasmaElement
-            ? (left ? "LEFT PLASMA FX - PLACE ON NOZZLE"
-                : "RIGHT PLASMA FX - PLACE ON NOZZLE")
-            : (left ? "LEFT EXHAUST - PLACE ON NOZZLE"
-                : "RIGHT EXHAUST - PLACE ON NOZZLE");
-        anchor = FindDescendant(searchRoot, anchorName);
-        masterOffset = plasmaElement
-            ? (left ? tuning.leftPlasmaOffset : tuning.rightPlasmaOffset)
-            : Vector3.zero;
+        anchor = ResolveExhaustAnchor(tuning, left);
 
         string side = left ? "left" : "right";
-        switch (_handleElement)
-        {
-            case HandleElement.HotCore:
-                positionProperty = side + "CoreOffset";
-                rotationProperty = side + "CoreRotation";
-                break;
-            case HandleElement.PlasmaPlume:
-                positionProperty = side + "PlumeOffset";
-                rotationProperty = side + "PlumeRotation";
-                break;
-            case HandleElement.IonFilaments:
-                positionProperty = side + "FilamentOffset";
-                rotationProperty = side + "FilamentRotation";
-                break;
-            case HandleElement.MemoryRibbon:
-                positionProperty = side + "RibbonOffset";
-                rotationProperty = side + "RibbonRotation";
-                break;
-            case HandleElement.PipeChamber:
-                positionProperty = side + "ChamberOffset";
-                rotationProperty = null;
-                break;
-            case HandleElement.PlasmaMotes:
-                positionProperty = side + "MoteOffset";
-                rotationProperty = side + "MoteRotation";
-                break;
-            default:
-                positionProperty = side + "SparkOffset";
-                rotationProperty = side + "SparkRotation";
-                break;
-        }
+        positionProperty = side + "ExhaustEffectOffset";
+        rotationProperty = side + "ExhaustEffectRotation";
         return anchor != null;
+    }
+
+    private static Transform ResolveExhaustAnchor(PropulsionWakeTuning tuning, bool left)
+    {
+        return tuning == null ? null : FindDescendant(tuning.transform,
+            left ? "LEFT EXHAUST - PLACE ON NOZZLE"
+                 : "RIGHT EXHAUST - PLACE ON NOZZLE");
     }
 
     private void DrawProperty(string propertyName, string label)
@@ -450,67 +454,18 @@ public sealed class PropulsionWakeTuningEditor : Editor
         }
     }
 
-    private void AddOrSelectPlasmaRig()
-    {
-        PropulsionWakeTuning tuning = (PropulsionWakeTuning)target;
-        CraftFeedbackSystem feedback = tuning.GetComponentInParent<CraftFeedbackSystem>();
-        if (feedback == null)
-        {
-            EditorUtility.DisplayDialog("Hovercraft feedback system not found",
-                "Place this propulsion rig below the hovercraft before adding the plasma-effects rig.",
-                "OK");
-            return;
-        }
-
-        Transform existing = FindDescendant(feedback.transform, "PlasmaFX_Rig");
-        if (existing != null)
-        {
-            feedback.plasmaEffectsPlacementRoot = existing;
-            EditorUtility.SetDirty(feedback);
-            Selection.activeTransform = existing;
-            EditorGUIUtility.PingObject(existing.gameObject);
-            return;
-        }
-
-        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlasmaPlacementPrefabPath);
-        if (prefab == null)
-        {
-            EditorUtility.DisplayDialog("Plasma prefab not found",
-                "Expected prefab at " + PlasmaPlacementPrefabPath, "OK");
-            return;
-        }
-
-        GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab,
-            feedback.transform);
-        Undo.RegisterCreatedObjectUndo(instance, "Add separate plasma FX rig");
-        instance.transform.localPosition = Vector3.zero;
-        instance.transform.localRotation = Quaternion.identity;
-        instance.transform.localScale = Vector3.one;
-        Transform sourceLeft = FindDescendant(tuning.transform,
-            "LEFT EXHAUST - PLACE ON NOZZLE");
-        Transform sourceRight = FindDescendant(tuning.transform,
-            "RIGHT EXHAUST - PLACE ON NOZZLE");
-        Transform plasmaLeft = FindDescendant(instance.transform,
-            "LEFT PLASMA FX - PLACE ON NOZZLE");
-        Transform plasmaRight = FindDescendant(instance.transform,
-            "RIGHT PLASMA FX - PLACE ON NOZZLE");
-        if (sourceLeft != null && plasmaLeft != null)
-            plasmaLeft.SetPositionAndRotation(sourceLeft.position, sourceLeft.rotation);
-        if (sourceRight != null && plasmaRight != null)
-            plasmaRight.SetPositionAndRotation(sourceRight.position, sourceRight.rotation);
-        Undo.RecordObject(feedback, "Assign separate plasma FX rig");
-        feedback.plasmaEffectsPlacementRoot = instance.transform;
-        EditorUtility.SetDirty(feedback);
-        Selection.activeTransform = instance.transform;
-        EditorGUIUtility.PingObject(instance);
-    }
-
     private static Transform FindDescendant(Transform root, string exactName)
     {
+        if (root == null || string.IsNullOrEmpty(exactName))
+            return null;
+
         Transform[] descendants = root.GetComponentsInChildren<Transform>(true);
         foreach (Transform descendant in descendants)
         {
-            if (descendant.name == exactName)
+            // Unity can leave destroyed-object entries in this array for the duration
+            // of an Undo/prefab/Play transition. Treat them as absent.
+            if (descendant != null && string.Equals(descendant.name, exactName,
+                    System.StringComparison.Ordinal))
                 return descendant;
         }
         return null;
@@ -573,7 +528,8 @@ public sealed class PropulsionWakeTuningEditor : Editor
                 "leftPlumeRotation", "rightPlumeRotation", "leftFilamentOffset",
                 "rightFilamentOffset", "leftFilamentRotation", "rightFilamentRotation",
                 "leftRibbonOffset", "rightRibbonOffset", "leftRibbonRotation",
-                "rightRibbonRotation", "leftPlasmaOffset", "rightPlasmaOffset",
+                "rightRibbonRotation", "leftExhaustEffectOffset", "rightExhaustEffectOffset",
+                "leftExhaustEffectRotation", "rightExhaustEffectRotation",
                 "leftChamberOffset", "rightChamberOffset", "leftMoteOffset",
                 "rightMoteOffset", "leftMoteRotation", "rightMoteRotation",
                 "leftSparkOffset", "rightSparkOffset", "leftSparkRotation",

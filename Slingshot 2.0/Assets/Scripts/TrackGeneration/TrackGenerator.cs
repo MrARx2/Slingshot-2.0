@@ -24,6 +24,11 @@ namespace TrackGeneration
     [RequireComponent(typeof(TrackSeedManager))]
     public class TrackGenerator : MonoBehaviour
     {
+#if UNITY_EDITOR
+        public static event System.Action<TrackGenerator> EditorPreviewBuilt;
+        public static event System.Action<TrackGenerator> EditorPreviewCleared;
+#endif
+
         [Header("Track Design (the actual request)")]
         [Tooltip("Every value generation uses. Style presets INITIALIZE these fields; nothing switches behavior on a preset name at runtime.")]
         public TrackDesignerSettings Designer = TrackStylePresetLibrary.Create(TrackStylePresetLibrary.Balanced);
@@ -35,6 +40,15 @@ namespace TrackGeneration
         [Header("Materials")]
         public Material MainRoadMaterial;
         public Material WallMaterial;
+        [UnityEngine.Serialization.FormerlySerializedAs("GuideLineMaterial")]
+        [Tooltip("Persistent, editable material for road center lines and wall marker bands. Using an asset prevents cached editor previews from falling back to magenta.")]
+        public Material RoadLineMaterial;
+        [Tooltip("Persistent checker/emissive material used by the start/finish beam and floor stripe.")]
+        public Material StartFinishMaterial;
+        [Tooltip("Persistent structural material used by the start/finish pillars.")]
+        public Material StartGatePillarMaterial;
+        [Tooltip("Persistent emissive material shared by checkpoint arches and number labels.")]
+        public Material CheckpointMaterial;
 
         [Header("Generation Output")]
         [SerializeField] private Transform trackRoot;
@@ -48,8 +62,9 @@ namespace TrackGeneration
         [SerializeField, Min(5f)] private float startLineArcOffset = 20f;
 
         [Header("Runtime Start")]
+        [Tooltip("Standalone/player builds may generate when no track exists. In the Unity Editor, Play Mode never silently replaces a missing preview — use Generate New Track explicitly.")]
         [SerializeField] private bool generateOnStart = true;
-        [Tooltip("Keep an editor-generated track when entering Play Mode instead of regenerating.")]
+        [Tooltip("Adopt the complete editor-generated preview when entering Play Mode instead of rebuilding it.")]
         [SerializeField] private bool keepEditorTrackOnPlay = true;
         [SerializeField] private bool placeHovercraftOnStart = true;
         [SerializeField, Min(0f)] private float startLineForwardOffset = 0f;
@@ -77,6 +92,14 @@ namespace TrackGeneration
         [SerializeField, HideInInspector] private int generatedMeshCount;
         [SerializeField, HideInInspector] private int generatedVertexCount;
         [SerializeField, HideInInspector] private int generatedTriangleCount;
+
+        // Generator-owned backup of the start frame. The generated hierarchy normally
+        // carries a TrackStartAnchor, but these values survive editor preview recovery
+        // even when optional runtime component references do not.
+        [SerializeField, HideInInspector] private bool cachedStartFrameValid;
+        [SerializeField, HideInInspector] private Vector3 cachedStartLocalPosition;
+        [SerializeField, HideInInspector] private Vector3 cachedStartLocalForward = Vector3.forward;
+        [SerializeField, HideInInspector] private Vector3 cachedStartLocalUp = Vector3.up;
 
         /// <summary>Flattened generated section list (branch routes appear as consecutive pairs).</summary>
         public List<GeneratedTrackSection> CurrentMacroSections { get; private set; }
@@ -112,6 +135,13 @@ namespace TrackGeneration
 
         private TrackSeedManager _seedManager;
         private ITrackRaceCraft _craft;
+        private bool _isGenerating;
+        private bool _pendingStartPlacement;
+        private float _startPlacementRetryDeadline;
+        private bool _startPlacementFailureLogged;
+
+        private const string GeneratedTrackRootPrefix = "GeneratedTrack_";
+        private const string PendingTrackSuffix = "_pending";
 
         private void Awake()
         {
@@ -125,14 +155,35 @@ namespace TrackGeneration
             // They are reproducible from the saved seed and settings, so keep them in the
             // editor scene for preview and play, but never embed them in the .unity file.
             if (!Application.isPlaying && trackRoot != null)
+            {
+                DisableDebugVisualization(trackRoot.gameObject);
+                RepairGeneratedTrackState(trackRoot.gameObject);
                 MarkGeneratedHierarchyTransient(trackRoot.gameObject);
+            }
         }
 
         /// <summary>Editor save guard for tracks created before transient serialization was introduced.</summary>
         public void PrepareGeneratedTrackForEditorSave()
         {
-            if (!Application.isPlaying && trackRoot != null)
-                MarkGeneratedHierarchyTransient(trackRoot.gameObject);
+            if (Application.isPlaying) return;
+
+            // Domain reloads and interrupted editor sessions can lose the serialized
+            // reference while the transient preview is still alive. Guard every
+            // generated root so a scene save can never embed its procedural meshes.
+            List<GameObject> roots = FindGeneratedTrackRoots();
+            foreach (GameObject root in roots)
+            {
+                DisableDebugVisualization(root);
+                RepairGeneratedTrackState(root);
+                MarkGeneratedHierarchyTransient(root);
+            }
+
+            if (trackRoot == null)
+            {
+                GameObject recovered = SelectNewestCompleteTrack(roots);
+                if (recovered != null)
+                    trackRoot = recovered.transform;
+            }
         }
 #endif
 
@@ -142,7 +193,16 @@ namespace TrackGeneration
 
             if (generateOnStart && !adoptedExisting)
             {
+#if UNITY_EDITOR
+                // Editor track creation is an explicit designer action. A missing or
+                // recovery-stripped preview must never turn Play into an expensive new
+                // random generation — especially because that also changes the seed the
+                // designer believed they were testing. Player builds retain the normal
+                // generate-on-start fallback below.
+                Debug.LogWarning("[TrackGenerator] Play Mode found no complete cached track preview, so automatic editor regeneration was skipped. Exit Play Mode and use 'Generate New Track'.");
+#else
                 GenerateTrack();
+#endif
             }
 
             if (placeHovercraftOnStart)
@@ -153,10 +213,26 @@ namespace TrackGeneration
 
         private void Update()
         {
-            if (!resetHovercraftWithBackspace || Keyboard.current == null)
-                return;
+            if (_pendingStartPlacement)
+            {
+                if (TryPlaceHovercraftAtTrackStart())
+                {
+                    _pendingStartPlacement = false;
+                    _startPlacementFailureLogged = false;
+                }
+                else if (Time.unscaledTime >= _startPlacementRetryDeadline)
+                {
+                    _pendingStartPlacement = false;
+                    if (!_startPlacementFailureLogged)
+                    {
+                        Debug.LogError("[TrackGenerator] Hovercraft placement could not resolve a valid cached track start after retrying. Regenerate or restore the track preview before driving.");
+                        _startPlacementFailureLogged = true;
+                    }
+                }
+            }
 
-            if (Keyboard.current.backspaceKey.wasPressedThisFrame)
+            if (resetHovercraftWithBackspace && Keyboard.current != null &&
+                Keyboard.current.backspaceKey.wasPressedThisFrame)
             {
                 PlaceHovercraftAtTrackStart();
             }
@@ -259,6 +335,28 @@ namespace TrackGeneration
         }
 
         private void GenerateInternal(string command, bool deriveStreamsFromMaster, SeedStream[] changedStreams)
+        {
+            if (_isGenerating)
+            {
+                Debug.LogWarning("[TrackGenerator] Ignored a second generation request while a track is already being built.");
+                return;
+            }
+
+            _isGenerating = true;
+            try
+            {
+                // Repair state left by a domain reload, interrupted generation, or an
+                // older generator version before allocating another full track.
+                ReconcileGeneratedTrackRoots(removeDuplicates: true);
+                GenerateInternalCore(command, deriveStreamsFromMaster, changedStreams);
+            }
+            finally
+            {
+                _isGenerating = false;
+            }
+        }
+
+        private void GenerateInternalCore(string command, bool deriveStreamsFromMaster, SeedStream[] changedStreams)
         {
             if (Config == null)
             {
@@ -487,7 +585,8 @@ namespace TrackGeneration
 
                 // Guidance visuals: center-flat guide lines + wall marker bands
                 // (non-colliding overlay meshes; break only at air gaps/open edges).
-                TrackGuideMarkingBuilder.Build(layout.Sections, resolved.RoadProfile, Designer.Visual, tempRootObj.transform);
+                TrackGuideMarkingBuilder.Build(layout.Sections, resolved.RoadProfile, Designer.Visual,
+                    tempRootObj.transform, RoadLineMaterial);
 
                 // Validate the built objects before committing.
                 int meshCount = 0;
@@ -506,11 +605,15 @@ namespace TrackGeneration
                 var visualizer = tempRootObj.AddComponent<MacroTrackDebugVisualizer>();
                 visualizer.Initialize(seed.BaseSeed, layout.Sections, resolved.RoadProfile);
                 visualizer.SetLayout(layout);
+                visualizer.Level = TrackDebugVisualizationLevel.Off;
+
+                CreateStartAnchor(tempRootObj.transform, layout.Sections[0].StartFrame);
 
                 if (buildRaceCourse)
                 {
                     RaceCourse course = RaceCourseBuilder.Build(tempRootObj.transform, layout, resolved.RoadProfile,
-                        checkpointCount, startLineArcOffset);
+                        checkpointCount, startLineArcOffset, StartFinishMaterial,
+                        StartGatePillarMaterial, CheckpointMaterial);
                     if (course == null)
                     {
                         result.Report.AddFailure(-1, GenerationFailureReason.RaceCourseBuildFailure, "RaceCourse",
@@ -521,8 +624,10 @@ namespace TrackGeneration
                     }
                 }
 
-                // Commit: destroy the previous track and promote the temporary root.
-                if (trackRoot != null) DestroyObject(trackRoot.gameObject);
+                // Commit: release every old/orphaned preview, not only the serialized
+                // reference. Editor recovery can lose that reference while the scene
+                // object remains alive.
+                DestroyGeneratedTrackRootsExcept(tempRootObj);
 
                 tempRootObj.name = $"GeneratedTrack_{seed.BaseSeed}";
                 trackRoot = tempRootObj.transform;
@@ -534,7 +639,13 @@ namespace TrackGeneration
 
                 CurrentMacroSections = layout.Sections;
                 CurrentLayout = layout;
+                CacheStartFrame(tempRootObj.transform, layout.Sections[0].StartFrame);
+                RepairGeneratedTrackState(tempRootObj);
                 UpdateGeneratedMeshStats();
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+                    EditorPreviewBuilt?.Invoke(this);
+#endif
                 return true;
             }
             catch (System.Exception e)
@@ -555,14 +666,118 @@ namespace TrackGeneration
             TrackDebugReportExporter.Export(this);
         }
 
-        /// <summary>Destroys the current generated track (explicit designer action — generation never does this before a successful swap).</summary>
+        /// <summary>Destroys all generated track previews while preserving settings and seeds.</summary>
         [ContextMenu("Clear Track")]
         public void ClearTrack()
         {
-            if (trackRoot != null) DestroyObject(trackRoot.gameObject);
+            DestroyGeneratedTrackRootsExcept(null);
             trackRoot = null;
             CurrentMacroSections = null;
             CurrentLayout = null;
+            UpdateGeneratedMeshStats();
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+                EditorPreviewCleared?.Invoke(this);
+#endif
+        }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Produces the exact lightweight layout needed to rebuild the editor preview.
+        /// CurrentLayout is runtime-only and can be cleared by a script/domain reload
+        /// while the visible DontSaveInEditor hierarchy remains alive. In that case the
+        /// serialized debug visualizer is the authoritative recovery source.
+        /// </summary>
+        public bool TryGetEditorPreviewCacheSnapshot(out int seedValue, out GeneratedTrackLayout layout)
+        {
+            seedValue = 0;
+            layout = null;
+
+            ReconcileGeneratedTrackRoots(removeDuplicates: true);
+
+            if (CurrentLayout?.Sections != null && CurrentLayout.Sections.Count > 0)
+            {
+                layout = CurrentLayout;
+                MacroTrackDebugVisualizer currentVisualizer = trackRoot != null
+                    ? trackRoot.GetComponent<MacroTrackDebugVisualizer>()
+                    : null;
+                seedValue = currentVisualizer != null
+                    ? currentVisualizer.Seed
+                    : (_seedManager ??= GetComponent<TrackSeedManager>()).CurrentSeedInput;
+                return true;
+            }
+
+            if (trackRoot == null)
+                return false;
+
+            MacroTrackDebugVisualizer visualizer = trackRoot.GetComponent<MacroTrackDebugVisualizer>();
+            if (visualizer?.Sections == null || visualizer.Sections.Count == 0)
+                return false;
+
+            layout = new GeneratedTrackLayout
+            {
+                Sections = visualizer.Sections,
+                Quarters = visualizer.Quarters ?? new List<GeneratedTrackQuarter>(),
+                LapLength = MacroTrackSampler.GetTotalLength(visualizer.Sections),
+                EstimatedNeutralLapTime = lastMetrics != null
+                    ? lastMetrics.EstimatedNeutralLapTimeSeconds
+                    : 0f,
+                Metrics = lastMetrics ?? new TrackGenerationMetrics()
+            };
+            seedValue = visualizer.Seed;
+            return true;
+        }
+
+        /// <summary>
+        /// Rebuilds only the render/collider preview from an already-generated layout.
+        /// This is used after Unity restores its Play Mode scene backup: the transient
+        /// mesh hierarchy is intentionally absent from that backup, but the layout cache
+        /// remains alive while Domain Reload is disabled. No procedural planning, seed
+        /// randomization, candidate search, or report replacement occurs here.
+        /// </summary>
+        public bool RestoreEditorPreviewFromCache(int seedValue, GeneratedTrackLayout cachedLayout,
+            bool forceRebuild = false)
+        {
+            if (cachedLayout?.Sections == null || cachedLayout.Sections.Count == 0)
+                return false;
+
+            ReconcileGeneratedTrackRoots(removeDuplicates: true);
+            if (!forceRebuild && TryAdoptExistingTrack())
+                return true;
+
+            var cachedResult = new TrackGenerationResult
+            {
+                Success = true,
+                RequestedSeed = seedValue,
+                Layout = cachedLayout,
+                Report = new TrackGenerationReport()
+            };
+
+            bool restored = TryBuildTransactional(TrackSeed.CreateNew(seedValue), cachedResult);
+            if (!restored)
+            {
+                Debug.LogWarning("[TrackGenerator] The cached track layout could not be restored. Use 'Regenerate Same Seed' to rebuild it.");
+                return false;
+            }
+
+            // Preserve the original generation report and revision. This operation only
+            // restores transient scene objects; it is not a new generation result.
+            Debug.Log($"[TrackGenerator] Restored cached track preview (seed {seedValue}, {cachedLayout.Sections.Count} sections) without rerunning generation.");
+            if (Application.isPlaying && placeHovercraftOnStart)
+                PlaceHovercraftAtTrackStart();
+            return true;
+        }
+#endif
+
+        /// <summary>
+        /// Removes abandoned pending builds and duplicate preview roots. If the serialized
+        /// reference was lost, the newest complete preview is adopted before older copies
+        /// are released. Safe to call repeatedly.
+        /// </summary>
+        [ContextMenu("Clean Stale Generated Tracks")]
+        public void CleanStaleGeneratedTracks()
+        {
+            ReconcileGeneratedTrackRoots(removeDuplicates: true);
             UpdateGeneratedMeshStats();
         }
 
@@ -596,17 +811,228 @@ namespace TrackGeneration
         {
             if (root == null) return;
 
+            // MeshFilter and MeshCollider commonly point to the same runtime Mesh.
+            // Gather first so a shared mesh is destroyed exactly once.
+            var meshes = new HashSet<UnityEngine.Mesh>();
+
             foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>(true))
             {
-                ReleaseMesh(filter.sharedMesh);
+                if (filter.sharedMesh != null)
+                    meshes.Add(filter.sharedMesh);
                 filter.sharedMesh = null;
             }
 
             foreach (MeshCollider collider in root.GetComponentsInChildren<MeshCollider>(true))
             {
-                ReleaseMesh(collider.sharedMesh);
+                if (collider.sharedMesh != null)
+                    meshes.Add(collider.sharedMesh);
                 collider.sharedMesh = null;
             }
+
+            foreach (UnityEngine.Mesh mesh in meshes)
+                ReleaseMesh(mesh);
+        }
+
+        private List<GameObject> FindGeneratedTrackRoots()
+        {
+            var roots = new List<GameObject>();
+            var seen = new HashSet<GameObject>();
+
+            void AddIfGeneratedRoot(GameObject candidate)
+            {
+                if (candidate == null || candidate == gameObject) return;
+                if (!candidate.name.StartsWith(GeneratedTrackRootPrefix, System.StringComparison.Ordinal)) return;
+
+#if UNITY_EDITOR
+                // Resources.FindObjectsOfTypeAll also returns prefab/assets from the
+                // AssetDatabase. Those are not live previews and must never be destroyed.
+                if (UnityEditor.EditorUtility.IsPersistent(candidate)) return;
+#endif
+
+                // Do not clean previews owned by a TrackGenerator in another additive
+                // scene. A DontSaveInEditor preview may temporarily have an invalid scene,
+                // so those candidates still belong in this recovery scan.
+                if (candidate.scene.IsValid() && gameObject.scene.IsValid() &&
+                    candidate.scene != gameObject.scene)
+                    return;
+
+                if (seen.Add(candidate))
+                    roots.Add(candidate);
+            }
+
+            if (gameObject.scene.IsValid() && gameObject.scene.isLoaded)
+            {
+                foreach (GameObject root in gameObject.scene.GetRootGameObjects())
+                    AddIfGeneratedRoot(root);
+            }
+
+            // DontSaveInEditor objects can remain alive, rendered and collidable while
+            // Unity omits them from Scene.GetRootGameObjects(). This was the source of
+            // stacked "ghost" tracks after Generate New Track. Scan all live objects so
+            // transactional replacement can release those hidden cached previews too.
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                foreach (GameObject candidate in Resources.FindObjectsOfTypeAll<GameObject>())
+                    AddIfGeneratedRoot(candidate);
+            }
+            else
+#endif
+            {
+                foreach (GameObject candidate in
+                         UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include))
+                    AddIfGeneratedRoot(candidate);
+            }
+
+            // Preserve awareness of the explicitly referenced root even if Unity is in
+            // the middle of changing its HideFlags/scene registration.
+            if (trackRoot != null)
+                AddIfGeneratedRoot(trackRoot.gameObject);
+
+            return roots;
+        }
+
+        private static bool IsPendingTrack(GameObject root)
+            => root != null && root.name.EndsWith(PendingTrackSuffix, System.StringComparison.Ordinal);
+
+        private static bool HasGeneratedMesh(GameObject root)
+        {
+            if (root == null) return false;
+            foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>(true))
+                if (filter.sharedMesh != null && filter.sharedMesh.vertexCount > 0)
+                    return true;
+            return false;
+        }
+
+        private static GameObject SelectNewestCompleteTrack(List<GameObject> roots)
+        {
+            GameObject selected = null;
+            int highestSibling = int.MinValue;
+            foreach (GameObject root in roots)
+            {
+                if (root == null || IsPendingTrack(root) || !HasGeneratedMesh(root)) continue;
+                int sibling = root.transform.GetSiblingIndex();
+                if (selected == null || sibling >= highestSibling)
+                {
+                    selected = root;
+                    highestSibling = sibling;
+                }
+            }
+            return selected;
+        }
+
+        private void ReconcileGeneratedTrackRoots(bool removeDuplicates)
+        {
+            List<GameObject> roots = FindGeneratedTrackRoots();
+            GameObject selected = trackRoot != null && roots.Contains(trackRoot.gameObject) &&
+                                  !IsPendingTrack(trackRoot.gameObject) && HasGeneratedMesh(trackRoot.gameObject)
+                ? trackRoot.gameObject
+                : SelectNewestCompleteTrack(roots);
+
+            foreach (GameObject root in roots)
+            {
+                if (root == null) continue;
+                DisableDebugVisualization(root);
+
+                if (IsPendingTrack(root) || (removeDuplicates && root != selected))
+                    DestroyObject(root);
+            }
+
+            trackRoot = selected != null ? selected.transform : null;
+
+#if UNITY_EDITOR
+            if (!Application.isPlaying && selected != null)
+            {
+                RepairGeneratedTrackState(selected);
+                MarkGeneratedHierarchyTransient(selected);
+            }
+            else if (selected != null)
+                RepairGeneratedTrackState(selected);
+#else
+            if (selected != null)
+                RepairGeneratedTrackState(selected);
+#endif
+        }
+
+        private void RepairGeneratedTrackState(GameObject root)
+        {
+            if (root == null) return;
+            RepairRoadMaterials(root);
+            RepairGuideLineMaterial(root);
+            RepairRaceCourse(root);
+            EnsureStartAnchor(root.transform);
+        }
+
+        private void RepairRoadMaterials(GameObject root)
+        {
+            if (root == null || (MainRoadMaterial == null && WallMaterial == null)) return;
+
+            foreach (MeshRenderer renderer in root.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                Transform parent = renderer.transform.parent;
+                if (parent == null || !parent.name.StartsWith("Track_", System.StringComparison.Ordinal) ||
+                    !renderer.name.StartsWith("LOD", System.StringComparison.Ordinal)) continue;
+
+                Material[] materials = renderer.sharedMaterials;
+                if (materials == null || materials.Length < 2) materials = new Material[2];
+                if (MainRoadMaterial != null) materials[0] = MainRoadMaterial;
+                if (WallMaterial != null) materials[1] = WallMaterial;
+                renderer.sharedMaterials = materials;
+            }
+        }
+
+        private void RepairGuideLineMaterial(GameObject root)
+        {
+            if (root == null || RoadLineMaterial == null) return;
+            Transform markingRoot = root.transform.Find("TrackGuideMarkings");
+            if (markingRoot == null) return;
+
+            foreach (MeshRenderer renderer in markingRoot.GetComponentsInChildren<MeshRenderer>(true))
+                renderer.sharedMaterial = RoadLineMaterial;
+        }
+
+        private void RepairRaceCourse(GameObject root)
+        {
+            if (root == null) return;
+            RaceCourse course = root.GetComponentInChildren<RaceCourse>(true);
+            if (course != null)
+                course.RepairGeneratedReferences();
+
+            foreach (RaceGate gate in root.GetComponentsInChildren<RaceGate>(true))
+            {
+                if (gate == null) continue;
+                foreach (MeshRenderer renderer in gate.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    Material material;
+                    if (!gate.IsStartFinish)
+                        material = CheckpointMaterial;
+                    else if (renderer.name.StartsWith("Pillar_", System.StringComparison.Ordinal))
+                        material = StartGatePillarMaterial;
+                    else
+                        material = StartFinishMaterial;
+
+                    if (material != null)
+                        renderer.sharedMaterial = material;
+                }
+            }
+        }
+
+        private void DestroyGeneratedTrackRootsExcept(GameObject keep)
+        {
+            List<GameObject> roots = FindGeneratedTrackRoots();
+            foreach (GameObject root in roots)
+            {
+                if (root == null || root == keep) continue;
+                DestroyObject(root);
+            }
+        }
+
+        private static void DisableDebugVisualization(GameObject root)
+        {
+            if (root == null) return;
+            MacroTrackDebugVisualizer visualizer = root.GetComponent<MacroTrackDebugVisualizer>();
+            if (visualizer != null)
+                visualizer.Level = TrackDebugVisualizationLevel.Off;
         }
 
 #if UNITY_EDITOR
@@ -659,6 +1085,7 @@ namespace TrackGeneration
         /// </summary>
         private bool TryAdoptExistingTrack()
         {
+            ReconcileGeneratedTrackRoots(removeDuplicates: true);
             if (trackRoot == null) return false;
 
             bool hasMesh = false;
@@ -676,16 +1103,43 @@ namespace TrackGeneration
                     MarkGeneratedHierarchyTransient(trackRoot.gameObject);
 #endif
                 CurrentMacroSections = visualizer.Sections;
+                RepairGeneratedTrackState(trackRoot.gameObject);
                 UpdateGeneratedMeshStats();
                 Debug.Log($"[TrackGenerator] Keeping editor-generated track (seed {visualizer.Seed}, {visualizer.Sections.Count} sections).");
                 return true;
             }
 
-            return false;
+            // Section records power diagnostics, but they are not required to render,
+            // collide with, or race on an already-built preview. Recovery and hot reload
+            // can strip that optional list while leaving every mesh and RaceCourse object
+            // intact. Treat the complete mesh hierarchy as the authoritative cache rather
+            // than throwing it away and generating an unrelated road.
+            CurrentMacroSections = visualizer != null ? visualizer.Sections : null;
+            CurrentLayout = null;
+            RepairGeneratedTrackState(trackRoot.gameObject);
+            UpdateGeneratedMeshStats();
+            Debug.LogWarning("[TrackGenerator] Keeping the existing editor-generated track. Its optional section diagnostics were unavailable, but the playable mesh cache is complete.");
+            return true;
         }
 
         [ContextMenu("Place Hovercraft At Track Start")]
         public void PlaceHovercraftAtTrackStart()
+        {
+            if (TryPlaceHovercraftAtTrackStart())
+            {
+                _pendingStartPlacement = false;
+                _startPlacementFailureLogged = false;
+                return;
+            }
+
+            // Cache restoration and scene activation can finish after Start on the
+            // first frame. Keep the request alive briefly rather than leaving the
+            // craft at its unrelated scene-authored position in empty space.
+            _pendingStartPlacement = true;
+            _startPlacementRetryDeadline = Time.unscaledTime + 2f;
+        }
+
+        private bool TryPlaceHovercraftAtTrackStart()
         {
             // `??=` is a plain C# null check, so it cannot see a craft whose
             // GameObject has been destroyed — the interface reference stays
@@ -697,14 +1151,12 @@ namespace TrackGeneration
 
             if (_craft == null || _craft.CraftTransform == null)
             {
-                Debug.LogWarning("[TrackGenerator] Could not place hovercraft: no ITrackRaceCraft found in the scene.");
-                return;
+                return false;
             }
 
             if (!TryGetTrackStartFrame(out Vector3 position, out Vector3 forward, out Vector3 up))
             {
-                Debug.LogWarning("[TrackGenerator] Could not place hovercraft: generate a track first.");
-                return;
+                return false;
             }
 
             up = up.sqrMagnitude > 0.001f ? up.normalized : Vector3.up;
@@ -736,25 +1188,166 @@ namespace TrackGeneration
                 RaceCourse course = trackRoot.GetComponentInChildren<RaceCourse>(true);
                 if (course != null) course.NotifyRespawn();
             }
+
+            return true;
         }
 
         private bool TryGetTrackStartFrame(out Vector3 position, out Vector3 forward, out Vector3 up)
         {
             Transform root = trackRoot != null ? trackRoot : transform;
 
-            if (CurrentMacroSections != null && CurrentMacroSections.Count > 0)
+            if (trackRoot != null)
             {
-                TrackConnectionFrame start = CurrentMacroSections[0].StartFrame;
+                Transform anchor = trackRoot.Find("TrackStartAnchor");
+                if (anchor != null)
+                {
+                    position = anchor.position;
+                    forward = anchor.forward;
+                    up = anchor.up;
+                    return true;
+                }
+            }
+
+            MacroTrackDebugVisualizer visualizer = trackRoot != null
+                ? trackRoot.GetComponent<MacroTrackDebugVisualizer>()
+                : null;
+            List<GeneratedTrackSection> ownedSections = visualizer != null ? visualizer.Sections : null;
+            if (ownedSections != null && ownedSections.Count > 0)
+            {
+                TrackConnectionFrame start = ownedSections[0].StartFrame;
                 position = root.TransformPoint(start.Position);
                 forward = root.TransformDirection(start.Forward);
                 up = root.TransformDirection(start.Up);
                 return true;
             }
 
+            // A recovered mesh-only preview can lose its optional section diagnostics.
+            // The race gate still provides a stable, driveable frame instead of leaving
+            // the craft at an unrelated scene position.
+            if (trackRoot != null)
+            {
+                RaceCourse course = trackRoot.GetComponentInChildren<RaceCourse>(true);
+                if (course != null)
+                    course.RepairGeneratedReferences();
+
+                RaceGate startGate = course != null ? course.StartFinishGate : null;
+                if (startGate == null)
+                {
+                    foreach (RaceGate candidate in trackRoot.GetComponentsInChildren<RaceGate>(true))
+                    {
+                        if (candidate != null && candidate.IsStartFinish)
+                        {
+                            startGate = candidate;
+                            break;
+                        }
+                    }
+                }
+
+                if (startGate != null)
+                {
+                    Transform gate = startGate.transform;
+                    position = gate.position;
+                    forward = gate.forward;
+                    up = gate.up;
+                    return true;
+                }
+
+                // The serialized generator-owned frame is deliberately last: only use
+                // it while a complete cached mesh is present, never as permission to
+                // spawn into empty space when the preview itself is missing.
+                if (cachedStartFrameValid && HasGeneratedMesh(trackRoot.gameObject))
+                {
+                    position = transform.TransformPoint(cachedStartLocalPosition);
+                    forward = transform.TransformDirection(cachedStartLocalForward);
+                    up = transform.TransformDirection(cachedStartLocalUp);
+                    return true;
+                }
+            }
+
             position = Vector3.zero;
             forward = Vector3.forward;
             up = Vector3.up;
             return false;
+        }
+
+        private void CreateStartAnchor(Transform root, TrackConnectionFrame frame)
+        {
+            if (root == null) return;
+            Transform existing = root.Find("TrackStartAnchor");
+            Transform anchor;
+            if (existing != null)
+            {
+                anchor = existing;
+            }
+            else
+            {
+                GameObject anchorObject = new GameObject("TrackStartAnchor");
+                anchorObject.transform.SetParent(root, false);
+                anchor = anchorObject.transform;
+            }
+
+            anchor.localPosition = frame.Position;
+            Vector3 frameUp = frame.Up.sqrMagnitude > 0.001f ? frame.Up.normalized : Vector3.up;
+            Vector3 frameForward = Vector3.ProjectOnPlane(frame.Forward, frameUp);
+            frameForward = frameForward.sqrMagnitude > 0.001f ? frameForward.normalized : Vector3.forward;
+            anchor.localRotation = Quaternion.LookRotation(frameForward, frameUp);
+        }
+
+        private void CacheStartFrame(Transform root, TrackConnectionFrame frame)
+        {
+            if (root == null) return;
+            cachedStartLocalPosition = transform.InverseTransformPoint(root.TransformPoint(frame.Position));
+            cachedStartLocalForward = transform.InverseTransformDirection(root.TransformDirection(frame.Forward)).normalized;
+            cachedStartLocalUp = transform.InverseTransformDirection(root.TransformDirection(frame.Up)).normalized;
+            cachedStartFrameValid = cachedStartLocalForward.sqrMagnitude > 0.001f &&
+                                    cachedStartLocalUp.sqrMagnitude > 0.001f;
+        }
+
+        private void EnsureStartAnchor(Transform root)
+        {
+            if (root == null || root.Find("TrackStartAnchor") != null) return;
+
+            // Always prefer metadata belonging to THIS hierarchy. With domain reload
+            // disabled, CurrentMacroSections can still point at the previous track
+            // during the first adoption pass.
+            MacroTrackDebugVisualizer visualizer = root.GetComponent<MacroTrackDebugVisualizer>();
+            List<GeneratedTrackSection> sections = visualizer != null ? visualizer.Sections : null;
+
+            if (sections != null && sections.Count > 0)
+            {
+                CreateStartAnchor(root, sections[0].StartFrame);
+                CacheStartFrame(root, sections[0].StartFrame);
+                return;
+            }
+
+            RaceGate startGate = null;
+            foreach (RaceGate gate in root.GetComponentsInChildren<RaceGate>(true))
+            {
+                if (gate != null && gate.IsStartFinish)
+                {
+                    startGate = gate;
+                    break;
+                }
+            }
+
+            GameObject anchorObject = new GameObject("TrackStartAnchor");
+            anchorObject.transform.SetParent(root, false);
+
+            if (startGate != null)
+            {
+                anchorObject.transform.SetPositionAndRotation(startGate.transform.position, startGate.transform.rotation);
+            }
+            else if (cachedStartFrameValid && HasGeneratedMesh(root.gameObject))
+            {
+                anchorObject.transform.SetPositionAndRotation(
+                    transform.TransformPoint(cachedStartLocalPosition),
+                    Quaternion.LookRotation(transform.TransformDirection(cachedStartLocalForward),
+                        transform.TransformDirection(cachedStartLocalUp)));
+            }
+            else
+            {
+                DestroyObject(anchorObject);
+            }
         }
 
         // ─────────────────────────── Stats / logging ───────────────────────────

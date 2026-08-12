@@ -649,7 +649,7 @@ namespace TrackGeneration.Design
         public bool CenterGuideEnabled = true;
 
         [Tooltip("Center guide color (shader-based — never raised collision geometry).")]
-        public Color CenterGuideColor = Color.white;
+        public Color CenterGuideColor = new Color(0.55f, 0.95f, 1f, 1f);
 
         [Tooltip("Guide line width in meters.")]
         [Range(0.05f, 2f)] public float CenterGuideWidth = 0.35f;
@@ -662,7 +662,7 @@ namespace TrackGeneration.Design
         public bool WallMarkersEnabled = true;
 
         [Tooltip("Wall marker color.")]
-        public Color WallMarkerColor = Color.white;
+        public Color WallMarkerColor = new Color(0.55f, 0.95f, 1f, 1f);
 
         [Tooltip("Marker line width along the track (meters).")]
         [Range(0.1f, 4f)] public float WallMarkerWidth = 0.8f;

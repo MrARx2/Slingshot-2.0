@@ -109,18 +109,26 @@ public sealed class PropulsionWakeTuning : MonoBehaviour
     public Vector3 leftRibbonRotation = Vector3.zero;
     public Vector3 rightRibbonRotation = Vector3.zero;
 
-    [Header("Plasma Sparks")]
+    [Header("Exhaust Effect")]
     [Tooltip("Adds hot plasma fragments that peel away from each exhaust under load.")]
     public bool showPlasmaSparks = true;
 
     [Tooltip("Shows the compact plasma glow sitting inside each exhaust pipe.")]
     public bool showPlasmaChamber = true;
 
-    [Tooltip("Fine local correction for the left plasma chamber and sparks only. XYZ follows the left plasma socket axes.")]
-    public Vector3 leftPlasmaOffset = Vector3.zero;
+    [Tooltip("Moves the left chamber, motes, and sparks assembly relative to the left exhaust pipe.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("leftPlasmaOffset")]
+    public Vector3 leftExhaustEffectOffset = Vector3.zero;
 
-    [Tooltip("Fine local correction for the right plasma chamber and sparks only. XYZ follows the right plasma socket axes.")]
-    public Vector3 rightPlasmaOffset = Vector3.zero;
+    [Tooltip("Moves the right chamber, motes, and sparks assembly relative to the right exhaust pipe.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("rightPlasmaOffset")]
+    public Vector3 rightExhaustEffectOffset = Vector3.zero;
+
+    [Tooltip("Aims the complete left chamber, motes, and sparks assembly relative to the exhaust trail.")]
+    public Vector3 leftExhaustEffectRotation = Vector3.zero;
+
+    [Tooltip("Aims the complete right chamber, motes, and sparks assembly relative to the exhaust trail.")]
+    public Vector3 rightExhaustEffectRotation = Vector3.zero;
 
     [Tooltip("Additional placement for the compact pipe chamber only, after the master plasma offset.")]
     public Vector3 leftChamberOffset = Vector3.zero;
@@ -159,14 +167,14 @@ public sealed class PropulsionWakeTuning : MonoBehaviour
     [Tooltip("Brightness and particle density of the plasma chamber.")]
     [Range(0f, 3f)] public float chamberIntensity = 1f;
 
-    [Tooltip("HDR head color of expelled plasma sparks.")]
+    [Tooltip("HDR head color of the expelled exhaust sparks.")]
     [ColorUsage(true, true)] public Color plasmaSparkColor =
         new Color(2.2f, 1.25f, 0.62f, 1f);
 
-    [Tooltip("Number of plasma sparks. This is separate from the general detail density.")]
+    [Tooltip("Number of expelled exhaust sparks. This is separate from the general detail density.")]
     [Range(0f, 3f)] public float sparkAmount = 1f;
 
-    [Tooltip("Physical size of individual plasma sparks.")]
+    [Tooltip("Physical size of individual exhaust sparks.")]
     [Range(0.2f, 3f)] public float sparkSize = 1f;
 
     [Tooltip("How quickly sparks are expelled behind the craft.")]
@@ -175,7 +183,7 @@ public sealed class PropulsionWakeTuning : MonoBehaviour
     [Tooltip("How widely sparks scatter around the main exhaust beam.")]
     [Range(0.2f, 3f)] public float sparkSpread = 1f;
 
-    [Tooltip("How long plasma sparks remain visible.")]
+    [Tooltip("How long exhaust sparks remain visible.")]
     [Range(0.2f, 3f)] public float sparkLifetime = 1f;
 
     [Tooltip("Visual length of individual spark streaks, independent from the main exhaust streaks.")]

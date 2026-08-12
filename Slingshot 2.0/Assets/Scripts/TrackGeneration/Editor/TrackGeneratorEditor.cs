@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -12,6 +13,372 @@ using TrackGeneration.Planning;
 
 namespace TrackGeneration.Editor
 {
+    /// <summary>
+    /// Keeps the generated layout (not its heavy procedural meshes) across Unity's
+    /// Play Mode backup restore. The backup correctly excludes DontSaveInEditor track
+    /// objects; after Play, this recreates only that exact preview from the cached layout.
+    /// </summary>
+    [InitializeOnLoad]
+    internal static class TrackGeneratorPlayPreviewCache
+    {
+        [System.Serializable]
+        private sealed class CachedPreview
+        {
+            public string ScenePath;
+            public string GeneratorPath;
+            public int Seed;
+            public string Fingerprint;
+            public GeneratedTrackLayout Layout;
+        }
+
+        [System.Serializable]
+        private sealed class CachedPreviewFile
+        {
+            public List<CachedPreview> Entries = new List<CachedPreview>();
+        }
+
+        private static readonly Dictionary<string, CachedPreview> Previews =
+            new Dictionary<string, CachedPreview>();
+        private static readonly string CacheFilePath = Path.Combine(
+            Directory.GetParent(Application.dataPath).FullName, "Library", "SlingshotTrackPreviewCache.json");
+        private static bool cacheFileKnownValid;
+        private static bool cancelledPlayTransitionNeedsRepair;
+
+        static TrackGeneratorPlayPreviewCache()
+        {
+            LoadFromDisk();
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+            TrackGenerator.EditorPreviewBuilt += OnEditorPreviewBuilt;
+            TrackGenerator.EditorPreviewCleared += Forget;
+        }
+
+        private static void OnEditorPreviewBuilt(TrackGenerator generator)
+        {
+            // A deliberate generator build may change internal samples while retaining
+            // the same seed and section endpoints. Always persist that new source data.
+            Capture(generator, forceWrite: true);
+        }
+
+        internal static bool Capture(TrackGenerator generator)
+            => Capture(generator, forceWrite: false);
+
+        private static bool Capture(TrackGenerator generator, bool forceWrite)
+        {
+            if (generator == null ||
+                !generator.TryGetEditorPreviewCacheSnapshot(out int seed, out GeneratedTrackLayout layout))
+                return false;
+
+            string scenePath = generator.gameObject.scene.path;
+            string generatorPath = GetHierarchyPath(generator.transform);
+            string key = CacheKey(scenePath, generatorPath);
+            string fingerprint = ComputeLayoutFingerprint(seed, layout);
+
+            // The layout cache is large. Rewriting the identical payload at every
+            // Play click both stalls the editor and gives virus scanners/indexers a
+            // needless opportunity to hold the destination file open.
+            if (!forceWrite && cacheFileKnownValid &&
+                Previews.TryGetValue(key, out CachedPreview existing) &&
+                existing.Seed == seed && existing.Fingerprint == fingerprint)
+            {
+                existing.Layout = layout;
+                return true;
+            }
+
+            Previews[key] = new CachedPreview
+            {
+                ScenePath = scenePath,
+                GeneratorPath = generatorPath,
+                Seed = seed,
+                Fingerprint = fingerprint,
+                Layout = layout
+            };
+            return SaveToDisk();
+        }
+
+        internal static void Forget(TrackGenerator generator)
+        {
+            if (generator == null) return;
+            Previews.Remove(CacheKey(generator.gameObject.scene.path, GetHierarchyPath(generator.transform)));
+            SaveToDisk();
+        }
+
+        internal static bool Repair(TrackGenerator generator)
+        {
+            if (generator == null)
+                return false;
+
+            string key = CacheKey(generator.gameObject.scene.path, GetHierarchyPath(generator.transform));
+            if (!Previews.TryGetValue(key, out CachedPreview cached) ||
+                cached.Layout?.Sections == null || cached.Layout.Sections.Count == 0)
+            {
+                LoadFromDisk();
+                Previews.TryGetValue(key, out cached);
+            }
+
+            if (cached?.Layout?.Sections == null || cached.Layout.Sections.Count == 0)
+                return false;
+
+            bool repaired = generator.RestoreEditorPreviewFromCache(
+                cached.Seed, cached.Layout, forceRebuild: true);
+            if (repaired)
+                SceneView.RepaintAll();
+            return repaired;
+        }
+
+        private static void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.ExitingEditMode)
+            {
+                bool allPreviewsReady = true;
+                foreach (TrackGenerator generator in
+                    Object.FindObjectsByType<TrackGenerator>(FindObjectsInactive.Include))
+                {
+                    if (!Capture(generator))
+                    {
+                        allPreviewsReady = false;
+                        Debug.LogError(
+                            $"[TrackGenerator] Play Mode was stopped because the preview cache for " +
+                            $"'{generator.name}' could not be verified. The editor preview will be repaired " +
+                            "after the Play transition is cancelled; then press Play again.");
+                    }
+                }
+
+                // A track made from DontSaveInEditor meshes is deliberately omitted
+                // from Unity's Play Mode scene copy. Entering Play without its compact
+                // layout cache can only strand the craft in empty space, so fail safely.
+                if (!allPreviewsReady)
+                {
+                    cancelledPlayTransitionNeedsRepair = true;
+                    EditorApplication.isPlaying = false;
+                }
+            }
+            else if (state == PlayModeStateChange.EnteredPlayMode)
+            {
+                // Generated previews carry DontSaveInEditor and are intentionally absent
+                // from Unity's Play Mode scene backup. Rebuild the exact cached layout
+                // immediately after that backup has been applied.
+                EditorApplication.delayCall += RestoreMissingPreviewsForPlayMode;
+            }
+            else if (state == PlayModeStateChange.EnteredEditMode && Previews.Count > 0)
+            {
+                // Unity finishes applying the backup at the end of this state change.
+                EditorApplication.delayCall += RestoreMissingPreviews;
+            }
+        }
+
+        private static void RestoreMissingPreviews()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                return;
+
+            foreach (TrackGenerator generator in
+                Object.FindObjectsByType<TrackGenerator>(FindObjectsInactive.Include))
+            {
+                string scenePath = generator.gameObject.scene.path;
+                string generatorPath = GetHierarchyPath(generator.transform);
+                if (!Previews.TryGetValue(CacheKey(scenePath, generatorPath), out CachedPreview cached) ||
+                    cached.Layout == null)
+                    continue;
+
+                // Unity may have started stripping DontSaveInEditor objects before a
+                // failed Play transition was cancelled. Never adopt that possibly
+                // partial hierarchy; rebuild one complete preview transactionally.
+                generator.RestoreEditorPreviewFromCache(cached.Seed, cached.Layout,
+                    forceRebuild: cancelledPlayTransitionNeedsRepair);
+            }
+
+            cancelledPlayTransitionNeedsRepair = false;
+            SceneView.RepaintAll();
+        }
+
+        private static void RestoreMissingPreviewsForPlayMode()
+        {
+            if (!EditorApplication.isPlaying)
+                return;
+
+            // Rehydrate plain serializable data rather than retaining references owned
+            // by the Edit Mode hierarchy Unity just removed from its scene backup.
+            LoadFromDisk();
+            RestoreForCurrentGenerators();
+        }
+
+        private static void RestoreForCurrentGenerators()
+        {
+            if (Previews.Count == 0)
+                LoadFromDisk();
+
+            foreach (TrackGenerator generator in
+                Object.FindObjectsByType<TrackGenerator>(FindObjectsInactive.Include))
+            {
+                string scenePath = generator.gameObject.scene.path;
+                string generatorPath = GetHierarchyPath(generator.transform);
+                if (!Previews.TryGetValue(CacheKey(scenePath, generatorPath), out CachedPreview cached) ||
+                    cached.Layout?.Sections == null || cached.Layout.Sections.Count == 0)
+                    continue;
+
+                if (generator.TrackRoot == null)
+                    generator.RestoreEditorPreviewFromCache(cached.Seed, cached.Layout);
+            }
+        }
+
+        private static bool SaveToDisk()
+        {
+            string temporaryPath = null;
+            try
+            {
+                var file = new CachedPreviewFile();
+                file.Entries.AddRange(Previews.Values);
+                Directory.CreateDirectory(Path.GetDirectoryName(CacheFilePath));
+                string json = JsonUtility.ToJson(file);
+                if (string.IsNullOrWhiteSpace(json) || json == "{}")
+                    throw new System.InvalidOperationException("Unity produced an empty preview-cache payload.");
+
+                // Never write into the live cache. Complete a unique sibling file,
+                // then atomically replace the destination. A brief Windows sharing
+                // lock is retried instead of being treated as corrupted track data.
+                temporaryPath = CacheFilePath + "." + System.Guid.NewGuid().ToString("N") + ".writing";
+                File.WriteAllText(temporaryPath, json);
+
+                System.Exception lastException = null;
+                for (int attempt = 0; attempt < 8; attempt++)
+                {
+                    try
+                    {
+                        if (File.Exists(CacheFilePath))
+                            File.Replace(temporaryPath, CacheFilePath, null);
+                        else
+                            File.Move(temporaryPath, CacheFilePath);
+
+                        cacheFileKnownValid = File.Exists(CacheFilePath) &&
+                            new FileInfo(CacheFilePath).Length > 0;
+                        return cacheFileKnownValid;
+                    }
+                    catch (System.IO.IOException exception)
+                    {
+                        lastException = exception;
+                    }
+                    catch (System.UnauthorizedAccessException exception)
+                    {
+                        lastException = exception;
+                    }
+
+                    System.Threading.Thread.Sleep(35 * (attempt + 1));
+                }
+
+                throw new System.IO.IOException(
+                    "The cache remained locked after eight atomic replacement attempts.", lastException);
+            }
+            catch (System.Exception exception)
+            {
+                cacheFileKnownValid = false;
+                Debug.LogError($"[TrackGenerator] Could not persist the editor track preview cache: {exception.Message}");
+                return false;
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(temporaryPath) && File.Exists(temporaryPath))
+                {
+                    try { File.Delete(temporaryPath); }
+                    catch { /* A stale temp is harmless and never read as a cache. */ }
+                }
+            }
+        }
+
+        private static void LoadFromDisk()
+        {
+            try
+            {
+                if (!File.Exists(CacheFilePath)) return;
+                string json = ReadCacheTextWithRetry();
+                CachedPreviewFile file = JsonUtility.FromJson<CachedPreviewFile>(json);
+                if (file?.Entries == null) return;
+
+                Previews.Clear();
+                foreach (CachedPreview preview in file.Entries)
+                {
+                    if (preview?.Layout?.Sections == null || preview.Layout.Sections.Count == 0) continue;
+                    if (string.IsNullOrEmpty(preview.Fingerprint))
+                        preview.Fingerprint = ComputeLayoutFingerprint(preview.Seed, preview.Layout);
+                    Previews[CacheKey(preview.ScenePath, preview.GeneratorPath)] = preview;
+                }
+                cacheFileKnownValid = Previews.Count > 0;
+            }
+            catch (System.Exception exception)
+            {
+                cacheFileKnownValid = false;
+                Debug.LogWarning($"[TrackGenerator] Could not read the editor track preview cache: {exception.Message}");
+            }
+        }
+
+        private static string ReadCacheTextWithRetry()
+        {
+            System.Exception lastException = null;
+            for (int attempt = 0; attempt < 6; attempt++)
+            {
+                try { return File.ReadAllText(CacheFilePath); }
+                catch (System.IO.IOException exception) { lastException = exception; }
+                catch (System.UnauthorizedAccessException exception) { lastException = exception; }
+                System.Threading.Thread.Sleep(25 * (attempt + 1));
+            }
+
+            throw new System.IO.IOException("The preview cache remained locked while reading.", lastException);
+        }
+
+        private static string ComputeLayoutFingerprint(int seed, GeneratedTrackLayout layout)
+        {
+            unchecked
+            {
+                ulong hash = 1469598103934665603UL;
+                void AddInt(int value) { hash ^= (uint)value; hash *= 1099511628211UL; }
+                void AddFloat(float value) => AddInt(value.GetHashCode());
+                void AddVector(Vector3 value)
+                {
+                    AddFloat(value.x);
+                    AddFloat(value.y);
+                    AddFloat(value.z);
+                }
+
+                AddInt(seed);
+                List<GeneratedTrackSection> sections = layout?.Sections;
+                AddInt(sections?.Count ?? 0);
+                if (sections != null)
+                {
+                    foreach (GeneratedTrackSection section in sections)
+                    {
+                        if (section == null) { AddInt(-1); continue; }
+                        AddInt(section.SectionIndex);
+                        AddInt((int)(section.Definition?.SectionType ?? default));
+                        AddInt(section.Definition?.SubdivisionCount ?? 0);
+                        AddFloat(section.Definition?.Length ?? 0f);
+                        AddVector(section.StartFrame.Position);
+                        AddVector(section.StartFrame.Forward);
+                        AddVector(section.StartFrame.Up);
+                        AddVector(section.EndFrame.Position);
+                        AddVector(section.EndFrame.Forward);
+                        AddVector(section.EndFrame.Up);
+                    }
+                }
+
+                return hash.ToString("X16");
+            }
+        }
+
+        private static string CacheKey(string scenePath, string generatorPath)
+            => $"{scenePath}|{generatorPath}";
+
+        private static string GetHierarchyPath(Transform transform)
+        {
+            if (transform == null) return string.Empty;
+            string path = transform.name;
+            while (transform.parent != null)
+            {
+                transform = transform.parent;
+                path = $"{transform.name}/{path}";
+            }
+            return path;
+        }
+    }
+
     internal sealed class TrackGeneratorSceneSaveGuard : AssetModificationProcessor
     {
         private static string[] OnWillSaveAssets(string[] paths)
@@ -136,7 +503,8 @@ namespace TrackGeneration.Editor
         // settingsLocks and layoutLockMode are owned by the lock panel / toolbar.
         private static readonly string[] SettingsFieldNames =
         {
-            "Designer", "Config", "MainRoadMaterial", "WallMaterial", "trackRoot",
+            "Designer", "Config", "MainRoadMaterial", "WallMaterial", "RoadLineMaterial",
+            "StartFinishMaterial", "StartGatePillarMaterial", "CheckpointMaterial", "trackRoot",
             "buildRaceCourse", "checkpointCount", "startLineArcOffset",
             "generateOnStart", "keepEditorTrackOnPlay", "placeHovercraftOnStart",
             "startLineForwardOffset", "resetHovercraftWithBackspace", "seedStreams"
@@ -169,6 +537,11 @@ namespace TrackGeneration.Editor
             }
 
             DetachLegacyChildTrack();
+
+            // Selecting the generator is also a safe recovery point after an editor or
+            // domain-reload interruption. Keep one complete preview, release abandoned
+            // pending/duplicate roots, and leave diagnostic gizmos off.
+            generator?.CleanStaleGeneratedTracks();
         }
 
         private void OnDisable()
@@ -380,6 +753,7 @@ namespace TrackGeneration.Editor
             _commandEpoch++; // mark this IMGUI pass as command-driven, not an idle repaint
             _cache.MarkSettingsDirty(); // relaxation policies may have adjusted settings
             EditorUtility.SetDirty(generator);
+            TrackGeneratorPlayPreviewCache.Capture(generator);
         }
 
         private void DrawTopToolbar(TrackGenerator generator)
@@ -595,10 +969,32 @@ namespace TrackGeneration.Editor
                 SectionHeader("TRACK MANAGEMENT");
                 using (new EditorGUILayout.HorizontalScope())
                 {
+                    if (GUILayout.Button(new GUIContent("Repair Cached Preview",
+                            "Transactionally rebuilds the exact cached track layout. Use this after a cancelled Play transition; it does not generate a new seed or design."),
+                            GUILayout.Height(20)))
+                    {
+                        bool repaired = TrackGeneratorPlayPreviewCache.Repair(generator);
+                        if (!repaired)
+                            EditorUtility.DisplayDialog("Cached Preview Unavailable",
+                                "No valid cached layout exists for this TrackGenerator. Generate a track once to create it.",
+                                "OK");
+                    }
+
+                    if (GUILayout.Button(new GUIContent("Clean Stale Previews",
+                            "Keeps the current generated track, removes abandoned pending builds and duplicate/orphaned generated roots, and hides track diagnostics."),
+                            GUILayout.Height(20)))
+                    {
+                        // Do not register procedural meshes with Undo: a duplicate track
+                        // can be several GB and copying it into Undo is itself a crash risk.
+                        Undo.RecordObject(generator, "Clean Stale Track Previews");
+                        generator.CleanStaleGeneratedTracks();
+                        EditorUtility.SetDirty(generator);
+                    }
+
                     var warnStyle = new GUIStyle(GUI.skin.button);
                     warnStyle.normal.textColor = new Color(1f, 0.55f, 0.4f);
                     if (GUILayout.Button(new GUIContent("Clear Generated Track",
-                            "Destroys the current generated track GameObjects after confirmation. Settings, seeds and locks are kept — Regenerate Same Seed rebuilds the identical track."),
+                            "Destroys every current, duplicate and pending generated track GameObject after confirmation. Settings, seeds and locks are kept — Regenerate Same Seed rebuilds the identical track."),
                             warnStyle, GUILayout.Height(20)))
                     {
                         if (EditorUtility.DisplayDialog("Clear Track",
@@ -609,6 +1005,7 @@ namespace TrackGeneration.Editor
                             // can freeze the editor before it has a chance to clear the track.
                             Undo.RecordObject(generator, "Clear Track");
                             generator.ClearTrack();
+                            TrackGeneratorPlayPreviewCache.Forget(generator);
                             EditorUtility.SetDirty(generator);
                         }
                     }
@@ -705,7 +1102,9 @@ namespace TrackGeneration.Editor
                 return;
             }
             Undo.RecordObject(vis, "Toggle Debug View");
-            vis.enabled = !vis.enabled;
+            bool turnOn = !vis.enabled || vis.Level == TrackDebugVisualizationLevel.Off;
+            vis.enabled = true;
+            vis.Level = turnOn ? TrackDebugVisualizationLevel.Normal : TrackDebugVisualizationLevel.Off;
             SceneView.RepaintAll();
         }
 

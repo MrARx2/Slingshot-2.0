@@ -349,3 +349,75 @@ are caught in the debug report (same place other closure failures are reported, 
 - Confirm `FreeFloating` behaviour is unchanged (no lift applied).
 - Add/extend an editor test: for N seeds under `KeepAboveStart`, assert the lowest built
   vertex Y ≥ 0 (mirrors the existing closure/elevation tests).
+
+---
+---
+
+# Part 4 — Crash: "Apply Presets → Generate New Track" hard‑crashes Unity
+
+Tracked per request. **Priority: high** (a hard crash loses unsaved work). Caveat: I can't
+run the editor from here, so the cause below is the strongest hypothesis from the code, not
+a reproduced stack. The **first diagnostic step is to read the real crash** (see below).
+
+## Leading hypothesis — out‑of‑memory / native cook crash from a large preset
+`ApplyPresets` (`TrackGeneratorEditor.cs:632`) can select a large **Style** and **Size**.
+Those presets set **`MaxTrackLengthMeters` up to 45,000–60,000 m** (`TrackStylePreset.cs:88,
+370, 414`) and Size can be **`Huge`** (`TrackSizeModifier`). Planning‑only tests pass at
+that scale, but the **editor "Generate" actually builds the full‑resolution render mesh and
+cooks every `MeshCollider`** — which the tests don't do.
+
+At 45–60 km, with render `ProfileResolution` up to 96 (≈241 pts/ring), thousands of rings,
+**plus the `ColliderProfileResolution` I recently raised 10→40 (≈4× collider triangles)**,
+the geometry volume can exhaust memory or crash the **native MeshCollider cooker**. Because
+there's **no global geometry budget and no try/catch around the build**, an OOM or native
+cooker fault becomes a *hard crash* rather than a caught, reported failure. The collider
+resolution bump makes this materially more likely than before — a strong suspect given the
+timing.
+
+**Why "Apply Presets" specifically:** a fresh/default designer is a modest size; applying a
+big Style/Size preset is what pushes length × resolution past the memory the build can hold.
+
+## Secondary hypotheses (rule in/out with the crash log)
+- **No top‑level guard.** `GenerateInternal` isn't wrapped in try/catch with cleanup, so any
+  exception mid‑build (bad index, degenerate mesh) can leave the editor unrecoverable.
+- **Fragile data‑dependent loops.** `TrackValidators.cs:197`
+  (`while (sections[j].RoadId == 1) j = (j+1) % count;`) terminates only because it
+  eventually reaches `cur` (RoadId≠1). It has **no explicit safety counter** and would spin
+  if that invariant ever broke (e.g., a preset producing an all‑alternate‑road layout) or
+  throw on a null/empty section list.
+- **Undo of a huge object graph.** `Undo.RecordObject(generator, "Apply Presets")` plus
+  generating a massive hierarchy can spike editor memory.
+
+## How to confirm the real cause (do this first)
+1. Reproduce, then open **`Editor.log`** (Help ▸ Reveal Log / `%LOCALAPPDATA%\Unity\Editor`).
+   A native crash writes a stack + often a `.dmp`. "Out of memory" / a `PxCook`/`MeshCollider`
+   frame → OOM/cook (leading hypothesis). A managed stack → a code path to fix.
+2. Note the `Applied: <Style> / <Difficulty> / <Size>` line the editor logs — record which
+   preset triggers it. Try the **same Style at Size = Small**; if the crash disappears, it's
+   the geometry‑volume/OOM path.
+3. Watch memory (Task Manager) during Generate — a rapid climb to the ceiling before the
+   crash confirms OOM.
+
+## Hardening (fixes, in order)
+1. **Global geometry budget.** Before/while building, cap total vertices / sections /
+   collider triangles; if a config would exceed it, **fail with a report entry** ("track too
+   large to build at this resolution") instead of allocating — turns a crash into a message.
+2. **Reconsider the collider‑resolution default.** The 10→40 bump multiplies collider cost;
+   make it **curvature‑adaptive** (40 only on corkscrews/loops, ~12 on straights) or lower
+   the default, especially at large sizes. Directly reduces the OOM surface.
+3. **Wrap `GenerateInternal` in try/catch** that logs, restores a safe state, and never
+   leaves half‑built native resources dangling.
+4. **Guard the data‑dependent loops** — add a safety counter to `TrackValidators.cs:197` and
+   null/empty‑list checks.
+5. **Clamp/validate applied preset values** in `PresetApplicator` (finite, in‑range length /
+   amplitude / resolutions) and **warn when a preset selects Huge** so the size is a
+   conscious choice.
+6. Consider building meshes via `Mesh.AllocateWritableMeshData` (less GC/peak memory) for the
+   largest tracks.
+
+## Verify
+- Reproduce the exact Style/Size, apply the fix, regenerate — no crash, and an oversized
+  config now reports a graceful failure instead.
+- Regression: Small/Medium presets still generate normally.
+- Add an editor test that builds (not just plans) a `Huge` preset and asserts it either
+  completes or fails gracefully under the geometry budget — no OOM.

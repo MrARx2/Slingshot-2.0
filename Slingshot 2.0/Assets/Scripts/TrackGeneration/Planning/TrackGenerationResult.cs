@@ -343,6 +343,7 @@ namespace TrackGeneration.Planning
     /// mesh building and camera systems, PLUS the four quarters that retain the
     /// road relationships the flat list cannot express.
     /// </summary>
+    [Serializable]
     public sealed class GeneratedTrackLayout
     {
         /// <summary>

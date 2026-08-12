@@ -59,6 +59,18 @@ public class CraftHUD : MonoBehaviour
     public Color speedExtremeMagenta = new Color(0.76f, 0.42f, 0.64f, 1f);
     public Color speedCandyRed = new Color(1f, 0.10f, 0.26f, 1f);
 
+    [Header("Drift Angle Indicator")]
+    [Tooltip("Show the compact three-node slip-angle instrument directly below velocity.")]
+    public bool showDriftAngleIndicator = true;
+    [Tooltip("Side-slip angle represented by the full left/right travel of the live node.")]
+    [Range(10f, 60f)] public float driftFullScaleDegrees = 32f;
+    [Tooltip("Angles inside this range settle at center so ordinary hover noise does not animate the HUD.")]
+    [Range(0f, 8f)] public float driftDeadZoneDegrees = 1.5f;
+    [Tooltip("Minimum planar speed before slip angle becomes meaningful.")]
+    [Min(0f)] public float driftMinimumSpeedKmh = 30f;
+    [Tooltip("How quickly the live drift node follows the measured angle.")]
+    [Range(1f, 30f)] public float driftIndicatorResponse = 12f;
+
     [Header("Theme")]
     public Color accent = new Color(0.32f, 0.68f, 0.66f, 1f);
     public Color accentHot = new Color(0.82f, 0.43f, 0.58f, 1f);
@@ -74,7 +86,7 @@ public class CraftHUD : MonoBehaviour
     private float _styleScale = -1f;
 
     // ── Animation state ─────────────────────────────────────────────
-    private float _intro, _displaySpeed, _speedVel;
+    private float _intro, _displaySpeed, _speedVel, _displayDriftAngle;
     private int _lastBoostSeq = int.MinValue;
     private float _boostPunch, _uiAlpha = 1f;
 
@@ -112,6 +124,23 @@ public class CraftHUD : MonoBehaviour
         OverchargeCore boost = craftCore != null ? craftCore.overcharge : null;
         float targetBoostFx = boost != null ? boost.CameraBoost01 : 0f;
 
+        float targetDriftAngle = 0f;
+        if (craftCore != null && craftCore.telemetry != null)
+        {
+            CraftTelemetry telemetry = craftCore.telemetry.CurrentTelemetry;
+            float planarSpeed = new Vector2(telemetry.forwardSpeed, telemetry.sideSpeed).magnitude;
+            if (planarSpeed * 3.6f >= driftMinimumSpeedKmh)
+            {
+                // Signed angle between the craft nose and its actual direction of travel.
+                // Abs(forward) keeps reversing from reading as an artificial 180-degree drift.
+                targetDriftAngle = Mathf.Atan2(
+                    telemetry.sideSpeed,
+                    Mathf.Max(0.01f, Mathf.Abs(telemetry.forwardSpeed))) * Mathf.Rad2Deg;
+                if (Mathf.Abs(targetDriftAngle) <= driftDeadZoneDegrees)
+                    targetDriftAngle = 0f;
+            }
+        }
+
         float targetBusReserve = 0f;
         float targetBusLimit = 0f;
         if (craftCore != null && craftCore.energy != null)
@@ -144,6 +173,10 @@ public class CraftHUD : MonoBehaviour
             _busReserve = Mathf.Lerp(_busReserve, targetBusReserve, 1f - Mathf.Exp(-busResponse * dt));
             float limitResponse = targetBusLimit > _busLimit ? 22f : 4f;
             _busLimit = Mathf.Lerp(_busLimit, targetBusLimit, 1f - Mathf.Exp(-limitResponse * dt));
+            _displayDriftAngle = Mathf.Lerp(
+                _displayDriftAngle,
+                targetDriftAngle,
+                1f - Mathf.Exp(-Mathf.Max(1f, driftIndicatorResponse) * dt));
         }
         else
         {
@@ -154,6 +187,7 @@ public class CraftHUD : MonoBehaviour
             _boostFx = targetBoostFx;
             _busReserve = targetBusReserve;
             _busLimit = targetBusLimit;
+            _displayDriftAngle = targetDriftAngle;
         }
     }
 
@@ -421,7 +455,7 @@ public class CraftHUD : MonoBehaviour
         FillQuad(new Rect(_busR.x, _systemsR.y, _busR.width, 2f * s), _busColor, 0.92f);
         FillQuad(new Rect(_speedR.x - 9f * s, _systemsR.y + 14f * s, 1f * s, _systemsR.height - 28f * s), accent, 0.13f);
         FillQuad(new Rect(_speedR.xMax + 8f * s, _systemsR.y + 14f * s, 1f * s, _systemsR.height - 28f * s), accent, 0.13f);
-        DrawPowerSpine(centerX, _systemsR.y + 82f * s);
+        DrawCenterTelemetrySpine(centerX, _systemsR.y + 82f * s);
 
         if (_coolingDown) Sweep(_systemsR, cham, 1.25f, true);
         else if (_boosting) Sweep(_systemsR, cham, 1.65f, false);
@@ -544,39 +578,61 @@ public class CraftHUD : MonoBehaviour
         FillQuad(new Rect(x, r.y, w, 3f * s), Color.white, 0.45f);
     }
 
-    /// <summary>Central BUS coupling indicator. It pulses and points toward the
-    /// Overcharge reserve while the BUS is actively refilling it.</summary>
-    private void DrawPowerSpine(float centerX, float centerY)
+    /// <summary>
+    /// Compact signed slip-angle instrument beneath velocity. The two quiet outer
+    /// diamonds establish the readable range; the live center diamond travels toward
+    /// the craft's actual slide direction. The vertical stem preserves the visual
+    /// relationship between velocity and the shared power ribbon.
+    /// </summary>
+    private void DrawCenterTelemetrySpine(float centerX, float centerY)
     {
         float s = S;
-        bool transferring = _coolingDown;
-        float pulse = transferring
-            ? 0.55f + 0.45f * (0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 9f))
-            : 0.32f;
-        Color color = transferring ? goodColor : accent;
+        float angle01 = Mathf.Clamp(
+            _displayDriftAngle / Mathf.Max(1f, driftFullScaleDegrees), -1f, 1f);
+        float severity = Mathf.Abs(angle01);
+        float eased = Mathf.Sign(angle01) * Mathf.SmoothStep(0f, 1f, severity);
+        float gripBreak = craftCore != null && craftCore.traction != null
+            ? craftCore.traction.CurrentTraction.gripBreakerAmount
+            : 0f;
 
-        float d = 5f * s;
-        float spineTop = _speedR.yMax + 3f * s;
-        float spineHeight = Mathf.Max(0f, centerY - d - spineTop);
+        Color driftColor = Color.Lerp(goodColor, accent, Mathf.Clamp01(severity * 1.8f));
+        if (severity > 0.62f)
+            driftColor = Color.Lerp(driftColor, warnColor, Mathf.InverseLerp(0.62f, 1f, severity));
+        driftColor = Color.Lerp(driftColor, warnColor, gripBreak * severity * 0.28f);
+
+        float halfRange = 18f * s;
+        float liveX = centerX + eased * halfRange;
+        float spineTop = _speedR.yMax + 2f * s;
+        float spineHeight = Mathf.Max(0f, centerY - 4f * s - spineTop);
         if (spineHeight > 0f)
-            FillQuad(new Rect(centerX - 0.5f * s, spineTop, 1f * s, spineHeight), color, pulse * 0.55f);
+            FillQuad(new Rect(centerX - 0.5f * s, spineTop, 1f * s, spineHeight), accent, 0.20f);
+
+        if (!showDriftAngleIndicator) return;
+
+        // Hairline range rail and a zero notch keep the control legible without text.
+        FillQuad(new Rect(centerX - halfRange, centerY - 0.5f * s, halfRange * 2f, 1f * s), accent, 0.13f);
+        FillQuad(new Rect(centerX - 0.5f * s, centerY - 3.5f * s, 1f * s, 7f * s), accent, 0.24f);
+
+        // Quiet boundary nodes: these stay fixed, while the third node reports slip.
+        DriftDiamond(centerX - halfRange, centerY, 2.2f * s, accent, 0.30f + (angle01 < 0f ? severity * 0.34f : 0f));
+        DriftDiamond(centerX + halfRange, centerY, 2.2f * s, accent, 0.30f + (angle01 > 0f ? severity * 0.34f : 0f));
+
+        float pulse = severity > 0.68f
+            ? 0.82f + 0.18f * (0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 8f))
+            : 1f;
+        float liveSize = Mathf.Lerp(3.1f, 4.2f, severity) * s;
+        DriftDiamond(liveX, centerY, liveSize, driftColor, pulse);
+    }
+
+    private void DriftDiamond(float x, float y, float radius, Color color, float alpha)
+    {
         FillPoly(new[]
         {
-            new Vector2(centerX, centerY - d),
-            new Vector2(centerX + d, centerY),
-            new Vector2(centerX, centerY + d),
-            new Vector2(centerX - d, centerY)
-        }, color, pulse);
-
-        if (!transferring) return;
-
-        // Three animated packets travel right-to-left: BUS -> OVERCHARGE.
-        for (int i = 0; i < 3; i++)
-        {
-            float t = Mathf.Repeat(Time.unscaledTime * 1.8f + i / 3f, 1f);
-            float x = Mathf.Lerp(centerX + 13f * s, centerX - 13f * s, t);
-            FillSkew(x - 2f * s, centerY - 1.5f * s, 4f * s, 3f * s, 1.5f * s, color, 0.35f + 0.65f * pulse);
-        }
+            new Vector2(x, y - radius),
+            new Vector2(x + radius, y),
+            new Vector2(x, y + radius),
+            new Vector2(x - radius, y)
+        }, color, alpha);
     }
 
     /// <summary>Small graduation ticks down the inner sides.</summary>

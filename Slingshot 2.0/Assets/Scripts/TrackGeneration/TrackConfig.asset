@@ -130,6 +130,8 @@ MonoBehaviour:
   maxJumpApproachSeconds: 3
   minLaunchTransitionSeconds: 0.35
   maxLaunchTransitionSeconds: 1.2
+  minJumpLaunchPitchDegrees: 3
+  maxJumpLaunchPitchDegrees: 6
   minJumpAirtimeSeconds: 1
   maxJumpAirtimeSeconds: 4
   minLandingTransitionSeconds: 0.5

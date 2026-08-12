@@ -839,6 +839,17 @@ namespace TrackGeneration.Tests
                 {
                     sawJump = true;
                     Assert.Greater(def.Length, 100f, "Jump ramps must not be car-scale (15 m) at 1300 km/h.");
+                    Assert.GreaterOrEqual(def.PitchChange, 3f - 0.01f,
+                        "Every air gap must have a deliberate elevation ramp, not a nearly-flat road edge.");
+
+                    TrackConnectionFrame[] ramp = sections[i].SubdivisionFrames;
+                    Assert.IsNotNull(ramp, "Launch ramp must emit driveable mesh frames.");
+                    Assert.Greater(ramp.Length, 4, "Launch ramp needs enough rings for a gradual elevation transition.");
+                    for (int f = 1; f < ramp.Length; f++)
+                    {
+                        Assert.GreaterOrEqual(ramp[f].PitchAngle + 0.01f, ramp[f - 1].PitchAngle,
+                            "Launch-ramp pitch must build continuously toward the lip; it may not flatten or kick.");
+                    }
                 }
                 if (def.SectionType == TrackMacroSectionType.AirGap)
                 {

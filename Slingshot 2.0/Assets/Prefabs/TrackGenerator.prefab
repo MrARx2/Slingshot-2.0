@@ -272,6 +272,10 @@ MonoBehaviour:
   Config: {fileID: 11400000, guid: 4d0b4b36f22cd3e48a102032c11d5212, type: 2}
   MainRoadMaterial: {fileID: 2100000, guid: 4f2f9e9c84f53594ca593721b39bc609, type: 2}
   WallMaterial: {fileID: 2100000, guid: fe765668807c4bd43a0f52032bb48755, type: 2}
+  RoadLineMaterial: {fileID: 2100000, guid: c329e07fc09047f8ad8a72d09df9cb51, type: 2}
+  StartFinishMaterial: {fileID: 2100000, guid: 4b056cb62eae45d2b311c38d1c4c42d1, type: 2}
+  StartGatePillarMaterial: {fileID: 2100000, guid: 68af95de90cd47c698991c2c4c806d50, type: 2}
+  CheckpointMaterial: {fileID: 2100000, guid: a2a1cb57f43a4fa584a77bf817e2badb, type: 2}
   trackRoot: {fileID: 0}
   buildRaceCourse: 1
   checkpointCount: 8

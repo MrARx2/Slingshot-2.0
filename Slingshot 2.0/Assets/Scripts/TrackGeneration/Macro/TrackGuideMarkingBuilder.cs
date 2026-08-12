@@ -28,7 +28,7 @@ namespace TrackGeneration.Macro
         private const float SurfaceOffset = 0.07f;   // meters above the surface (no z-fighting, no ridge)
 
         public static void Build(List<GeneratedTrackSection> sections, TrackRoadProfileSettings profile,
-            TrackVisualSettings visual, Transform root)
+            TrackVisualSettings visual, Transform root, Material persistentMaterial = null)
         {
             if (visual == null || (!visual.CenterGuideEnabled && !visual.WallMarkersEnabled)) return;
             if (profile == null || !profile.IsHalfPipe) return;
@@ -36,8 +36,16 @@ namespace TrackGeneration.Macro
             var markingRoot = new GameObject("TrackGuideMarkings");
             markingRoot.transform.SetParent(root, false);
 
-            Material guideMat = MakeMaterial(visual.CenterGuideColor, visual.CenterGuideEmission);
-            Material markerMat = MakeMaterial(visual.WallMarkerColor, 1f);
+            // Generated previews are deliberately excluded from scene serialization.
+            // A material created only in memory can therefore lose its shader/reference
+            // during editor recovery and render magenta. Production tracks receive a
+            // persistent project material; the runtime material remains a test/fallback.
+            Material guideMat = persistentMaterial != null
+                ? persistentMaterial
+                : MakeMaterial(visual.CenterGuideColor, visual.CenterGuideEmission);
+            Material markerMat = persistentMaterial != null
+                ? persistentMaterial
+                : MakeMaterial(visual.WallMarkerColor, 1f);
 
             var chains = CollectChains(sections);
             int chunkIndex = 0;
