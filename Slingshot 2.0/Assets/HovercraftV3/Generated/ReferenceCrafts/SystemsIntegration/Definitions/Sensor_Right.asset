@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c71c5c680fc201d4d9c5951440ab2131, type: 3}
+  m_Name: Sensor_Right
+  m_EditorClassIdentifier: Lunarlight.Hovercraft.V3::Lunarlight.Hovercraft.V3.V3DirectionalSensorDefinition
+  stableId: sensor.chassis.right
+  displayName: Right Directional Sensor
+  manufacturer: Lunarlight
+  description: Right surface and atmosphere sensor.
+  direction: 3
+  rangeMeters: 40
+  requestedSampleRateHz: 60
+  minimumSampleRateHz: 15
+  maximumSampleRateHz: 120
+  idlePower: 2
+  powerPerSample: 0.025
+  surfaceMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  castType: 0
+  sphereRadius: 0.08
+  minimumValidDistance: 0.02
+  triggerInteraction: 1
+  firmware: {fileID: 11400000, guid: 359ba8227472ba547ba457ed6ef3e8d0, type: 2}
+  prefab: {fileID: 4893452536012198640, guid: 7bc71b2b0aa34d8ab20665a704638e0f, type: 3}
+  massKg: 0.75
+  localVisualScale: {x: 0.14, y: 0.08, z: 0.18}
+  debugColor: {r: 0, g: 1, b: 1, a: 1}

@@ -1,0 +1,12 @@
+category,sample_count,mean_force_n,peak_force_n,mean_gravity_vertical_n
+"gravity",426,113948.0859375,113948.375,-113948.0859375
+"propulsion",426,0,0,0
+"braking",426,0,0,0
+"hover",426,0,0,0
+"roof",426,0,0,0
+"lateral",426,0,0,0
+"aerodynamic",426,0,0,0
+"contact",426,0,0,0
+"expected_net",426,113948.0859375,113948.375,-113948.0859375
+"observed_net",426,113948.9765625,113950.46875,-113948.9765625
+"residual",426,0.584231972694397,2.09375,-0.40601158142089844

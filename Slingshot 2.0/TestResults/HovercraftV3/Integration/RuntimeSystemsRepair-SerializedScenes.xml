@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="2" result="Passed" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-07-29 14:27:18Z" end-time="2026-07-29 14:27:19Z" duration="1.0785733">
+  <test-suite type="TestSuite" id="1000" name="Slingshot 2.0" fullname="Slingshot 2.0" runstate="Runnable" testcasecount="223" result="Passed" start-time="2026-07-29 14:27:18Z" end-time="2026-07-29 14:27:19Z" duration="1.078573" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1130" name="Lunarlight.Hovercraft.V3.EditorTests.dll" fullname="C:/Users/Jack_/AppData/Local/Temp/HovercraftV3_Repair_Unity_019f9e57/Library/ScriptAssemblies/Lunarlight.Hovercraft.V3.EditorTests.dll" runstate="Runnable" testcasecount="108" result="Passed" start-time="2026-07-29 14:27:18Z" end-time="2026-07-29 14:27:19Z" duration="1.027199" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="105468" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1131" name="Lunarlight" fullname="Lunarlight" runstate="Runnable" testcasecount="108" result="Passed" start-time="2026-07-29 14:27:18Z" end-time="2026-07-29 14:27:19Z" duration="1.026150" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1132" name="Hovercraft" fullname="Lunarlight.Hovercraft" runstate="Runnable" testcasecount="108" result="Passed" start-time="2026-07-29 14:27:18Z" end-time="2026-07-29 14:27:19Z" duration="1.021929" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1133" name="V3" fullname="Lunarlight.Hovercraft.V3" runstate="Runnable" testcasecount="108" result="Passed" start-time="2026-07-29 14:27:18Z" end-time="2026-07-29 14:27:19Z" duration="1.018199" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1134" name="Tests" fullname="Lunarlight.Hovercraft.V3.Tests" runstate="Runnable" testcasecount="108" result="Passed" start-time="2026-07-29 14:27:18Z" end-time="2026-07-29 14:27:19Z" duration="1.017365" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestFixture" id="1059" name="V3SerializedScenePlayModeTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3SerializedScenePlayModeTests" classname="Lunarlight.Hovercraft.V3.Tests.V3SerializedScenePlayModeTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-07-29 14:27:18Z" end-time="2026-07-29 14:27:19Z" duration="1.015216" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1060" name="CraftLab_SerializedPlayModeTopologyInputAndRebuild" fullname="Lunarlight.Hovercraft.V3.Tests.V3SerializedScenePlayModeTests.CraftLab_SerializedPlayModeTopologyInputAndRebuild" methodname="CraftLab_SerializedPlayModeTopologyInputAndRebuild" classname="Lunarlight.Hovercraft.V3.Tests.V3SerializedScenePlayModeTests" runstate="Runnable" seed="476849477" result="Passed" start-time="2026-07-29 14:27:13Z" end-time="2026-07-29 14:27:16Z" duration="3.548139" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  </properties>
+                </test-case>
+                <test-case id="1061" name="HandlingTrack_SerializedPlayModeTopologyAndInput" fullname="Lunarlight.Hovercraft.V3.Tests.V3SerializedScenePlayModeTests.HandlingTrack_SerializedPlayModeTopologyAndInput" methodname="HandlingTrack_SerializedPlayModeTopologyAndInput" classname="Lunarlight.Hovercraft.V3.Tests.V3SerializedScenePlayModeTests" runstate="Runnable" seed="1776354325" result="Passed" start-time="2026-07-29 14:27:16Z" end-time="2026-07-29 14:27:19Z" duration="2.768768" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <output><![CDATA[Saving results to: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\TestResults.xml
+]]></output>
+                </test-case>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

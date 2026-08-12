@@ -1,0 +1,24 @@
+{
+    "testId": "test.v3.full_track.primary_systems.01",
+    "testVersion": 2,
+    "sessionId": "a6146f655733",
+    "buildId": "build.hovercraft.baseline.01",
+    "buildGuid": "a2946245bc904c19a0827a4308c729be",
+    "buildOwnership": "GeneratedReference",
+    "controlPath": "MainframeScheduled",
+    "comparisonGroupId": "comparison.track_following_endurance_schema6_v2",
+    "finalPhase": 5,
+    "passed": false,
+    "abortReason": "Runner disabled during an active test.",
+    "utcStarted": "2026-08-06T15:19:39.2898422Z",
+    "utcEnded": "2026-08-06T15:19:39.2903457Z",
+    "runnerOverheadMilliseconds": 374.9513,
+    "droppedSamples": 0,
+    "droppedEvents": 0,
+    "recorderOutputDirectory": "D:\\Projects\\Unity\\Slingshot2\\Slingshot-2.0\\Slingshot 2.0\\TestDriveReports\\HovercraftV3\\Controlled\\Aborted_20260806_151939",
+    "assertions": [],
+    "setupWarnings": [
+        "Track-relative start resolved at 0 m.",
+        "Controlled track follower owns steering, pitch, strafe, and speed commands."
+    ]
+}

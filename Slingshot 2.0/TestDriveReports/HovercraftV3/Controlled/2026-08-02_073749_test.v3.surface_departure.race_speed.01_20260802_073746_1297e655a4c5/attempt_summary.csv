@@ -1,0 +1,2 @@
+attempt_index,sample_count,discontinuity_samples,start_time_s,end_time_s,duration_s,start_track_distance_m,max_track_distance_m,mean_speed_mps,max_speed_mps,max_abs_lateral_offset_m,min_ride_height_m,event_count
+0,277,0,0.0099999929138321619,2.7699980371315189,2.7599980442176868,0,0,23.592153549194336,29.999897003173828,0,0,11

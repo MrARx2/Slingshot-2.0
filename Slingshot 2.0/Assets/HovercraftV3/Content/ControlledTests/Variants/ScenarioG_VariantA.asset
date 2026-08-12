@@ -1,0 +1,341 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7ef9b82ff20a97e419835ac4cdb15bbf, type: 3}
+  m_Name: ScenarioG_VariantA
+  m_EditorClassIdentifier: Lunarlight.Hovercraft.V3::Lunarlight.Hovercraft.V3.CraftBuildDefinition
+  stableId: build.authored.controlled.variant_a.01
+  buildAssetGuid: 0321f621be64f8740a310d7dd4189e08
+  ownership: 1
+  allowLegacyPipelineFallback: 0
+  displayName: Apex V3 Systems Integration Prototype
+  manufacturerName: Lunarlight
+  vehicleClass: Balanced Systems Prototype
+  layoutName: Rear Gimbal / Four-Corner Suspension / Active Aero
+  summary: A complete Mainframe-driven craft with seven physical system computers,
+    six sensors, firmware, passive suspension, active aerodynamics, and finite active
+    cooling.
+  drivingNotes: F4 toggles the systems console; O/P change pages. Physical hover
+    and roof thrusters follow sensed track curvature and separation. Power starvation
+    degrades software and sensor rates before hardware limits are bypassed.
+  chassis: {fileID: 11400000, guid: 65dc5f347638c93458b7eb483589c53e, type: 2}
+  catalog: {fileID: 11400000, guid: 6bac14c916a67da4e93334a625b08d36, type: 2}
+  hoverConfiguration:
+    stableId: hover.apex.systems.01
+    configurationVersion: 3
+    targetHoverHeight: 3.75
+    minimumClearance: 1
+    maximumOperationalRange: 80
+    probeRadius: 0.1
+    fallbackProbeRadius: 0.35
+    nearHoverRange: 12
+    captureRange: 24
+    fallbackRange: 32
+    captureAuthorityByDistance:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 12
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 20
+        value: 0.35
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 28
+        value: 0
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    oneProbeAuthority: 0.2
+    twoProbeAuthority: 0.55
+    threeProbeAuthority: 0.8
+    fallbackOnlyAuthority: 0.15
+    normalConsensusAngleDegrees: 40
+    staleSurfaceTimeoutSeconds: 0.15
+    automaticHoverAuthorityLimit: 7
+    automaticRoofAuthorityLimit: 7
+    manualAuthorityLimit: 1
+    hoverStrength: 0.45
+    hoverDamping: 0.12
+    gravityCompensationEnabled: 1
+    gravityCompensationMultiplier: 1
+    compressionLimit: 0.3
+    extensionLimit: 0.12
+    angularDamping: 0.08
+    pitchSensitivity: 0.589
+    surfaceAlignStrength: 60
+    surfaceAlignDamping: 4
+    maximumSurfaceAlignAcceleration: 60
+    stiffenStartSpeed: 80
+    stiffenFullSpeed: 600
+    maximumSpeedStiffness: 3.5
+    surfaceCurvatureFeedForward: 1.1
+    surfaceTrackingResponse: 12
+    maximumSurfaceTrackingAcceleration: 340
+    roofCaptureStrength: 7
+    roofCaptureDamping: 5
+    maximumRoofCaptureAcceleration: 180
+    roofCaptureDeadband: 0.35
+    trackSurfaceMask:
+      serializedVersion: 2
+      m_Bits: 256
+  installations:
+  - socketId: Propulsion.Rear.Center
+    connector: {fileID: 11400000, guid: 86a4482a2dfe20e4ba5b2a04977cd25e, type: 2}
+    endpoint: {fileID: 11400000, guid: 2647a6ceb1617fc41b5f1ec88a0a2929, type: 2}
+    automaticAuthorityCap: 0.8
+    manualAuthorityCap: 1
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0.1, y: 0, z: 0}
+  - socketId: Braking.Front.Center
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: 93c8c202be025d948a59644fd032f961, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Hover.Front.Left.Bottom
+    connector: {fileID: 11400000, guid: 98ceda341d58b804e90b393dac616d07, type: 2}
+    endpoint: {fileID: 11400000, guid: 992c1347cfcb42541b10364ceb88c396, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Hover.Front.Right.Bottom
+    connector: {fileID: 11400000, guid: 98ceda341d58b804e90b393dac616d07, type: 2}
+    endpoint: {fileID: 11400000, guid: 992c1347cfcb42541b10364ceb88c396, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Hover.Rear.Left.Bottom
+    connector: {fileID: 11400000, guid: 98ceda341d58b804e90b393dac616d07, type: 2}
+    endpoint: {fileID: 11400000, guid: 992c1347cfcb42541b10364ceb88c396, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Hover.Rear.Right.Bottom
+    connector: {fileID: 11400000, guid: 98ceda341d58b804e90b393dac616d07, type: 2}
+    endpoint: {fileID: 11400000, guid: 992c1347cfcb42541b10364ceb88c396, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Control.Front.Left.Top
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: caf0c721d61d2934aabcc9157089910c, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Control.Front.Right.Top
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: caf0c721d61d2934aabcc9157089910c, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Control.Rear.Left.Top
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: caf0c721d61d2934aabcc9157089910c, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Control.Rear.Right.Top
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: caf0c721d61d2934aabcc9157089910c, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Strafe.Left.Front
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: 6a7aac7e49c57fb47b905ee173f632d9, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Strafe.Right.Front
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: 6a7aac7e49c57fb47b905ee173f632d9, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Strafe.Left.Rear
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: 6a7aac7e49c57fb47b905ee173f632d9, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Strafe.Right.Rear
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: 6a7aac7e49c57fb47b905ee173f632d9, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Core.Main
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: 42f9a36674140814ea2e6ec9aa44c639, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Cockpit.Main
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: 3a4f124416e07f645abf1a303317944f, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: System.PilotInterface
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: 66c5ee7de5be14043bda5284094f9899, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: System.Drive
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: 11c89f53b052f9146818d089b0c12ef3, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: System.Hover
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: a88bb1829bed26545ae016a7f27cba69, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: System.Stabilizer
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: 88f077bd0d29c6d4f9abd6287430ab3e, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: System.Traction
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: c00c2b1d5c5387948a8b618dad2bc75d, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: System.Aerodynamics
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: 181db4b79671ba848859df59f14cd257, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: System.Telemetry
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: 59d5b6025c339034e82698257ffe0c1d, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Aero.Front.Left
+    connector: {fileID: 11400000, guid: 36fbe01511946df4fbbf2797b563eda1, type: 2}
+    endpoint: {fileID: 11400000, guid: e1502be86c31107468c738f2bba39c70, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Aero.Front.Right
+    connector: {fileID: 11400000, guid: 36fbe01511946df4fbbf2797b563eda1, type: 2}
+    endpoint: {fileID: 11400000, guid: e1502be86c31107468c738f2bba39c70, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Aero.Rear.Left
+    connector: {fileID: 11400000, guid: 36fbe01511946df4fbbf2797b563eda1, type: 2}
+    endpoint: {fileID: 11400000, guid: e1502be86c31107468c738f2bba39c70, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Aero.Rear.Right
+    connector: {fileID: 11400000, guid: 36fbe01511946df4fbbf2797b563eda1, type: 2}
+    endpoint: {fileID: 11400000, guid: e1502be86c31107468c738f2bba39c70, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}
+  - socketId: Cooling.Main
+    connector: {fileID: 0}
+    endpoint: {fileID: 11400000, guid: e20f1a53770ff4244be716b735c3b2b8, type: 2}
+    automaticAuthorityCap: 0
+    manualAuthorityCap: 0
+    emergencyAllowed: 1
+    authorityConfigured: 1
+    localCalibration: {x: 0, y: 0, z: 0}

@@ -1,0 +1,2 @@
+section_id,start_distance_m,end_distance_m,event_count,maximum_severity,event_types
+"unmapped",0,10,5,2,"ManualMarker, PowerStarvation, SampleRateDrop, TaskUnderMinimum"

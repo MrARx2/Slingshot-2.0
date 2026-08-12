@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="8" result="Passed" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-07-29 14:10:53Z" end-time="2026-07-29 14:10:54Z" duration="0.220634">
+  <test-suite type="TestSuite" id="1000" name="Slingshot 2.0" fullname="Slingshot 2.0" runstate="Runnable" testcasecount="221" result="Passed" start-time="2026-07-29 14:10:53Z" end-time="2026-07-29 14:10:54Z" duration="0.220634" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1127" name="Lunarlight.Hovercraft.V3.EditorTests.dll" fullname="C:/Users/Jack_/AppData/Local/Temp/HovercraftV3_Repair_Unity_019f9e57/Library/ScriptAssemblies/Lunarlight.Hovercraft.V3.EditorTests.dll" runstate="Runnable" testcasecount="106" result="Passed" start-time="2026-07-29 14:10:53Z" end-time="2026-07-29 14:10:54Z" duration="0.214743" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="102288" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1128" name="Lunarlight" fullname="Lunarlight" runstate="Runnable" testcasecount="106" result="Passed" start-time="2026-07-29 14:10:53Z" end-time="2026-07-29 14:10:54Z" duration="0.210504" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1129" name="Hovercraft" fullname="Lunarlight.Hovercraft" runstate="Runnable" testcasecount="106" result="Passed" start-time="2026-07-29 14:10:53Z" end-time="2026-07-29 14:10:54Z" duration="0.209507" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1130" name="V3" fullname="Lunarlight.Hovercraft.V3" runstate="Runnable" testcasecount="106" result="Passed" start-time="2026-07-29 14:10:53Z" end-time="2026-07-29 14:10:54Z" duration="0.208537" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1131" name="Tests" fullname="Lunarlight.Hovercraft.V3.Tests" runstate="Runnable" testcasecount="106" result="Passed" start-time="2026-07-29 14:10:53Z" end-time="2026-07-29 14:10:54Z" duration="0.207551" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestFixture" id="1049" name="V3RuntimeSystemsRepairSprintTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-07-29 14:10:53Z" end-time="2026-07-29 14:10:54Z" duration="0.205975" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1056" name="Readiness_FaultsWhenPhysicalSensorIsMissing" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.Readiness_FaultsWhenPhysicalSensorIsMissing" methodname="Readiness_FaultsWhenPhysicalSensorIsMissing" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="576838736" result="Passed" start-time="2026-07-29 14:10:53Z" end-time="2026-07-29 14:10:54Z" duration="0.062568" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1057" name="Readiness_FaultsWhenSystemCallbackIsMissing" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.Readiness_FaultsWhenSystemCallbackIsMissing" methodname="Readiness_FaultsWhenSystemCallbackIsMissing" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="879839998" result="Passed" start-time="2026-07-29 14:10:54Z" end-time="2026-07-29 14:10:54Z" duration="0.004681" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-suite type="ParameterizedMethod" id="1054" name="RealKeyboardW_AcceleratesPhysicalCraft" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.RealKeyboardW_AcceleratesPhysicalCraft" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-07-29 14:10:54Z" end-time="2026-07-29 14:10:54Z" duration="0.094740" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1052" name="RealKeyboardW_AcceleratesPhysicalCraft(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/SystemsIntegration/Builds/ApexV3_SystemsIntegration.asset&quot;)" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.RealKeyboardW_AcceleratesPhysicalCraft(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/SystemsIntegration/Builds/ApexV3_SystemsIntegration.asset&quot;)" methodname="RealKeyboardW_AcceleratesPhysicalCraft" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="759693306" result="Passed" start-time="2026-07-29 14:10:54Z" end-time="2026-07-29 14:10:54Z" duration="0.078387" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1053" name="RealKeyboardW_AcceleratesPhysicalCraft(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_V2Reference.asset&quot;)" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.RealKeyboardW_AcceleratesPhysicalCraft(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_V2Reference.asset&quot;)" methodname="RealKeyboardW_AcceleratesPhysicalCraft" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="600056032" result="Passed" start-time="2026-07-29 14:10:54Z" end-time="2026-07-29 14:10:54Z" duration="0.011627" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                </test-suite>
+                <test-case id="1051" name="RealKeyboardW_UsesBothSupportedInputRoutes" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.RealKeyboardW_UsesBothSupportedInputRoutes" methodname="RealKeyboardW_UsesBothSupportedInputRoutes" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="1071152192" result="Passed" start-time="2026-07-29 14:10:54Z" end-time="2026-07-29 14:10:54Z" duration="0.007627" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1055" name="Scheduler_GrantedCadenceControlsCallbackExecution" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.Scheduler_GrantedCadenceControlsCallbackExecution" methodname="Scheduler_GrantedCadenceControlsCallbackExecution" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="890025867" result="Passed" start-time="2026-07-29 14:10:54Z" end-time="2026-07-29 14:10:54Z" duration="0.011943" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1058" name="SensorSample_UsesLocalAirflowAndMovingSurfaceVelocity" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.SensorSample_UsesLocalAirflowAndMovingSurfaceVelocity" methodname="SensorSample_UsesLocalAirflowAndMovingSurfaceVelocity" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="206287095" result="Passed" start-time="2026-07-29 14:10:54Z" end-time="2026-07-29 14:10:54Z" duration="0.001945" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1050" name="SerializedScenes_HaveOneAuthoritativeSystemsBuild" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.SerializedScenes_HaveOneAuthoritativeSystemsBuild" methodname="SerializedScenes_HaveOneAuthoritativeSystemsBuild" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="1921223473" result="Passed" start-time="2026-07-29 14:10:54Z" end-time="2026-07-29 14:10:54Z" duration="0.014567" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <output><![CDATA[Saving results to: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\TestResults.xml
+]]></output>
+                </test-case>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

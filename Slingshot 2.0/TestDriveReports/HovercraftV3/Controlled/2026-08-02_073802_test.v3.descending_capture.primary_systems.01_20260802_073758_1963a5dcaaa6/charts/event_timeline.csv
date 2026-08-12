@@ -1,0 +1,10 @@
+timestamp_s,track_distance_m,event_type,severity,section_id
+0,0,ManualMarker,0,""
+0.0099999929138321619,0,SampleRateDrop,1,""
+0.0099999929138321619,0,SensorWorldDisagreement,1,""
+0.0099999929138321619,0,TaskUnderMinimum,2,""
+0.0099999929138321619,0,PowerStarvation,2,""
+0.029999978741496597,0,SurfaceReacquired,0,""
+0.039999971655328787,0,ThrusterSaturation,1,""
+0.049999964569160976,0,SpringTravelLimit,1,""
+4.009997158446712,0,ManualMarker,0,""

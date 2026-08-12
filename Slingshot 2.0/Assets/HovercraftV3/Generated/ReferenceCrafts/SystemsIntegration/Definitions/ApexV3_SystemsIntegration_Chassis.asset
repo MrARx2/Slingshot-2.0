@@ -1,0 +1,85 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbfcad11170e60a49800a1d3ded6afe4, type: 3}
+  m_Name: ApexV3_V2Reference_Chassis
+  m_EditorClassIdentifier: Lunarlight.Hovercraft.V3::Lunarlight.Hovercraft.V3.ChassisDefinition
+  stableId: chassis.apex.v3.systems_integration.01
+  displayName: Apex V3 Systems Chassis
+  prefab: {fileID: 4968773693152170470, guid: a97934e4d43ec004987f1cd57fc3d4b5, type: 3}
+  baseMassKg: 8520
+  baseCenterOfMass: {x: 0, y: -0.65262157, z: 0.004151838}
+  parityCenterOfMassCalibration: {x: 0, y: 0, z: 0}
+  integratedMainframe: {fileID: 11400000, guid: 85c851ba12700164b9e37c9e353bc935, type: 2}
+  integratedSensors:
+  - {fileID: 11400000, guid: 0667f1702352413438e70f435e61f1c1, type: 2}
+  - {fileID: 11400000, guid: 53c1e88ff98dd4a48a51affa3d150d7e, type: 2}
+  - {fileID: 11400000, guid: c732bab429be521468dcc222fc0b4979, type: 2}
+  - {fileID: 11400000, guid: 102305381d9415847ae37ab0ab79dc8a, type: 2}
+  - {fileID: 11400000, guid: 685978bdfb4d15849a5e59780ea64823, type: 2}
+  - {fileID: 11400000, guid: a968377f68d98054b89fe378b8b42bec, type: 2}
+  routerProfile: {fileID: 11400000, guid: 1d41d6f7c03859f49968438c20132f03, type: 2}
+  aerodynamicReferenceArea: 10
+  dragCoefficient: 0.015
+  downforceReferenceArea: 8
+  downforceCoefficient: 0.005
+  aerodynamicCenterOfPressure: {x: 0, y: 0.15, z: 0.25}
+  compressibilityDragMultiplier:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.65
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.85
+      value: 1.15
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1.3
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1.25
+      value: 1.4
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4

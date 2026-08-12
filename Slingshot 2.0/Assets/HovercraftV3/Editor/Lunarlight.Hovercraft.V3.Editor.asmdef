@@ -2,7 +2,10 @@
   "name": "Lunarlight.Hovercraft.V3.Editor",
   "rootNamespace": "Lunarlight.Hovercraft.V3.Editor",
   "references": [
-    "Lunarlight.Hovercraft.V3"
+    "Lunarlight.Hovercraft.V3",
+    "Lunarlight.Hovercraft.V3.TrackIntegration",
+    "Lunarlight.Hovercraft.V3.Diagnostics",
+    "Slingshot.TrackGeneration"
   ],
   "includePlatforms": [
     "Editor"

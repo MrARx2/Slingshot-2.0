@@ -96,9 +96,54 @@ namespace TrackGeneration.Race
                 Width = Mathf.Lerp(a.Width, b.Width, t),
                 BankAngle = Mathf.LerpAngle(a.BankAngle, b.BankAngle, t),
                 PitchAngle = Mathf.LerpAngle(a.PitchAngle, b.PitchAngle, t),
+                AccumulatedRoadRoll = Mathf.Lerp(
+                    a.AccumulatedRoadRoll,
+                    b.AccumulatedRoadRoll,
+                    t),
+                AccumulatedVerticalRotation = Mathf.Lerp(
+                    a.AccumulatedVerticalRotation,
+                    b.AccumulatedVerticalRotation,
+                    t),
+                HorizontalCurvature = Mathf.Lerp(
+                    a.HorizontalCurvature,
+                    b.HorizontalCurvature,
+                    t),
+                HorizontalCurvatureRate = Mathf.Lerp(
+                    a.HorizontalCurvatureRate,
+                    b.HorizontalCurvatureRate,
+                    t),
+                VerticalCurvature = Mathf.Lerp(
+                    a.VerticalCurvature,
+                    b.VerticalCurvature,
+                    t),
+                VerticalCurvatureRate = Mathf.Lerp(
+                    a.VerticalCurvatureRate,
+                    b.VerticalCurvatureRate,
+                    t),
+                RoadRollRate = Mathf.Lerp(
+                    a.RoadRollRate,
+                    b.RoadRollRate,
+                    t),
+                RoadRollAcceleration = Mathf.Lerp(
+                    a.RoadRollAcceleration,
+                    b.RoadRollAcceleration,
+                    t),
                 ArcLength = arc,
                 LapProgress = Mathf.Lerp(a.LapProgress, b.LapProgress, t),
-                SideHeight = Mathf.Lerp(a.SideHeight, b.SideHeight, t)
+                SideHeight = Mathf.Lerp(a.SideHeight, b.SideHeight, t),
+                LeftWallSuppression = Mathf.Lerp(
+                    a.LeftWallSuppression,
+                    b.LeftWallSuppression,
+                    t),
+                RightWallSuppression = Mathf.Lerp(
+                    a.RightWallSuppression,
+                    b.RightWallSuppression,
+                    t),
+                TurnRounding = Mathf.Lerp(a.TurnRounding, b.TurnRounding, t),
+                LeftOverhang = Mathf.Lerp(a.LeftOverhang, b.LeftOverhang, t),
+                RightOverhang = Mathf.Lerp(a.RightOverhang, b.RightOverhang, t),
+                PipeClosure = Mathf.Lerp(a.PipeClosure, b.PipeClosure, t),
+                WallrideMorph = Mathf.Lerp(a.WallrideMorph, b.WallrideMorph, t)
             };
         }
     }

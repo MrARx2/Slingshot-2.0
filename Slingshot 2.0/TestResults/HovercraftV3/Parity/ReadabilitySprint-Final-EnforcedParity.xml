@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="6" result="Passed" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-07-29 10:07:24Z" end-time="2026-07-29 10:07:25Z" duration="0.1319544">
+  <test-suite type="TestSuite" id="1000" name="Slingshot 2.0" fullname="Slingshot 2.0" runstate="Runnable" testcasecount="213" result="Passed" start-time="2026-07-29 10:07:24Z" end-time="2026-07-29 10:07:25Z" duration="0.131954" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1117" name="Lunarlight.Hovercraft.V3.EditorTests.dll" fullname="D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0/Library/ScriptAssemblies/Lunarlight.Hovercraft.V3.EditorTests.dll" runstate="Runnable" testcasecount="98" result="Passed" start-time="2026-07-29 10:07:24Z" end-time="2026-07-29 10:07:25Z" duration="0.080207" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="44480" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1118" name="Lunarlight" fullname="Lunarlight" runstate="Runnable" testcasecount="98" result="Passed" start-time="2026-07-29 10:07:24Z" end-time="2026-07-29 10:07:25Z" duration="0.079168" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1119" name="Hovercraft" fullname="Lunarlight.Hovercraft" runstate="Runnable" testcasecount="98" result="Passed" start-time="2026-07-29 10:07:24Z" end-time="2026-07-29 10:07:25Z" duration="0.078586" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1120" name="V3" fullname="Lunarlight.Hovercraft.V3" runstate="Runnable" testcasecount="98" result="Passed" start-time="2026-07-29 10:07:24Z" end-time="2026-07-29 10:07:25Z" duration="0.077924" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1121" name="Tests" fullname="Lunarlight.Hovercraft.V3.Tests" runstate="Runnable" testcasecount="98" result="Passed" start-time="2026-07-29 10:07:24Z" end-time="2026-07-29 10:07:25Z" duration="0.074148" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestFixture" id="1081" name="V3ParityHarnessTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-07-29 10:07:24Z" end-time="2026-07-29 10:07:25Z" duration="0.069249" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1083" name="CommandProfile_EvaluatesSegmentBoundariesDeterministically" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.CommandProfile_EvaluatesSegmentBoundariesDeterministically" methodname="CommandProfile_EvaluatesSegmentBoundariesDeterministically" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="473614395" result="Passed" start-time="2026-07-29 10:06:02Z" end-time="2026-07-29 10:06:02Z" duration="0.008817" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1082" name="GeneratedProfile_CoversReferenceMeasurementSegments" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.GeneratedProfile_CoversReferenceMeasurementSegments" methodname="GeneratedProfile_CoversReferenceMeasurementSegments" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="1563748228" result="Passed" start-time="2026-07-29 10:06:02Z" end-time="2026-07-29 10:06:02Z" duration="0.002548" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1087" name="ParityScene_CompletesFullProfileAndExportsTelemetry" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.ParityScene_CompletesFullProfileAndExportsTelemetry" methodname="ParityScene_CompletesFullProfileAndExportsTelemetry" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="605482513" result="Passed" start-time="2026-07-29 10:06:02Z" end-time="2026-07-29 10:07:23Z" duration="80.554913" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                    <property name="Category" value="ParityCapture" />
+                  </properties>
+                  <output><![CDATA[Parity run complete. V2 samples: 7801; V3 samples: 7801. Output: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\HovercraftV3\Parity
+Gate 3 parity telemetry: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\HovercraftV3\Parity
+]]></output>
+                </test-case>
+                <test-case id="1086" name="ParityScene_StartsScriptedRunInPlayMode" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.ParityScene_StartsScriptedRunInPlayMode" methodname="ParityScene_StartsScriptedRunInPlayMode" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="732586574" result="Passed" start-time="2026-07-29 10:07:23Z" end-time="2026-07-29 10:07:25Z" duration="1.712568" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1085" name="Summary_DoesNotTreatPresetScenarioSpeedAsAccelerationMaximum" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.Summary_DoesNotTreatPresetScenarioSpeedAsAccelerationMaximum" methodname="Summary_DoesNotTreatPresetScenarioSpeedAsAccelerationMaximum" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="320180595" result="Passed" start-time="2026-07-29 10:07:25Z" end-time="2026-07-29 10:07:25Z" duration="0.004582" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1084" name="V2Fingerprint_RejectsPlaceholderAndAcceptsReferenceMassLayout" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.V2Fingerprint_RejectsPlaceholderAndAcceptsReferenceMassLayout" methodname="V2Fingerprint_RejectsPlaceholderAndAcceptsReferenceMassLayout" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="2075066831" result="Passed" start-time="2026-07-29 10:07:25Z" end-time="2026-07-29 10:07:25Z" duration="0.000974" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <output><![CDATA[Saving results to: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\TestResults.xml
+]]></output>
+                </test-case>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

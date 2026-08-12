@@ -3,7 +3,12 @@
   "rootNamespace": "Lunarlight.Hovercraft.V3.Tests",
   "references": [
     "Lunarlight.Hovercraft.V3",
+    "Lunarlight.Hovercraft.V3.TrackIntegration",
+    "Lunarlight.Hovercraft.V3.Editor",
+    "Lunarlight.Hovercraft.V3.Diagnostics",
+    "Slingshot.TrackGeneration",
     "Unity.InputSystem",
+    "Unity.InputSystem.TestFramework",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],

@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 638a4552f6cae9249a1c0305e8043040, type: 3}
+  m_Name: Computer_Aerodynamics
+  m_EditorClassIdentifier: Lunarlight.Hovercraft.V3::Lunarlight.Hovercraft.V3.V3SystemComputerDefinition
+  stableId: computer.aerodynamics.balanced.01
+  displayName: Balanced Aerodynamics Computer
+  manufacturer: {fileID: 0}
+  productFamily: Apex Balanced Systems
+  description: Generated systems-integration prototype hardware.
+  role: 6
+  size: 0
+  prefab: {fileID: 1274401834881002740, guid: b0a41decac46a09448ac7f6ba1af4971, type: 3}
+  prototype: 1
+  physical:
+    massKg: 22
+    localCenterOfMass: {x: 0, y: 0, z: 0}
+    maximumStructuralLoadN: 200000
+    maximumSupportedForceN: 200000
+  power:
+    domain: 0
+    idleDemand: 0
+    maximumDemand: 0
+    disabledDemand: 0
+    efficiency: 1
+    overloadDemandMultiplier: 1
+  thermal:
+    enabled: 0
+    ambientTemperatureC: 0
+    maximumSafeTemperatureC: 0
+    overheatTemperatureC: 0
+    restartTemperatureC: 0
+    hotOutputLimitAtOverheat: 0
+    coolingLockoutSeconds: 0
+    thermalCapacity: 0
+    passiveCoolingPerSecond: 0
+    idleHeatPerSecond: 0
+    maximumOutputHeatPerSecond: 0
+    overloadHeatMultiplier: 0
+  compatibleParentFamilies: 05000000
+  requiresPower: 0
+  requiresData: 1
+  providedCapabilities: 256
+  requiredCapabilities: 0
+  computerRole: 5
+  computeCapacityPerSecond: 300
+  taskCapacity: 1
+  bundledSoftware: {fileID: 11400000, guid: 0239451d4ed52244f8393c6d9ea8c42b, type: 2}

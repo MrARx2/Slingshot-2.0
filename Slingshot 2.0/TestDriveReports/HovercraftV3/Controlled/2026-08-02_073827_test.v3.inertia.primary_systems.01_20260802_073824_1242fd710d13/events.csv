@@ -1,0 +1,9 @@
+event_id,type,severity,timestamp_s,tick,sample_index,attempt_index,reset_reason,track_distance_m,section_id,speed_mps,world_state,manual,notes
+"manual_0001",ManualMarker,0,0,-1,-1,0,"",0,"",0,Unknown,true,"Controlled phase: Measured"
+"SampleRateDrop_00000000",SampleRateDrop,1,0.0099999929138321619,0,0,0,"",0,"",0,Unknown,false,"Measured sensor rate fell below 75% of its grant."
+"TaskUnderMinimum_00000000",TaskUnderMinimum,2,0.0099999929138321619,0,0,0,"",0,"",0,Unknown,false,"A software task measured below its minimum useful rate."
+"PowerStarvation_00000000",PowerStarvation,2,0.0099999929138321619,0,0,0,"",0,"",0,Unknown,false,"Requested power exceeded granted power."
+"Spin_00000021",Spin,2,0.21999984410430837,21,21,0,"",0,"",2.0595364570617676,Unknown,false,"Surface-normal angular rate exceeded the spin threshold."
+"Rollover_00000182",Rollover,3,1.8299987032312923,182,182,0,"",0,"",24.382061004638672,Unknown,false,"Craft up axis points away from the local track surface."
+"manual_0007",ManualMarker,0,3.0099978670634919,300,300,0,"",0,"",35.733348846435547,Unknown,true,"Controlled phase: Cooldown"
+"Rollover_00000326",Rollover,3,3.2699976828231287,326,326,0,"",0,"",38.238861083984375,Unknown,false,"Craft up axis points away from the local track surface."

@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3abfccf4e478f81489b1ff664e16c230, type: 3}
+  m_Name: Balanced_ActiveCooling
+  m_EditorClassIdentifier: Lunarlight.Hovercraft.V3::Lunarlight.Hovercraft.V3.V3CoolingModuleDefinition
+  stableId: cooling.active.balanced.01
+  displayName: Balanced Active Cooling
+  manufacturer: {fileID: 0}
+  productFamily: Apex Balanced Systems
+  description: Generated systems-integration prototype hardware.
+  role: 9
+  size: 0
+  prefab: {fileID: 7931771321027361500, guid: af6b307c051b0df46980010a11406538, type: 3}
+  prototype: 1
+  physical:
+    massKg: 55
+    localCenterOfMass: {x: 0, y: 0, z: 0}
+    maximumStructuralLoadN: 200000
+    maximumSupportedForceN: 200000
+  power:
+    domain: 0
+    idleDemand: 5
+    maximumDemand: 90
+    disabledDemand: 0
+    efficiency: 1
+    overloadDemandMultiplier: 1
+  thermal:
+    enabled: 0
+    ambientTemperatureC: 0
+    maximumSafeTemperatureC: 0
+    overheatTemperatureC: 0
+    restartTemperatureC: 0
+    hotOutputLimitAtOverheat: 0
+    coolingLockoutSeconds: 0
+    thermalCapacity: 0
+    passiveCoolingPerSecond: 0
+    idleHeatPerSecond: 0
+    maximumOutputHeatPerSecond: 0
+    overloadHeatMultiplier: 0
+  compatibleParentFamilies: 08000000
+  requiresPower: 1
+  requiresData: 1
+  providedCapabilities: 0
+  requiredCapabilities: 0
+  maximumHeatRemovalPerSecond: 300
+  activationTemperatureC: 55
+  firmware: {fileID: 11400000, guid: bf69e3fd697224444b4b1ddd8ddcef9e, type: 2}

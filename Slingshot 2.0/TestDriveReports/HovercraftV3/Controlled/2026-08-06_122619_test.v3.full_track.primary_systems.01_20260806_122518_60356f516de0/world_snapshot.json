@@ -1,0 +1,46 @@
+{
+    "sceneName": "V3_TrackTest",
+    "gravity": {
+        "x": 0.0,
+        "y": -9.8100004196167,
+        "z": 0.0
+    },
+    "fixedDeltaTime": 0.00999999325722456,
+    "maximumDeltaTime": 0.3333333432674408,
+    "defaultSolverIterations": 6,
+    "defaultSolverVelocityIterations": 1,
+    "defaultContactOffset": 0.009999999776482582,
+    "bounceThreshold": 2.0,
+    "sleepThreshold": 0.004999999888241291,
+    "physicsSimulationMode": "FixedUpdate",
+    "trackInstanceId": -61490,
+    "trackGenerationRevision": 171,
+    "trackSectionCount": 61,
+    "trackRootName": "V3 Track Test Cached Track",
+    "hasWorldSimulation": true,
+    "worldRootId": "world.root.v3_tracktest",
+    "worldProfileId": "world.earth_standard",
+    "worldProfileName": "Earth Standard",
+    "worldConfigurationVersion": 1,
+    "referenceWorldY": 0.0,
+    "seaLevelTemperatureC": 15.0,
+    "seaLevelPressurePa": 101325.0,
+    "seaLevelDensity": 1.2250123023986817,
+    "atmosphereMode": "StandardLapseRate",
+    "lapseRateKPerMeter": 0.006500000134110451,
+    "profileGravity": {
+        "x": 0.0,
+        "y": -9.806650161743164,
+        "z": 0.0
+    },
+    "globalWind": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "gustStrength": 0.0,
+    "turbulenceStrength": 0.0,
+    "coolingMultiplier": 1.0,
+    "windSeed": 314159,
+    "environmentZoneCount": 3
+}

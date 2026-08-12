@@ -1,0 +1,985 @@
+[Licensing::Module] Trying to connect to existing licensing client channel...
+Built from '6000.5/staging' branch; Version is '6000.5.0f1 (88b47c5e7076) revision 8959100'; Using compiler version '194234433'; Build Type 'Release'
+OS: 'Windows 11  (10.0.26200) Professional' Language: 'en' Physical Memory: 65173 MB
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Jack_" at "2026-07-29T14:28:07.1947252Z"
+BatchMode: 1, IsHumanControllingUs: 0, StartBugReporterOnCrash: 0, Is64bit: 1
+System  architecture: x64
+Process architecture: x64
+Date: 2026-07-29T14:28:07Z
+
+COMMAND LINE ARGUMENTS:
+C:\Program Files\Unity\Hub\Editor\6000.5.0f1\Editor\Unity.exe
+-batchmode
+-projectPath
+C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57
+-runTests
+-testPlatform
+EditMode
+-testFilter
+Lunarlight.Hovercraft.V3
+-testResults
+C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\V3_Filtered_TestResults_PostScene.xml
+-logFile
+C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\V3_Filtered_Tests_PostScene.log
+Successfully changed project path to: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57
+C:/Users/Jack_/AppData/Local/Temp/HovercraftV3_Repair_Unity_019f9e57
+[UnityMemory] Configuration Parameters - Can be set up in boot.config
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-nav-mesh-worker=65536"
+    "memorysetup-temp-allocator-size-audio-worker=65536"
+    "memorysetup-temp-allocator-size-cloud-worker=32768"
+    "memorysetup-temp-allocator-size-gfx=262144"
+    "memorysetup-temp-allocator-size-preload-manager=33554432"
+    "memorysetup-allocator-temp-initial-block-size-main=262144"
+    "memorysetup-allocator-temp-initial-block-size-worker=262144"
+    "memorysetup-temp-allocator-size-job-worker=262144"
+    "memorysetup-temp-allocator-size-background-worker=32768"
+    "memorysetup-bucket-allocator-granularity=16"
+    "memorysetup-bucket-allocator-bucket-count=8"
+    "memorysetup-bucket-allocator-block-size=33554432"
+    "memorysetup-bucket-allocator-block-count=8"
+    "memorysetup-main-allocator-block-size=16777216"
+    "memorysetup-thread-allocator-block-size=16777216"
+    "memorysetup-main-allocator-mimalloc-enabled=0"
+    "memorysetup-gfx-main-allocator-block-size=16777216"
+    "memorysetup-gfx-thread-allocator-block-size=16777216"
+    "memorysetup-cache-allocator-block-size=4194304"
+    "memorysetup-typetree-allocator-block-size=2097152"
+    "memorysetup-profiler-bucket-allocator-granularity=16"
+    "memorysetup-profiler-bucket-allocator-bucket-count=8"
+    "memorysetup-profiler-bucket-allocator-block-size=33554432"
+    "memorysetup-profiler-bucket-allocator-block-count=8"
+    "memorysetup-profiler-allocator-block-size=16777216"
+    "memorysetup-profiler-editor-allocator-block-size=1048576"
+    "memorysetup-temp-allocator-size-main=16777216"
+    "memorysetup-job-temp-allocator-block-size=2097152"
+    "memorysetup-job-temp-allocator-block-size-background=1048576"
+    "memorysetup-job-temp-allocator-reduction-small-platforms=262144"
+Logging is directed to a specific file, skipping project log.Player connection [70664]  Target information:
+
+Player connection [70664]  * "[IP] 192.168.0.198 [Port] 55505 [Flags] 2 [Guid] 561586313 [EditorId] 561586313 [Version] 1048832 [Id] WindowsEditor(7,JackROG) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
+
+Player connection [70664] Host joined multi-casting on [225.0.0.222:54997]...
+Player connection [70664] Host joined alternative multi-casting on [225.0.0.222:34997]...
+Input System module state changed to: Initialized.
+[Physics::Module] Initialized fallback backend.
+[Physics::Module] Id: 0xdecafbad
+[Package Manager] Connected to IPC stream "Upm-66900" after 0.2 seconds.
+[Licensing::Module] Licensing is not yet initialized.
+[Licensing::Client] Error: HandshakeResponse reported an error:
+	ResponseCode: 505
+	ResponseStatus: Unsupported protocol version '1.18.1'.
+[Licensing::Module] Error: Failed to handshake to channel: "LicenseClient-Jack_"
+[Licensing::IpcConnector] LicenseClient-Jack_ channel disconnected successfully.
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Jack_-6000.5.0" at "2026-07-29T14:28:08.3091094Z"
+[Licensing::Client] Code 10 while verifying Licensing Client signature (process Id: 66736, path: "C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/Resources/Licensing/Client/Unity.Licensing.Client.exe")
+[Licensing::Module] LicensingClient has failed validation; ignoring
+[Licensing::Client] Handshaking with LicensingClient:
+  Version:                 1.18.1+9fbee8e
+  Session Id:              5dbe18649006469aa74bc3ed41879829
+  Correlation Id:          4e1872c3a9ab6ddcae353519faf4281d
+  External correlation Id: 6202625882357753815
+  Machine Id:              /GJp5GQQrC1dJ9Sb/cVpXVkOuWs=
+[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-Jack_-6000.5.0" (connect: 0.00s, validation: 0.00s, handshake: 0.01s)
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Jack_-6000.5.0-notifications" at "2026-07-29T14:28:08.3155078Z"
+[Licensing::Module] Error: Access token is unavailable; failed to update
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] License group:
+  Id: 18967160142921-UnityPersXXXX
+  Product: Unity Personal
+  Type: Assigned
+  Expiration: Unlimited
+[Licensing::Client] Successfully updated license, isAsync: True, time: 0.00
+[Licensing::Module] Licensing Background thread has ended after 1.12s
+[Licensing::Module] Licensing is initialized (took 0.74s).
+[Licensing::Client] Successfully resolved entitlement details
+Library Redirect Path: Library/
+[Physics::Module] Selected backend.
+[Physics::Module] Name: PhysX
+[Physics::Module] Id: 0xf2b8ea05
+[Physics::Module] SDK Version: 4.1.2
+[Physics::Module] Integration Version: 1.0.0
+[Physics::Module] Threading Mode: Multi-Threaded
+Initialize engine version: 6000.5.0f1 (88b47c5e7076)
+[Subsystems] Discovering subsystems at path C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/Resources/UnitySubsystems
+[Subsystems] Discovering subsystems at path C:/Users/Jack_/AppData/Local/Temp/HovercraftV3_Repair_Unity_019f9e57/Assets
+GfxDevice: creating device client; kGfxThreadingModeNonThreaded
+d3d12: failed to query info queue interface (0x80004002).
+Direct3D:
+    Version:         Direct3D 12 [level 12.2]
+    Renderer:        NVIDIA GeForce RTX 5090 (ID=0x2b85)
+    Vendor:          NVIDIA
+    VRAM:            32187 MB
+    App VRAM Budget: 31419 MB
+    Driver:          32.0.16.1062
+Initialize mono
+Mono path[0] = 'C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/Managed'
+Mono path[1] = 'C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/BCLExtensions/runtime/netstandard2.1'
+Mono path[2] = 'C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/MonoBleedingEdge/lib/mono/unityjit-win32'
+Mono config path = 'C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/MonoBleedingEdge/etc'
+Using monoOptions --debugger-agent=transport=dt_socket,embedding=1,server=y,suspend=n,address=127.0.0.1:56900
+CodeReloadManager initialized
+ImportWorker Server TCP listen port: 0
+AcceleratorClientConnectionCallback - disconnected - :0
+Begin MonoManager ReloadAssembly
+Registering precompiled unity dll's ...
+Register platform support module: C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/PlaybackEngines/WindowsStandaloneSupport/UnityEditor.WindowsStandalone.Extensions.dll
+Registered in 0.001217 seconds.
+Native extension for WindowsStandalone target not found
+Package Manager log level set to [2]
+ScheduleIndexationOnStartup MainProcess:False IndexOnStartup:False
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.230 seconds
+Domain Reload Profiling: 558ms
+	BeginReloadAssembly (104ms)
+		CreateAndSetChildDomain (32ms)
+	RebuildCommonClasses (3ms)
+	RebuildNativeTypeToScriptingClass (10ms)
+	initialDomainReloadingComplete (38ms)
+	LoadAllAssembliesAndSetupDomain (171ms)
+		LoadAssemblies (70ms)
+		AnalyzeDomain (124ms)
+			TypeCache.Refresh (123ms)
+				TypeCache.ScanAssembly (114ms)
+	FinalizeReload (232ms)
+		SetupLoadedEditorAssemblies (0ms)
+			BeforeProcessingInitializeOnLoad (55ms)
+			ProcessInitializeOnLoadAttributes (56ms)
+			ProcessInitializeOnLoadMethodAttributes (70ms)
+[Licensing::Client] Successfully resolved entitlement details
+Application.AssetDatabase Initial Refresh Start
+[Package Manager] Restoring resolved packages state from cache
+[Licensing::Client] Successfully resolved entitlement details
+[Package Manager] Registered 59 packages:
+  Packages from [https://packages.unity.com]:
+    com.unity.ai.navigation@2.0.13 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.ai.navigation@42d896194035)
+    com.unity.collab-proxy@2.12.4 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.collab-proxy@0b1559bcd34e)
+    com.unity.ide.rider@3.0.38 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.ide.rider@1f60b3138684)
+    com.unity.ide.visualstudio@2.0.26 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.ide.visualstudio@a99d56dec63f)
+    com.unity.inputsystem@1.19.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.inputsystem@21a28c3a6c83)
+    com.unity.splines@2.8.4 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.splines@9b00833aca09)
+    com.unity.timeline@1.8.12 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.timeline@8cd8509afae5)
+    com.unity.visualscripting@1.9.11 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.visualscripting@8bed5ad90189)
+    com.unity.settings-manager@2.1.1 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.settings-manager@0b8638c5ce86)
+    com.unity.searcher@4.9.4 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.searcher@d45a78918735)
+    com.unity.burst@1.8.29 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.burst@6bb9aca3ef38)
+    com.unity.nuget.mono-cecil@1.11.6 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.nuget.mono-cecil@ecb9724e46ff)
+    com.unity.test-framework.performance@3.5.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.test-framework.performance@8b56083ec0f0)
+  Built-in packages:
+    com.unity.multiplayer.center@1.0.1 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.multiplayer.center@b860850997d0)
+    com.unity.render-pipelines.universal@17.5.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.render-pipelines.universal@0c18adc4ff89)
+    com.unity.test-framework@1.7.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.test-framework@f3e6c9a02477)
+    com.unity.ugui@2.5.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.ugui@4f9b15fd1386)
+    com.unity.modules.accessibility@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.accessibility)
+    com.unity.modules.adaptiveperformance@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.adaptiveperformance)
+    com.unity.modules.ai@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.ai)
+    com.unity.modules.androidjni@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.androidjni)
+    com.unity.modules.animation@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.animation)
+    com.unity.modules.assetbundle@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.assetbundle)
+    com.unity.modules.audio@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.audio)
+    com.unity.modules.cloth@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.cloth)
+    com.unity.modules.director@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.director)
+    com.unity.modules.imageconversion@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.imageconversion)
+    com.unity.modules.imgui@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.imgui)
+    com.unity.modules.jsonserialize@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.jsonserialize)
+    com.unity.modules.particlesystem@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.particlesystem)
+    com.unity.modules.physics@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.physics)
+    com.unity.modules.physics2d@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.physics2d)
+    com.unity.modules.physicscore2d@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.physicscore2d)
+    com.unity.modules.screencapture@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.screencapture)
+    com.unity.modules.terrain@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.terrain)
+    com.unity.modules.terrainphysics@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.terrainphysics)
+    com.unity.modules.tilemap@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.tilemap)
+    com.unity.modules.ui@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.ui)
+    com.unity.modules.uielements@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.uielements)
+    com.unity.modules.umbra@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.umbra)
+    com.unity.modules.unityanalytics@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.unityanalytics)
+    com.unity.modules.unitywebrequest@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.unitywebrequest)
+    com.unity.modules.unitywebrequestassetbundle@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.unitywebrequestassetbundle)
+    com.unity.modules.unitywebrequestaudio@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.unitywebrequestaudio)
+    com.unity.modules.unitywebrequesttexture@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.unitywebrequesttexture)
+    com.unity.modules.unitywebrequestwww@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.unitywebrequestwww)
+    com.unity.modules.vectorgraphics@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.vectorgraphics)
+    com.unity.modules.vehicles@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.vehicles)
+    com.unity.modules.video@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.video)
+    com.unity.modules.wind@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.wind)
+    com.unity.modules.xr@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.xr)
+    com.unity.modules.subsystems@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.subsystems)
+    com.unity.modules.hierarchycore@1.0.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.modules.hierarchycore)
+    com.unity.ext.nunit@2.1.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.ext.nunit@44f7d31723bd)
+    com.unity.mathematics@1.4.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.mathematics@981956d94fb6)
+    com.unity.render-pipelines.core@17.5.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.render-pipelines.core@f43b729f1f6e)
+    com.unity.shadergraph@17.5.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.shadergraph@3fa956880a81)
+    com.unity.render-pipelines.universal-config@17.5.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.render-pipelines.universal-config@fdda01c80fe3)
+    com.unity.collections@6.5.0 (location: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\Library\PackageCache\com.unity.collections@a43cabe808ca)
+[Subsystems] No new subsystems found in resolved package list.
+[Package Manager] Done registering packages in 0.01 seconds
+Starting: C:\Program Files\Unity\Hub\Editor\6000.5.0f1\Editor\Data\Tools\BuildPipeline\bee_backend.exe --ipc --defer-dag-verification --dagfile="Library/Bee/1900b0aE.dag" --continue-on-failure --profile="Library/Bee/backend1.traceevents" ScriptAssemblies
+WorkingDir: C:/Users/Jack_/AppData/Local/Temp/HovercraftV3_Repair_Unity_019f9e57
+DisplayProgressbar: Compiling Scripts
+ExitCode: 0 Duration: 0s224ms
+[ 788/1008  0s] ILPP-Configuration Library/ilpp-configuration.nevergeneratedoutput
+*** Tundra build success (0.20 seconds), 1 items updated, 1008 evaluated
+AssetDatabase: script compilation time: 0.509343s
+Begin MonoManager ReloadAssembly
+Total cache size 122480828
+Total cache size after purge 122480828, took 00:00:00.0713923
+Native extension for WindowsStandalone target not found
+ScheduleIndexationOnStartup MainProcess:True IndexOnStartup:False
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.765 seconds
+Domain Reload Profiling: 1366ms
+	BeginReloadAssembly (171ms)
+		DisableScriptedObjects (54ms)
+		CreateAndSetChildDomain (29ms)
+	RebuildCommonClasses (5ms)
+	RebuildNativeTypeToScriptingClass (10ms)
+	initialDomainReloadingComplete (35ms)
+	LoadAllAssembliesAndSetupDomain (378ms)
+		LoadAssemblies (203ms)
+		AnalyzeDomain (158ms)
+			TypeCache.Refresh (104ms)
+				TypeCache.ScanAssembly (97ms)
+			BuildScriptInfoCaches (48ms)
+			ResolveRequiredComponents (5ms)
+	FinalizeReload (766ms)
+		SetupLoadedEditorAssemblies (0ms)
+			BeforeProcessingInitializeOnLoad (52ms)
+			ProcessInitializeOnLoadAttributes (394ms)
+			ProcessInitializeOnLoadMethodAttributes (104ms)
+			AfterProcessingInitializeOnLoad (4ms)
+		AwakeInstancesAfterBackupRestoration (14ms)
+Starting new worker id: 0 with log in C:/Users/Jack_/AppData/Local/Temp/HovercraftV3_Repair_Unity_019f9e57/Logs/AssetImportWorkerHW0.log
+
+Asset Pipeline Refresh (id=21186119af01ffe4d8eef417241bf8ab): Total: 2.287 seconds - Initiated by InitialRefreshV2(ForceSynchronousImport)
+	(Values over 0.05ms)
+	Summary:
+		Imports: total=0 (actual=0, local cache=0, cache server=0)
+		Asset DB Process Time: managed=0 ms, native=1068 ms
+		Asset DB Callback time: managed=17 ms, native=13 ms
+		Scripting: domain reloads=1, domain reload time=639 ms, compile time=511 ms, other=36 ms
+		Project Asset Count: scripts=1493, non-scripts=2508
+		Asset File Changes: new=0, changed=0, moved=0, deleted=0
+		Scan Filter Count: 0
+	InvokePackagesCallback: 15.086ms
+	ApplyChangesToAssetFolders: 0.413ms
+	Scan: 67.194ms
+	Collect global state as custom dependencies: 3.281ms
+	CategorizeScriptCompilationAssets: 30.701ms
+	ProcessAssetsWithTransientArtifactChanges: 52.385ms
+	CategorizeAssets: 29.160ms
+	CompileScripts: 510.776ms
+	ImportOutOfDateAssets: 805.206ms (777.420ms without children)
+		UnloadImportedAssets: 0.591ms
+		EnsureUptoDateAssetsAreRegisteredWithGuidPM: 0.315ms
+		ImportSchedulerStart: 26.861ms
+	PostProcessAllAssets: 17.602ms
+		MonoPostProcessAllAssets: 17.560ms
+			UniversalRenderPipelineGlobalSettingsPostprocessor.OnPostprocessAllAssets 6.331ms
+			SyncVS.PostprocessSyncProject 2.017ms
+			WindowAssetPostprocessingWatcher.OnPostprocessAllAssets 1.248ms
+			SpeedTree9Postprocessor.OnPostprocessAllAssets 1.028ms
+			RenderPipelineGlobalSettingsPostprocessor.OnPostprocessAllAssets 0.549ms
+			ShaderReflectionAssetPostProcessor.OnPostprocessAllAssets 0.212ms
+			ReferencedClipsPostProcessor.OnPostprocessAllAssets 0.200ms
+			InputActionAssetPostprocessor.OnPostprocessAllAssets 0.160ms
+			TerrainToolbarOverlayPostProcessor.OnPostprocessAllAssets 0.134ms
+			AssetDatabaseCallbacks.OnPostprocessAllAssets 0.096ms
+			ProjectSettingsPostprocessor.OnPostprocessAllAssets 0.091ms
+	UnloadStreamsBegin: 2.423ms
+	PersistCurrentRevisions: 0.077ms
+	GenerateScriptTypeHashes: 1.438ms
+	GenerateScriptTypeSerializationHashes: 2.463ms
+	Untracked: 748.601ms
+
+Application.AssetDatabase Initial Refresh End
+Launched and connected shader compiler UnityShaderCompiler.exe after 0.01 seconds
+Worker ready: AssetImportWorkerHW0 0
+Scanning for USB devices : 2047.216ms
+Initializing Unity extensions:
+[MODES] ModeService[none].Initialize
+[MODES] ModeService[none].LoadModes
+[MODES] Loading mode Default (0) for mode-current-id-Slingshot 2.0
+GetVirtualKey: Could not map char: z (122) to any virtual key
+GetVirtualKey: Could not map char: y (121) to any virtual key
+GetVirtualKey: Could not map char: x (120) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: v (118) to any virtual key
+GetVirtualKey: Could not map char: V (86) to any virtual key
+GetVirtualKey: Could not map char: d (100) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: a (97) to any virtual key
+GetVirtualKey: Could not map char: d (100) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: r (114) to any virtual key
+GetVirtualKey: Could not map char: i (105) to any virtual key
+GetVirtualKey: Could not map char: l (108) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: k (107) to any virtual key
+GetVirtualKey: Could not map char: p (112) to any virtual key
+GetVirtualKey: Could not map char: p (112) to any virtual key
+GetVirtualKey: Could not map char: p (112) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: r (114) to any virtual key
+GetVirtualKey: Could not map char: P (80) to any virtual key
+GetVirtualKey: Could not map char: n (110) to any virtual key
+GetVirtualKey: Could not map char: n (110) to any virtual key
+GetVirtualKey: Could not map char: g (103) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: a (97) to any virtual key
+GetVirtualKey: Could not map char: a (97) to any virtual key
+GetVirtualKey: Could not map char: n (110) to any virtual key
+GetVirtualKey: Could not map char: o (111) to any virtual key
+GetVirtualKey: Could not map char: s (115) to any virtual key
+GetVirtualKey: Could not map char: s (115) to any virtual key
+GetVirtualKey: Could not map char: b (98) to any virtual key
+GetVirtualKey: Could not map char: b (98) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: u (117) to any virtual key
+Unloading 25 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 6767 unused Assets / (5.9 MB). Loaded Objects now: 7667.
+Memory consumption went from 396.4 MB to 390.5 MB.
+Total: 8.362700 ms (FindLiveObjects: 0.283200 ms CreateObjectMapping: 1.039800 ms MarkObjects: 4.144900 ms  DeleteObjects: 2.892200 ms)
+
+[Project] Loading completed in 6.995 seconds
+	Project init time: 				6.621 seconds
+		Template init time: 		0.000 seconds
+		Package Manager init time: 		0.888 seconds
+		Asset Database init time: 		0.184 seconds
+		Global illumination init time: 	0.002 seconds
+		Assemblies load time: 			0.585 seconds
+		Unity extensions init time: 	0.022 seconds
+		Asset Database refresh time: 	2.287 seconds
+	Scene opening time: 			0.122 seconds
+##utp:{"type":"ProjectInfo","version":2,"phase":"Immediate","time":1785335294168,"processId":66900,"projectLoad":6.9948054,"projectInit":6.6205739,"templateInit":0.0,"packageManagerInit":0.888082,"assetDatabaseInit":0.1843456,"globalIlluminationInit":0.0016519,"assembliesLoad":0.5852644,"unityExtensionsInit":0.0217742,"assetDatabaseRefresh":2.2874415,"sceneOpening":0.1217134}
+##utp:{"type":"EditorInfo","version":2,"phase":"Immediate","time":1785335294168,"processId":66900,"editorVersion":"6000.5.0f1 (88b47c5e7076)","branch":"6000.5/staging","buildType":"Release","platform":"Windows"}
+[Licensing::Client] Successfully resolved entitlement details
+Running tests for ExecutionSettings with details:
+targetPlatform = 
+playerHeartbeatTimeout = 600
+filters[0] = 
+   Filter with settings:
+   testMode = EditMode
+   targetPlatform = 
+   testNames = null
+   groupNames = Lunarlight.Hovercraft.V3
+   categoryNames = null
+   assemblyNames = null
+ignoreTests = {}
+featureFlags = null
+
+UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+UnityEngine.DebugLogHandler:Internal_Log (UnityEngine.LogType,UnityEngine.LogOption,string,UnityEngine.Object)
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:Log (UnityEngine.LogType,object)
+UnityEngine.Debug:Log (object)
+UnityEditor.TestTools.TestRunner.CommandLineTest.Executer:InitializeAndExecuteRun (string[]) (at ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/CommandLineTest/Executer.cs:53)
+UnityEditor.TestTools.TestRunner.CommandLineTest.TestStarter:InitializeAndExecuteRun () (at ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/CommandLineTest/TestStarter.cs:64)
+UnityEditor.EditorApplication:Internal_CallUpdateFunctions ()
+
+(Filename: ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/CommandLineTest/Executer.cs Line: 53)
+
+[UnityConnectServicesConfig] config is NOT valid, switching to default
+Created GICache directory at C:/Users/Jack_/AppData/LocalLow/Unity/Caches/GiCache. Took: 0.008s, timestamps: [6.997 - 7.005]
+[Licensing::Client] Successfully resolved entitlement details
+Unloading 6 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 4 unused Assets / (64.3 KB). Loaded Objects now: 7693.
+Memory consumption went from 411.8 MB to 411.8 MB.
+Total: 5.160300 ms (FindLiveObjects: 0.170500 ms CreateObjectMapping: 0.434900 ms MarkObjects: 4.523900 ms  DeleteObjects: 0.030400 ms)
+
+Executing IPrebuildSetup for: Unity.PerformanceTesting.Editor.TestRunBuilder.
+UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+UnityEngine.DebugLogHandler:Internal_Log (UnityEngine.LogType,UnityEngine.LogOption,string,UnityEngine.Object)
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:Log (UnityEngine.LogType,object)
+UnityEngine.Debug:Log (object)
+UnityEditor.TestTools.TestRunner.TestRun.Tasks.BuildActionTaskBase`1/<ExecuteMethods>d__8<UnityEngine.TestTools.IPrebuildSetup>:MoveNext () (at ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/TestRun/Tasks/BuildActionTaskBase.cs:48)
+UnityEditor.TestTools.TestRunner.TestRun.Tasks.BuildActionTaskBase`1/<Execute>d__7<UnityEngine.TestTools.IPrebuildSetup>:MoveNext () (at ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/TestRun/Tasks/BuildActionTaskBase.cs:34)
+UnityEditor.TestTools.TestRunner.TestRun.TestJobRunner:ExecuteStep () (at ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/TestRun/TestJobRunner.cs:194)
+UnityEditor.TestTools.TestRunner.TestRun.TestJobRunner:ExecuteCallback () (at ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/TestRun/TestJobRunner.cs:129)
+UnityEditor.EditorApplication:Internal_CallUpdateFunctions ()
+
+(Filename: ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/TestRun/Tasks/BuildActionTaskBase.cs Line: 48)
+
+Opening scene 'Assets/HovercraftV3/Generated/RegressionAssets/Parity/Scenes/V2_V3_FlatGround_Parity.unity'
+Unloading 28 Unused Serialized files (Serialized files now loaded: 0)
+Loaded scene 'Assets/HovercraftV3/Generated/RegressionAssets/Parity/Scenes/V2_V3_FlatGround_Parity.unity'
+	Deserialize:            0.885 ms
+	Integration:            20.392 ms
+	Integration of assets:  0.002 ms
+	Thread Wait Time:       0.019 ms
+	Total Operation Time:   21.298 ms
+Unloading 3 unused Assets / (3.0 KB). Loaded Objects now: 8181.
+Memory consumption went from 436.0 MB to 436.0 MB.
+Total: 4.901000 ms (FindLiveObjects: 0.244900 ms CreateObjectMapping: 0.489400 ms MarkObjects: 4.150500 ms  DeleteObjects: 0.015700 ms)
+
+Reloading assemblies for play mode.
+Reloading assemblies after forced synchronous recompile.
+Begin MonoManager ReloadAssembly
+GetVirtualKey: Could not map char: z (122) to any virtual key
+GetVirtualKey: Could not map char: y (121) to any virtual key
+GetVirtualKey: Could not map char: x (120) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: v (118) to any virtual key
+GetVirtualKey: Could not map char: V (86) to any virtual key
+GetVirtualKey: Could not map char: d (100) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: a (97) to any virtual key
+GetVirtualKey: Could not map char: d (100) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: r (114) to any virtual key
+GetVirtualKey: Could not map char: i (105) to any virtual key
+GetVirtualKey: Could not map char: l (108) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: k (107) to any virtual key
+GetVirtualKey: Could not map char: p (112) to any virtual key
+GetVirtualKey: Could not map char: p (112) to any virtual key
+GetVirtualKey: Could not map char: p (112) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: r (114) to any virtual key
+GetVirtualKey: Could not map char: P (80) to any virtual key
+GetVirtualKey: Could not map char: n (110) to any virtual key
+GetVirtualKey: Could not map char: n (110) to any virtual key
+GetVirtualKey: Could not map char: g (103) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: a (97) to any virtual key
+GetVirtualKey: Could not map char: a (97) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: u (117) to any virtual key
+GetVirtualKey: Could not map char: n (110) to any virtual key
+GetVirtualKey: Could not map char: o (111) to any virtual key
+GetVirtualKey: Could not map char: s (115) to any virtual key
+GetVirtualKey: Could not map char: s (115) to any virtual key
+GetVirtualKey: Could not map char: b (98) to any virtual key
+GetVirtualKey: Could not map char: b (98) to any virtual key
+Native extension for WindowsStandalone target not found
+ScheduleIndexationOnStartup MainProcess:True IndexOnStartup:False
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.606 seconds
+Domain Reload Profiling: 1109ms
+	BeginReloadAssembly (309ms)
+		DisableScriptedObjects (52ms)
+		CreateAndSetChildDomain (166ms)
+	RebuildCommonClasses (7ms)
+	RebuildNativeTypeToScriptingClass (11ms)
+	initialDomainReloadingComplete (44ms)
+	LoadAllAssembliesAndSetupDomain (131ms)
+		LoadAssemblies (81ms)
+		AnalyzeDomain (14ms)
+			TypeCache.Refresh (4ms)
+			ResolveRequiredComponents (6ms)
+	FinalizeReload (606ms)
+		SetupLoadedEditorAssemblies (0ms)
+			BeforeProcessingInitializeOnLoad (56ms)
+			ProcessInitializeOnLoadAttributes (187ms)
+			ProcessInitializeOnLoadMethodAttributes (140ms)
+			AfterProcessingInitializeOnLoad (4ms)
+		AwakeInstancesAfterBackupRestoration (27ms)
+No restricted APIs configured; Validation skipped.
+Checking 23 assemblies for restricted APIs found 0 usage(s) in 2 ms
+
+Asset Pipeline Refresh (id=0fd4f775889bcf040a7b03a2711f3794): Total: 2.033 seconds - Initiated by StopAssetImportingV2(ForceSynchronousImport | ForceDomainReload)
+	(Values over 0.05ms)
+	Summary:
+		Imports: total=0 (actual=0, local cache=0, cache server=0)
+		Asset DB Process Time: managed=0 ms, native=812 ms
+		Asset DB Callback time: managed=476 ms, native=207 ms
+		Scripting: domain reloads=1, domain reload time=536 ms, compile time=1 ms, other=0 ms
+		Project Asset Count: scripts=1493, non-scripts=2508
+		Asset File Changes: new=0, changed=0, moved=0, deleted=0
+		Scan Filter Count: 0
+	InvokePackagesCallback: 1.331ms
+	ApplyChangesToAssetFolders: 0.245ms
+	Collect global state as custom dependencies: 1.457ms
+	ProcessAssetsWithTransientArtifactChanges: 117.089ms
+	CategorizeAssets: 31.597ms
+	CompileScripts: 1.251ms
+	ImportOutOfDateAssets: 631.881ms (615.757ms without children)
+		CollectScriptTypesHashes: 1.097ms
+		ReloadNativeAssets: 0.785ms
+		UnloadImportedAssets: 0.178ms
+		EnsureUptoDateAssetsAreRegisteredWithGuidPM: 0.342ms
+		ImportSchedulerStart: 14.802ms
+	PostProcessAllAssets: 680.837ms
+		PostProcessCallbackCreateDeferredMaterials 18.804ms
+		AssemblyValidation.PostprocessAllAssets 13.454ms
+		ShaderAssetModifiedCallback 9.147ms
+		ComputeShaderImportPostprocess 3.700ms
+		RaytracingShaderImportPostprocess 3.683ms
+		SpeedTreeImporter.PostprocessAllAssets 3.230ms
+		LocalizationDatabase.AssetDatabasePostprocessCallback 1.916ms
+		BlockShaderImporter.PostprocessAllAssets 1.739ms
+		XRBuildSystem.XRAssetImported 0.394ms
+		MonoPostProcessAllAssets: 475.454ms
+			SyncVS.PostprocessSyncProject 151.364ms
+			ShaderGraphAssetPostProcessor.OnPostprocessAllAssets 105.025ms
+			AssetPostprocessor.OnPostprocessAllAssets 46.678ms
+			PostProcessor.OnPostprocessAllAssets 26.624ms
+			MaterialPostprocessor.OnPostprocessAllAssets 19.114ms
+			InputActionJsonNameModifierAssetProcessor.OnPostprocessAllAssets 19.026ms
+			InputActionAssetPostprocessor.OnPostprocessAllAssets 18.958ms
+			TextAssetPostProcessor.OnPostprocessAllAssets 13.564ms
+			StyleCatalogPostProcessor.OnPostprocessAllAssets 13.488ms
+			AssetChangedListener.OnPostprocessAllAssets 8.227ms
+			UniversalRenderPipelineGlobalSettingsPostprocessor.OnPostprocessAllAssets 6.060ms
+			BuilderAssetPostprocessor.OnPostprocessAllAssets 3.744ms
+			SpeedTree9Postprocessor.OnPostprocessAllAssets 3.609ms
+			RenderPipelineGlobalSettingsPostprocessor.OnPostprocessAllAssets 2.906ms
+			RetainedModeAssetPostprocessor.OnPostprocessAllAssets 1.195ms
+			WindowAssetPostprocessingWatcher.OnPostprocessAllAssets 1.088ms
+			SampleDependencyImporterPostProcessor.OnPostprocessAllAssets 0.305ms
+			ArtifactBrowserPostProcessor.OnPostprocessAllAssets 0.297ms
+			ShaderReflectionAssetPostProcessor.OnPostprocessAllAssets 0.288ms
+			ReferencedClipsPostProcessor.OnPostprocessAllAssets 0.237ms
+			UVCSAssetPostprocessor.OnPostprocessAllAssets 0.236ms
+			ProjectSettingsPostprocessor.OnPostprocessAllAssets 0.234ms
+			TMPro_TexturePostProcessor.OnPostprocessAllAssets 0.230ms
+			SpeedTreePostProcessor.OnPostprocessAllAssets 0.226ms
+			AudioMixerPostprocessor.OnPostprocessAllAssets 0.174ms
+			SamplePostprocessor.OnPostprocessAllAssets 0.173ms
+			AssetEvents.OnPostprocessAllAssets 0.150ms
+			TerrainToolbarOverlayPostProcessor.OnPostprocessAllAssets 0.139ms
+			AssetDatabaseCallbacks.OnPostprocessAllAssets 0.090ms
+			ConfigAssetsTracker.OnPostprocessAllAssets 0.068ms
+			ScenarioDriftAssetsTracker.OnPostprocessAllAssets 0.064ms
+	PostAssetChangesProfiler: 2.235ms
+	GatherAllCurrentPrimaryImportResultRevisions: 0.078ms
+	UnloadStreamsBegin: 0.050ms
+	PersistCurrentRevisions: 0.077ms
+	GenerateScriptTypeHashes: 2.733ms
+	GenerateScriptTypeSerializationHashes: 4.587ms
+	Untracked: 558.103ms
+
+Loaded scene 'Temp/__Backupscenes/0.backup'
+	Deserialize:            2.772 ms
+	Integration:            37.299 ms
+	Integration of assets:  0.860 ms
+	Thread Wait Time:       0.010 ms
+	Total Operation Time:   40.941 ms
+[MODES] ModeService[none].Initialize
+[MODES] ModeService[none].LoadModes
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Client] Successfully resolved entitlement details
+Unloading 3 Unused Serialized files (Serialized files now loaded: 0)
+Loaded scene 'Temp/__Backupscenes/0.backup'
+	Deserialize:            1.258 ms
+	Integration:            15.680 ms
+	Integration of assets:  0.001 ms
+	Thread Wait Time:       0.009 ms
+	Total Operation Time:   16.949 ms
+Unloading 6083 unused Assets / (1.6 MB). Loaded Objects now: 8184.
+Memory consumption went from 432.8 MB to 431.3 MB.
+Total: 8.020900 ms (FindLiveObjects: 0.543400 ms CreateObjectMapping: 1.081700 ms MarkObjects: 5.422600 ms  DeleteObjects: 0.972300 ms)
+
+Opening scene 'Assets/HovercraftV3/Scenes/Development/V3_HandlingTrack.unity additively'
+Loaded scene 'Assets/HovercraftV3/Scenes/Development/V3_HandlingTrack.unity'
+	Deserialize:            14.905 ms
+	Integration:            1.477 ms
+	Integration of assets:  0.537 ms
+	Thread Wait Time:       0.012 ms
+	Total Operation Time:   16.930 ms
+Opening scene 'Assets/HovercraftV3/Scenes/Development/V3_CraftLab.unity additively'
+Loaded scene 'Assets/HovercraftV3/Scenes/Development/V3_CraftLab.unity'
+	Deserialize:            3.458 ms
+	Integration:            0.712 ms
+	Integration of assets:  0.001 ms
+	Thread Wait Time:       0.011 ms
+	Total Operation Time:   4.183 ms
+Opening scene 'Assets/HovercraftV3/Scenes/Development/V3_HandlingTrack.unity additively'
+Loaded scene 'Assets/HovercraftV3/Scenes/Development/V3_HandlingTrack.unity'
+	Deserialize:            3.565 ms
+	Integration:            0.698 ms
+	Integration of assets:  0.002 ms
+	Thread Wait Time:       0.010 ms
+	Total Operation Time:   4.275 ms
+Opening scene 'Assets/HovercraftV3/Scenes/Development/V3_CraftLab.unity'
+Unloading 69 Unused Serialized files (Serialized files now loaded: 0)
+Loaded scene 'Assets/HovercraftV3/Scenes/Development/V3_CraftLab.unity'
+	Deserialize:            3.219 ms
+	Integration:            14.423 ms
+	Integration of assets:  0.001 ms
+	Thread Wait Time:       0.173 ms
+	Total Operation Time:   17.816 ms
+Unloading 114 unused Assets / (52.3 KB). Loaded Objects now: 8821.
+Memory consumption went from 433.2 MB to 433.1 MB.
+Total: 6.172600 ms (FindLiveObjects: 0.346600 ms CreateObjectMapping: 0.556900 ms MarkObjects: 5.158700 ms  DeleteObjects: 0.109600 ms)
+
+Reloading assemblies for play mode.
+Reloading assemblies after forced synchronous recompile.
+Begin MonoManager ReloadAssembly
+GetVirtualKey: Could not map char: z (122) to any virtual key
+GetVirtualKey: Could not map char: y (121) to any virtual key
+GetVirtualKey: Could not map char: x (120) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: v (118) to any virtual key
+GetVirtualKey: Could not map char: V (86) to any virtual key
+GetVirtualKey: Could not map char: d (100) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: a (97) to any virtual key
+GetVirtualKey: Could not map char: d (100) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: r (114) to any virtual key
+GetVirtualKey: Could not map char: i (105) to any virtual key
+GetVirtualKey: Could not map char: l (108) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: k (107) to any virtual key
+GetVirtualKey: Could not map char: p (112) to any virtual key
+GetVirtualKey: Could not map char: p (112) to any virtual key
+GetVirtualKey: Could not map char: p (112) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: r (114) to any virtual key
+GetVirtualKey: Could not map char: P (80) to any virtual key
+GetVirtualKey: Could not map char: n (110) to any virtual key
+GetVirtualKey: Could not map char: n (110) to any virtual key
+GetVirtualKey: Could not map char: g (103) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: a (97) to any virtual key
+GetVirtualKey: Could not map char: a (97) to any virtual key
+GetVirtualKey: Could not map char: n (110) to any virtual key
+GetVirtualKey: Could not map char: o (111) to any virtual key
+GetVirtualKey: Could not map char: s (115) to any virtual key
+GetVirtualKey: Could not map char: s (115) to any virtual key
+GetVirtualKey: Could not map char: b (98) to any virtual key
+GetVirtualKey: Could not map char: b (98) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: u (117) to any virtual key
+Native extension for WindowsStandalone target not found
+ScheduleIndexationOnStartup MainProcess:True IndexOnStartup:False
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.651 seconds
+Domain Reload Profiling: 1142ms
+	BeginReloadAssembly (328ms)
+		DisableScriptedObjects (53ms)
+		CreateAndSetChildDomain (173ms)
+	RebuildCommonClasses (6ms)
+	RebuildNativeTypeToScriptingClass (10ms)
+	initialDomainReloadingComplete (37ms)
+	LoadAllAssembliesAndSetupDomain (109ms)
+		LoadAssemblies (72ms)
+		AnalyzeDomain (13ms)
+			TypeCache.Refresh (4ms)
+			ResolveRequiredComponents (6ms)
+	FinalizeReload (651ms)
+		SetupLoadedEditorAssemblies (0ms)
+			BeforeProcessingInitializeOnLoad (54ms)
+			ProcessInitializeOnLoadAttributes (182ms)
+			ProcessInitializeOnLoadMethodAttributes (154ms)
+			AfterProcessingInitializeOnLoad (4ms)
+		AwakeInstancesAfterBackupRestoration (28ms)
+
+Asset Pipeline Refresh (id=297c9aa872a77f846a007633fa67f0d8): Total: 1.280 seconds - Initiated by StopAssetImportingV2(ForceSynchronousImport | ForceDomainReload)
+	(Values over 0.05ms)
+	Summary:
+		Imports: total=0 (actual=0, local cache=0, cache server=0)
+		Asset DB Process Time: managed=0 ms, native=736 ms
+		Asset DB Callback time: managed=17 ms, native=0 ms
+		Scripting: domain reloads=1, domain reload time=524 ms, compile time=1 ms, other=0 ms
+		Project Asset Count: scripts=1493, non-scripts=2508
+		Asset File Changes: new=0, changed=0, moved=0, deleted=0
+		Scan Filter Count: 0
+	InvokePackagesCallback: 1.793ms
+	ApplyChangesToAssetFolders: 0.247ms
+	Collect global state as custom dependencies: 1.237ms
+	ProcessAssetsWithTransientArtifactChanges: 0.077ms
+	CategorizeAssets: 31.474ms
+	CompileScripts: 1.279ms
+	ImportOutOfDateAssets: 677.738ms (660.859ms without children)
+		CollectScriptTypesHashes: 0.611ms
+		ReloadNativeAssets: 0.865ms
+		UnloadImportedAssets: 0.127ms
+		EnsureUptoDateAssetsAreRegisteredWithGuidPM: 0.397ms
+		ImportSchedulerStart: 15.473ms
+	PostProcessAllAssets: 17.568ms
+		MonoPostProcessAllAssets: 17.564ms
+			ShaderGraphAssetPostProcessor.OnPostprocessAllAssets 105.025ms
+			AssetPostprocessor.OnPostprocessAllAssets 46.678ms
+			PostProcessor.OnPostprocessAllAssets 26.624ms
+			MaterialPostprocessor.OnPostprocessAllAssets 19.114ms
+			InputActionJsonNameModifierAssetProcessor.OnPostprocessAllAssets 19.026ms
+			TextAssetPostProcessor.OnPostprocessAllAssets 13.564ms
+			StyleCatalogPostProcessor.OnPostprocessAllAssets 13.488ms
+			AssetChangedListener.OnPostprocessAllAssets 8.227ms
+			UniversalRenderPipelineGlobalSettingsPostprocessor.OnPostprocessAllAssets 6.096ms
+			BuilderAssetPostprocessor.OnPostprocessAllAssets 3.744ms
+			SyncVS.PostprocessSyncProject 1.711ms
+			WindowAssetPostprocessingWatcher.OnPostprocessAllAssets 1.212ms
+			RetainedModeAssetPostprocessor.OnPostprocessAllAssets 1.195ms
+			SpeedTree9Postprocessor.OnPostprocessAllAssets 1.040ms
+			ProjectSettingsPostprocessor.OnPostprocessAllAssets 0.496ms
+			RenderPipelineGlobalSettingsPostprocessor.OnPostprocessAllAssets 0.453ms
+			SampleDependencyImporterPostProcessor.OnPostprocessAllAssets 0.305ms
+			ArtifactBrowserPostProcessor.OnPostprocessAllAssets 0.297ms
+			UVCSAssetPostprocessor.OnPostprocessAllAssets 0.236ms
+			TMPro_TexturePostProcessor.OnPostprocessAllAssets 0.230ms
+			SpeedTreePostProcessor.OnPostprocessAllAssets 0.226ms
+			ShaderReflectionAssetPostProcessor.OnPostprocessAllAssets 0.218ms
+			ReferencedClipsPostProcessor.OnPostprocessAllAssets 0.200ms
+			AudioMixerPostprocessor.OnPostprocessAllAssets 0.174ms
+			SamplePostprocessor.OnPostprocessAllAssets 0.173ms
+			InputActionAssetPostprocessor.OnPostprocessAllAssets 0.160ms
+			AssetEvents.OnPostprocessAllAssets 0.150ms
+			TerrainToolbarOverlayPostProcessor.OnPostprocessAllAssets 0.132ms
+			AssetDatabaseCallbacks.OnPostprocessAllAssets 0.093ms
+			ConfigAssetsTracker.OnPostprocessAllAssets 0.068ms
+			ScenarioDriftAssetsTracker.OnPostprocessAllAssets 0.064ms
+	GatherAllCurrentPrimaryImportResultRevisions: 0.072ms
+	PersistCurrentRevisions: 0.156ms
+	GenerateScriptTypeHashes: 2.526ms
+	GenerateScriptTypeSerializationHashes: 4.048ms
+	Untracked: 542.419ms
+
+Loaded scene 'Temp/__Backupscenes/0.backup'
+	Deserialize:            2.168 ms
+	Integration:            36.903 ms
+	Integration of assets:  0.039 ms
+	Thread Wait Time:       0.008 ms
+	Total Operation Time:   39.118 ms
+[MODES] ModeService[none].Initialize
+[MODES] ModeService[none].LoadModes
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Client] Successfully resolved entitlement details
+Unloading 4 Unused Serialized files (Serialized files now loaded: 0)
+Loaded scene 'Temp/__Backupscenes/0.backup'
+	Deserialize:            1.284 ms
+	Integration:            12.235 ms
+	Integration of assets:  0.002 ms
+	Thread Wait Time:       0.013 ms
+	Total Operation Time:   13.533 ms
+Unloading 12 unused Assets / (19.0 KB). Loaded Objects now: 8826.
+Memory consumption went from 397.8 MB to 397.8 MB.
+Total: 6.032400 ms (FindLiveObjects: 0.402000 ms CreateObjectMapping: 0.513600 ms MarkObjects: 5.098000 ms  DeleteObjects: 0.017800 ms)
+
+Importing 'GUID: 052faaac586de48259a63d0c4782560b - Path: Assets/InputSystem_Actions.inputactions' with importer (ScriptedImporter : Unity.InputSystem:UnityEngine.InputSystem.Editor:InputActionImporter)
+Imported 'GUID: 052faaac586de48259a63d0c4782560b' -> (Import Result ID: '813cfbe59eb5a0db34425221e5bb39eb') in 0.014 seconds [static and dynamic dependencies]. Details - ImportResultOutputID=bbfb877907408e564857a6547f55d828 DependenciesID=82352250b4c9d768b31b45aae0a057b1 StaticDependenciesID=fe9b9f42ca1e127e535eb933a66f2ac4 
+Asset Pipeline Refresh (id=262c6f8e967a9674798ada84c68bf89f): Total: 0.084 seconds - Initiated by StopAssetImportingV2(NoUpdateAssetOptions)
+Opening scene 'Assets/HovercraftV3/Scenes/Development/V3_HandlingTrack.unity'
+Unloading 1 Unused Serialized files (Serialized files now loaded: 0)
+Loaded scene 'Assets/HovercraftV3/Scenes/Development/V3_HandlingTrack.unity'
+	Deserialize:            3.621 ms
+	Integration:            11.920 ms
+	Integration of assets:  0.001 ms
+	Thread Wait Time:       0.011 ms
+	Total Operation Time:   15.553 ms
+Unloading 13 unused Assets / (1.2 KB). Loaded Objects now: 8826.
+Memory consumption went from 403.0 MB to 403.0 MB.
+Total: 6.597000 ms (FindLiveObjects: 0.429800 ms CreateObjectMapping: 0.534000 ms MarkObjects: 5.611000 ms  DeleteObjects: 0.021400 ms)
+
+Reloading assemblies for play mode.
+Reloading assemblies after forced synchronous recompile.
+Begin MonoManager ReloadAssembly
+GetVirtualKey: Could not map char: z (122) to any virtual key
+GetVirtualKey: Could not map char: y (121) to any virtual key
+GetVirtualKey: Could not map char: x (120) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: v (118) to any virtual key
+GetVirtualKey: Could not map char: V (86) to any virtual key
+GetVirtualKey: Could not map char: d (100) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: a (97) to any virtual key
+GetVirtualKey: Could not map char: d (100) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: r (114) to any virtual key
+GetVirtualKey: Could not map char: i (105) to any virtual key
+GetVirtualKey: Could not map char: l (108) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: k (107) to any virtual key
+GetVirtualKey: Could not map char: p (112) to any virtual key
+GetVirtualKey: Could not map char: p (112) to any virtual key
+GetVirtualKey: Could not map char: p (112) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: r (114) to any virtual key
+GetVirtualKey: Could not map char: P (80) to any virtual key
+GetVirtualKey: Could not map char: n (110) to any virtual key
+GetVirtualKey: Could not map char: n (110) to any virtual key
+GetVirtualKey: Could not map char: g (103) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: f (102) to any virtual key
+GetVirtualKey: Could not map char: a (97) to any virtual key
+GetVirtualKey: Could not map char: a (97) to any virtual key
+GetVirtualKey: Could not map char: n (110) to any virtual key
+GetVirtualKey: Could not map char: o (111) to any virtual key
+GetVirtualKey: Could not map char: s (115) to any virtual key
+GetVirtualKey: Could not map char: s (115) to any virtual key
+GetVirtualKey: Could not map char: b (98) to any virtual key
+GetVirtualKey: Could not map char: b (98) to any virtual key
+GetVirtualKey: Could not map char: c (99) to any virtual key
+GetVirtualKey: Could not map char: u (117) to any virtual key
+Native extension for WindowsStandalone target not found
+ScheduleIndexationOnStartup MainProcess:True IndexOnStartup:False
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.633 seconds
+Domain Reload Profiling: 1107ms
+	BeginReloadAssembly (312ms)
+		DisableScriptedObjects (24ms)
+		CreateAndSetChildDomain (182ms)
+	RebuildCommonClasses (8ms)
+	RebuildNativeTypeToScriptingClass (10ms)
+	initialDomainReloadingComplete (36ms)
+	LoadAllAssembliesAndSetupDomain (108ms)
+		LoadAssemblies (73ms)
+		AnalyzeDomain (12ms)
+			TypeCache.Refresh (4ms)
+			ResolveRequiredComponents (6ms)
+	FinalizeReload (634ms)
+		SetupLoadedEditorAssemblies (0ms)
+			BeforeProcessingInitializeOnLoad (55ms)
+			ProcessInitializeOnLoadAttributes (190ms)
+			ProcessInitializeOnLoadMethodAttributes (136ms)
+			AfterProcessingInitializeOnLoad (6ms)
+		AwakeInstancesAfterBackupRestoration (25ms)
+
+Asset Pipeline Refresh (id=1e38806a5bf0ce04f90c2d40d4c85bb2): Total: 1.240 seconds - Initiated by StopAssetImportingV2(ForceSynchronousImport | ForceDomainReload)
+	(Values over 0.05ms)
+	Summary:
+		Imports: total=0 (actual=0, local cache=0, cache server=0)
+		Asset DB Process Time: managed=0 ms, native=713 ms
+		Asset DB Callback time: managed=16 ms, native=0 ms
+		Scripting: domain reloads=1, domain reload time=508 ms, compile time=1 ms, other=0 ms
+		Project Asset Count: scripts=1493, non-scripts=2508
+		Asset File Changes: new=0, changed=0, moved=0, deleted=0
+		Scan Filter Count: 0
+	InvokePackagesCallback: 1.357ms
+	ApplyChangesToAssetFolders: 0.261ms
+	Collect global state as custom dependencies: 1.213ms
+	ProcessAssetsWithTransientArtifactChanges: 0.072ms
+	CategorizeAssets: 30.020ms
+	CompileScripts: 1.217ms
+	ImportOutOfDateAssets: 658.328ms (642.453ms without children)
+		CollectScriptTypesHashes: 0.532ms
+		ReloadNativeAssets: 0.866ms
+		UnloadImportedAssets: 0.133ms
+		EnsureUptoDateAssetsAreRegisteredWithGuidPM: 0.328ms
+		ImportSchedulerStart: 14.530ms
+	PostProcessAllAssets: 16.320ms
+		MonoPostProcessAllAssets: 16.317ms
+			StyleCatalogPostProcessor.OnPostprocessAllAssets 10.938ms
+			UniversalRenderPipelineGlobalSettingsPostprocessor.OnPostprocessAllAssets 5.868ms
+			BuilderAssetPostprocessor.OnPostprocessAllAssets 3.146ms
+			AssetPostprocessor.OnPostprocessAllAssets 2.392ms
+			SyncVS.PostprocessSyncProject 1.661ms
+			WindowAssetPostprocessingWatcher.OnPostprocessAllAssets 1.379ms
+			InputActionJsonNameModifierAssetProcessor.OnPostprocessAllAssets 1.210ms
+			SpeedTree9Postprocessor.OnPostprocessAllAssets 1.018ms
+			AssetChangedListener.OnPostprocessAllAssets 0.749ms
+			RetainedModeAssetPostprocessor.OnPostprocessAllAssets 0.737ms
+			ShaderGraphAssetPostProcessor.OnPostprocessAllAssets 0.663ms
+			TMPro_TexturePostProcessor.OnPostprocessAllAssets 0.533ms
+			RenderPipelineGlobalSettingsPostprocessor.OnPostprocessAllAssets 0.437ms
+			MaterialPostprocessor.OnPostprocessAllAssets 0.343ms
+			ArtifactBrowserPostProcessor.OnPostprocessAllAssets 0.305ms
+			UVCSAssetPostprocessor.OnPostprocessAllAssets 0.298ms
+			SampleDependencyImporterPostProcessor.OnPostprocessAllAssets 0.267ms
+			ShaderReflectionAssetPostProcessor.OnPostprocessAllAssets 0.221ms
+			AudioMixerPostprocessor.OnPostprocessAllAssets 0.212ms
+			TextAssetPostProcessor.OnPostprocessAllAssets 0.208ms
+			ReferencedClipsPostProcessor.OnPostprocessAllAssets 0.204ms
+			AssetEvents.OnPostprocessAllAssets 0.175ms
+			InputActionAssetPostprocessor.OnPostprocessAllAssets 0.151ms
+			PostProcessor.OnPostprocessAllAssets 0.121ms
+			TerrainToolbarOverlayPostProcessor.OnPostprocessAllAssets 0.119ms
+			ScenarioDriftAssetsTracker.OnPostprocessAllAssets 0.096ms
+			AssetDatabaseCallbacks.OnPostprocessAllAssets 0.092ms
+			ProjectSettingsPostprocessor.OnPostprocessAllAssets 0.086ms
+			SamplePostprocessor.OnPostprocessAllAssets 0.083ms
+			SpeedTreePostProcessor.OnPostprocessAllAssets 0.082ms
+			ConfigAssetsTracker.OnPostprocessAllAssets 0.070ms
+	GatherAllCurrentPrimaryImportResultRevisions: 0.071ms
+	PersistCurrentRevisions: 0.077ms
+	GenerateScriptTypeHashes: 2.326ms
+	GenerateScriptTypeSerializationHashes: 3.813ms
+	Untracked: 526.569ms
+
+Loaded scene 'Temp/__Backupscenes/0.backup'
+	Deserialize:            1.457 ms
+	Integration:            35.171 ms
+	Integration of assets:  0.001 ms
+	Thread Wait Time:       0.011 ms
+	Total Operation Time:   36.640 ms
+[MODES] ModeService[none].Initialize
+[MODES] ModeService[none].LoadModes
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Client] Successfully resolved entitlement details
+Unloading 0 Unused Serialized files (Serialized files now loaded: 0)
+Loaded scene 'Temp/__Backupscenes/0.backup'
+	Deserialize:            1.386 ms
+	Integration:            15.563 ms
+	Integration of assets:  0.002 ms
+	Thread Wait Time:       0.020 ms
+	Total Operation Time:   16.970 ms
+Unloading 12 unused Assets / (2.3 KB). Loaded Objects now: 8827.
+Memory consumption went from 403.7 MB to 403.7 MB.
+Total: 5.816600 ms (FindLiveObjects: 0.338900 ms CreateObjectMapping: 0.516200 ms MarkObjects: 4.943800 ms  DeleteObjects: 0.016900 ms)
+
+Importing 'GUID: 052faaac586de48259a63d0c4782560b - Path: Assets/InputSystem_Actions.inputactions' with importer (ScriptedImporter : Unity.InputSystem:UnityEngine.InputSystem.Editor:InputActionImporter)
+Imported 'GUID: 052faaac586de48259a63d0c4782560b' -> (Import Result ID: '813cfbe59eb5a0db34425221e5bb39eb') in 0.014 seconds [static and dynamic dependencies]. Details - ImportResultOutputID=bbfb877907408e564857a6547f55d828 DependenciesID=82352250b4c9d768b31b45aae0a057b1 StaticDependenciesID=fe9b9f42ca1e127e535eb933a66f2ac4 
+Asset Pipeline Refresh (id=d69eb63703de54d4e95c9a6a8a840489): Total: 0.080 seconds - Initiated by StopAssetImportingV2(NoUpdateAssetOptions)
+Saving results to: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\TestResults.xml
+Saving results to: C:\Users\Jack_\AppData\Local\Temp\HovercraftV3_Repair_Unity_019f9e57\V3_Filtered_TestResults_PostScene.xml
+Executing IPostBuildCleanup for: Unity.PerformanceTesting.Editor.TestRunBuilder.
+UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+UnityEngine.DebugLogHandler:Internal_Log (UnityEngine.LogType,UnityEngine.LogOption,string,UnityEngine.Object)
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:Log (UnityEngine.LogType,object)
+UnityEngine.Debug:Log (object)
+UnityEditor.TestTools.TestRunner.TestRun.Tasks.BuildActionTaskBase`1/<ExecuteMethods>d__8<UnityEngine.TestTools.IPostBuildCleanup>:MoveNext () (at ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/TestRun/Tasks/BuildActionTaskBase.cs:48)
+UnityEditor.TestTools.TestRunner.TestRun.Tasks.BuildActionTaskBase`1/<Execute>d__7<UnityEngine.TestTools.IPostBuildCleanup>:MoveNext () (at ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/TestRun/Tasks/BuildActionTaskBase.cs:34)
+UnityEditor.TestTools.TestRunner.TestRun.TestJobRunner:ExecuteStep () (at ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/TestRun/TestJobRunner.cs:194)
+UnityEditor.TestTools.TestRunner.TestRun.TestJobRunner:ExecuteCallback () (at ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/TestRun/TestJobRunner.cs:129)
+UnityEditor.EditorApplication:Internal_CallUpdateFunctions ()
+
+(Filename: ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/TestRun/Tasks/BuildActionTaskBase.cs Line: 48)
+
+Unloading 2 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 209 unused Assets / (66.7 KB). Loaded Objects now: 8158.
+Memory consumption went from 407.6 MB to 407.5 MB.
+Total: 6.226500 ms (FindLiveObjects: 0.179100 ms CreateObjectMapping: 0.489900 ms MarkObjects: 5.448900 ms  DeleteObjects: 0.107700 ms)
+
+DisplayProgressbar: Undo
+Test run completed. Exiting with code 0 (Ok). Run completed.
+UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+UnityEngine.DebugLogHandler:Internal_Log (UnityEngine.LogType,UnityEngine.LogOption,string,UnityEngine.Object)
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:Log (UnityEngine.LogType,object)
+UnityEngine.Debug:Log (object)
+UnityEditor.TestTools.TestRunner.CommandLineTest.Executer:ExitApplication (UnityEditor.TestTools.TestRunner.CommandLineTest.Executer/ReturnCodes,string) (at ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/CommandLineTest/Executer.cs:81)
+UnityEditor.TestTools.TestRunner.CommandLineTest.Executer:ExitIfRunIsCompleted () (at ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/CommandLineTest/Executer.cs:74)
+UnityEditor.EditorApplication:Internal_CallUpdateFunctions ()
+
+(Filename: ./Library/PackageCache/com.unity.test-framework@f3e6c9a02477/UnityEditor.TestRunner/CommandLineTest/Executer.cs Line: 81)
+
+MonoPathRemapper: Attempts to remap: 15601; Successful remaps: 2400
+Serialized file version minimum: 23, current 23
+Importing 'GUID: 00000000000000008000000000000000 - Path: ProjectSettings/DynamicsManager.asset' with importer (LibraryAssetImporter)
+Imported 'GUID: 00000000000000008000000000000000' -> (Import Result ID: 'eb53d25498e75c76d082af46d5f04a6b') in 0.001 seconds [static dependencies only]. Details - ImportResultOutputID=af765d07e318cf68f695edacf91778bd DependenciesID=14ce3a3b6d7b8e1521c711114ce52a42 StaticDependenciesID=e270a1d9210fd7cbaf14878ac9d21fd4 
+Importing 'GUID: 0000000000000000b000000000000000 - Path: ProjectSettings/EditorBuildSettings.asset' with importer (LibraryAssetImporter)
+Imported 'GUID: 0000000000000000b000000000000000' -> (Import Result ID: 'e642fa7bbbd00ee1dcf2e68410ac207c') in 0.000 seconds [static dependencies only]. Details - ImportResultOutputID=4647dd083cfc32cebcd7526e8846440c DependenciesID=873768b2f04b61bb44318995ddcd3a68 StaticDependenciesID=1fe920c149bde0f40fb9feeae28913ab 
+Asset Pipeline Refresh (id=cef55415d03b6b44898c63e28b9f9397): Total: 0.036 seconds - Initiated by StopAssetImportingV2(NoUpdateAssetOptions)
+[Physics::Module] Cleanup current backend.
+[Physics::Module] Id: 0xf2b8ea05
+Input System module state changed to: ShutdownInProgress.
+Input Polling Thread exited.
+Input System module state changed to: Shutdown.
+[Licensing::IpcConnector] LicenseClient-Jack_-6000.5.0-notifications channel disconnected successfully.
+[Licensing::IpcConnector] LicenseClient-Jack_-6000.5.0 channel disconnected successfully.
+AcceleratorClientConnectionCallback - disconnected - :0
+Cleanup mono
+CodeReloadManager destroyed
+Checking for leaked weakptr:
+  Found no leaked weakptrs.
+[Package Manager] Server process was shutdown
+##utp:{"type":"MemoryLeaks","version":2,"phase":"Immediate","time":1785335306410,"processId":66900,"allocatedMemory":16241425,"memoryLabels":[{"Default":209793},{"Permanent":15516},{"NewDelete":71523},{"Thread":4205176},{"Manager":40517},{"VertexData":8},{"Geometry":816},{"Texture":24},{"Shader":852236},{"Material":24},{"GfxDevice":57368},{"Animation":952},{"Audio":592},{"FreeType":8},{"FontEngine":736},{"Physics":2146},{"Physics2D":16},{"Serialization":3608},{"Input":42840},{"JobScheduler":256},{"TextLib":216},{"Mono":48},{"MonoCode":64},{"ScriptingNativeRuntime":1025212},{"BaseObject":1622472},{"Resource":1208},{"Renderer":3080},{"Transform":4685},{"File":9967},{"WebCam":616},{"Culling":32},{"Terrain":11442},{"Wind":24},{"STL":40},{"String":13525},{"StaticString":3808},{"Utility":2675958},{"Curl":2559},{"PoolAlloc":2264},{"AI":80},{"TypeTree":14869},{"CodeReload":448},{"RuntimeInitializeOnLoadManager":64},{"Sprites":102},{"SpriteAtlas":120},{"GI":7816},{"Director":8296},{"CloudService":720},{"WebRequest":808},{"VR":47114},{"SceneManager":608},{"Video":208},{"LazyScriptCache":32},{"Camera":17},{"Secure":2377},{"SerializationCache":1576},{"APIUpdating":10320},{"Subsystems":336},{"VirtualTexturing":57888},{"StaticSafetyDebugInfo":278528},{"Analytics":424},{"Hierarchy":1176},{"UIElements":72},{"CoreStats":13688},{"Identifiers":13536},{"Gui":128},{"EditorUtility":119489},{"VersionControl":8},{"Undo":931},{"AssetDatabase":4723267},{"AssetImporter":40},{"EditorGi":328},{"UnityConnect":38929},{"Upm":1912},{"UpmDiagnostics":8},{"AssetCompliance":64},{"DrivenProperties":72},{"LocalIPC":211},{"ProfilerEditor":9746},{"CoreBusinessMetrics":2614},{"Windowing":456},{"Licensing":664},{"AssetReference":32},{"IPCStream":32}]}

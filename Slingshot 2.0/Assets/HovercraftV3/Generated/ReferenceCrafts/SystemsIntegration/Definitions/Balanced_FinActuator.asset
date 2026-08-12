@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4adb9e4a2c44dcc4d81c835055eb6c41, type: 3}
+  m_Name: Balanced_FinActuator
+  m_EditorClassIdentifier: Lunarlight.Hovercraft.V3::Lunarlight.Hovercraft.V3.V3RotaryActuatorDefinition
+  stableId: connector.aero.rotary.balanced.01
+  displayName: Balanced Rotary Fin Actuator
+  manufacturer: {fileID: 0}
+  productFamily: Apex Balanced Systems
+  description: Generated systems-integration prototype hardware.
+  role: 8
+  size: 0
+  prefab: {fileID: 8762518935196462396, guid: 5547084386e4ff84ab671c2271b497f8, type: 3}
+  prototype: 1
+  physical:
+    massKg: 18
+    localCenterOfMass: {x: 0, y: 0, z: 0}
+    maximumStructuralLoadN: 200000
+    maximumSupportedForceN: 200000
+  power:
+    domain: 0
+    idleDemand: 2
+    maximumDemand: 30
+    disabledDemand: 0
+    efficiency: 1
+    overloadDemandMultiplier: 1
+  thermal:
+    enabled: 0
+    ambientTemperatureC: 0
+    maximumSafeTemperatureC: 0
+    overheatTemperatureC: 0
+    restartTemperatureC: 0
+    hotOutputLimitAtOverheat: 0
+    coolingLockoutSeconds: 0
+    thermalCapacity: 0
+    passiveCoolingPerSecond: 0
+    idleHeatPerSecond: 0
+    maximumOutputHeatPerSecond: 0
+    overloadHeatMultiplier: 0
+  compatibleParentFamilies: 06000000
+  requiresPower: 1
+  requiresData: 1
+  providedCapabilities: 0
+  requiredCapabilities: 0
+  kind: 4
+  childSocketFamily: 6
+  childSize: 0
+  allowedEndpointCategories: 05000000
+  supportedEndpointMassKg: 100
+  supportedEndpointForceN: 100000
+  childPowerAvailability: 100
+  childHasPower: 1
+  childHasData: 1
+  localAxis: {x: 1, y: 0, z: 0}
+  minimumAngleDegrees: -25
+  maximumAngleDegrees: 25
+  speedDegreesPerSecond: 120
+  accelerationDegreesPerSecondSquared: 480
+  maximumLoadNm: 10000
+  firmware: {fileID: 11400000, guid: 39f7bc55429b94d4198f3ed9d8627552, type: 2}

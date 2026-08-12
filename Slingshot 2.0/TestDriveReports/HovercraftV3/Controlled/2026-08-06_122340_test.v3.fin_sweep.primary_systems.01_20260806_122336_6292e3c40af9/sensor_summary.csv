@@ -1,0 +1,15 @@
+sensor_id,direction,sample_count,valid_samples,hit_count,comparable_samples,mean_age_s,mean_abs_distance_error_m,max_abs_distance_error_m,mean_normal_error_deg,miss_count
+"sensor.chassis.front","Front",326,326,0,0,0.0099999653175473213,0,0,0,0
+"sensor.chassis.rear","Rear",326,326,0,0,0.01401837170124054,0,0,0,0
+"sensor.chassis.left","Left",326,326,0,0,0.01401837170124054,0,0,0,0
+"sensor.chassis.right","Right",326,326,0,0,0.01401837170124054,0,0,0,0
+"sensor.chassis.top","Top",326,326,0,0,0.01401837170124054,0,0,0,0
+"sensor.chassis.bottom","Bottom",326,326,0,0,0.0099999653175473213,0,0,0,0
+"sensor_6","HoverProbe",1,1,0,1,0,0,0,0,0
+"sensor_7","HoverProbe",1,1,0,1,0,0,0,0,0
+"sensor_8","HoverProbe",1,1,0,1,0,0,0,0,0
+"sensor_9","HoverProbe",1,1,0,1,0,0,0,0,0
+"Hover.Front.Left.Bottom","HoverProbe",325,325,0,325,0,0,0,0,0
+"Hover.Front.Right.Bottom","HoverProbe",325,325,0,325,0,0,0,0,0
+"Hover.Rear.Left.Bottom","HoverProbe",325,325,0,325,0,0,0,0,0
+"Hover.Rear.Right.Bottom","HoverProbe",325,325,0,325,0,0,0,0,0

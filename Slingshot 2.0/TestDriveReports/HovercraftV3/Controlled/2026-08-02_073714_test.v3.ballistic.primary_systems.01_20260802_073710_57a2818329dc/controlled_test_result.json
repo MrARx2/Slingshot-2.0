@@ -1,0 +1,126 @@
+{
+    "testId": "test.v3.ballistic.primary_systems.01",
+    "testVersion": 1,
+    "sessionId": "57a2818329dc",
+    "buildId": "build.hovercraft.baseline.01",
+    "buildGuid": "a2946245bc904c19a0827a4308c729be",
+    "buildOwnership": "GeneratedReference",
+    "controlPath": "MainframeScheduled",
+    "comparisonGroupId": "comparison.ballistic_v1",
+    "finalPhase": 4,
+    "passed": true,
+    "abortReason": "",
+    "utcStarted": "2026-08-02T07:37:09.8302017Z",
+    "utcEnded": "2026-08-02T07:37:14.9070090Z",
+    "runnerOverheadMilliseconds": 0.1718,
+    "droppedSamples": 0,
+    "droppedEvents": 0,
+    "recorderOutputDirectory": "D:\\Projects\\Unity\\Slingshot2\\Slingshot-2.0\\Slingshot 2.0\\TestDriveReports\\HovercraftV3\\Controlled\\2026-08-02_073714_test.v3.ballistic.primary_systems.01_20260802_073710_57a2818329dc",
+    "assertions": [
+        {
+            "assertionId": "a.capture.zero",
+            "passed": true,
+            "expected": "0..0.001",
+            "measured": "min=0, max=0",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "hover.captureAuthority"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "a.bottom.zero",
+            "passed": true,
+            "expected": "0..1",
+            "measured": "min=0, max=0",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "forces.bottom"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "a.roof.zero",
+            "passed": true,
+            "expected": "0..1",
+            "measured": "min=0, max=0",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "forces.roof"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "a.no.contact",
+            "passed": true,
+            "expected": "0..0",
+            "measured": "min=0, max=0",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "world.contactCount"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "a.gravity.response",
+            "passed": true,
+            "expected": "-9.80665 +/- 1.5",
+            "measured": "mean=-9.80553",
+            "tolerance": 1.5,
+            "sampleTimeRange": "0.05-0.5 s",
+            "supportingChannels": [
+                "world.acceleration.y"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "a.freeflight",
+            "passed": true,
+            "expected": "FreeFlight",
+            "measured": "NoSurface -> FreeFlight",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "a.residual.p95",
+            "passed": true,
+            "expected": "p95 <= 250",
+            "measured": "p95=1.83594",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "forces.residual",
+                "world.contactCount",
+                "identity.dynamicsValid"
+            ],
+            "evidenceFile": "force_summary.csv"
+        },
+        {
+            "assertionId": "a.no.false.landing",
+            "passed": true,
+            "expected": "0 events",
+            "measured": "0 events",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "events.json"
+        },
+        {
+            "assertionId": "a.build.identity",
+            "passed": true,
+            "expected": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "measured": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "session_manifest.json"
+        }
+    ],
+    "setupWarnings": []
+}

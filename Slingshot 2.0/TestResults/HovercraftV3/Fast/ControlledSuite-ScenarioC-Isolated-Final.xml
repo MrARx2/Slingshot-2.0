@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-08-01 16:59:40Z" end-time="2026-08-01 16:59:45Z" duration="4.7568837">
+  <test-suite type="TestSuite" id="1000" name="Slingshot 2.0" fullname="Slingshot 2.0" runstate="Runnable" testcasecount="284" result="Passed" start-time="2026-08-01 16:59:40Z" end-time="2026-08-01 16:59:45Z" duration="4.756884" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1196" name="Lunarlight.Hovercraft.V3.EditorTests.dll" fullname="D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0/Library/ScriptAssemblies/Lunarlight.Hovercraft.V3.EditorTests.dll" runstate="Runnable" testcasecount="167" result="Passed" start-time="2026-08-01 16:59:40Z" end-time="2026-08-01 16:59:45Z" duration="4.710114" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="140420" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1197" name="Lunarlight" fullname="Lunarlight" runstate="Runnable" testcasecount="167" result="Passed" start-time="2026-08-01 16:59:40Z" end-time="2026-08-01 16:59:45Z" duration="4.708816" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1198" name="Hovercraft" fullname="Lunarlight.Hovercraft" runstate="Runnable" testcasecount="167" result="Passed" start-time="2026-08-01 16:59:40Z" end-time="2026-08-01 16:59:45Z" duration="4.708257" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1199" name="V3" fullname="Lunarlight.Hovercraft.V3" runstate="Runnable" testcasecount="167" result="Passed" start-time="2026-08-01 16:59:40Z" end-time="2026-08-01 16:59:45Z" duration="4.707929" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1200" name="Tests" fullname="Lunarlight.Hovercraft.V3.Tests" runstate="Runnable" testcasecount="167" result="Passed" start-time="2026-08-01 16:59:40Z" end-time="2026-08-01 16:59:45Z" duration="4.707591" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestFixture" id="1027" name="V3ControlledDynamicsTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-08-01 16:59:40Z" end-time="2026-08-01 16:59:45Z" duration="4.698194" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1035" name="SelectedScenario_RunsThroughSerializedSceneAndExports" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.SelectedScenario_RunsThroughSerializedSceneAndExports" methodname="SelectedScenario_RunsThroughSerializedSceneAndExports" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1724194526" result="Passed" start-time="2026-08-01 16:59:38Z" end-time="2026-08-01 16:59:45Z" duration="7.082109" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                    <property name="Category" value="ControlledCapture" />
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <output><![CDATA[Controlled selected-scenario package: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\TestDriveReports\HovercraftV3\Controlled\2026-08-01_165945_test.v3.surface_departure.race_speed.01_20260801_165940_fd8063964db7
+Saving results to: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\TestResults.xml
+]]></output>
+                </test-case>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

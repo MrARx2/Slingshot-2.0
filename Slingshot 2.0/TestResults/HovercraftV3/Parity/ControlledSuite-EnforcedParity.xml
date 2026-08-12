@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-08-01 16:29:34Z" end-time="2026-08-01 16:30:53Z" duration="78.2750992">
+  <test-suite type="TestSuite" id="1000" name="Slingshot 2.0" fullname="Slingshot 2.0" runstate="Runnable" testcasecount="281" result="Passed" start-time="2026-08-01 16:29:34Z" end-time="2026-08-01 16:30:53Z" duration="78.275099" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1193" name="Lunarlight.Hovercraft.V3.EditorTests.dll" fullname="D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0/Library/ScriptAssemblies/Lunarlight.Hovercraft.V3.EditorTests.dll" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-08-01 16:29:35Z" end-time="2026-08-01 16:30:53Z" duration="78.209529" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="105052" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1194" name="Lunarlight" fullname="Lunarlight" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-08-01 16:29:35Z" end-time="2026-08-01 16:30:53Z" duration="78.208193" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1195" name="Hovercraft" fullname="Lunarlight.Hovercraft" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-08-01 16:29:35Z" end-time="2026-08-01 16:30:53Z" duration="78.207169" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1196" name="V3" fullname="Lunarlight.Hovercraft.V3" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-08-01 16:29:35Z" end-time="2026-08-01 16:30:53Z" duration="78.205951" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1197" name="Tests" fullname="Lunarlight.Hovercraft.V3.Tests" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-08-01 16:29:35Z" end-time="2026-08-01 16:30:53Z" duration="78.201626" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestFixture" id="1142" name="V3ParityHarnessTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-08-01 16:29:35Z" end-time="2026-08-01 16:30:53Z" duration="78.195186" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1148" name="ParityScene_CompletesFullProfileAndExportsTelemetry" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.ParityScene_CompletesFullProfileAndExportsTelemetry" methodname="ParityScene_CompletesFullProfileAndExportsTelemetry" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="953239251" result="Passed" start-time="2026-08-01 16:29:32Z" end-time="2026-08-01 16:30:53Z" duration="80.575091" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                    <property name="Category" value="ParityCapture" />
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <output><![CDATA[Parity run complete. V2 samples: 7801; V3 samples: 7801. Output: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\HovercraftV3\Parity
+Gate 3 parity telemetry: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\HovercraftV3\Parity
+Saving results to: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\TestResults.xml
+]]></output>
+                </test-case>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

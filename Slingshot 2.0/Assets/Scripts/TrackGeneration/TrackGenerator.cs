@@ -53,6 +53,10 @@ namespace TrackGeneration
         [SerializeField] private bool keepEditorTrackOnPlay = true;
         [SerializeField] private bool placeHovercraftOnStart = true;
         [SerializeField, Min(0f)] private float startLineForwardOffset = 0f;
+        [Tooltip("Authoritative scene anchor used by V3 assembly and recovery. It is created or updated from the generated track start frame.")]
+        [SerializeField] private Transform trackStartSpawnPoint;
+        [Tooltip("Distance along the generated start-frame up axis. V3 integration keeps this synchronized with the selected craft build's hover target.")]
+        [SerializeField, Min(0f)] private float trackStartSpawnRideHeight = 3.075f;
         [SerializeField] private bool resetHovercraftWithBackspace = true;
 
         [Header("Seed Streams (independent subsystem randomness)")]
@@ -86,6 +90,16 @@ namespace TrackGeneration
 
         /// <summary>Root transform the generated track is local to.</summary>
         public Transform TrackRoot => trackRoot;
+
+        /// <summary>
+        /// Authoritative spawn/reset anchor derived from the first generated
+        /// track frame. Unlike the generated mesh root, this survives track
+        /// regeneration so scene references remain valid.
+        /// </summary>
+        public Transform TrackStartSpawnPoint => trackStartSpawnPoint;
+
+        /// <summary>Configured ride-height offset used by the start anchor.</summary>
+        public float TrackStartSpawnRideHeight => trackStartSpawnRideHeight;
 
         public TrackGenerationReport LastReport => lastReport;
         public TrackGenerationMetrics LastMetrics => lastMetrics;
@@ -126,6 +140,9 @@ namespace TrackGeneration
             {
                 GenerateTrack();
             }
+
+            RefreshTrackStartSpawnPoint();
+            NotifyTrackBoundsChanged();
 
             if (placeHovercraftOnStart)
             {
@@ -511,7 +528,9 @@ namespace TrackGeneration
 
                 CurrentMacroSections = layout.Sections;
                 CurrentLayout = layout;
+                RefreshTrackStartSpawnPoint();
                 UpdateGeneratedMeshStats();
+                NotifyTrackBoundsChanged();
                 return true;
             }
             catch (System.Exception e)
@@ -575,7 +594,9 @@ namespace TrackGeneration
             if (visualizer != null && visualizer.Sections != null && visualizer.Sections.Count > 0)
             {
                 CurrentMacroSections = visualizer.Sections;
+                RefreshTrackStartSpawnPoint();
                 UpdateGeneratedMeshStats();
+                NotifyTrackBoundsChanged();
                 Debug.Log($"[TrackGenerator] Keeping editor-generated track (seed {visualizer.Seed}, {visualizer.Sections.Count} sections).");
                 return true;
             }
@@ -593,18 +614,15 @@ namespace TrackGeneration
                 return;
             }
 
-            if (!TryGetTrackStartFrame(out Vector3 position, out Vector3 forward, out Vector3 up))
+            trackStartSpawnRideHeight = Mathf.Max(0f, _craft.SpawnRideHeight);
+            if (!RefreshTrackStartSpawnPoint())
             {
                 Debug.LogWarning("[TrackGenerator] Could not place hovercraft: generate a track first.");
                 return;
             }
 
-            up = up.sqrMagnitude > 0.001f ? up.normalized : Vector3.up;
-            forward = Vector3.ProjectOnPlane(forward, up);
-            forward = forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward;
-
-            Vector3 spawnPosition = position + forward * startLineForwardOffset + up * _craft.SpawnRideHeight;
-            Quaternion spawnRotation = Quaternion.LookRotation(forward, up);
+            Vector3 spawnPosition = trackStartSpawnPoint.position;
+            Quaternion spawnRotation = trackStartSpawnPoint.rotation;
 
             Rigidbody rb = _craft.CraftRigidbody;
             if (rb != null)
@@ -630,7 +648,66 @@ namespace TrackGeneration
             }
         }
 
-        private bool TryGetTrackStartFrame(out Vector3 position, out Vector3 forward, out Vector3 up)
+        /// <summary>
+        /// Sets the persistent start-anchor ride height and immediately
+        /// refreshes its pose when a generated track is available.
+        /// </summary>
+        public bool SetTrackStartSpawnRideHeight(float rideHeight)
+        {
+            trackStartSpawnRideHeight = Mathf.Max(0f, rideHeight);
+            return RefreshTrackStartSpawnPoint();
+        }
+
+        /// <summary>
+        /// Returns the persistent scene anchor, creating it outside the
+        /// replaceable generated-track hierarchy when necessary.
+        /// </summary>
+        public Transform GetOrCreateTrackStartSpawnPoint()
+        {
+            if (trackStartSpawnPoint != null)
+                return trackStartSpawnPoint;
+
+            Transform existing = transform.Find("Track Start Spawn Point");
+            if (existing != null)
+            {
+                trackStartSpawnPoint = existing;
+                return existing;
+            }
+
+            var spawnObject = new GameObject("Track Start Spawn Point");
+            UnityEngine.SceneManagement.Scene scene = gameObject.scene;
+            if (scene.IsValid())
+                UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(spawnObject, scene);
+
+            spawnObject.transform.SetParent(transform, true);
+            trackStartSpawnPoint = spawnObject.transform;
+            return trackStartSpawnPoint;
+        }
+
+        /// <summary>
+        /// Rebuilds the authoritative spawn pose from the first generated
+        /// section. Forward follows the authored course direction and up
+        /// follows the starting surface normal.
+        /// </summary>
+        public bool RefreshTrackStartSpawnPoint()
+        {
+            if (!TryGetTrackStartFrame(out Vector3 position, out Vector3 forward, out Vector3 up))
+                return false;
+
+            up = up.sqrMagnitude > 0.001f ? up.normalized : Vector3.up;
+            forward = Vector3.ProjectOnPlane(forward, up);
+            forward = forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward;
+
+            Transform spawn = GetOrCreateTrackStartSpawnPoint();
+            spawn.SetPositionAndRotation(
+                position + forward * startLineForwardOffset +
+                up * trackStartSpawnRideHeight,
+                Quaternion.LookRotation(forward, up));
+            return true;
+        }
+
+        /// <summary>Returns the authored surface frame at track distance zero.</summary>
+        public bool TryGetTrackStartFrame(out Vector3 position, out Vector3 forward, out Vector3 up)
         {
             Transform root = trackRoot != null ? trackRoot : transform;
 
@@ -647,6 +724,80 @@ namespace TrackGeneration
             forward = Vector3.forward;
             up = Vector3.up;
             return false;
+        }
+
+        /// <summary>
+        /// Returns the complete generated geometry bounds in world space.
+        /// Recovery systems use this to remain valid for deeply descending
+        /// procedural tracks.
+        /// </summary>
+        public bool TryGetTrackWorldBounds(out Bounds bounds)
+        {
+            bounds = default;
+            if (trackRoot == null)
+                return false;
+
+            bool found = false;
+            Renderer[] renderers =
+                trackRoot.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null || !renderer.enabled)
+                    continue;
+
+                if (!found)
+                {
+                    bounds = renderer.bounds;
+                    found = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(renderer.bounds);
+                }
+            }
+
+            if (found)
+                return true;
+
+            if (CurrentMacroSections == null)
+                return false;
+
+            for (int i = 0; i < CurrentMacroSections.Count; i++)
+            {
+                Bounds local = CurrentMacroSections[i].SectionBounds;
+                Vector3 min = local.min;
+                Vector3 max = local.max;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 point = new Vector3(
+                        (corner & 1) == 0 ? min.x : max.x,
+                        (corner & 2) == 0 ? min.y : max.y,
+                        (corner & 4) == 0 ? min.z : max.z);
+                    point = trackRoot.TransformPoint(point);
+                    if (!found)
+                    {
+                        bounds = new Bounds(point, Vector3.zero);
+                        found = true;
+                    }
+                    else
+                    {
+                        bounds.Encapsulate(point);
+                    }
+                }
+            }
+
+            return found;
+        }
+
+        private void NotifyTrackBoundsChanged()
+        {
+            _craft ??= TrackCraftLocator.FindCraft();
+            if (_craft is ITrackBoundsConsumer consumer &&
+                TryGetTrackWorldBounds(out Bounds bounds))
+            {
+                consumer.OnTrackBoundsChanged(bounds);
+            }
         }
 
         // ─────────────────────────── Stats / logging ───────────────────────────

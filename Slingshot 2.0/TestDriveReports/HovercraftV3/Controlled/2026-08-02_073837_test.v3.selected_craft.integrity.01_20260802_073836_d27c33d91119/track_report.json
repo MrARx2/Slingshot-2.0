@@ -1,0 +1,38 @@
+{
+    "schemaVersion": 6,
+    "trackEntityId": 0,
+    "generationRevision": 0,
+    "trackRootName": "",
+    "totalLengthMeters": 0.0,
+    "centerlineSampleIntervalMeters": 1.0,
+    "sectionCount": 0,
+    "centerlineSampleCount": 0,
+    "sections": [],
+    "centerline": [],
+    "colliderAudit": {
+        "colliderCount": 0,
+        "enabledColliderCount": 0,
+        "triggerCount": 0,
+        "distinctLayerCount": 0,
+        "layers": [],
+        "combinedWorldBounds": {
+            "m_Center": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "m_Extent": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            }
+        }
+    },
+    "gravity": {
+        "x": 0.0,
+        "y": -9.806650161743164,
+        "z": 0.0
+    },
+    "dataQuality": "Unavailable",
+    "notes": "Centerline and section data are read from the generated track; surface distance is independently probed against track colliders."
+}

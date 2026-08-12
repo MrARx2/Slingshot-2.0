@@ -1,0 +1,193 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4ff6f33904a1344eac6c931af885653, type: 3}
+  m_Name: A2_BallisticGravityOnly
+  m_EditorClassIdentifier: Lunarlight.Hovercraft.V3.Diagnostics::Lunarlight.Hovercraft.V3.Diagnostics.ControlledTests.V3ControlledTestDefinition
+  stableTestId: test.v3.ballistic.gravity_only.01
+  displayName: Scenario A2 - Gravity Only Approximation
+  description: 
+  category: 0
+  version: 2
+  authoringNotes: 
+  expectedDurationSeconds: 4.5
+  requiredSchemaVersion: 6
+  tags: []
+  build: {fileID: 11400000, guid: dbea3cb22e1661b43afb2ef94ecfb6b5, type: 2}
+  requiredBuildStableId: build.test.v3.ballistic.gravity_only.01
+  requiredBuildGuid: dbea3cb22e1661b43afb2ef94ecfb6b5
+  requiredOwnership: 2
+  requiredControlPath: 1
+  expectLegacyFallbackAllowed: 0
+  scenePath: Assets/HovercraftV3/Scenes/Diagnostics/V3_ControlledDynamics.unity
+  worldProfile: {fileID: 11400000, guid: 32bd2a6177bae1d4d8080f88c33a9691, type: 2}
+  requiredWorldRootStableId: world.root.v3_controlleddynamics
+  expectedGravity: {x: 0, y: -9.80665, z: 0}
+  expectAtmosphere: 1
+  expectWind: 1
+  fixtureKind: 0
+  fixturePrefab: {fileID: 0}
+  initialCondition:
+    worldPosition: {x: 0, y: 250, z: -500}
+    worldEulerAngles: {x: 0, y: 0, z: 0}
+    linearVelocity: {x: 0, y: 0, z: 0}
+    angularVelocity: {x: 0, y: 0, z: 0}
+    startSleeping: 0
+    requireNoInitialContact: 1
+    useTrackRelation: 0
+    trackDistanceMeters: 0
+    trackSectionId: 
+  warmupSeconds: 0.25
+  measuredSeconds: 4
+  cooldownSeconds: 0.25
+  resetBeforeSetup: 1
+  runtimeOverride:
+    disableChassisAerodynamics: 1
+    disableFinAerodynamics: 1
+    requireTestOnlyBuild: 1
+    rationale: Transiently disables every aerodynamic force producer so the same
+      gravity-only definition is valid for any selected craft.
+  measuredReset:
+    enabled: 0
+    triggerSeconds: 1
+    reason: CONTROLLED RESET
+  failures: []
+  commands: []
+  assertions:
+  - assertionId: a2.aero.zero
+    description: 
+    type: 0
+    signalId: forces.aero
+    windowStartSeconds: 0
+    windowEndSeconds: 3.4028235e+38
+    minimum: 0
+    maximum: 0.001
+    target: 0
+    tolerance: 0
+    deadlineSeconds: 0
+    eventType: 0
+    expectedEventCount: 1
+    stateSequence: []
+    expectedText: 
+    supportingChannels:
+    - forces.aero
+  - assertionId: a2.fin.zero
+    description: 
+    type: 0
+    signalId: forces.fin
+    windowStartSeconds: 0
+    windowEndSeconds: 3.4028235e+38
+    minimum: 0
+    maximum: 0.001
+    target: 0
+    tolerance: 0
+    deadlineSeconds: 0
+    eventType: 0
+    expectedEventCount: 1
+    stateSequence: []
+    expectedText: 
+    supportingChannels:
+    - forces.fin
+  - assertionId: a2.no.contact
+    description: 
+    type: 0
+    signalId: world.contactCount
+    windowStartSeconds: 0
+    windowEndSeconds: 3.4028235e+38
+    minimum: 0
+    maximum: 0
+    target: 0
+    tolerance: 0
+    deadlineSeconds: 0
+    eventType: 0
+    expectedEventCount: 1
+    stateSequence: []
+    expectedText: 
+    supportingChannels:
+    - world.contactCount
+  - assertionId: a2.gravity.response
+    description: 
+    type: 1
+    signalId: world.acceleration.y
+    windowStartSeconds: 0.05
+    windowEndSeconds: 0.5
+    minimum: 0
+    maximum: 0
+    target: -9.80665
+    tolerance: 0.25
+    deadlineSeconds: 0
+    eventType: 0
+    expectedEventCount: 1
+    stateSequence: []
+    expectedText: 
+    supportingChannels:
+    - world.acceleration.y
+  - assertionId: a2.residual.p95
+    description: 
+    type: 6
+    signalId: forces.residual
+    windowStartSeconds: 0
+    windowEndSeconds: 3.4028235e+38
+    minimum: 0
+    maximum: 100
+    target: 0
+    tolerance: 0
+    deadlineSeconds: 0
+    eventType: 0
+    expectedEventCount: 1
+    stateSequence: []
+    expectedText: 
+    supportingChannels:
+    - forces.residual
+    - world.contactCount
+    - identity.dynamicsValid
+  - assertionId: a2.no.false.landing
+    description: 
+    type: 5
+    signalId: 
+    windowStartSeconds: 0
+    windowEndSeconds: 3.4028235e+38
+    minimum: 0
+    maximum: 0
+    target: 0
+    tolerance: 0
+    deadlineSeconds: 0
+    eventType: 43
+    expectedEventCount: 0
+    stateSequence: []
+    expectedText: 
+    supportingChannels: []
+  - assertionId: a2.build.identity
+    description: 
+    type: 8
+    signalId: 
+    windowStartSeconds: 0
+    windowEndSeconds: 3.4028235e+38
+    minimum: 0
+    maximum: 0
+    target: 0
+    tolerance: 0
+    deadlineSeconds: 0
+    eventType: 0
+    expectedEventCount: 1
+    stateSequence: []
+    expectedText: 
+    supportingChannels: []
+  output:
+    sessionNameTemplate: '{testId}_{utc}'
+    outputFolder: TestDriveReports/HovercraftV3/Controlled
+    rawDataEnabled: 0
+    compactDataEnabled: 1
+    csvEnabled: 1
+    markdownEnabled: 1
+    comparisonGroupId: comparison.gravity_only_v2
+    baselineReferencePackage: 
+    calibrationDecisionId: 

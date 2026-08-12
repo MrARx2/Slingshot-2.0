@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="5" result="Passed" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.0600832">
+  <test-suite type="TestSuite" id="1000" name="Slingshot 2.0" fullname="Slingshot 2.0" runstate="Runnable" testcasecount="281" result="Passed" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.060083" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1193" name="Lunarlight.Hovercraft.V3.EditorTests.dll" fullname="D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0/Library/ScriptAssemblies/Lunarlight.Hovercraft.V3.EditorTests.dll" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.054511" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="149804" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1194" name="Lunarlight" fullname="Lunarlight" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.053528" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1195" name="Hovercraft" fullname="Lunarlight.Hovercraft" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.052760" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1196" name="V3" fullname="Lunarlight.Hovercraft.V3" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.048530" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1197" name="Tests" fullname="Lunarlight.Hovercraft.V3.Tests" runstate="Runnable" testcasecount="164" result="Passed" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.047644" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestFixture" id="1027" name="V3ControlledDynamicsTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" testcasecount="5" result="Passed" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.045211" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1031" name="Assertions_EvaluateNumericEventTransitionAndBuildIdentity" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.Assertions_EvaluateNumericEventTransitionAndBuildIdentity" methodname="Assertions_EvaluateNumericEventTransitionAndBuildIdentity" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="257576433" result="Passed" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.029327" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1030" name="ControlledInput_UsesExclusiveOwnerAndNormalPilotCommand" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.ControlledInput_UsesExclusiveOwnerAndNormalPilotCommand" methodname="ControlledInput_UsesExclusiveOwnerAndNormalPilotCommand" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1856287279" result="Passed" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.003405" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1028" name="Definition_ValidatesSchemaBuildCommandsAndSignals" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.Definition_ValidatesSchemaBuildCommandsAndSignals" methodname="Definition_ValidatesSchemaBuildCommandsAndSignals" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1541297909" result="Passed" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.001195" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1029" name="Registry_RejectsDuplicateStableTestIds" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.Registry_RejectsDuplicateStableTestIds" methodname="Registry_RejectsDuplicateStableTestIds" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="656740871" result="Passed" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.001063" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1032" name="RuntimeOverride_IsRejectedForGeneratedBuild" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.RuntimeOverride_IsRejectedForGeneratedBuild" methodname="RuntimeOverride_IsRejectedForGeneratedBuild" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1084561333" result="Passed" start-time="2026-08-01 16:14:45Z" end-time="2026-08-01 16:14:45Z" duration="0.001114" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <output><![CDATA[Saving results to: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\TestResults.xml
+]]></output>
+                </test-case>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

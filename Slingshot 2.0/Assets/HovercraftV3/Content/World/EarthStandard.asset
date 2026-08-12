@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b024a941c1332144b5c21bd51cad2e7, type: 3}
+  m_Name: EarthStandard
+  m_EditorClassIdentifier: Lunarlight.Hovercraft.V3::Lunarlight.Hovercraft.V3.V3WorldProfile
+  stableId: world.earth_standard
+  displayName: Earth Standard
+  description: Earth-like baseline atmosphere for Hovercraft V3 development.
+  configurationVersion: 1
+  referenceWorldY: 0
+  altitudeOffsetMeters: 0
+  gravityEnabled: 1
+  gravityDirection: {x: 0, y: -1, z: 0}
+  gravityMagnitude: 9.80665
+  gravityModelId: uniform_directional.v1
+  atmosphereEnabled: 1
+  atmosphereMode: 0
+  seaLevelTemperatureC: 15
+  seaLevelPressurePa: 101325
+  customSeaLevelDensity: 1.225
+  temperatureLapseRateKPerMeter: 0.0065
+  minimumTemperatureK: 180
+  maximumAltitudeMeters: 20000
+  windEnabled: 1
+  globalWindDirection: {x: 0, y: 0, z: 1}
+  globalWindSpeed: 0
+  gustStrength: 0
+  gustTimeScale: 0.08
+  gustSpatialScale: 0.002
+  turbulenceEnabled: 1
+  turbulenceStrength: 0
+  turbulenceSpatialScale: 0.01
+  turbulenceTemporalScale: 0.2
+  turbulenceVerticalContribution: 0.35
+  deterministicWindSeed: 314159
+  thermalEnvironmentEnabled: 1
+  baselineCoolingMultiplier: 1
+  minimumCoolingMultiplier: 0.1
+  maximumCoolingMultiplier: 5
+  coolingReferenceAirspeed: 100
+  maximumAirflowCoolingMultiplier: 4
+  environmentZonesEnabled: 1
+  debuggingEnabled: 1
+  recorderIntegrationEnabled: 1

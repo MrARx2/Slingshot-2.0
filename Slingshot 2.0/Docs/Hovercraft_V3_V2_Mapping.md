@@ -96,7 +96,8 @@ The repeatable generator is available at:
 
 `Tools > Hovercraft V3 > Generate V2 Reference Prototype`
 
-It owns `Assets/HovercraftV3/Prototype/` and creates:
+It owns
+`Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/` and creates:
 
 - the primitive Apex V3 reference chassis prefab with 16 authored sockets;
 - V2-reference main, brake, hover, roof, and strafe thruster definitions;
@@ -218,8 +219,8 @@ Generate or refresh the measurement scene with:
 
 The generator owns:
 
-- `Assets/HovercraftV3/Parity/Scenes/V2_V3_FlatGround_Parity.unity`;
-- `Assets/HovercraftV3/Parity/Profiles/V2_V3_Parity_Command_Profile.asset`.
+- `Assets/HovercraftV3/Generated/RegressionAssets/Parity/Scenes/V2_V3_FlatGround_Parity.unity`;
+- `Assets/HovercraftV3/Generated/RegressionAssets/Parity/Profiles/V2_V3_Parity_Command_Profile.asset`.
 
 The 78-second profile runs settle, idle-hover, acceleration, braking from
 500 km/h, yaw pulses at 500 and 1,000 km/h, strafe at 500 km/h, and a pitch

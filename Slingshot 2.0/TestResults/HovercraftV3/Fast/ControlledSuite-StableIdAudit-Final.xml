@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-08-01 17:42:19Z" end-time="2026-08-01 17:42:19Z" duration="0.0799992">
+  <test-suite type="TestSuite" id="1000" name="Slingshot 2.0" fullname="Slingshot 2.0" runstate="Runnable" testcasecount="284" result="Passed" start-time="2026-08-01 17:42:19Z" end-time="2026-08-01 17:42:19Z" duration="0.079999" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1196" name="Lunarlight.Hovercraft.V3.EditorTests.dll" fullname="D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0/Library/ScriptAssemblies/Lunarlight.Hovercraft.V3.EditorTests.dll" runstate="Runnable" testcasecount="167" result="Passed" start-time="2026-08-01 17:42:19Z" end-time="2026-08-01 17:42:19Z" duration="0.070188" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="157436" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1197" name="Lunarlight" fullname="Lunarlight" runstate="Runnable" testcasecount="167" result="Passed" start-time="2026-08-01 17:42:19Z" end-time="2026-08-01 17:42:19Z" duration="0.068531" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1198" name="Hovercraft" fullname="Lunarlight.Hovercraft" runstate="Runnable" testcasecount="167" result="Passed" start-time="2026-08-01 17:42:19Z" end-time="2026-08-01 17:42:19Z" duration="0.067043" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1199" name="V3" fullname="Lunarlight.Hovercraft.V3" runstate="Runnable" testcasecount="167" result="Passed" start-time="2026-08-01 17:42:19Z" end-time="2026-08-01 17:42:19Z" duration="0.065501" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1200" name="Tests" fullname="Lunarlight.Hovercraft.V3.Tests" runstate="Runnable" testcasecount="167" result="Passed" start-time="2026-08-01 17:42:19Z" end-time="2026-08-01 17:42:19Z" duration="0.064019" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestFixture" id="1078" name="V3ProjectReadabilitySprintTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" classname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" runstate="Runnable" testcasecount="9" result="Passed" start-time="2026-08-01 17:42:19Z" end-time="2026-08-01 17:42:19Z" duration="0.058362" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1087" name="StableIdAudit_FindsNoDuplicateAssetsOrInvalidWorldRoots" fullname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests.StableIdAudit_FindsNoDuplicateAssetsOrInvalidWorldRoots" methodname="StableIdAudit_FindsNoDuplicateAssetsOrInvalidWorldRoots" classname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" runstate="Runnable" seed="1428559507" result="Passed" start-time="2026-08-01 17:42:19Z" end-time="2026-08-01 17:42:19Z" duration="0.050432" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <output><![CDATA[Saving results to: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\TestResults.xml
+]]></output>
+                </test-case>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

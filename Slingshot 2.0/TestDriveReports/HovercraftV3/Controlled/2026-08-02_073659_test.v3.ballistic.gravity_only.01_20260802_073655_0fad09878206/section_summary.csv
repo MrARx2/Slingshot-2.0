@@ -1,0 +1,2 @@
+section_id,section_type,sample_count,duration_s,min_speed_mps,max_speed_mps,mean_speed_mps,max_abs_lateral_offset_m,min_ride_height_m,max_ride_height_m,max_abs_vertical_acceleration_mps2,unexpected_airborne_samples,power_limited_samples,event_count
+"unmapped","",426,4.2599971275776625,0.098066434264183044,41.776451110839844,20.937185287475586,0,0,0,9.8068304061889648,0,0,0

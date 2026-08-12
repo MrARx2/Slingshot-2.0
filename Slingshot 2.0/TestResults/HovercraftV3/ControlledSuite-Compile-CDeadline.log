@@ -1,0 +1,413 @@
+[Licensing::Module] Trying to connect to existing licensing client channel...
+Built from '6000.5/staging' branch; Version is '6000.5.0f1 (88b47c5e7076) revision 8959100'; Using compiler version '194234433'; Build Type 'Release'
+OS: 'Windows 11  (10.0.26200) Professional' Language: 'en' Physical Memory: 65173 MB
+BatchMode: 1, IsHumanControllingUs: 0, StartBugReporterOnCrash: 0, Is64bit: 1
+System  architecture: x64
+Process architecture: x64
+Date: 2026-08-01T17:01:52Z
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Jack_" at "2026-08-01T17:01:52.5023014Z"
+
+COMMAND LINE ARGUMENTS:
+C:\Program Files\Unity\Hub\Editor\6000.5.0f1\Editor\Unity.exe
+-batchmode
+-nographics
+-projectPath
+D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0
+-executeMethod
+Lunarlight.Hovercraft.V3.Editor.V3ControlledTestAssetUtility.CreateOrUpdatePresetsFromCommandLine
+-quit
+-logFile
+D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\TestResults\HovercraftV3\ControlledSuite-Compile-CDeadline.log
+Successfully changed project path to: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0
+D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0
+[UnityMemory] Configuration Parameters - Can be set up in boot.config
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-nav-mesh-worker=65536"
+    "memorysetup-temp-allocator-size-audio-worker=65536"
+    "memorysetup-temp-allocator-size-cloud-worker=32768"
+    "memorysetup-temp-allocator-size-gfx=262144"
+    "memorysetup-temp-allocator-size-preload-manager=33554432"
+    "memorysetup-allocator-temp-initial-block-size-main=262144"
+    "memorysetup-allocator-temp-initial-block-size-worker=262144"
+    "memorysetup-temp-allocator-size-job-worker=262144"
+    "memorysetup-temp-allocator-size-background-worker=32768"
+    "memorysetup-bucket-allocator-granularity=16"
+    "memorysetup-bucket-allocator-bucket-count=8"
+    "memorysetup-bucket-allocator-block-size=33554432"
+    "memorysetup-bucket-allocator-block-count=8"
+    "memorysetup-main-allocator-block-size=16777216"
+    "memorysetup-thread-allocator-block-size=16777216"
+    "memorysetup-main-allocator-mimalloc-enabled=0"
+    "memorysetup-gfx-main-allocator-block-size=16777216"
+    "memorysetup-gfx-thread-allocator-block-size=16777216"
+    "memorysetup-cache-allocator-block-size=4194304"
+    "memorysetup-typetree-allocator-block-size=2097152"
+    "memorysetup-profiler-bucket-allocator-granularity=16"
+    "memorysetup-profiler-bucket-allocator-bucket-count=8"
+    "memorysetup-profiler-bucket-allocator-block-size=33554432"
+    "memorysetup-profiler-bucket-allocator-block-count=8"
+    "memorysetup-profiler-allocator-block-size=16777216"
+    "memorysetup-profiler-editor-allocator-block-size=1048576"
+    "memorysetup-temp-allocator-size-main=16777216"
+    "memorysetup-job-temp-allocator-block-size=2097152"
+    "memorysetup-job-temp-allocator-block-size-background=1048576"
+    "memorysetup-job-temp-allocator-reduction-small-platforms=262144"
+Logging is directed to a specific file, skipping project log.Player connection [113108]  Target information:
+
+Player connection [113108]  * "[IP] 192.168.0.198 [Port] 55504 [Flags] 2 [Guid] 1855996722 [EditorId] 1855996722 [Version] 1048832 [Id] WindowsEditor(7,JackROG) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
+
+Player connection [113108] Host joined multi-casting on [225.0.0.222:54997]...
+Player connection [113108] Host joined alternative multi-casting on [225.0.0.222:34997]...
+Input System module state changed to: Initialized.
+[Physics::Module] Initialized fallback backend.
+[Physics::Module] Id: 0xdecafbad
+[Package Manager] Connected to IPC stream "Upm-126836" after 0.2 seconds.
+[Licensing::Module] Licensing is not yet initialized.
+[Licensing::Client] Error: HandshakeResponse reported an error:
+	ResponseCode: 505
+	ResponseStatus: Unsupported protocol version '1.18.1'.
+[Licensing::Module] Error: Failed to handshake to channel: "LicenseClient-Jack_"
+[Licensing::IpcConnector] LicenseClient-Jack_ channel disconnected successfully.
+[Licensing::IpcConnector] Channel LicenseClient-Jack_-6000.5.0 doesn't exist
+[Licensing::Module] Successfully launched the LicensingClient (PId: 139580)
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Jack_-6000.5.0" at "2026-08-01T17:01:53.7758403Z"
+[Licensing::Client] Code 10 while verifying Licensing Client signature (process Id: 139580, path: "C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/Resources/Licensing/Client/Unity.Licensing.Client.exe")
+[Licensing::Module] LicensingClient has failed validation; ignoring
+[Licensing::Client] Handshaking with LicensingClient:
+  Version:                 1.18.1+9fbee8e
+  Session Id:              1eb89e1ca3a24244b52fb56f7daf2a47
+  Correlation Id:          b7b5d327c5f51134992a771f57c55834
+  External correlation Id: 6792682030295470484
+  Machine Id:              /GJp5GQQrC1dJ9Sb/cVpXVkOuWs=
+[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-Jack_-6000.5.0" (connect: 0.16s, validation: 0.13s, handshake: 0.01s)
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Jack_-6000.5.0-notifications" at "2026-08-01T17:01:53.9083294Z"
+[Licensing::Module] Connected to LicensingClient (PId: 139580, launch time: 0.00, total connection time: 0.29s)
+[Licensing::Module] Error: Access token is unavailable; failed to update
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] License group:
+  Id: 18967160142921-UnityPersXXXX
+  Product: Unity Personal
+  Type: Assigned
+  Expiration: Unlimited
+[Licensing::Client] Successfully updated license, isAsync: True, time: 0.01
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] Licensing Background thread has ended after 1.43s
+[Licensing::Module] Licensing is initialized (took 1.03s).
+[Licensing::Client] Successfully resolved entitlement details
+Library Redirect Path: Library/
+[Physics::Module] Selected backend.
+[Physics::Module] Name: PhysX
+[Physics::Module] Id: 0xf2b8ea05
+[Physics::Module] SDK Version: 4.1.2
+[Physics::Module] Integration Version: 1.0.0
+[Physics::Module] Threading Mode: Multi-Threaded
+Initialize engine version: 6000.5.0f1 (88b47c5e7076)
+[Subsystems] Discovering subsystems at path C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/Resources/UnitySubsystems
+[Subsystems] Discovering subsystems at path D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0/Assets
+Forcing GfxDevice: Null
+GfxDevice: creating device client; kGfxThreadingModeNonThreaded
+NullGfxDevice:
+    Version:  NULL 1.0 [1.0]
+    Renderer: Null Device
+    Vendor:   Unity Technologies
+Shader Hidden/ChartRasterizerHardware is not supported: GPU does not support conservative rasterization
+Initialize mono
+Mono path[0] = 'C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/Managed'
+Mono path[1] = 'C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/BCLExtensions/runtime/netstandard2.1'
+Mono path[2] = 'C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/MonoBleedingEdge/lib/mono/unityjit-win32'
+Mono config path = 'C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/MonoBleedingEdge/etc'
+Using monoOptions --debugger-agent=transport=dt_socket,embedding=1,server=y,suspend=n,address=127.0.0.1:56836
+CodeReloadManager initialized
+ImportWorker Server TCP listen port: 0
+AcceleratorClientConnectionCallback - disconnected - :0
+Begin MonoManager ReloadAssembly
+Registering precompiled unity dll's ...
+Register platform support module: C:/Program Files/Unity/Hub/Editor/6000.5.0f1/Editor/Data/PlaybackEngines/WindowsStandaloneSupport/UnityEditor.WindowsStandalone.Extensions.dll
+Registered in 0.001062 seconds.
+Native extension for WindowsStandalone target not found
+Package Manager log level set to [2]
+ScheduleIndexationOnStartup MainProcess:False IndexOnStartup:True
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.229 seconds
+Domain Reload Profiling: 528ms
+	BeginReloadAssembly (80ms)
+		CreateAndSetChildDomain (6ms)
+	RebuildCommonClasses (3ms)
+	RebuildNativeTypeToScriptingClass (10ms)
+	initialDomainReloadingComplete (38ms)
+	LoadAllAssembliesAndSetupDomain (166ms)
+		LoadAssemblies (71ms)
+		AnalyzeDomain (121ms)
+			TypeCache.Refresh (119ms)
+				TypeCache.ScanAssembly (111ms)
+	FinalizeReload (231ms)
+		SetupLoadedEditorAssemblies (0ms)
+			BeforeProcessingInitializeOnLoad (57ms)
+			ProcessInitializeOnLoadAttributes (56ms)
+			ProcessInitializeOnLoadMethodAttributes (68ms)
+[Licensing::Client] Successfully resolved entitlement details
+Application.AssetDatabase Initial Refresh Start
+[Package Manager] Restoring resolved packages state from cache
+[Licensing::Client] Successfully resolved entitlement details
+[Package Manager] Registered 59 packages:
+  Packages from [https://packages.unity.com]:
+    com.unity.ai.navigation@2.0.13 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.ai.navigation@42d896194035)
+    com.unity.collab-proxy@2.12.4 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.collab-proxy@0b1559bcd34e)
+    com.unity.ide.rider@3.0.38 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.ide.rider@1f60b3138684)
+    com.unity.ide.visualstudio@2.0.26 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.ide.visualstudio@a99d56dec63f)
+    com.unity.inputsystem@1.19.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.inputsystem@21a28c3a6c83)
+    com.unity.splines@2.8.4 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.splines@9b00833aca09)
+    com.unity.timeline@1.8.12 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.timeline@8cd8509afae5)
+    com.unity.visualscripting@1.9.11 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.visualscripting@8bed5ad90189)
+    com.unity.settings-manager@2.1.1 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.settings-manager@0b8638c5ce86)
+    com.unity.searcher@4.9.4 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.searcher@d45a78918735)
+    com.unity.burst@1.8.29 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.burst@6bb9aca3ef38)
+    com.unity.nuget.mono-cecil@1.11.6 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.nuget.mono-cecil@ecb9724e46ff)
+    com.unity.test-framework.performance@3.5.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.test-framework.performance@8b56083ec0f0)
+  Built-in packages:
+    com.unity.multiplayer.center@1.0.1 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.multiplayer.center@b860850997d0)
+    com.unity.render-pipelines.universal@17.5.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.render-pipelines.universal@0c18adc4ff89)
+    com.unity.test-framework@1.7.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.test-framework@f3e6c9a02477)
+    com.unity.ugui@2.5.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.ugui@4f9b15fd1386)
+    com.unity.modules.accessibility@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.accessibility)
+    com.unity.modules.adaptiveperformance@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.adaptiveperformance)
+    com.unity.modules.ai@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.ai)
+    com.unity.modules.androidjni@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.androidjni)
+    com.unity.modules.animation@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.animation)
+    com.unity.modules.assetbundle@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.assetbundle)
+    com.unity.modules.audio@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.audio)
+    com.unity.modules.cloth@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.cloth)
+    com.unity.modules.director@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.director)
+    com.unity.modules.imageconversion@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.imageconversion)
+    com.unity.modules.imgui@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.imgui)
+    com.unity.modules.jsonserialize@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.jsonserialize)
+    com.unity.modules.particlesystem@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.particlesystem)
+    com.unity.modules.physics@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.physics)
+    com.unity.modules.physics2d@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.physics2d)
+    com.unity.modules.physicscore2d@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.physicscore2d)
+    com.unity.modules.screencapture@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.screencapture)
+    com.unity.modules.terrain@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.terrain)
+    com.unity.modules.terrainphysics@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.terrainphysics)
+    com.unity.modules.tilemap@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.tilemap)
+    com.unity.modules.ui@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.ui)
+    com.unity.modules.uielements@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.uielements)
+    com.unity.modules.umbra@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.umbra)
+    com.unity.modules.unityanalytics@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.unityanalytics)
+    com.unity.modules.unitywebrequest@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.unitywebrequest)
+    com.unity.modules.unitywebrequestassetbundle@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.unitywebrequestassetbundle)
+    com.unity.modules.unitywebrequestaudio@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.unitywebrequestaudio)
+    com.unity.modules.unitywebrequesttexture@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.unitywebrequesttexture)
+    com.unity.modules.unitywebrequestwww@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.unitywebrequestwww)
+    com.unity.modules.vectorgraphics@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.vectorgraphics)
+    com.unity.modules.vehicles@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.vehicles)
+    com.unity.modules.video@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.video)
+    com.unity.modules.wind@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.wind)
+    com.unity.modules.xr@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.xr)
+    com.unity.modules.subsystems@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.subsystems)
+    com.unity.modules.hierarchycore@1.0.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.modules.hierarchycore)
+    com.unity.ext.nunit@2.1.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.ext.nunit@44f7d31723bd)
+    com.unity.mathematics@1.4.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.mathematics@981956d94fb6)
+    com.unity.render-pipelines.core@17.5.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.render-pipelines.core@f43b729f1f6e)
+    com.unity.shadergraph@17.5.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.shadergraph@3fa956880a81)
+    com.unity.render-pipelines.universal-config@17.5.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.render-pipelines.universal-config@fdda01c80fe3)
+    com.unity.collections@6.5.0 (location: D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Library\PackageCache\com.unity.collections@a43cabe808ca)
+[Subsystems] No new subsystems found in resolved package list.
+[Package Manager] Done registering packages in 0.01 seconds
+[ScriptCompilation] Requested script compilation because: AssetDatabase observed changes in script compilation related files
+Starting: C:\Program Files\Unity\Hub\Editor\6000.5.0f1\Editor\Data\Tools\BuildPipeline\bee_backend.exe --ipc --defer-dag-verification --dagfile="Library/Bee/1900b0aE.dag" --continue-on-failure --profile="Library/Bee/backend1.traceevents" ScriptAssemblies
+WorkingDir: D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0
+DisplayProgressbar: Compiling Scripts
+ExitCode: 0 Duration: 1s253ms
+[ 798/1028  0s] ILPP-Configuration Library/ilpp-configuration.nevergeneratedoutput
+[1012/1028  0s] Csc Library/Bee/artifacts/1900b0aE.dag/Lunarlight.Hovercraft.V3.Editor.dll (+2 others)
+[1016/1028  0s] ILPostProcess Library/Bee/artifacts/1900b0aE.dag/post-processed/Lunarlight.Hovercraft.V3.Editor.dll (+pdb)
+Processing assembly Library/Bee/artifacts/1900b0aE.dag/Lunarlight.Hovercraft.V3.Editor.dll, with 140 defines and 308 references
+
+processors: Unity.Jobs.CodeGen.JobsILPostProcessor, zzzUnity.Burst.CodeGen.BurstILPostProcessor
+
+running Unity.Jobs.CodeGen.JobsILPostProcessor
+
+running zzzUnity.Burst.CodeGen.BurstILPostProcessor
+[1017/1028  0s] ILPostProcess Library/Bee/artifacts/1900b0aE.dag/post-processed/Lunarlight.Hovercraft.V3.EditorTests.dll (+pdb)
+Processing assembly Library/Bee/artifacts/1900b0aE.dag/Lunarlight.Hovercraft.V3.EditorTests.dll, with 140 defines and 297 references
+
+processors: Unity.Jobs.CodeGen.JobsILPostProcessor, zzzUnity.Burst.CodeGen.BurstILPostProcessor
+
+running Unity.Jobs.CodeGen.JobsILPostProcessor
+
+running zzzUnity.Burst.CodeGen.BurstILPostProcessor
+[1018/1028  0s] CopyFiles Library/ScriptAssemblies/Lunarlight.Hovercraft.V3.Editor.dll
+[1019/1028  0s] CopyFiles Library/ScriptAssemblies/Lunarlight.Hovercraft.V3.Editor.pdb
+[1022/1028  0s] ILPostProcess Library/Bee/artifacts/1900b0aE.dag/post-processed/Assembly-CSharp.dll (+pdb)
+Processing assembly Library/Bee/artifacts/1900b0aE.dag/Assembly-CSharp.dll, with 142 defines and 346 references
+
+processors: Unity.Jobs.CodeGen.JobsILPostProcessor, zzzUnity.Burst.CodeGen.BurstILPostProcessor
+
+running Unity.Jobs.CodeGen.JobsILPostProcessor
+
+running zzzUnity.Burst.CodeGen.BurstILPostProcessor
+[1023/1028  0s] ILPostProcess Library/Bee/artifacts/1900b0aE.dag/post-processed/Assembly-CSharp-Editor.dll (+pdb)
+Processing assembly Library/Bee/artifacts/1900b0aE.dag/Assembly-CSharp-Editor.dll, with 140 defines and 368 references
+
+processors: Unity.Jobs.CodeGen.JobsILPostProcessor, zzzUnity.Burst.CodeGen.BurstILPostProcessor
+
+running Unity.Jobs.CodeGen.JobsILPostProcessor
+
+running zzzUnity.Burst.CodeGen.BurstILPostProcessor
+*** Tundra build success (1.23 seconds), 8 items updated, 1028 evaluated
+AssetDatabase: script compilation time: 1.542942s
+Begin MonoManager ReloadAssembly
+Total cache size 122480828
+Total cache size after purge 122480828, took 00:00:00.0696277
+Native extension for WindowsStandalone target not found
+ScheduleIndexationOnStartup MainProcess:True IndexOnStartup:True
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.763 seconds
+Domain Reload Profiling: 1300ms
+	BeginReloadAssembly (133ms)
+		DisableScriptedObjects (13ms)
+		CreateAndSetChildDomain (31ms)
+	RebuildCommonClasses (6ms)
+	RebuildNativeTypeToScriptingClass (10ms)
+	initialDomainReloadingComplete (35ms)
+	LoadAllAssembliesAndSetupDomain (352ms)
+		LoadAssemblies (188ms)
+		AnalyzeDomain (154ms)
+			TypeCache.Refresh (104ms)
+				TypeCache.ScanAssembly (98ms)
+			BuildScriptInfoCaches (44ms)
+			ResolveRequiredComponents (5ms)
+	FinalizeReload (764ms)
+		SetupLoadedEditorAssemblies (0ms)
+			BeforeProcessingInitializeOnLoad (49ms)
+			ProcessInitializeOnLoadAttributes (407ms)
+			ProcessInitializeOnLoadMethodAttributes (107ms)
+			AfterProcessingInitializeOnLoad (4ms)
+		AwakeInstancesAfterBackupRestoration (12ms)
+Starting new worker id: 0 with log in D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0/Logs/AssetImportWorkerHW0.log
+
+Asset Pipeline Refresh (id=a0bae40081883d64bae5276be89df2f7): Total: 3.476 seconds - Initiated by InitialRefreshV2(ForceSynchronousImport)
+	(Values over 0.05ms)
+	Summary:
+		Imports: total=0 (actual=0, local cache=0, cache server=0)
+		Asset DB Process Time: managed=0 ms, native=1193 ms
+		Asset DB Callback time: managed=116 ms, native=18 ms
+		Scripting: domain reloads=1, domain reload time=568 ms, compile time=1544 ms, other=33 ms
+		Project Asset Count: scripts=1520, non-scripts=3036
+		Asset File Changes: new=0, changed=1, moved=0, deleted=0
+		Scan Filter Count: 0
+	InvokePackagesCallback: 16.642ms
+	ApplyChangesToAssetFolders: 0.374ms
+	Scan: 200.877ms
+	Collect global state as custom dependencies: 1.876ms
+	OnSourceAssetsModified: 0.600ms
+	CategorizeScriptCompilationAssets: 29.787ms
+	ProcessAssetsWithTransientArtifactChanges: 49.196ms
+	CategorizeAssets: 36.174ms
+	CompileScripts: 1544.320ms
+	ImportOutOfDateAssets: 802.745ms (774.523ms without children)
+		UnloadImportedAssets: 0.617ms
+		EnsureUptoDateAssetsAreRegisteredWithGuidPM: 0.558ms
+		ImportSchedulerStart: 27.026ms
+	PostProcessAllAssets: 117.597ms
+		VCAutoAddAssetPostprocess 0.736ms
+		XRBuildSystem.XRAssetImported 0.202ms
+		MonoPostProcessAllAssets: 116.391ms
+			AssetPostprocessor.OnPostprocessAllAssets 76.907ms
+			StyleCatalogPostProcessor.OnPostprocessAllAssets 11.741ms
+			UniversalRenderPipelineGlobalSettingsPostprocessor.OnPostprocessAllAssets 7.487ms
+			BuilderAssetPostprocessor.OnPostprocessAllAssets 3.452ms
+			SyncVS.PostprocessSyncProject 2.084ms
+			WindowAssetPostprocessingWatcher.OnPostprocessAllAssets 1.570ms
+			SpeedTree9Postprocessor.OnPostprocessAllAssets 1.047ms
+			ShaderGraphAssetPostProcessor.OnPostprocessAllAssets 0.841ms
+			RetainedModeAssetPostprocessor.OnPostprocessAllAssets 0.749ms
+			AssetChangedListener.OnPostprocessAllAssets 0.747ms
+			RenderPipelineGlobalSettingsPostprocessor.OnPostprocessAllAssets 0.509ms
+			MaterialPostprocessor.OnPostprocessAllAssets 0.421ms
+			ArtifactBrowserPostProcessor.OnPostprocessAllAssets 0.293ms
+			SampleDependencyImporterPostProcessor.OnPostprocessAllAssets 0.292ms
+			TMPro_TexturePostProcessor.OnPostprocessAllAssets 0.255ms
+			UVCSAssetPostprocessor.OnPostprocessAllAssets 0.219ms
+			ReferencedClipsPostProcessor.OnPostprocessAllAssets 0.216ms
+			TextAssetPostProcessor.OnPostprocessAllAssets 0.191ms
+			InputActionAssetPostprocessor.OnPostprocessAllAssets 0.189ms
+			ShaderReflectionAssetPostProcessor.OnPostprocessAllAssets 0.185ms
+			PostProcessor.OnPostprocessAllAssets 0.176ms
+			AudioMixerPostprocessor.OnPostprocessAllAssets 0.158ms
+			InputActionJsonNameModifierAssetProcessor.OnPostprocessAllAssets 0.149ms
+			AssetEvents.OnPostprocessAllAssets 0.128ms
+			TerrainToolbarOverlayPostProcessor.OnPostprocessAllAssets 0.120ms
+			AssetDatabaseCallbacks.OnPostprocessAllAssets 0.097ms
+			ProjectSettingsPostprocessor.OnPostprocessAllAssets 0.089ms
+			SamplePostprocessor.OnPostprocessAllAssets 0.088ms
+			SpeedTreePostProcessor.OnPostprocessAllAssets 0.084ms
+			ConfigAssetsTracker.OnPostprocessAllAssets 0.074ms
+			ScenarioDriftAssetsTracker.OnPostprocessAllAssets 0.062ms
+	PostAssetChangesProfiler: 2.138ms
+	UnloadStreamsBegin: 2.394ms
+	PersistCurrentRevisions: 0.092ms
+	GenerateScriptTypeHashes: 2.073ms
+	GenerateScriptTypeSerializationHashes: 3.587ms
+	Untracked: 667.879ms
+
+Application.AssetDatabase Initial Refresh End
+Shader Hidden/ChartRasterizerHardware is not supported: GPU does not support conservative rasterization
+Scanning for USB devices : 35.693ms
+Initializing Unity extensions:
+[MODES] ModeService[none].Initialize
+[MODES] ModeService[none].LoadModes
+[MODES] Loading mode Default (0) for mode-current-id-Slingshot 2.0
+Unloading 25 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 6816 unused Assets / (2.6 MB). Loaded Objects now: 7715.
+Memory consumption went from 404.8 MB to 402.2 MB.
+Total: 7.588500 ms (FindLiveObjects: 0.436400 ms CreateObjectMapping: 1.159200 ms MarkObjects: 4.644000 ms  DeleteObjects: 1.345000 ms)
+
+Importing 'GUID: f2e5549cd040fc74cbf3a52ff5bd5721 - Path: Assets/HovercraftV3/Content/ControlledTests/Definitions/H_PrimaryFullTrack.asset' with importer (NativeFormatImporter)
+Imported 'GUID: f2e5549cd040fc74cbf3a52ff5bd5721' -> (Import Result ID: '15463e02cc00e2445925d60a63a8b6cb') in 0.003 seconds [static dependencies only]. Details - ImportResultOutputID=15629cf6e64e38ff7707f770e9291aba DependenciesID=731c50ceab732cec81a931bcfe997dea StaticDependenciesID=95fc6bbf1639f002e8b83f3e92775b58 
+Importing 'GUID: b3354eb05ef0cda4ca02289c080c8f08 - Path: Assets/HovercraftV3/Content/ControlledTests/Definitions/C_SurfaceDeparture.asset' with importer (NativeFormatImporter)
+Imported 'GUID: b3354eb05ef0cda4ca02289c080c8f08' -> (Import Result ID: '534fd8ba9e0c9e7bab50a5de5de4f8cc') in 0.001 seconds [static dependencies only]. Details - ImportResultOutputID=511586c0646adcee17f4d45d607a3fd9 DependenciesID=d57a86cf2e1d845dcbdabd3cdda4e4c1 StaticDependenciesID=aa2d3a6e9f8a5bb45f0d716f6ea8ebd6 
+Importing 'GUID: 4447bd78667f4de498b2f009c0afba7a - Path: Assets/HovercraftV3/Content/ControlledTests/Definitions/B_FinSweep.asset' with importer (NativeFormatImporter)
+Imported 'GUID: 4447bd78667f4de498b2f009c0afba7a' -> (Import Result ID: '8c251c4f43dc263f96f811bfd3acf239') in 0.000 seconds [static dependencies only]. Details - ImportResultOutputID=61458266e5c4c10530018d281b560a41 DependenciesID=73467a8f3e15e3a7dfed2b4f056d2135 StaticDependenciesID=9ff108fe2d898c3d3712cdd985212868 
+Importing 'GUID: 2933cbec5832bfc4eae58514df4e54b4 - Path: Assets/HovercraftV3/Content/ControlledTests/Definitions/G_AuthoredVariants.asset' with importer (NativeFormatImporter)
+Imported 'GUID: 2933cbec5832bfc4eae58514df4e54b4' -> (Import Result ID: '7d4729f4098a836caeb08418a730dc3d') in 0.000 seconds [static dependencies only]. Details - ImportResultOutputID=b41d078a8a4836e06c1833558d1016eb DependenciesID=e7dc163b7e23be198f6b56e691af9dcd StaticDependenciesID=197151ae8ec899bc7ab46a323c093258 
+Importing 'GUID: 89de0aaf49588174eb54e2b586a7788d - Path: Assets/HovercraftV3/Content/ControlledTests/Definitions/F_Inertia.asset' with importer (NativeFormatImporter)
+Imported 'GUID: 89de0aaf49588174eb54e2b586a7788d' -> (Import Result ID: '8ea979034b680cbb07aef0ef44239b0a') in 0.000 seconds [static dependencies only]. Details - ImportResultOutputID=ac74ab71a217448b4d68d3206a8a4b34 DependenciesID=29e057085569f041e3f4a034c1fccf00 StaticDependenciesID=99926701ffa32d234115dfd9471ba521 
+Importing 'GUID: 2b7437de123dd4645862250853a41b3b - Path: Assets/HovercraftV3/Content/ControlledTests/Definitions/A_Ballistic.asset' with importer (NativeFormatImporter)
+Imported 'GUID: 2b7437de123dd4645862250853a41b3b' -> (Import Result ID: '8bcd5b8bf6c7cbdd625110486f81fe4c') in 0.000 seconds [static dependencies only]. Details - ImportResultOutputID=71271e702b226d19499fa01496431f43 DependenciesID=94822d453635689caf48927be38dae00 StaticDependenciesID=e0d01df73b48fd6a62e1a2ebfaf85a7f 
+Importing 'GUID: 6c4f041e2a3e46b45a87f4f6249cf46d - Path: Assets/HovercraftV3/Content/ControlledTests/Definitions/D_DescendingCapture.asset' with importer (NativeFormatImporter)
+Imported 'GUID: 6c4f041e2a3e46b45a87f4f6249cf46d' -> (Import Result ID: 'fe73567300a8d603d23ef04e7211cb89') in 0.000 seconds [static dependencies only]. Details - ImportResultOutputID=1825a12baed35f01da87b75a2b30c02a DependenciesID=4048007f43f0ead478d676fe5d974afa StaticDependenciesID=72f4859bb05ccc233f2f1eb1db305fa8 
+Importing 'GUID: fc9b0ce69c7c2be4680f711be3e09599 - Path: Assets/HovercraftV3/Content/ControlledTests/Definitions/E_ResetNeutrality.asset' with importer (NativeFormatImporter)
+Imported 'GUID: fc9b0ce69c7c2be4680f711be3e09599' -> (Import Result ID: '055725265c8f66e1e993b337199a1148') in 0.000 seconds [static dependencies only]. Details - ImportResultOutputID=a58704dc6d6299392d367f1beffa57e0 DependenciesID=5c3c5419de46c3a5e5b26d947ad11cbf StaticDependenciesID=5098fe5d39cfb2058efcadf1d2832e48 
+Asset Pipeline Refresh (id=50ae5c711fa199f47abc1281c223586f): Total: 0.072 seconds - Initiated by StopAssetImportingV2(NoUpdateAssetOptions)
+Asset Pipeline Refresh (id=6a59bdaf812df014eb8d52a0286b9850): Total: 0.006 seconds - Initiated by RefreshV2(NoUpdateAssetOptions)
+Hovercraft V3 controlled scenario A-H presets updated.
+UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+UnityEngine.DebugLogHandler:Internal_Log (UnityEngine.LogType,UnityEngine.LogOption,string,UnityEngine.Object)
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:Log (UnityEngine.LogType,object)
+UnityEngine.Debug:Log (object)
+Lunarlight.Hovercraft.V3.Editor.V3ControlledTestAssetUtility:CreateOrUpdatePresets () (at Assets/HovercraftV3/Editor/Diagnostics/ControlledTests/V3ControlledDynamicsTestWindow.cs:414)
+Lunarlight.Hovercraft.V3.Editor.V3ControlledTestAssetUtility:CreateOrUpdatePresetsFromCommandLine () (at Assets/HovercraftV3/Editor/Diagnostics/ControlledTests/V3ControlledDynamicsTestWindow.cs:419)
+
+(Filename: Assets/HovercraftV3/Editor/Diagnostics/ControlledTests/V3ControlledDynamicsTestWindow.cs Line: 414)
+
+Batchmode quit successfully invoked - shutting down!
+Curl error 42: Callback aborted
+[Physics::Module] Cleanup current backend.
+[Physics::Module] Id: 0xf2b8ea05
+Input System module state changed to: ShutdownInProgress.
+Input Polling Thread exited.
+Input System module state changed to: Shutdown.
+[Licensing::IpcConnector] LicenseClient-Jack_-6000.5.0-notifications channel disconnected successfully.
+[Licensing::IpcConnector] LicenseClient-Jack_-6000.5.0 channel disconnected successfully.
+AcceleratorClientConnectionCallback - disconnected - :0
+Cleanup mono
+CodeReloadManager destroyed
+Exiting batchmode successfully now!
+Exiting without the bug reporter. Application will terminate with return code 0

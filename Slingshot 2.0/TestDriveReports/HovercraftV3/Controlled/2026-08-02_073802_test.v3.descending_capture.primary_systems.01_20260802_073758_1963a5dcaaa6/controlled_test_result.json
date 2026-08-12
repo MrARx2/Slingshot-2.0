@@ -1,0 +1,100 @@
+{
+    "testId": "test.v3.descending_capture.primary_systems.01",
+    "testVersion": 2,
+    "sessionId": "1963a5dcaaa6",
+    "buildId": "build.hovercraft.baseline.01",
+    "buildGuid": "a2946245bc904c19a0827a4308c729be",
+    "buildOwnership": "GeneratedReference",
+    "controlPath": "MainframeScheduled",
+    "comparisonGroupId": "comparison.descending_capture_v2",
+    "finalPhase": 4,
+    "passed": true,
+    "abortReason": "",
+    "utcStarted": "2026-08-02T07:37:58.1059729Z",
+    "utcEnded": "2026-08-02T07:38:03.2263608Z",
+    "runnerOverheadMilliseconds": 0.1773,
+    "droppedSamples": 0,
+    "droppedEvents": 0,
+    "recorderOutputDirectory": "D:\\Projects\\Unity\\Slingshot2\\Slingshot-2.0\\Slingshot 2.0\\TestDriveReports\\HovercraftV3\\Controlled\\2026-08-02_073802_test.v3.descending_capture.primary_systems.01_20260802_073758_1963a5dcaaa6",
+    "assertions": [
+        {
+            "assertionId": "d.capture.bounded",
+            "passed": true,
+            "expected": "0..1",
+            "measured": "min=0, max=1",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "hover.captureAuthority"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "d.residual.p95",
+            "passed": true,
+            "expected": "p95 <= 500",
+            "measured": "p95=1.07392",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "forces.residual",
+                "world.contactCount",
+                "identity.dynamicsValid"
+            ],
+            "evidenceFile": "force_summary.csv"
+        },
+        {
+            "assertionId": "d.capture.established",
+            "passed": true,
+            "expected": "hover.captureAuthority reaches >= 0.9",
+            "measured": "maximum=1",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "hover.captureAuthority"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "d.surface.reacquired",
+            "passed": true,
+            "expected": "1 events",
+            "measured": "1 events",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-0.5 s",
+            "supportingChannels": [],
+            "evidenceFile": "events.json"
+        },
+        {
+            "assertionId": "d.no.probe.loss",
+            "passed": true,
+            "expected": "0 events",
+            "measured": "0 events",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "events.json"
+        },
+        {
+            "assertionId": "d.no.reset",
+            "passed": true,
+            "expected": "0 events",
+            "measured": "0 events",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "events.json"
+        },
+        {
+            "assertionId": "d.build.identity",
+            "passed": true,
+            "expected": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "measured": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "session_manifest.json"
+        }
+    ],
+    "setupWarnings": []
+}

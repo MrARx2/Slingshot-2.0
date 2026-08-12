@@ -1,0 +1,17 @@
+{
+  "name": "Lunarlight.Hovercraft.V3.TrackIntegration",
+  "rootNamespace": "Lunarlight.Hovercraft.V3.TrackIntegration",
+  "references": [
+    "Lunarlight.Hovercraft.V3",
+    "Slingshot.TrackGeneration"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

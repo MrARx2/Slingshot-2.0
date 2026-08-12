@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="8" result="Skipped:Ignored" total="8" passed="6" failed="0" inconclusive="0" skipped="2" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.1130134">
+  <test-suite type="TestSuite" id="1000" name="Slingshot 2.0" fullname="Slingshot 2.0" runstate="Runnable" testcasecount="284" result="Skipped" label="Ignored" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.113013" total="8" passed="6" failed="0" inconclusive="0" skipped="2" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <reason>
+      <message><![CDATA[One or more child tests were ignored]]></message>
+    </reason>
+    <test-suite type="Assembly" id="1196" name="Lunarlight.Hovercraft.V3.EditorTests.dll" fullname="D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0/Library/ScriptAssemblies/Lunarlight.Hovercraft.V3.EditorTests.dll" runstate="Runnable" testcasecount="167" result="Skipped" label="Ignored" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.106787" total="8" passed="6" failed="0" inconclusive="0" skipped="2" asserts="0">
+      <properties>
+        <property name="_PID" value="121600" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <reason>
+        <message><![CDATA[One or more child tests were ignored]]></message>
+      </reason>
+      <test-suite type="TestSuite" id="1197" name="Lunarlight" fullname="Lunarlight" runstate="Runnable" testcasecount="167" result="Skipped" label="Ignored" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.105770" total="8" passed="6" failed="0" inconclusive="0" skipped="2" asserts="0">
+        <properties />
+        <reason>
+          <message><![CDATA[One or more child tests were ignored]]></message>
+        </reason>
+        <test-suite type="TestSuite" id="1198" name="Hovercraft" fullname="Lunarlight.Hovercraft" runstate="Runnable" testcasecount="167" result="Skipped" label="Ignored" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.104893" total="8" passed="6" failed="0" inconclusive="0" skipped="2" asserts="0">
+          <properties />
+          <reason>
+            <message><![CDATA[One or more child tests were ignored]]></message>
+          </reason>
+          <test-suite type="TestSuite" id="1199" name="V3" fullname="Lunarlight.Hovercraft.V3" runstate="Runnable" testcasecount="167" result="Skipped" label="Ignored" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.100876" total="8" passed="6" failed="0" inconclusive="0" skipped="2" asserts="0">
+            <properties />
+            <reason>
+              <message><![CDATA[One or more child tests were ignored]]></message>
+            </reason>
+            <test-suite type="TestSuite" id="1200" name="Tests" fullname="Lunarlight.Hovercraft.V3.Tests" runstate="Runnable" testcasecount="167" result="Skipped" label="Ignored" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.099497" total="8" passed="6" failed="0" inconclusive="0" skipped="2" asserts="0">
+              <properties />
+              <reason>
+                <message><![CDATA[One or more child tests were ignored]]></message>
+              </reason>
+              <test-suite type="TestFixture" id="1027" name="V3ControlledDynamicsTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" testcasecount="8" result="Skipped" label="Ignored" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.093820" total="8" passed="6" failed="0" inconclusive="0" skipped="2" asserts="0">
+                <properties />
+                <reason>
+                  <message><![CDATA[One or more child tests were ignored]]></message>
+                </reason>
+                <test-case id="1031" name="Assertions_EvaluateNumericEventTransitionAndBuildIdentity" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.Assertions_EvaluateNumericEventTransitionAndBuildIdentity" methodname="Assertions_EvaluateNumericEventTransitionAndBuildIdentity" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1257611206" result="Passed" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.028151" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1030" name="ControlledInput_UsesExclusiveOwnerAndNormalPilotCommand" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.ControlledInput_UsesExclusiveOwnerAndNormalPilotCommand" methodname="ControlledInput_UsesExclusiveOwnerAndNormalPilotCommand" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1760146306" result="Passed" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.001757" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1028" name="Definition_ValidatesSchemaBuildCommandsAndSignals" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.Definition_ValidatesSchemaBuildCommandsAndSignals" methodname="Definition_ValidatesSchemaBuildCommandsAndSignals" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1648620526" result="Passed" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.001313" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1033" name="FailureController_UsesPartAvailabilityAndRestoresState" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.FailureController_UsesPartAvailabilityAndRestoresState" methodname="FailureController_UsesPartAvailabilityAndRestoresState" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1113598576" result="Passed" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.046967" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <output><![CDATA[Hovercraft V3 could not sample an authoritative World Simulation. World-dependent sensors and aerodynamics are invalid; Unity Rigidbody gravity remains as the documented compatibility fallback.
+]]></output>
+                </test-case>
+                <test-case id="1029" name="Registry_RejectsDuplicateStableTestIds" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.Registry_RejectsDuplicateStableTestIds" methodname="Registry_RejectsDuplicateStableTestIds" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1984593870" result="Passed" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.000967" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1032" name="RuntimeOverride_IsRejectedForGeneratedBuild" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.RuntimeOverride_IsRejectedForGeneratedBuild" methodname="RuntimeOverride_IsRejectedForGeneratedBuild" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1955083069" result="Passed" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.001274" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1034" name="ScenarioA_RunsThroughSerializedTrackSceneAndExports" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.ScenarioA_RunsThroughSerializedTrackSceneAndExports" methodname="ScenarioA_RunsThroughSerializedTrackSceneAndExports" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="587710168" result="Skipped" label="Ignored" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.004206" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                    <property name="Category" value="ControlledCapture" />
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <reason>
+                    <message><![CDATA[Set HOVERCRAFT_V3_RUN_CONTROLLED_CAPTURE=1 to run the real controlled Scenario A capture.]]></message>
+                  </reason>
+                </test-case>
+                <test-case id="1035" name="SelectedScenario_RunsThroughSerializedSceneAndExports" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.SelectedScenario_RunsThroughSerializedSceneAndExports" methodname="SelectedScenario_RunsThroughSerializedSceneAndExports" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="432118544" result="Skipped" label="Ignored" start-time="2026-08-01 17:28:42Z" end-time="2026-08-01 17:28:42Z" duration="0.000488" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                    <property name="Category" value="ControlledCapture" />
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <reason>
+                    <message><![CDATA[Set HOVERCRAFT_V3_RUN_CONTROLLED_CAPTURE=1 and HOVERCRAFT_V3_CONTROLLED_DEFINITION to run a selected capture.]]></message>
+                  </reason>
+                  <output><![CDATA[Saving results to: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\TestResults.xml
+]]></output>
+                </test-case>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

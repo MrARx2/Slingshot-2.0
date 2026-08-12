@@ -1,0 +1,127 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4ff6f33904a1344eac6c931af885653, type: 3}
+  m_Name: F_Inertia
+  m_EditorClassIdentifier: Lunarlight.Hovercraft.V3.Diagnostics::Lunarlight.Hovercraft.V3.Diagnostics.ControlledTests.V3ControlledTestDefinition
+  stableTestId: test.v3.inertia.primary_systems.01
+  displayName: Scenario F - Inertia and Angular Response
+  description: 
+  category: 4
+  version: 1
+  authoringNotes: 
+  expectedDurationSeconds: 3.5
+  requiredSchemaVersion: 6
+  tags: []
+  build: {fileID: 11400000, guid: 70217178c6d526f41827ae2c1f83eff8, type: 2}
+  requiredBuildStableId: build.apex.v3.systems_integration.balanced.01
+  requiredBuildGuid: 70217178c6d526f41827ae2c1f83eff8
+  requiredOwnership: 0
+  requiredControlPath: 1
+  expectLegacyFallbackAllowed: 0
+  scenePath: Assets/HovercraftV3/Scenes/Diagnostics/V3_ControlledDynamics.unity
+  worldProfile: {fileID: 11400000, guid: 32bd2a6177bae1d4d8080f88c33a9691, type: 2}
+  requiredWorldRootStableId: world.root.v3_controlleddynamics
+  expectedGravity: {x: 0, y: -9.80665, z: 0}
+  expectAtmosphere: 1
+  expectWind: 1
+  fixtureKind: 0
+  fixturePrefab: {fileID: 0}
+  initialCondition:
+    worldPosition: {x: 0, y: 300, z: -1000}
+    worldEulerAngles: {x: 0, y: 0, z: 0}
+    linearVelocity: {x: 0, y: 0, z: 0}
+    angularVelocity: {x: 0, y: 0, z: 0}
+    startSleeping: 0
+    requireNoInitialContact: 1
+    useTrackRelation: 0
+    trackDistanceMeters: 0
+    trackSectionId: 
+  warmupSeconds: 0.25
+  measuredSeconds: 3
+  cooldownSeconds: 0.25
+  resetBeforeSetup: 1
+  runtimeOverride:
+    disableChassisAerodynamics: 0
+    requireTestOnlyBuild: 1
+    rationale: 
+  measuredReset:
+    enabled: 0
+    triggerSeconds: 1
+    reason: CONTROLLED RESET
+  failures: []
+  commands:
+  - startSeconds: 0.1
+    endSeconds: 0.8
+    throttle: 0
+    strafe: 0
+    yaw: 0.7
+    pitch: 0
+    lift: 0
+    downforce: 0
+    stabilizationEnabled: 0
+    gripBreaker: 0
+    emergencyOverload: 0
+  - startSeconds: 1.1
+    endSeconds: 1.8
+    throttle: 0
+    strafe: 0
+    yaw: 0
+    pitch: 0.7
+    lift: 0
+    downforce: 0
+    stabilizationEnabled: 0
+    gripBreaker: 0
+    emergencyOverload: 0
+  assertions:
+  - assertionId: f.angular.error
+    description: 
+    type: 0
+    signalId: inertia.angularAccelerationError
+    windowStartSeconds: 0
+    windowEndSeconds: 3.4028235e+38
+    minimum: 0
+    maximum: 10
+    target: 0
+    tolerance: 0
+    deadlineSeconds: 0
+    eventType: 0
+    expectedEventCount: 1
+    stateSequence: []
+    expectedText: 
+    supportingChannels:
+    - inertia.angularAccelerationError
+  - assertionId: f.build.identity
+    description: 
+    type: 8
+    signalId: 
+    windowStartSeconds: 0
+    windowEndSeconds: 3.4028235e+38
+    minimum: 0
+    maximum: 0
+    target: 0
+    tolerance: 0
+    deadlineSeconds: 0
+    eventType: 0
+    expectedEventCount: 1
+    stateSequence: []
+    expectedText: 
+    supportingChannels: []
+  output:
+    sessionNameTemplate: '{testId}_{utc}'
+    outputFolder: TestDriveReports/HovercraftV3/Controlled
+    rawDataEnabled: 0
+    compactDataEnabled: 1
+    csvEnabled: 1
+    markdownEnabled: 1
+    comparisonGroupId: comparison.inertia_roll_pitch_yaw_v1
+    baselineReferencePackage: 
+    calibrationDecisionId: 

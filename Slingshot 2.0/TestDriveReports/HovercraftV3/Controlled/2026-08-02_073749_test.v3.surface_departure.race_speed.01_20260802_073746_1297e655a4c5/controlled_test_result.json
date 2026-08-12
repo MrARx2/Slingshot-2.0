@@ -1,0 +1,102 @@
+{
+    "testId": "test.v3.surface_departure.race_speed.01",
+    "testVersion": 2,
+    "sessionId": "1297e655a4c5",
+    "buildId": "build.hovercraft.baseline.01",
+    "buildGuid": "a2946245bc904c19a0827a4308c729be",
+    "buildOwnership": "GeneratedReference",
+    "controlPath": "MainframeScheduled",
+    "comparisonGroupId": "comparison.capture_range_v2",
+    "finalPhase": 4,
+    "passed": true,
+    "abortReason": "",
+    "utcStarted": "2026-08-02T07:37:46.1737907Z",
+    "utcEnded": "2026-08-02T07:37:49.7859228Z",
+    "runnerOverheadMilliseconds": 0.1563,
+    "droppedSamples": 0,
+    "droppedEvents": 0,
+    "recorderOutputDirectory": "D:\\Projects\\Unity\\Slingshot2\\Slingshot-2.0\\Slingshot 2.0\\TestDriveReports\\HovercraftV3\\Controlled\\2026-08-02_073749_test.v3.surface_departure.race_speed.01_20260802_073746_1297e655a4c5",
+    "assertions": [
+        {
+            "assertionId": "c.transition",
+            "passed": true,
+            "expected": "NearSurfaceHover -> CaptureLimited -> FreeFlight",
+            "measured": "NoSurface -> NearSurfaceHover -> CaptureLimited -> NearSurfaceHover -> ProbeLost -> NoSurface -> FreeFlight",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "c.bottom.clears",
+            "passed": true,
+            "expected": "hover.bottomRequest <= 0.001 by 1.61 s (within 0.25 s after 1.36 s)",
+            "measured": "reached at 1.37 s",
+            "tolerance": 0.0,
+            "sampleTimeRange": "1.36-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "c.roof.clears",
+            "passed": true,
+            "expected": "hover.roofRequest <= 0.001 by 1.61 s (within 0.25 s after 1.36 s)",
+            "measured": "reached at 1.37 s",
+            "tolerance": 0.0,
+            "sampleTimeRange": "1.36-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "c.build.identity",
+            "passed": true,
+            "expected": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "measured": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "session_manifest.json"
+        },
+        {
+            "assertionId": "c.probe.loss",
+            "passed": true,
+            "expected": "1 events",
+            "measured": "1 events",
+            "tolerance": 0.0,
+            "sampleTimeRange": "1-2 s",
+            "supportingChannels": [],
+            "evidenceFile": "events.json"
+        },
+        {
+            "assertionId": "c.envelope.departure",
+            "passed": true,
+            "expected": "1 events",
+            "measured": "1 events",
+            "tolerance": 0.0,
+            "sampleTimeRange": "1-2 s",
+            "supportingChannels": [],
+            "evidenceFile": "events.json"
+        },
+        {
+            "assertionId": "c.no.reacquire.after.departure",
+            "passed": true,
+            "expected": "0 events",
+            "measured": "0 events",
+            "tolerance": 0.0,
+            "sampleTimeRange": "1.5-2.5 s",
+            "supportingChannels": [],
+            "evidenceFile": "events.json"
+        },
+        {
+            "assertionId": "c.no.reset",
+            "passed": true,
+            "expected": "0 events",
+            "measured": "0 events",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "events.json"
+        }
+    ],
+    "setupWarnings": []
+}

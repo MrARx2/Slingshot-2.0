@@ -1,0 +1,10 @@
+event_id,type,severity,timestamp_s,tick,sample_index,attempt_index,reset_reason,track_distance_m,section_id,speed_mps,world_state,manual,notes
+"manual_0001",ManualMarker,0,0,-1,-1,0,"",0,"",35,Unknown,true,"Controlled phase: Measured"
+"SampleRateDrop_00000000",SampleRateDrop,1,0.0099999929138321619,0,0,0,"",0,"",34.999820709228516,Unknown,false,"Measured sensor rate fell below 75% of its grant."
+"SensorWorldDisagreement_00000000",SensorWorldDisagreement,1,0.0099999929138321619,0,0,0,"",0,"",34.999820709228516,Unknown,false,"Sensor and independent world truth exceeded comparison tolerances."
+"TaskUnderMinimum_00000000",TaskUnderMinimum,2,0.0099999929138321619,0,0,0,"",0,"",34.999820709228516,Unknown,false,"A software task measured below its minimum useful rate."
+"PowerStarvation_00000000",PowerStarvation,2,0.0099999929138321619,0,0,0,"",0,"",34.999820709228516,Unknown,false,"Requested power exceeded granted power."
+"SurfaceReacquired_00000002",SurfaceReacquired,0,0.029999978741496597,2,2,0,"",0,"",34.903041839599609,Unknown,false,"Current physical surface evidence was reacquired."
+"ThrusterSaturation_00000003",ThrusterSaturation,1,0.039999971655328787,3,3,0,"",0,"",34.816326141357422,Unknown,false,"Thruster request is saturated above executed output."
+"SpringTravelLimit_00000004",SpringTravelLimit,1,0.049999964569160976,4,4,0,"",0,"",34.726131439208984,Unknown,false,"A spring mount reached a physical travel limit."
+"manual_0009",ManualMarker,0,4.009997158446712,400,400,0,"",0,"",14.197298049926758,Unknown,true,"Controlled phase: Cooldown"

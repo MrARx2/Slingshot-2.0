@@ -1,0 +1,12 @@
+timestamp_s,track_distance_m,event_type,severity,section_id
+0,0,ManualMarker,0,""
+0.0099999929138321619,0,SampleRateDrop,1,""
+0.0099999929138321619,0,TaskUnderMinimum,2,""
+0.0099999929138321619,0,PowerStarvation,2,""
+0.029999978741496597,0,SurfaceReacquired,0,""
+1.1999991496598639,0,ThrusterSaturation,1,""
+1.2099991425736962,0,NearSurfaceExit,0,""
+1.3699990291950113,0,SurfaceEnvelopeDeparture,0,""
+1.3699990291950113,0,ProbeLoss,1,""
+1.3699990291950113,0,NearSurfaceExit,0,""
+2.5099982213718817,0,ManualMarker,0,""

@@ -1,0 +1,8 @@
+task_id,role,sample_count,mean_requested_hz,mean_granted_hz,mean_measured_hz,maximum_skipped_count,below_minimum_samples,fault_samples
+"software.pilotinterface.stock","PilotInterface",325,120,120,46.077678680419922,0,200,0
+"software.hover.stock","Hover",325,120,120,46.077678680419922,0,200,0
+"software.stabilizer.stock","Stabilizer",325,120,120,46.077678680419922,0,200,0
+"software.drive.stock","Drive",325,60,60,22.921545028686523,0,200,0
+"software.traction.stock","Traction",325,120,120,46.077678680419922,0,200,0
+"software.aerodynamics.stock","Aerodynamics",325,60,60,22.921545028686523,0,200,0
+"software.telemetry.stock","Telemetry",325,30,30,11.424210548400879,0,200,0

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="7" result="Passed" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:17Z" duration="1.7564738">
+  <test-suite type="TestSuite" id="1000" name="Slingshot 2.0" fullname="Slingshot 2.0" runstate="Runnable" testcasecount="213" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:17Z" duration="1.756474" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1117" name="Lunarlight.Hovercraft.V3.EditorTests.dll" fullname="D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0/Library/ScriptAssemblies/Lunarlight.Hovercraft.V3.EditorTests.dll" runstate="Runnable" testcasecount="98" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:17Z" duration="1.746114" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="59992" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1118" name="Lunarlight" fullname="Lunarlight" runstate="Runnable" testcasecount="98" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:17Z" duration="1.744857" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1119" name="Hovercraft" fullname="Lunarlight.Hovercraft" runstate="Runnable" testcasecount="98" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:17Z" duration="1.743735" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1120" name="V3" fullname="Lunarlight.Hovercraft.V3" runstate="Runnable" testcasecount="98" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:17Z" duration="1.739928" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1121" name="Tests" fullname="Lunarlight.Hovercraft.V3.Tests" runstate="Runnable" testcasecount="98" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:17Z" duration="1.738911" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestFixture" id="1049" name="V3SystemsIntegrationTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" testcasecount="7" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:17Z" duration="1.737101" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1054" name="BalancedProfile_WeightsEveryControlDomainAtOne" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.BalancedProfile_WeightsEveryControlDomainAtOne" methodname="BalancedProfile_WeightsEveryControlDomainAtOne" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="678751269" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:15Z" duration="0.018989" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1051" name="CompleteCraft_AssemblesAndBootsReady" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.CompleteCraft_AssemblesAndBootsReady" methodname="CompleteCraft_AssemblesAndBootsReady" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="106290658" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:15Z" duration="0.030910" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1052" name="CompleteCraft_ContainsRequiredPhysicalSystems" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.CompleteCraft_ContainsRequiredPhysicalSystems" methodname="CompleteCraft_ContainsRequiredPhysicalSystems" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="791445539" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:15Z" duration="0.003777" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1050" name="GeneratedBuild_IsValidAndHasStableIdentity" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.GeneratedBuild_IsValidAndHasStableIdentity" methodname="GeneratedBuild_IsValidAndHasStableIdentity" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="523755152" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:15Z" duration="0.000354" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1053" name="MainframeTick_RunsSoftwareAndRoutesStandardRequests" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.MainframeTick_RunsSoftwareAndRoutesStandardRequests" methodname="MainframeTick_RunsSoftwareAndRoutesStandardRequests" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="74701594" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:15Z" duration="0.008723" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1056" name="SystemsRuntime_SurvivesTenMinutesOfVirtualFixedTicks" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.SystemsRuntime_SurvivesTenMinutesOfVirtualFixedTicks" methodname="SystemsRuntime_SurvivesTenMinutesOfVirtualFixedTicks" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="995917469" result="Passed" start-time="2026-07-29 10:03:15Z" end-time="2026-07-29 10:03:17Z" duration="1.663292" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1055" name="V2ReferenceBuild_RemainsExactLegacyMass" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.V2ReferenceBuild_RemainsExactLegacyMass" methodname="V2ReferenceBuild_RemainsExactLegacyMass" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="2144310010" result="Passed" start-time="2026-07-29 10:03:17Z" end-time="2026-07-29 10:03:17Z" duration="0.002595" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <output><![CDATA[Saving results to: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\TestResults.xml
+]]></output>
+                </test-case>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

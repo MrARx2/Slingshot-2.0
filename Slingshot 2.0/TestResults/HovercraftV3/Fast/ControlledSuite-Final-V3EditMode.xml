@@ -1,0 +1,731 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="167" result="Failed(Child)" total="167" passed="163" failed="1" inconclusive="0" skipped="3" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-08-01 17:29:45Z" end-time="2026-08-01 17:29:46Z" duration="0.6327796">
+  <test-suite type="TestSuite" id="1000" name="Slingshot 2.0" fullname="Slingshot 2.0" runstate="Runnable" testcasecount="284" result="Failed" site="Child" start-time="2026-08-01 17:29:45Z" end-time="2026-08-01 17:29:46Z" duration="0.632780" total="167" passed="163" failed="1" inconclusive="0" skipped="3" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="1196" name="Lunarlight.Hovercraft.V3.EditorTests.dll" fullname="D:/Projects/Unity/Slingshot2/Slingshot-2.0/Slingshot 2.0/Library/ScriptAssemblies/Lunarlight.Hovercraft.V3.EditorTests.dll" runstate="Runnable" testcasecount="167" result="Failed" site="Child" start-time="2026-08-01 17:29:45Z" end-time="2026-08-01 17:29:46Z" duration="0.574617" total="167" passed="163" failed="1" inconclusive="0" skipped="3" asserts="0">
+      <properties>
+        <property name="_PID" value="156412" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestSuite" id="1197" name="Lunarlight" fullname="Lunarlight" runstate="Runnable" testcasecount="167" result="Failed" site="Child" start-time="2026-08-01 17:29:45Z" end-time="2026-08-01 17:29:46Z" duration="0.570204" total="167" passed="163" failed="1" inconclusive="0" skipped="3" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-suite type="TestSuite" id="1198" name="Hovercraft" fullname="Lunarlight.Hovercraft" runstate="Runnable" testcasecount="167" result="Failed" site="Child" start-time="2026-08-01 17:29:45Z" end-time="2026-08-01 17:29:46Z" duration="0.566608" total="167" passed="163" failed="1" inconclusive="0" skipped="3" asserts="0">
+          <properties />
+          <failure>
+            <message><![CDATA[One or more child tests had errors]]></message>
+          </failure>
+          <test-suite type="TestSuite" id="1199" name="V3" fullname="Lunarlight.Hovercraft.V3" runstate="Runnable" testcasecount="167" result="Failed" site="Child" start-time="2026-08-01 17:29:45Z" end-time="2026-08-01 17:29:46Z" duration="0.566180" total="167" passed="163" failed="1" inconclusive="0" skipped="3" asserts="0">
+            <properties />
+            <failure>
+              <message><![CDATA[One or more child tests had errors]]></message>
+            </failure>
+            <test-suite type="TestSuite" id="1200" name="Tests" fullname="Lunarlight.Hovercraft.V3.Tests" runstate="Runnable" testcasecount="167" result="Failed" site="Child" start-time="2026-08-01 17:29:45Z" end-time="2026-08-01 17:29:46Z" duration="0.564064" total="167" passed="163" failed="1" inconclusive="0" skipped="3" asserts="0">
+              <properties />
+              <failure>
+                <message><![CDATA[One or more child tests had errors]]></message>
+              </failure>
+              <test-suite type="TestFixture" id="1001" name="CraftBuildValidatorTests" fullname="Lunarlight.Hovercraft.V3.Tests.CraftBuildValidatorTests" classname="Lunarlight.Hovercraft.V3.Tests.CraftBuildValidatorTests" runstate="Runnable" testcasecount="5" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.024191" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1006" name="ConnectorChain_CombinedMassOverParentLimit_IsRejected" fullname="Lunarlight.Hovercraft.V3.Tests.CraftBuildValidatorTests.ConnectorChain_CombinedMassOverParentLimit_IsRejected" methodname="ConnectorChain_CombinedMassOverParentLimit_IsRejected" classname="Lunarlight.Hovercraft.V3.Tests.CraftBuildValidatorTests" runstate="Runnable" seed="627688641" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.012901" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1005" name="ConnectorChain_OverChildMassLimit_IsRejected" fullname="Lunarlight.Hovercraft.V3.Tests.CraftBuildValidatorTests.ConnectorChain_OverChildMassLimit_IsRejected" methodname="ConnectorChain_OverChildMassLimit_IsRejected" classname="Lunarlight.Hovercraft.V3.Tests.CraftBuildValidatorTests" runstate="Runnable" seed="668110240" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000913" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1004" name="ConnectorChain_WithCompatibleChild_IsCompatible" fullname="Lunarlight.Hovercraft.V3.Tests.CraftBuildValidatorTests.ConnectorChain_WithCompatibleChild_IsCompatible" methodname="ConnectorChain_WithCompatibleChild_IsCompatible" classname="Lunarlight.Hovercraft.V3.Tests.CraftBuildValidatorTests" runstate="Runnable" seed="425057550" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000874" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1003" name="DirectEndpoint_OverForceLimit_IsRejected" fullname="Lunarlight.Hovercraft.V3.Tests.CraftBuildValidatorTests.DirectEndpoint_OverForceLimit_IsRejected" methodname="DirectEndpoint_OverForceLimit_IsRejected" classname="Lunarlight.Hovercraft.V3.Tests.CraftBuildValidatorTests" runstate="Runnable" seed="408376223" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.001057" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1002" name="DirectEndpoint_WithMatchingLimits_IsCompatible" fullname="Lunarlight.Hovercraft.V3.Tests.CraftBuildValidatorTests.DirectEndpoint_WithMatchingLimits_IsCompatible" methodname="DirectEndpoint_WithMatchingLimits_IsCompatible" classname="Lunarlight.Hovercraft.V3.Tests.CraftBuildValidatorTests" runstate="Runnable" seed="2086795530" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000775" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1132" name="V2ReferencePrototypeTests" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.060324" total="12" passed="12" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1143" name="ControllerPipeline_ForwardCommandUsesPoweredMainThrusterPath" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests.ControllerPipeline_ForwardCommandUsesPoweredMainThrusterPath" methodname="ControllerPipeline_ForwardCommandUsesPoweredMainThrusterPath" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" seed="1868916453" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.044745" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1144" name="ControllerPipeline_LosesAuthorityWhenControlPartIsDisabled" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests.ControllerPipeline_LosesAuthorityWhenControlPartIsDisabled" methodname="ControllerPipeline_LosesAuthorityWhenControlPartIsDisabled" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" seed="1817490005" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.002901" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1142" name="GimbalVariation_ThrusterAndVisualFollowActuatedMountOutsideHull" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests.GimbalVariation_ThrusterAndVisualFollowActuatedMountOutsideHull" methodname="GimbalVariation_ThrusterAndVisualFollowActuatedMountOutsideHull" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" seed="527711930" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.003832" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1140" name="GimbalVariation_UsesSameMainThrusterThroughConnector" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests.GimbalVariation_UsesSameMainThrusterThroughConnector" methodname="GimbalVariation_UsesSameMainThrusterThroughConnector" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" seed="478332973" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000788" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1139" name="ReferenceActuators_ExposePhysicalParityAuthority" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests.ReferenceActuators_ExposePhysicalParityAuthority" methodname="ReferenceActuators_ExposePhysicalParityAuthority" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" seed="572343130" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000243" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1138" name="ReferenceBuild_CalculatedCenterOfMassMatchesV2" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests.ReferenceBuild_CalculatedCenterOfMassMatchesV2" methodname="ReferenceBuild_CalculatedCenterOfMassMatchesV2" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" seed="964053617" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000459" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1133" name="ReferenceBuild_IsValid" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests.ReferenceBuild_IsValid" methodname="ReferenceBuild_IsValid" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" seed="934939735" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000139" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1137" name="ReferenceBuild_MassIsElevenThousandKg" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests.ReferenceBuild_MassIsElevenThousandKg" methodname="ReferenceBuild_MassIsElevenThousandKg" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" seed="1321439546" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000083" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1136" name="ReferenceChassis_HasFourDroneStyleVerticalThrusterOutriggers" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests.ReferenceChassis_HasFourDroneStyleVerticalThrusterOutriggers" methodname="ReferenceChassis_HasFourDroneStyleVerticalThrusterOutriggers" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" seed="980285275" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000816" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1134" name="ReferenceChassis_HasSixteenStableSockets" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests.ReferenceChassis_HasSixteenStableSockets" methodname="ReferenceChassis_HasSixteenStableSockets" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" seed="1951356960" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000495" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1135" name="ReferenceChassis_ThrusterSocketsExposeOutwardMounts" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests.ReferenceChassis_ThrusterSocketsExposeOutwardMounts" methodname="ReferenceChassis_ThrusterSocketsExposeOutwardMounts" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" seed="1084390137" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000606" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1141" name="RuntimeAssembler_RebuildsReferenceWithOneRigidbody" fullname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests.RuntimeAssembler_RebuildsReferenceWithOneRigidbody" methodname="RuntimeAssembler_RebuildsReferenceWithOneRigidbody" classname="Lunarlight.Hovercraft.V3.Tests.V2ReferencePrototypeTests" runstate="Runnable" seed="18596482" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.003796" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1027" name="V3ControlledDynamicsTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" testcasecount="8" result="Skipped" label="Ignored" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.043456" total="8" passed="6" failed="0" inconclusive="0" skipped="2" asserts="0">
+                <properties />
+                <reason>
+                  <message><![CDATA[One or more child tests were ignored]]></message>
+                </reason>
+                <test-case id="1031" name="Assertions_EvaluateNumericEventTransitionAndBuildIdentity" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.Assertions_EvaluateNumericEventTransitionAndBuildIdentity" methodname="Assertions_EvaluateNumericEventTransitionAndBuildIdentity" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1994607706" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.014508" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1030" name="ControlledInput_UsesExclusiveOwnerAndNormalPilotCommand" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.ControlledInput_UsesExclusiveOwnerAndNormalPilotCommand" methodname="ControlledInput_UsesExclusiveOwnerAndNormalPilotCommand" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="317593534" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000617" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1028" name="Definition_ValidatesSchemaBuildCommandsAndSignals" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.Definition_ValidatesSchemaBuildCommandsAndSignals" methodname="Definition_ValidatesSchemaBuildCommandsAndSignals" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="965160247" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.001263" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1033" name="FailureController_UsesPartAvailabilityAndRestoresState" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.FailureController_UsesPartAvailabilityAndRestoresState" methodname="FailureController_UsesPartAvailabilityAndRestoresState" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="504461445" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.019515" asserts="0">
+                  <properties />
+                  <output><![CDATA[Hovercraft V3 could not sample an authoritative World Simulation. World-dependent sensors and aerodynamics are invalid; Unity Rigidbody gravity remains as the documented compatibility fallback.
+]]></output>
+                </test-case>
+                <test-case id="1029" name="Registry_RejectsDuplicateStableTestIds" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.Registry_RejectsDuplicateStableTestIds" methodname="Registry_RejectsDuplicateStableTestIds" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="887189175" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000863" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1032" name="RuntimeOverride_IsRejectedForGeneratedBuild" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.RuntimeOverride_IsRejectedForGeneratedBuild" methodname="RuntimeOverride_IsRejectedForGeneratedBuild" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1823094262" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000626" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1034" name="ScenarioA_RunsThroughSerializedTrackSceneAndExports" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.ScenarioA_RunsThroughSerializedTrackSceneAndExports" methodname="ScenarioA_RunsThroughSerializedTrackSceneAndExports" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="1365560855" result="Skipped" label="Ignored" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.004137" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                    <property name="Category" value="ControlledCapture" />
+                  </properties>
+                  <reason>
+                    <message><![CDATA[Set HOVERCRAFT_V3_RUN_CONTROLLED_CAPTURE=1 to run the real controlled Scenario A capture.]]></message>
+                  </reason>
+                </test-case>
+                <test-case id="1035" name="SelectedScenario_RunsThroughSerializedSceneAndExports" fullname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests.SelectedScenario_RunsThroughSerializedSceneAndExports" methodname="SelectedScenario_RunsThroughSerializedSceneAndExports" classname="Lunarlight.Hovercraft.V3.Tests.V3ControlledDynamicsTests" runstate="Runnable" seed="214057562" result="Skipped" label="Ignored" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:15Z" duration="0.000469" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                    <property name="Category" value="ControlledCapture" />
+                  </properties>
+                  <reason>
+                    <message><![CDATA[Set HOVERCRAFT_V3_RUN_CONTROLLED_CAPTURE=1 and HOVERCRAFT_V3_CONTROLLED_DEFINITION to run a selected capture.]]></message>
+                  </reason>
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1007" name="V3CraftKernelServicesTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests" runstate="Runnable" testcasecount="5" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:16Z" duration="0.021607" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="ParameterizedMethod" id="1011" name="ConnectorVariations_IncludeConnectorMassExactlyOnce" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests.ConnectorVariations_IncludeConnectorMassExactlyOnce" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:16Z" duration="0.006507" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1009" name="ConnectorVariations_IncludeConnectorMassExactlyOnce(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_MainGimbalDemo.asset&quot;,11120.0f,2690.0f,120.0f,&quot;Connector.Gimbal.Main.V2Reference&quot;)" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests.ConnectorVariations_IncludeConnectorMassExactlyOnce(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_MainGimbalDemo.asset&quot;,11120.0f,2690.0f,120.0f,&quot;Connector.Gimbal.Main.V2Reference&quot;)" methodname="ConnectorVariations_IncludeConnectorMassExactlyOnce" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests" runstate="Runnable" seed="752613698" result="Passed" start-time="2026-08-01 17:29:15Z" end-time="2026-08-01 17:29:16Z" duration="0.003624" asserts="0">
+                    <properties />
+                  </test-case>
+                  <test-case id="1010" name="ConnectorVariations_IncludeConnectorMassExactlyOnce(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_HoverSpringDemo.asset&quot;,11035.0f,2605.0f,35.0f,&quot;Connector.Spring.Hover.V2Reference&quot;)" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests.ConnectorVariations_IncludeConnectorMassExactlyOnce(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_HoverSpringDemo.asset&quot;,11035.0f,2605.0f,35.0f,&quot;Connector.Spring.Hover.V2Reference&quot;)" methodname="ConnectorVariations_IncludeConnectorMassExactlyOnce" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests" runstate="Runnable" seed="1427389646" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.002567" asserts="0">
+                    <properties />
+                  </test-case>
+                </test-suite>
+                <test-case id="1013" name="ControllerFreeCraft_StillOwnsMassAndValidationKernel" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests.ControllerFreeCraft_StillOwnsMassAndValidationKernel" methodname="ControllerFreeCraft_StillOwnsMassAndValidationKernel" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests" runstate="Runnable" seed="1950100505" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.005952" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1008" name="ReferenceCraft_UsesAuditableMassAndValidationServices" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests.ReferenceCraft_UsesAuditableMassAndValidationServices" methodname="ReferenceCraft_UsesAuditableMassAndValidationServices" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests" runstate="Runnable" seed="123007079" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.004895" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1012" name="RuntimeValidator_DetectsAndRecoversFromMassCorruption" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests.RuntimeValidator_DetectsAndRecoversFromMassCorruption" methodname="RuntimeValidator_DetectsAndRecoversFromMassCorruption" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftKernelServicesTests" runstate="Runnable" seed="509890152" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.003649" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1014" name="V3CraftRegistryTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftRegistryTests" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftRegistryTests" runstate="Runnable" testcasecount="5" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.011003" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1019" name="AuthoredVariant_DeepCopiesLocalTuningAndSharesProducts" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftRegistryTests.AuthoredVariant_DeepCopiesLocalTuningAndSharesProducts" methodname="AuthoredVariant_DeepCopiesLocalTuningAndSharesProducts" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftRegistryTests" runstate="Runnable" seed="1018997523" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.001908" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1017" name="BuildValidation_AllowsRequirementProvidedByAnotherPart" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftRegistryTests.BuildValidation_AllowsRequirementProvidedByAnotherPart" methodname="BuildValidation_AllowsRequirementProvidedByAnotherPart" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftRegistryTests" runstate="Runnable" seed="1888703581" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.001142" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1018" name="BuildValidation_RejectsMissingGlobalCapability" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftRegistryTests.BuildValidation_RejectsMissingGlobalCapability" methodname="BuildValidation_RejectsMissingGlobalCapability" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftRegistryTests" runstate="Runnable" seed="2119814790" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000787" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1016" name="GimbalCraft_IndexesConnectorAndEndpointAtSameSocket" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftRegistryTests.GimbalCraft_IndexesConnectorAndEndpointAtSameSocket" methodname="GimbalCraft_IndexesConnectorAndEndpointAtSameSocket" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftRegistryTests" runstate="Runnable" seed="952284419" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.002731" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1015" name="ReferenceCraft_IndexesSocketsPartsAndCapabilities" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftRegistryTests.ReferenceCraft_IndexesSocketsPartsAndCapabilities" methodname="ReferenceCraft_IndexesSocketsPartsAndCapabilities" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftRegistryTests" runstate="Runnable" seed="2021856470" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.003406" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1062" name="V3CraftTelemetryHubTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftTelemetryHubTests" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftTelemetryHubTests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.015715" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1064" name="CapturedSnapshot_IsStableAfterLiveStateAndModeChange" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftTelemetryHubTests.CapturedSnapshot_IsStableAfterLiveStateAndModeChange" methodname="CapturedSnapshot_IsStableAfterLiveStateAndModeChange" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftTelemetryHubTests" runstate="Runnable" seed="1431560394" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.004613" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1065" name="NestedConnectorSnapshot_PreservesBothPartsAtOneSocket" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftTelemetryHubTests.NestedConnectorSnapshot_PreservesBothPartsAtOneSocket" methodname="NestedConnectorSnapshot_PreservesBothPartsAtOneSocket" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftTelemetryHubTests" runstate="Runnable" seed="1378334254" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.003664" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1063" name="ReferenceSnapshot_ConsolidatesIdentityMotionPowerAndParts" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftTelemetryHubTests.ReferenceSnapshot_ConsolidatesIdentityMotionPowerAndParts" methodname="ReferenceSnapshot_ConsolidatesIdentityMotionPowerAndParts" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftTelemetryHubTests" runstate="Runnable" seed="1486281357" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.004271" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1066" name="RuntimeWithoutReferenceControllers_StillInstallsTelemetryKernel" fullname="Lunarlight.Hovercraft.V3.Tests.V3CraftTelemetryHubTests.RuntimeWithoutReferenceControllers_StillInstallsTelemetryKernel" methodname="RuntimeWithoutReferenceControllers_StillInstallsTelemetryKernel" classname="Lunarlight.Hovercraft.V3.Tests.V3CraftTelemetryHubTests" runstate="Runnable" seed="884314507" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.002305" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1036" name="V3DiagnosticFoundationTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.042397" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1037" name="ChannelRegistry_CanonicalIdsAreUniqueAndVersioned" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests.ChannelRegistry_CanonicalIdsAreUniqueAndVersioned" methodname="ChannelRegistry_CanonicalIdsAreUniqueAndVersioned" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests" runstate="Runnable" seed="1972884024" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000616" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1038" name="Clock_ProducesMonotonicCanonicalIdentityAndPhaseStamp" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests.Clock_ProducesMonotonicCanonicalIdentityAndPhaseStamp" methodname="Clock_ProducesMonotonicCanonicalIdentityAndPhaseStamp" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests" runstate="Runnable" seed="722997225" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000923" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1039" name="Clock_ReducedRateSamplesRetainPhysicalTickIdentity" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests.Clock_ReducedRateSamplesRetainPhysicalTickIdentity" methodname="Clock_ReducedRateSamplesRetainPhysicalTickIdentity" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests" runstate="Runnable" seed="2033546000" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000142" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1042" name="Export_WritesRequiredFoundationPackageAndChecksum" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests.Export_WritesRequiredFoundationPackageAndChecksum" methodname="Export_WritesRequiredFoundationPackageAndChecksum" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests" runstate="Runnable" seed="336361946" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.038687" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1040" name="Session_ReducedRateProfilePublishesSamplingMetadata" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests.Session_ReducedRateProfilePublishesSamplingMetadata" methodname="Session_ReducedRateProfilePublishesSamplingMetadata" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests" runstate="Runnable" seed="739056397" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000515" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1041" name="Session_UsesBoundedPreallocatedSlotsAndReportsOverflow" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests.Session_UsesBoundedPreallocatedSlotsAndReportsOverflow" methodname="Session_UsesBoundedPreallocatedSlotsAndReportsOverflow" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticFoundationTests" runstate="Runnable" seed="146244641" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000535" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1043" name="V3DiagnosticLedgerEventReportTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticLedgerEventReportTests" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticLedgerEventReportTests" runstate="Runnable" testcasecount="5" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.028555" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1045" name="EventDetector_RecordsTransitionWithRollingSampleContext" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticLedgerEventReportTests.EventDetector_RecordsTransitionWithRollingSampleContext" methodname="EventDetector_RecordsTransitionWithRollingSampleContext" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticLedgerEventReportTests" runstate="Runnable" seed="1639256863" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.001986" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1044" name="ForceLedger_ReconcilesKnownPhysicalForcesWithObservedAcceleration" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticLedgerEventReportTests.ForceLedger_ReconcilesKnownPhysicalForcesWithObservedAcceleration" methodname="ForceLedger_ReconcilesKnownPhysicalForcesWithObservedAcceleration" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticLedgerEventReportTests" runstate="Runnable" seed="692491473" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.002244" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1048" name="KnownMismatchBenchmark_ExportsEvidencePackageWithoutClaimingCause" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticLedgerEventReportTests.KnownMismatchBenchmark_ExportsEvidencePackageWithoutClaimingCause" methodname="KnownMismatchBenchmark_ExportsEvidencePackageWithoutClaimingCause" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticLedgerEventReportTests" runstate="Runnable" seed="1882092196" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.018827" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1046" name="ReportBuilder_ProducesSectionDeviceSystemSensorAndForceEvidence" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticLedgerEventReportTests.ReportBuilder_ProducesSectionDeviceSystemSensorAndForceEvidence" methodname="ReportBuilder_ProducesSectionDeviceSystemSensorAndForceEvidence" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticLedgerEventReportTests" runstate="Runnable" seed="770874597" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000996" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1047" name="ReportBuilder_SplitsAttemptsAndExcludesResetDiscontinuity" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticLedgerEventReportTests.ReportBuilder_SplitsAttemptsAndExcludesResetDiscontinuity" methodname="ReportBuilder_SplitsAttemptsAndExcludesResetDiscontinuity" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticLedgerEventReportTests" runstate="Runnable" seed="2020232627" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000735" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1049" name="V3DiagnosticTruthAndSensorTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.073766" total="12" passed="12" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1059" name="BeliefRecorder_CapturesMainframeAndHoverInterpretedState" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests.BeliefRecorder_CapturesMainframeAndHoverInterpretedState" methodname="BeliefRecorder_CapturesMainframeAndHoverInterpretedState" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" seed="1337466610" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.006342" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1061" name="DeviceRecorder_PreservesRequestAllocationExecutionChain" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests.DeviceRecorder_PreservesRequestAllocationExecutionChain" methodname="DeviceRecorder_PreservesRequestAllocationExecutionChain" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" seed="1046707108" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.009418" asserts="0">
+                  <properties />
+                  <output><![CDATA[Hovercraft V3 could not sample an authoritative World Simulation. World-dependent sensors and aerodynamics are invalid; Unity Rigidbody gravity remains as the documented compatibility fallback.
+]]></output>
+                </test-case>
+                <test-case id="1056" name="EventDetector_IgnoresRoundingOnlyPowerDeficits" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests.EventDetector_IgnoresRoundingOnlyPowerDeficits" methodname="EventDetector_IgnoresRoundingOnlyPowerDeficits" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" seed="713951275" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000313" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1055" name="EventDetector_UsesLocalTrackNormalForLoopRollover" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests.EventDetector_UsesLocalTrackNormalForLoopRollover" methodname="EventDetector_UsesLocalTrackNormalForLoopRollover" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" seed="407085642" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.004121" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1053" name="EventDetector_UsesPhysicalTakeoffAndContactLandingVocabulary" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests.EventDetector_UsesPhysicalTakeoffAndContactLandingVocabulary" methodname="EventDetector_UsesPhysicalTakeoffAndContactLandingVocabulary" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" seed="552457447" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000276" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1060" name="ExecutionRecorder_CapturesSchedulerRequestsAndPower" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests.ExecutionRecorder_CapturesSchedulerRequestsAndPower" methodname="ExecutionRecorder_CapturesSchedulerRequestsAndPower" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" seed="442160631" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.006104" asserts="0">
+                  <properties />
+                  <output><![CDATA[Hovercraft V3 could not sample an authoritative World Simulation. World-dependent sensors and aerodynamics are invalid; Unity Rigidbody gravity remains as the documented compatibility fallback.
+]]></output>
+                </test-case>
+                <test-case id="1058" name="SensorRecorder_RecordsPhysicalMountsAndExplicitMissingTruth" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests.SensorRecorder_RecordsPhysicalMountsAndExplicitMissingTruth" methodname="SensorRecorder_RecordsPhysicalMountsAndExplicitMissingTruth" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" seed="550253426" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.006434" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1057" name="TrackAnalyzer_MapsWorldPoseIntoTrackFrameWithoutMutatingBody" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests.TrackAnalyzer_MapsWorldPoseIntoTrackFrameWithoutMutatingBody" methodname="TrackAnalyzer_MapsWorldPoseIntoTrackFrameWithoutMutatingBody" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" seed="2116957005" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.013304" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1054" name="WorldContact_UsesConfiguredEightMetreHoverEnvelope" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests.WorldContact_UsesConfiguredEightMetreHoverEnvelope" methodname="WorldContact_UsesConfiguredEightMetreHoverEnvelope" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" seed="860577662" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.005651" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1050" name="WorldTruth_DerivesAccelerationFromCanonicalFixedDelta" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests.WorldTruth_DerivesAccelerationFromCanonicalFixedDelta" methodname="WorldTruth_DerivesAccelerationFromCanonicalFixedDelta" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" seed="1784936728" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.004778" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1051" name="WorldTruth_PreservesDistinctCraftAndWorldTickIdentities" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests.WorldTruth_PreservesDistinctCraftAndWorldTickIdentities" methodname="WorldTruth_PreservesDistinctCraftAndWorldTickIdentities" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" seed="31258990" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.010566" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1052" name="WorldTruth_ResetBoundaryDoesNotCreateTeleportAcceleration" fullname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests.WorldTruth_ResetBoundaryDoesNotCreateTeleportAcceleration" methodname="WorldTruth_ResetBoundaryDoesNotCreateTeleportAcceleration" classname="Lunarlight.Hovercraft.V3.Tests.V3DiagnosticTruthAndSensorTests" runstate="Runnable" seed="35210141" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.004859" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1121" name="V3GimbalVariationTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3GimbalVariationTests" classname="Lunarlight.Hovercraft.V3.Tests.V3GimbalVariationTests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.023848" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1123" name="GimbalInput_HoldsTransientMouseCommandBeforeRecentering" fullname="Lunarlight.Hovercraft.V3.Tests.V3GimbalVariationTests.GimbalInput_HoldsTransientMouseCommandBeforeRecentering" methodname="GimbalInput_HoldsTransientMouseCommandBeforeRecentering" classname="Lunarlight.Hovercraft.V3.Tests.V3GimbalVariationTests" runstate="Runnable" seed="66510759" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000193" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1122" name="GimbalServo_UsesAuthoredAccelerationAndSpeedLimits" fullname="Lunarlight.Hovercraft.V3.Tests.V3GimbalVariationTests.GimbalServo_UsesAuthoredAccelerationAndSpeedLimits" methodname="GimbalServo_UsesAuthoredAccelerationAndSpeedLimits" classname="Lunarlight.Hovercraft.V3.Tests.V3GimbalVariationTests" runstate="Runnable" seed="1499890216" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000071" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1125" name="GimbalVariation_PhysicalSimulationAddsNaturalYawAuthority" fullname="Lunarlight.Hovercraft.V3.Tests.V3GimbalVariationTests.GimbalVariation_PhysicalSimulationAddsNaturalYawAuthority" methodname="GimbalVariation_PhysicalSimulationAddsNaturalYawAuthority" classname="Lunarlight.Hovercraft.V3.Tests.V3GimbalVariationTests" runstate="Runnable" seed="2031503435" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.014604" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1124" name="GimbalVariation_SameThrusterGainsPoweredYawDeflection" fullname="Lunarlight.Hovercraft.V3.Tests.V3GimbalVariationTests.GimbalVariation_SameThrusterGainsPoweredYawDeflection" methodname="GimbalVariation_SameThrusterGainsPoweredYawDeflection" classname="Lunarlight.Hovercraft.V3.Tests.V3GimbalVariationTests" runstate="Runnable" seed="2011408411" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.007885" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1152" name="V3HandlingControllerTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" testcasecount="18" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.015758" total="18" passed="18" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1165" name="ActuatorAllocator_ProducesYawTorqueFromBalancedStrafeThrusters" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.ActuatorAllocator_ProducesYawTorqueFromBalancedStrafeThrusters" methodname="ActuatorAllocator_ProducesYawTorqueFromBalancedStrafeThrusters" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="1447619861" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.003316" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1166" name="AngularAcceleration_IsConvertedThroughTheRigidbodyInertiaTensor" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.AngularAcceleration_IsConvertedThroughTheRigidbodyInertiaTensor" methodname="AngularAcceleration_IsConvertedThroughTheRigidbodyInertiaTensor" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="1267780098" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000516" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1167" name="FinCoefficientModel_UsesAoAStallDragAndReverseFlow" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.FinCoefficientModel_UsesAoAStallDragAndReverseFlow" methodname="FinCoefficientModel_UsesAoAStallDragAndReverseFlow" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="1000705654" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000600" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1153" name="HandlingControllers_CannotApplyForcesDirectlyToRigidbody" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.HandlingControllers_CannotApplyForcesDirectlyToRigidbody" methodname="HandlingControllers_CannotApplyForcesDirectlyToRigidbody" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="1497643520" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000864" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1158" name="HoverDamping_IgnoresForwardSpeedParallelToSurface" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.HoverDamping_IgnoresForwardSpeedParallelToSurface" methodname="HoverDamping_IgnoresForwardSpeedParallelToSurface" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="1951832896" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000196" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1159" name="HoverDamping_UsesVelocityAlongDetectedSurfaceNormal" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.HoverDamping_UsesVelocityAlongDetectedSurfaceNormal" methodname="HoverDamping_UsesVelocityAlongDetectedSurfaceNormal" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="31714450" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000150" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1156" name="HoverFallback_ProjectsMissedProbeOntoDetectedSurface" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.HoverFallback_ProjectsMissedProbeOntoDetectedSurface" methodname="HoverFallback_ProjectsMissedProbeOntoDetectedSurface" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="804677710" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000334" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1157" name="HoverFallback_RejectsSurfaceBehindProbe" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.HoverFallback_RejectsSurfaceBehindProbe" methodname="HoverFallback_RejectsSurfaceBehindProbe" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="1998959317" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000077" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1168" name="InertiaHelpers_RoundTripTorqueAndAddDistributedMass" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.InertiaHelpers_RoundTripTorqueAndAddDistributedMass" methodname="InertiaHelpers_RoundTripTorqueAndAddDistributedMass" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="1138517080" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.001011" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1161" name="RoofCapture_RespondsToSeparationWithoutVirtualAdhesion" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.RoofCapture_RespondsToSeparationWithoutVirtualAdhesion" methodname="RoofCapture_RespondsToSeparationWithoutVirtualAdhesion" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="1687349140" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000169" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1155" name="SurfaceAlignment_DampsExistingRollPitchRate" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.SurfaceAlignment_DampsExistingRollPitchRate" methodname="SurfaceAlignment_DampsExistingRollPitchRate" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="798545287" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000482" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1154" name="SurfaceAlignment_ProducesBoundedRollPitchCorrectionWithoutYaw" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.SurfaceAlignment_ProducesBoundedRollPitchCorrectionWithoutYaw" methodname="SurfaceAlignment_ProducesBoundedRollPitchCorrectionWithoutYaw" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="2102385984" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000178" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1160" name="SurfaceTracking_ConvertsSensedNormalRotationIntoBoundedAcceleration" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.SurfaceTracking_ConvertsSensedNormalRotationIntoBoundedAcceleration" methodname="SurfaceTracking_ConvertsSensedNormalRotationIntoBoundedAcceleration" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="631653065" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000381" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1162" name="SystemsCraft_RoofCaptureSubmitsOnlyPhysicalThrusterRequests" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.SystemsCraft_RoofCaptureSubmitsOnlyPhysicalThrusterRequests" methodname="SystemsCraft_RoofCaptureSubmitsOnlyPhysicalThrusterRequests" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="665883814" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.004848" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1169" name="Traction_CoastsLaterallyAndLongitudinally" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.Traction_CoastsLaterallyAndLongitudinally" methodname="Traction_CoastsLaterallyAndLongitudinally" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="1479323173" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000320" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1170" name="Traction_OnlyAddsLongitudinalGripAgainstTrajectory" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.Traction_OnlyAddsLongitudinalGripAgainstTrajectory" methodname="Traction_OnlyAddsLongitudinalGripAgainstTrajectory" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="1685833859" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000114" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1163" name="Vectoring_SeparatesPilotYawFromPhysicalRateDampingIntent" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.Vectoring_SeparatesPilotYawFromPhysicalRateDampingIntent" methodname="Vectoring_SeparatesPilotYawFromPhysicalRateDampingIntent" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="888000182" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000104" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1164" name="Vectoring_StrafeCalibrationPreservesReferenceForce" fullname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests.Vectoring_StrafeCalibrationPreservesReferenceForce" methodname="Vectoring_StrafeCalibrationPreservesReferenceForce" classname="Lunarlight.Hovercraft.V3.Tests.V3HandlingControllerTests" runstate="Runnable" seed="1134264405" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000074" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1171" name="V3MainframeFoundationTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3MainframeFoundationTests" classname="Lunarlight.Hovercraft.V3.Tests.V3MainframeFoundationTests" runstate="Runnable" testcasecount="5" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.002378" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1175" name="DirectionalSensor_UsesSixDistinctChassisAxes" fullname="Lunarlight.Hovercraft.V3.Tests.V3MainframeFoundationTests.DirectionalSensor_UsesSixDistinctChassisAxes" methodname="DirectionalSensor_UsesSixDistinctChassisAxes" classname="Lunarlight.Hovercraft.V3.Tests.V3MainframeFoundationTests" runstate="Runnable" seed="1192299157" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000347" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1173" name="IntentBus_PreservesHighLevelPilotIntent" fullname="Lunarlight.Hovercraft.V3.Tests.V3MainframeFoundationTests.IntentBus_PreservesHighLevelPilotIntent" methodname="IntentBus_PreservesHighLevelPilotIntent" classname="Lunarlight.Hovercraft.V3.Tests.V3MainframeFoundationTests" runstate="Runnable" seed="1198414326" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000172" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1176" name="LegacyReferenceChassis_HasNoIntegratedMainframe" fullname="Lunarlight.Hovercraft.V3.Tests.V3MainframeFoundationTests.LegacyReferenceChassis_HasNoIntegratedMainframe" methodname="LegacyReferenceChassis_HasNoIntegratedMainframe" classname="Lunarlight.Hovercraft.V3.Tests.V3MainframeFoundationTests" runstate="Runnable" seed="2107466374" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000174" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1172" name="ObservationBus_ReplacesOnlyMatchingTypedSource" fullname="Lunarlight.Hovercraft.V3.Tests.V3MainframeFoundationTests.ObservationBus_ReplacesOnlyMatchingTypedSource" methodname="ObservationBus_ReplacesOnlyMatchingTypedSource" classname="Lunarlight.Hovercraft.V3.Tests.V3MainframeFoundationTests" runstate="Runnable" seed="800831681" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000744" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1174" name="SystemRequest_ExpiresAtDeclaredValidityBoundary" fullname="Lunarlight.Hovercraft.V3.Tests.V3MainframeFoundationTests.SystemRequest_ExpiresAtDeclaredValidityBoundary" methodname="SystemRequest_ExpiresAtDeclaredValidityBoundary" classname="Lunarlight.Hovercraft.V3.Tests.V3MainframeFoundationTests" runstate="Runnable" seed="495269997" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000134" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1177" name="V3OverloadProtectionTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3OverloadProtectionTests" classname="Lunarlight.Hovercraft.V3.Tests.V3OverloadProtectionTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.004273" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1178" name="EmergencyOverload_RaisesOutputPowerAndHeatWithoutChangingNormal" fullname="Lunarlight.Hovercraft.V3.Tests.V3OverloadProtectionTests.EmergencyOverload_RaisesOutputPowerAndHeatWithoutChangingNormal" methodname="EmergencyOverload_RaisesOutputPowerAndHeatWithoutChangingNormal" classname="Lunarlight.Hovercraft.V3.Tests.V3OverloadProtectionTests" runstate="Runnable" seed="18793125" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.002744" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1179" name="ThermalProtection_DeratesLocksOutCoolsAndRestarts" fullname="Lunarlight.Hovercraft.V3.Tests.V3OverloadProtectionTests.ThermalProtection_DeratesLocksOutCoolsAndRestarts" methodname="ThermalProtection_DeratesLocksOutCoolsAndRestarts" classname="Lunarlight.Hovercraft.V3.Tests.V3OverloadProtectionTests" runstate="Runnable" seed="91036509" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.001025" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1145" name="V3ParityHarnessTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" testcasecount="6" result="Skipped" label="Ignored" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.076381" total="6" passed="5" failed="0" inconclusive="0" skipped="1" asserts="0">
+                <properties />
+                <reason>
+                  <message><![CDATA[One or more child tests were ignored]]></message>
+                </reason>
+                <test-case id="1147" name="CommandProfile_EvaluatesSegmentBoundariesDeterministically" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.CommandProfile_EvaluatesSegmentBoundariesDeterministically" methodname="CommandProfile_EvaluatesSegmentBoundariesDeterministically" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="1014822931" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000684" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1146" name="GeneratedProfile_CoversReferenceMeasurementSegments" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.GeneratedProfile_CoversReferenceMeasurementSegments" methodname="GeneratedProfile_CoversReferenceMeasurementSegments" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="1121870798" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000820" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1151" name="ParityScene_CompletesFullProfileAndExportsTelemetry" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.ParityScene_CompletesFullProfileAndExportsTelemetry" methodname="ParityScene_CompletesFullProfileAndExportsTelemetry" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="2017565772" result="Skipped" label="Ignored" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:16Z" duration="0.000532" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                    <property name="Category" value="ParityCapture" />
+                  </properties>
+                  <reason>
+                    <message><![CDATA[Set HOVERCRAFT_V3_RUN_PARITY_CAPTURE=1 to run the 78-second real-time Gate 3 capture.]]></message>
+                  </reason>
+                </test-case>
+                <test-case id="1150" name="ParityScene_StartsScriptedRunInPlayMode" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.ParityScene_StartsScriptedRunInPlayMode" methodname="ParityScene_StartsScriptedRunInPlayMode" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="8935896" result="Passed" start-time="2026-08-01 17:29:16Z" end-time="2026-08-01 17:29:18Z" duration="2.393385" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  </properties>
+                </test-case>
+                <test-case id="1149" name="Summary_DoesNotTreatPresetScenarioSpeedAsAccelerationMaximum" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.Summary_DoesNotTreatPresetScenarioSpeedAsAccelerationMaximum" methodname="Summary_DoesNotTreatPresetScenarioSpeedAsAccelerationMaximum" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="824713167" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.004212" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1148" name="V2Fingerprint_RejectsPlaceholderAndAcceptsReferenceMassLayout" fullname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.V2Fingerprint_RejectsPlaceholderAndAcceptsReferenceMassLayout" methodname="V2Fingerprint_RejectsPlaceholderAndAcceptsReferenceMassLayout" classname="Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests" runstate="Runnable" seed="1524292025" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.000989" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1067" name="V3PlayerFeedbackAndRecoveryTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests" classname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests" runstate="Runnable" testcasecount="9" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.072310" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1075" name="AirborneRecovery_RejectsFalseGroundAndProvidesLiftAuthority" fullname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests.AirborneRecovery_RejectsFalseGroundAndProvidesLiftAuthority" methodname="AirborneRecovery_RejectsFalseGroundAndProvidesLiftAuthority" classname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests" runstate="Runnable" seed="133103732" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.008294" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1073" name="CockpitWarnings_ReportOverloadDeratingAndLockout" fullname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests.CockpitWarnings_ReportOverloadDeratingAndLockout" methodname="CockpitWarnings_ReportOverloadDeratingAndLockout" classname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests" runstate="Runnable" seed="248594655" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.006061" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1077" name="FreeDriveScene_HasPlayableCraftCameraHudAndCourse" fullname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests.FreeDriveScene_HasPlayableCraftCameraHudAndCourse" methodname="FreeDriveScene_HasPlayableCraftCameraHudAndCourse" classname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests" runstate="Runnable" seed="1432811273" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.019180" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1076" name="FreeDriveSession_BindsAndResetsReferenceCraft" fullname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests.FreeDriveSession_BindsAndResetsReferenceCraft" methodname="FreeDriveSession_BindsAndResetsReferenceCraft" classname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests" runstate="Runnable" seed="60407810" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.005081" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1068" name="PilotInput_UsesRebindableKeyboardAndGamepadActions" fullname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests.PilotInput_UsesRebindableKeyboardAndGamepadActions" methodname="PilotInput_UsesRebindableKeyboardAndGamepadActions" classname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests" runstate="Runnable" seed="1603346776" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.002853" asserts="0">
+                  <properties />
+                </test-case>
+                <test-suite type="ParameterizedMethod" id="1072" name="PresetBuilds_ExposePlayerFacingVehicleIdentity" fullname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests.PresetBuilds_ExposePlayerFacingVehicleIdentity" classname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests" runstate="Runnable" testcasecount="3" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.002235" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1069" name="PresetBuilds_ExposePlayerFacingVehicleIdentity(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_V2Reference.asset&quot;,&quot;Apex V3 Reference&quot;,&quot;Direct-Mount / Balanced&quot;)" fullname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests.PresetBuilds_ExposePlayerFacingVehicleIdentity(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_V2Reference.asset&quot;,&quot;Apex V3 Reference&quot;,&quot;Direct-Mount / Balanced&quot;)" methodname="PresetBuilds_ExposePlayerFacingVehicleIdentity" classname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests" runstate="Runnable" seed="1093058158" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.000572" asserts="0">
+                    <properties />
+                  </test-case>
+                  <test-case id="1070" name="PresetBuilds_ExposePlayerFacingVehicleIdentity(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_MainGimbalDemo.asset&quot;,&quot;Apex V3 Vector&quot;,&quot;Rear-Gimbal Vectoring&quot;)" fullname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests.PresetBuilds_ExposePlayerFacingVehicleIdentity(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_MainGimbalDemo.asset&quot;,&quot;Apex V3 Vector&quot;,&quot;Rear-Gimbal Vectoring&quot;)" methodname="PresetBuilds_ExposePlayerFacingVehicleIdentity" classname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests" runstate="Runnable" seed="1449780212" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.000301" asserts="0">
+                    <properties />
+                  </test-case>
+                  <test-case id="1071" name="PresetBuilds_ExposePlayerFacingVehicleIdentity(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_HoverSpringDemo.asset&quot;,&quot;Apex V3 Terrain&quot;,&quot;Front-Left Spring Hover&quot;)" fullname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests.PresetBuilds_ExposePlayerFacingVehicleIdentity(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_HoverSpringDemo.asset&quot;,&quot;Apex V3 Terrain&quot;,&quot;Front-Left Spring Hover&quot;)" methodname="PresetBuilds_ExposePlayerFacingVehicleIdentity" classname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests" runstate="Runnable" seed="762653947" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.000249" asserts="0">
+                    <properties />
+                  </test-case>
+                </test-suite>
+                <test-case id="1074" name="SlopeRecovery_AlignsCraftTowardTwelveDegreeSurface" fullname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests.SlopeRecovery_AlignsCraftTowardTwelveDegreeSurface" methodname="SlopeRecovery_AlignsCraftTowardTwelveDegreeSurface" classname="Lunarlight.Hovercraft.V3.Tests.V3PlayerFeedbackAndRecoveryTests" runstate="Runnable" seed="345700529" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.027428" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1180" name="V3PowerDistributionModeTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3PowerDistributionModeTests" classname="Lunarlight.Hovercraft.V3.Tests.V3PowerDistributionModeTests" runstate="Runnable" testcasecount="5" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.011555" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1181" name="AllocationModes_ExposeStableDataDrivenOrders" fullname="Lunarlight.Hovercraft.V3.Tests.V3PowerDistributionModeTests.AllocationModes_ExposeStableDataDrivenOrders" methodname="AllocationModes_ExposeStableDataDrivenOrders" classname="Lunarlight.Hovercraft.V3.Tests.V3PowerDistributionModeTests" runstate="Runnable" seed="2122790563" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.000981" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1184" name="ConstrainedCore_ShedsLoadsBySelectedModeAndReportsCockpitState" fullname="Lunarlight.Hovercraft.V3.Tests.V3PowerDistributionModeTests.ConstrainedCore_ShedsLoadsBySelectedModeAndReportsCockpitState" methodname="ConstrainedCore_ShedsLoadsBySelectedModeAndReportsCockpitState" classname="Lunarlight.Hovercraft.V3.Tests.V3PowerDistributionModeTests" runstate="Runnable" seed="799464995" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.005675" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1182" name="PilotPowerModeRequest_IsConsumedExactlyOnce" fullname="Lunarlight.Hovercraft.V3.Tests.V3PowerDistributionModeTests.PilotPowerModeRequest_IsConsumedExactlyOnce" methodname="PilotPowerModeRequest_IsConsumedExactlyOnce" classname="Lunarlight.Hovercraft.V3.Tests.V3PowerDistributionModeTests" runstate="Runnable" seed="1060391519" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.000586" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1183" name="PowerModeDescriptions_ExplainPriorityAndHeadroom" fullname="Lunarlight.Hovercraft.V3.Tests.V3PowerDistributionModeTests.PowerModeDescriptions_ExplainPriorityAndHeadroom" methodname="PowerModeDescriptions_ExplainPriorityAndHeadroom" classname="Lunarlight.Hovercraft.V3.Tests.V3PowerDistributionModeTests" runstate="Runnable" seed="383998457" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.000160" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1185" name="SharedThruster_PreservesEachCommandPriorityWithoutDuplicatingDemand" fullname="Lunarlight.Hovercraft.V3.Tests.V3PowerDistributionModeTests.SharedThruster_PreservesEachCommandPriorityWithoutDuplicatingDemand" methodname="SharedThruster_PreservesEachCommandPriorityWithoutDuplicatingDemand" classname="Lunarlight.Hovercraft.V3.Tests.V3PowerDistributionModeTests" runstate="Runnable" seed="426557610" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.003119" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1078" name="V3ProjectReadabilitySprintTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" classname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" runstate="Runnable" testcasecount="9" result="Failed" site="Child" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.095787" total="9" passed="8" failed="1" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <failure>
+                  <message><![CDATA[One or more child tests had errors]]></message>
+                </failure>
+                <test-case id="1083" name="AuthoritativeBuildSelection_DrivesPreviewAndPlayAssembly" fullname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests.AuthoritativeBuildSelection_DrivesPreviewAndPlayAssembly" methodname="AuthoritativeBuildSelection_DrivesPreviewAndPlayAssembly" classname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" runstate="Runnable" seed="449160429" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.020317" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1080" name="CompleteCraft_HasReadableHierarchyAndNoLocalInput" fullname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests.CompleteCraft_HasReadableHierarchyAndNoLocalInput" methodname="CompleteCraft_HasReadableHierarchyAndNoLocalInput" classname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" runstate="Runnable" seed="627955973" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.005959" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1082" name="EditorPreview_IsCompleteNonSimulatingAndCleanable" fullname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests.EditorPreview_IsCompleteNonSimulatingAndCleanable" methodname="EditorPreview_IsCompleteNonSimulatingAndCleanable" classname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" runstate="Runnable" seed="1547522057" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.003796" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1079" name="LocalInput_UsesExplicitAuthorityStatesAndPageActions" fullname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests.LocalInput_UsesExplicitAuthorityStatesAndPageActions" methodname="LocalInput_UsesExplicitAuthorityStatesAndPageActions" classname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" runstate="Runnable" seed="2028679671" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.000819" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1086" name="MigratedPathsAndForceAuthority_AreCanonical" fullname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests.MigratedPathsAndForceAuthority_AreCanonical" methodname="MigratedPathsAndForceAuthority_AreCanonical" classname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" runstate="Runnable" seed="714015669" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.018753" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1085" name="PresentationPanels_CanBeCollapsedAndRestored" fullname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests.PresentationPanels_CanBeCollapsedAndRestored" methodname="PresentationPanels_CanBeCollapsedAndRestored" classname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" runstate="Runnable" seed="472010497" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.000319" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1081" name="Spawner_AssemblesRebuildsReconnectsAndClears" fullname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests.Spawner_AssemblesRebuildsReconnectsAndClears" methodname="Spawner_AssemblesRebuildsReconnectsAndClears" classname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" runstate="Runnable" seed="2037882269" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.005050" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1087" name="StableIdAudit_FindsNoDuplicateAssetsOrInvalidWorldRoots" fullname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests.StableIdAudit_FindsNoDuplicateAssetsOrInvalidWorldRoots" methodname="StableIdAudit_FindsNoDuplicateAssetsOrInvalidWorldRoots" classname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" runstate="Runnable" seed="820357851" result="Failed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.032211" asserts="0">
+                  <properties />
+                  <failure>
+                    <message><![CDATA[  Duplicate IDs: world.root.v3_handlingtrack => Assets/HovercraftV3/Scenes/Development/V3_CraftLab.unity#world-root | Assets/HovercraftV3/Scenes/Development/V3_HandlingTrack.unity#world-root | Missing IDs:  | Invalid world IDs: 
+  Expected: True
+  But was:  False
+]]></message>
+                    <stack-trace><![CDATA[at Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests.StableIdAudit_FindsNoDuplicateAssetsOrInvalidWorldRoots () [0x00006] in D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0\Assets\HovercraftV3\Tests\Editor\Integration\V3ProjectReadabilitySprintTests.cs:473
+]]></stack-trace>
+                  </failure>
+                </test-case>
+                <test-case id="1084" name="SystemsConsole_DiscoversTenPagesAndWraps" fullname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests.SystemsConsole_DiscoversTenPagesAndWraps" methodname="SystemsConsole_DiscoversTenPagesAndWraps" classname="Lunarlight.Hovercraft.V3.Tests.V3ProjectReadabilitySprintTests" runstate="Runnable" seed="22613756" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.007084" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1088" name="V3RuntimeSystemsRepairSprintTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.149927" total="10" passed="10" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1096" name="CompleteBuild_DoesNotSilentlyUseLegacyFallback" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.CompleteBuild_DoesNotSilentlyUseLegacyFallback" methodname="CompleteBuild_DoesNotSilentlyUseLegacyFallback" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="784674598" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.022723" asserts="0">
+                  <properties />
+                  <output><![CDATA[Hovercraft V3 could not sample an authoritative World Simulation. World-dependent sensors and aerodynamics are invalid; Unity Rigidbody gravity remains as the documented compatibility fallback.
+]]></output>
+                </test-case>
+                <test-case id="1095" name="FullDynamicReset_ClearsAuthorityAndNeutralizesFirstTick" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.FullDynamicReset_ClearsAuthorityAndNeutralizesFirstTick" methodname="FullDynamicReset_ClearsAuthorityAndNeutralizesFirstTick" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="1612038447" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.009384" asserts="0">
+                  <properties />
+                  <output><![CDATA[Hovercraft V3 could not sample an authoritative World Simulation. World-dependent sensors and aerodynamics are invalid; Unity Rigidbody gravity remains as the documented compatibility fallback.
+]]></output>
+                </test-case>
+                <test-case id="1097" name="Readiness_FaultsWhenPhysicalSensorIsMissing" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.Readiness_FaultsWhenPhysicalSensorIsMissing" methodname="Readiness_FaultsWhenPhysicalSensorIsMissing" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="175186482" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.008168" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1098" name="Readiness_FaultsWhenSystemCallbackIsMissing" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.Readiness_FaultsWhenSystemCallbackIsMissing" methodname="Readiness_FaultsWhenSystemCallbackIsMissing" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="264021268" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.008699" asserts="0">
+                  <properties />
+                </test-case>
+                <test-suite type="ParameterizedMethod" id="1093" name="RealKeyboardW_AcceleratesPhysicalCraft" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.RealKeyboardW_AcceleratesPhysicalCraft" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.066142" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1091" name="RealKeyboardW_AcceleratesPhysicalCraft(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/SystemsIntegration/Builds/ApexV3_SystemsIntegration.asset&quot;)" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.RealKeyboardW_AcceleratesPhysicalCraft(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/SystemsIntegration/Builds/ApexV3_SystemsIntegration.asset&quot;)" methodname="RealKeyboardW_AcceleratesPhysicalCraft" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="111679612" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.056644" asserts="0">
+                    <properties />
+                    <output><![CDATA[Hovercraft V3 could not sample an authoritative World Simulation. World-dependent sensors and aerodynamics are invalid; Unity Rigidbody gravity remains as the documented compatibility fallback.
+]]></output>
+                  </test-case>
+                  <test-case id="1092" name="RealKeyboardW_AcceleratesPhysicalCraft(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_V2Reference.asset&quot;)" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.RealKeyboardW_AcceleratesPhysicalCraft(&quot;Assets/HovercraftV3/Generated/ReferenceCrafts/V2Parity/Builds/ApexV3_V2Reference.asset&quot;)" methodname="RealKeyboardW_AcceleratesPhysicalCraft" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="2065509786" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.008683" asserts="0">
+                    <properties />
+                  </test-case>
+                </test-suite>
+                <test-case id="1090" name="RealKeyboardW_UsesBothSupportedInputRoutes" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.RealKeyboardW_UsesBothSupportedInputRoutes" methodname="RealKeyboardW_UsesBothSupportedInputRoutes" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="532550624" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.007725" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1094" name="Scheduler_GrantedCadenceControlsCallbackExecution" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.Scheduler_GrantedCadenceControlsCallbackExecution" methodname="Scheduler_GrantedCadenceControlsCallbackExecution" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="1676773217" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.012145" asserts="0">
+                  <properties />
+                  <output><![CDATA[Hovercraft V3 could not sample an authoritative World Simulation. World-dependent sensors and aerodynamics are invalid; Unity Rigidbody gravity remains as the documented compatibility fallback.
+]]></output>
+                </test-case>
+                <test-case id="1099" name="SensorSample_UsesLocalAirflowAndMovingSurfaceVelocity" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.SensorSample_UsesLocalAirflowAndMovingSurfaceVelocity" methodname="SensorSample_UsesLocalAirflowAndMovingSurfaceVelocity" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="284597174" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.001659" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1089" name="SerializedScenes_HaveOneAuthoritativeSystemsBuild" fullname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests.SerializedScenes_HaveOneAuthoritativeSystemsBuild" methodname="SerializedScenes_HaveOneAuthoritativeSystemsBuild" classname="Lunarlight.Hovercraft.V3.Tests.V3RuntimeSystemsRepairSprintTests" runstate="Runnable" seed="199929779" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:18Z" duration="0.011368" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1100" name="V3SerializedScenePlayModeTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3SerializedScenePlayModeTests" classname="Lunarlight.Hovercraft.V3.Tests.V3SerializedScenePlayModeTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-08-01 17:29:23Z" end-time="2026-08-01 17:29:24Z" duration="1.171231" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1101" name="CraftLab_SerializedPlayModeTopologyInputAndRebuild" fullname="Lunarlight.Hovercraft.V3.Tests.V3SerializedScenePlayModeTests.CraftLab_SerializedPlayModeTopologyInputAndRebuild" methodname="CraftLab_SerializedPlayModeTopologyInputAndRebuild" classname="Lunarlight.Hovercraft.V3.Tests.V3SerializedScenePlayModeTests" runstate="Runnable" seed="341261521" result="Passed" start-time="2026-08-01 17:29:18Z" end-time="2026-08-01 17:29:21Z" duration="2.790629" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  </properties>
+                </test-case>
+                <test-case id="1102" name="HandlingTrack_SerializedPlayModeTopologyAndInput" fullname="Lunarlight.Hovercraft.V3.Tests.V3SerializedScenePlayModeTests.HandlingTrack_SerializedPlayModeTopologyAndInput" methodname="HandlingTrack_SerializedPlayModeTopologyAndInput" classname="Lunarlight.Hovercraft.V3.Tests.V3SerializedScenePlayModeTests" runstate="Runnable" seed="633915001" result="Passed" start-time="2026-08-01 17:29:21Z" end-time="2026-08-01 17:29:24Z" duration="2.918944" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  </properties>
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1126" name="V3SpringMountVariationTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3SpringMountVariationTests" classname="Lunarlight.Hovercraft.V3.Tests.V3SpringMountVariationTests" runstate="Runnable" testcasecount="5" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.044791" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1128" name="SpringIntegrator_EnforcesCompressionAndExtensionStops" fullname="Lunarlight.Hovercraft.V3.Tests.V3SpringMountVariationTests.SpringIntegrator_EnforcesCompressionAndExtensionStops" methodname="SpringIntegrator_EnforcesCompressionAndExtensionStops" classname="Lunarlight.Hovercraft.V3.Tests.V3SpringMountVariationTests" runstate="Runnable" seed="953976424" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.000847" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1127" name="SpringIntegrator_SettlesAtAuthoredStaticDeflection" fullname="Lunarlight.Hovercraft.V3.Tests.V3SpringMountVariationTests.SpringIntegrator_SettlesAtAuthoredStaticDeflection" methodname="SpringIntegrator_SettlesAtAuthoredStaticDeflection" classname="Lunarlight.Hovercraft.V3.Tests.V3SpringMountVariationTests" runstate="Runnable" seed="171731950" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.000269" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1130" name="SpringVariation_CompressesAndRecoversWithoutChangingForcePath" fullname="Lunarlight.Hovercraft.V3.Tests.V3SpringMountVariationTests.SpringVariation_CompressesAndRecoversWithoutChangingForcePath" methodname="SpringVariation_CompressesAndRecoversWithoutChangingForcePath" classname="Lunarlight.Hovercraft.V3.Tests.V3SpringMountVariationTests" runstate="Runnable" seed="841823519" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.010328" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1131" name="SpringVariation_RemainsBoundedDuringCoupledFlatGroundHover" fullname="Lunarlight.Hovercraft.V3.Tests.V3SpringMountVariationTests.SpringVariation_RemainsBoundedDuringCoupledFlatGroundHover" methodname="SpringVariation_RemainsBoundedDuringCoupledFlatGroundHover" classname="Lunarlight.Hovercraft.V3.Tests.V3SpringMountVariationTests" runstate="Runnable" seed="1861903549" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.026294" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1129" name="SpringVariation_UsesSameHoverEndpointAndOneRigidbody" fullname="Lunarlight.Hovercraft.V3.Tests.V3SpringMountVariationTests.SpringVariation_UsesSameHoverEndpointAndOneRigidbody" methodname="SpringVariation_UsesSameHoverEndpointAndOneRigidbody" classname="Lunarlight.Hovercraft.V3.Tests.V3SpringMountVariationTests" runstate="Runnable" seed="1443750128" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.006138" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1103" name="V3SystemsIntegrationTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" testcasecount="11" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:27Z" duration="2.608148" total="11" passed="11" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1112" name="BalancedProfile_WeightsEveryControlDomainAtOne" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.BalancedProfile_WeightsEveryControlDomainAtOne" methodname="BalancedProfile_WeightsEveryControlDomainAtOne" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="1871240463" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.001190" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1105" name="BaselineBuild_IsValidAndUsesFixedRearPropulsion" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.BaselineBuild_IsValidAndUsesFixedRearPropulsion" methodname="BaselineBuild_IsValidAndUsesFixedRearPropulsion" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="1980022586" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.000833" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1106" name="BaselineCraft_AssemblesWithoutGimbalRuntime" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.BaselineCraft_AssemblesWithoutGimbalRuntime" methodname="BaselineCraft_AssemblesWithoutGimbalRuntime" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="1924619751" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.004360" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1107" name="CompleteCraft_AssemblesAndBootsReady" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.CompleteCraft_AssemblesAndBootsReady" methodname="CompleteCraft_AssemblesAndBootsReady" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="1983624451" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.004066" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1108" name="CompleteCraft_ContainsRequiredPhysicalSystems" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.CompleteCraft_ContainsRequiredPhysicalSystems" methodname="CompleteCraft_ContainsRequiredPhysicalSystems" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="354171806" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.003757" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1109" name="CompleteCraft_DoesNotInstallDuplicateSystemsOverlay" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.CompleteCraft_DoesNotInstallDuplicateSystemsOverlay" methodname="CompleteCraft_DoesNotInstallDuplicateSystemsOverlay" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="382560171" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.003518" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1104" name="GeneratedBuild_IsValidAndHasStableIdentity" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.GeneratedBuild_IsValidAndHasStableIdentity" methodname="GeneratedBuild_IsValidAndHasStableIdentity" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="1112074199" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.000249" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1111" name="MainframeTick_RunsSoftwareAndRoutesStandardRequests" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.MainframeTick_RunsSoftwareAndRoutesStandardRequests" methodname="MainframeTick_RunsSoftwareAndRoutesStandardRequests" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="649989649" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.007116" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1110" name="SensorsAndFins_AreCompactAndMountedOnChassisSurfaces" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.SensorsAndFins_AreCompactAndMountedOnChassisSurfaces" methodname="SensorsAndFins_AreCompactAndMountedOnChassisSurfaces" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="554891938" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:24Z" duration="0.001043" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1114" name="SystemsRuntime_SurvivesTenMinutesOfVirtualFixedTicks" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.SystemsRuntime_SurvivesTenMinutesOfVirtualFixedTicks" methodname="SystemsRuntime_SurvivesTenMinutesOfVirtualFixedTicks" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="65229253" result="Passed" start-time="2026-08-01 17:29:24Z" end-time="2026-08-01 17:29:27Z" duration="2.579866" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1113" name="V2ReferenceBuild_RemainsExactLegacyMass" fullname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests.V2ReferenceBuild_RemainsExactLegacyMass" methodname="V2ReferenceBuild_RemainsExactLegacyMass" classname="Lunarlight.Hovercraft.V3.Tests.V3SystemsIntegrationTests" runstate="Runnable" seed="1955215478" result="Passed" start-time="2026-08-01 17:29:27Z" end-time="2026-08-01 17:29:27Z" duration="0.000395" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1020" name="V3ThermalFoundationTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests" classname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-08-01 17:29:27Z" end-time="2026-08-01 17:29:27Z" duration="0.012680" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1023" name="EnergyCore_ReportsCraftPowerUtilizationAndLoadHeat" fullname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests.EnergyCore_ReportsCraftPowerUtilizationAndLoadHeat" methodname="EnergyCore_ReportsCraftPowerUtilizationAndLoadHeat" classname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests" runstate="Runnable" seed="451780184" result="Passed" start-time="2026-08-01 17:29:27Z" end-time="2026-08-01 17:29:27Z" duration="0.003049" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1026" name="OverheatThreshold_EntersProtectionWithoutChangingManualEnable" fullname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests.OverheatThreshold_EntersProtectionWithoutChangingManualEnable" methodname="OverheatThreshold_EntersProtectionWithoutChangingManualEnable" classname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests" runstate="Runnable" seed="1907628312" result="Passed" start-time="2026-08-01 17:29:27Z" end-time="2026-08-01 17:29:27Z" duration="0.001248" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1022" name="ThermalController_LoadedThrusterHeatsFasterThenCoolsUnloaded" fullname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests.ThermalController_LoadedThrusterHeatsFasterThenCoolsUnloaded" methodname="ThermalController_LoadedThrusterHeatsFasterThenCoolsUnloaded" classname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests" runstate="Runnable" seed="540582123" result="Passed" start-time="2026-08-01 17:29:27Z" end-time="2026-08-01 17:29:27Z" duration="0.003283" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1021" name="ThermalController_TracksEveryRelevantInstalledPart" fullname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests.ThermalController_TracksEveryRelevantInstalledPart" methodname="ThermalController_TracksEveryRelevantInstalledPart" classname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests" runstate="Runnable" seed="837967730" result="Passed" start-time="2026-08-01 17:29:27Z" end-time="2026-08-01 17:29:27Z" duration="0.003134" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1024" name="ThermalModel_OverloadOutputUsesReservedHeatMultiplier" fullname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests.ThermalModel_OverloadOutputUsesReservedHeatMultiplier" methodname="ThermalModel_OverloadOutputUsesReservedHeatMultiplier" classname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests" runstate="Runnable" seed="1220710488" result="Passed" start-time="2026-08-01 17:29:27Z" end-time="2026-08-01 17:29:27Z" duration="0.000248" asserts="0">
+                  <properties />
+                </test-case>
+                <test-case id="1025" name="ThrusterDebugColor_ProgressesFromCoolToSafeToOverheat" fullname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests.ThrusterDebugColor_ProgressesFromCoolToSafeToOverheat" methodname="ThrusterDebugColor_ProgressesFromCoolToSafeToOverheat" classname="Lunarlight.Hovercraft.V3.Tests.V3ThermalFoundationTests" runstate="Runnable" seed="182290559" result="Passed" start-time="2026-08-01 17:29:27Z" end-time="2026-08-01 17:29:27Z" duration="0.000345" asserts="0">
+                  <properties />
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1115" name="V3TrackTestSceneIntegrationTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3TrackTestSceneIntegrationTests" classname="Lunarlight.Hovercraft.V3.Tests.V3TrackTestSceneIntegrationTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-08-01 17:29:45Z" end-time="2026-08-01 17:29:46Z" duration="0.357045" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1117" name="TrackTestScene_PlayModeAdoptsCachedTrackAndPlacesCraft" fullname="Lunarlight.Hovercraft.V3.Tests.V3TrackTestSceneIntegrationTests.TrackTestScene_PlayModeAdoptsCachedTrackAndPlacesCraft" methodname="TrackTestScene_PlayModeAdoptsCachedTrackAndPlacesCraft" classname="Lunarlight.Hovercraft.V3.Tests.V3TrackTestSceneIntegrationTests" runstate="Explicit" seed="822085139" result="Passed" start-time="2026-08-01 17:29:27Z" end-time="2026-08-01 17:29:46Z" duration="18.679794" asserts="0">
+                  <properties>
+                    <property name="_JOINTYPE" value="UnityCombinatorial" />
+                    <property name="_SKIPREASON" value="Generates the full procedural track and is intentionally reserved for focused Track Test scene validation." />
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1116" name="TrackTestScene_UsesGeneratorOwnedV3StartPose" fullname="Lunarlight.Hovercraft.V3.Tests.V3TrackTestSceneIntegrationTests.TrackTestScene_UsesGeneratorOwnedV3StartPose" methodname="TrackTestScene_UsesGeneratorOwnedV3StartPose" classname="Lunarlight.Hovercraft.V3.Tests.V3TrackTestSceneIntegrationTests" runstate="Runnable" seed="1145108620" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.151507" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1118" name="V3WorldClockAndHoverConfigurationTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldClockAndHoverConfigurationTests" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldClockAndHoverConfigurationTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.077146" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1120" name="CaptureEnvelope_DecaysAndFallbackCannotReachFullAuthority" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldClockAndHoverConfigurationTests.CaptureEnvelope_DecaysAndFallbackCannotReachFullAuthority" methodname="CaptureEnvelope_DecaysAndFallbackCannotReachFullAuthority" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldClockAndHoverConfigurationTests" runstate="Runnable" seed="145127017" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.000401" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1119" name="SerializedHoverConfiguration_PersistsAndReassemblesExactly" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldClockAndHoverConfigurationTests.SerializedHoverConfiguration_PersistsAndReassemblesExactly" methodname="SerializedHoverConfiguration_PersistsAndReassemblesExactly" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldClockAndHoverConfigurationTests" runstate="Runnable" seed="387213416" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.075514" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+              </test-suite>
+              <test-suite type="TestFixture" id="1186" name="V3WorldSimulationTests" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests" runstate="Runnable" testcasecount="9" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.111222" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1193" name="CrosswindAndHotZones_BlendAirflowDensityAndCooling" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests.CrosswindAndHotZones_BlendAirflowDensityAndCooling" methodname="CrosswindAndHotZones_BlendAirflowDensityAndCooling" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests" runstate="Runnable" seed="90369236" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.024493" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1195" name="DevelopmentScenes_HaveExactlyOneConfiguredWorldRoot" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests.DevelopmentScenes_HaveExactlyOneConfiguredWorldRoot" methodname="DevelopmentScenes_HaveExactlyOneConfiguredWorldRoot" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests" runstate="Runnable" seed="703046115" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.037826" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1194" name="DifferentCraftInitializationTimes_ShareOneWorldClockAndFields" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests.DifferentCraftInitializationTimes_ShareOneWorldClockAndFields" methodname="DifferentCraftInitializationTimes_ShareOneWorldClockAndFields" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests" runstate="Runnable" seed="1834462417" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.009282" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1187" name="EarthProfile_ProducesCoherentSeaLevelAndAltitudeSamples" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests.EarthProfile_ProducesCoherentSeaLevelAndAltitudeSamples" methodname="EarthProfile_ProducesCoherentSeaLevelAndAltitudeSamples" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests" runstate="Runnable" seed="167774149" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.006446" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1190" name="QueryService_ReportsMissingAndDuplicateWorlds" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests.QueryService_ReportsMissingAndDuplicateWorlds" methodname="QueryService_ReportsMissingAndDuplicateWorlds" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests" runstate="Runnable" seed="961946683" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.007847" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <output><![CDATA[Hovercraft V3 requires exactly one active World Simulation root in scene ''. Multiple roots are active.
+]]></output>
+                </test-case>
+                <test-case id="1192" name="RelativeAirflow_HeadwindAndTailwindChangeDynamicPressure" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests.RelativeAirflow_HeadwindAndTailwindChangeDynamicPressure" methodname="RelativeAirflow_HeadwindAndTailwindChangeDynamicPressure" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests" runstate="Runnable" seed="825932756" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.006003" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1191" name="ThermalInput_UsesDensityAirspeedAndWorldMultiplier" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests.ThermalInput_UsesDensityAirspeedAndWorldMultiplier" methodname="ThermalInput_UsesDensityAirspeedAndWorldMultiplier" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests" runstate="Runnable" seed="1757398825" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.005249" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1188" name="WindGustAndTurbulence_AreDeterministicAndSmooth" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests.WindGustAndTurbulence_AreDeterministicAndSmooth" methodname="WindGustAndTurbulence_AreDeterministicAndSmooth" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests" runstate="Runnable" seed="979105721" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.005847" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1189" name="Zones_BlendAndHigherPriorityOverrideWins" fullname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests.Zones_BlendAndHigherPriorityOverrideWins" methodname="Zones_BlendAndHigherPriorityOverrideWins" classname="Lunarlight.Hovercraft.V3.Tests.V3WorldSimulationTests" runstate="Runnable" seed="103212249" result="Passed" start-time="2026-08-01 17:29:46Z" end-time="2026-08-01 17:29:46Z" duration="0.006041" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <output><![CDATA[Saving results to: C:/Users/Jack_/AppData/LocalLow/DefaultCompany/Slingshot 2_0\TestResults.xml
+]]></output>
+                </test-case>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

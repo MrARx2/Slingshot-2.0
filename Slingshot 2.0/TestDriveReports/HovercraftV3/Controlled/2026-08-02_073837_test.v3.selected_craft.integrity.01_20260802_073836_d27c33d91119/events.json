@@ -1,0 +1,130 @@
+{
+    "count": 5,
+    "events": [
+        {
+            "eventId": "manual_0001",
+            "type": 0,
+            "severity": 0,
+            "timestamp": 0.0,
+            "tick": -1,
+            "sampleIndex": -1,
+            "attemptIndex": 0,
+            "resetReason": "",
+            "trackDistance": 0.0,
+            "sectionId": "",
+            "craftPosition": {
+                "x": 3.3760443329811098e-9,
+                "y": 40.0,
+                "z": 6.705522537231445e-8
+            },
+            "speedMetersPerSecond": 0.0,
+            "worldState": 0,
+            "craftBeliefState": "NotGrounded",
+            "possibleContributingDomains": "",
+            "preEventStartSample": 0,
+            "postEventEndSample": 126,
+            "notes": "Controlled phase: Measured",
+            "manual": true
+        },
+        {
+            "eventId": "SampleRateDrop_00000000",
+            "type": 20,
+            "severity": 1,
+            "timestamp": 0.009999992913832162,
+            "tick": 0,
+            "sampleIndex": 0,
+            "attemptIndex": 0,
+            "resetReason": "",
+            "trackDistance": 0.0,
+            "sectionId": "",
+            "craftPosition": {
+                "x": 3.3760443329811098e-9,
+                "y": 40.0,
+                "z": 6.705522537231445e-8
+            },
+            "speedMetersPerSecond": 0.0,
+            "worldState": 0,
+            "craftBeliefState": "NotGrounded",
+            "possibleContributingDomains": "sensor,scheduler,power",
+            "preEventStartSample": 0,
+            "postEventEndSample": 126,
+            "notes": "Measured sensor rate fell below 75% of its grant.",
+            "manual": false
+        },
+        {
+            "eventId": "TaskUnderMinimum_00000000",
+            "type": 21,
+            "severity": 2,
+            "timestamp": 0.009999992913832162,
+            "tick": 0,
+            "sampleIndex": 0,
+            "attemptIndex": 0,
+            "resetReason": "",
+            "trackDistance": 0.0,
+            "sectionId": "",
+            "craftPosition": {
+                "x": 3.3760443329811098e-9,
+                "y": 40.0,
+                "z": 6.705522537231445e-8
+            },
+            "speedMetersPerSecond": 0.0,
+            "worldState": 0,
+            "craftBeliefState": "NotGrounded",
+            "possibleContributingDomains": "scheduler,power",
+            "preEventStartSample": 0,
+            "postEventEndSample": 126,
+            "notes": "A software task measured below its minimum useful rate.",
+            "manual": false
+        },
+        {
+            "eventId": "PowerStarvation_00000000",
+            "type": 29,
+            "severity": 2,
+            "timestamp": 0.009999992913832162,
+            "tick": 0,
+            "sampleIndex": 0,
+            "attemptIndex": 0,
+            "resetReason": "",
+            "trackDistance": 0.0,
+            "sectionId": "",
+            "craftPosition": {
+                "x": 3.3760443329811098e-9,
+                "y": 40.0,
+                "z": 6.705522537231445e-8
+            },
+            "speedMetersPerSecond": 0.0,
+            "worldState": 0,
+            "craftBeliefState": "NotGrounded",
+            "possibleContributingDomains": "power",
+            "preEventStartSample": 0,
+            "postEventEndSample": 126,
+            "notes": "Requested power exceeded granted power.",
+            "manual": false
+        },
+        {
+            "eventId": "manual_0005",
+            "type": 0,
+            "severity": 0,
+            "timestamp": 1.0099992842970523,
+            "tick": 100,
+            "sampleIndex": 100,
+            "attemptIndex": 0,
+            "resetReason": "",
+            "trackDistance": 0.0,
+            "sectionId": "",
+            "craftPosition": {
+                "x": -6.367918103933334e-7,
+                "y": 35.048797607421878,
+                "z": -0.00006267055869102478
+            },
+            "speedMetersPerSecond": 9.802218437194825,
+            "worldState": 0,
+            "craftBeliefState": "NotGrounded",
+            "possibleContributingDomains": "",
+            "preEventStartSample": 0,
+            "postEventEndSample": 126,
+            "notes": "Controlled phase: Cooldown",
+            "manual": true
+        }
+    ]
+}

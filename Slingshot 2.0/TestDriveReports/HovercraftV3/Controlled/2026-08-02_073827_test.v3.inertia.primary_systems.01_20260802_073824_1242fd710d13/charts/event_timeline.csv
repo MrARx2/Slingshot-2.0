@@ -1,0 +1,9 @@
+timestamp_s,track_distance_m,event_type,severity,section_id
+0,0,ManualMarker,0,""
+0.0099999929138321619,0,SampleRateDrop,1,""
+0.0099999929138321619,0,TaskUnderMinimum,2,""
+0.0099999929138321619,0,PowerStarvation,2,""
+0.21999984410430837,0,Spin,2,""
+1.8299987032312923,0,Rollover,3,""
+3.0099978670634919,0,ManualMarker,0,""
+3.2699976828231287,0,Rollover,3,""

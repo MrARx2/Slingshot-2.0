@@ -1,0 +1,1460 @@
+{
+    "schemaVersion": 6,
+    "sessionId": "60356f516de0",
+    "generatedUtc": "2026-08-06T12:26:19.1460209Z",
+    "executiveSummary": "Captured 6027 synchronized physics samples over 60.27 seconds. Data quality: Nominal. Evidence includes 274 unexpected-airborne samples, 197 world/belief disagreement samples, and 0 power-limited samples. These counts identify review windows, not causes.",
+    "dataQuality": "Nominal",
+    "sampleCount": 6027,
+    "droppedSampleCount": 0,
+    "droppedEventCount": 0,
+    "eventCount": 187,
+    "durationSeconds": 60.269957291666667,
+    "maximumSpeedMetersPerSecond": 193.67906188964845,
+    "maximumResidualForceN": 9.778066635131836,
+    "maximumResidualTorqueNm": 435054.03125,
+    "contactFreeResidualSampleCount": 6025,
+    "contactFreeResidualMeanN": 4.4094953536987309,
+    "contactFreeResidualP95N": 8.470699310302735,
+    "contactFreeResidualMaxN": 9.778066635131836,
+    "unexpectedAirborneSamples": 274,
+    "worldBeliefDisagreementSamples": 197,
+    "powerLimitedSamples": 0,
+    "thermalDeratingSamples": 0,
+    "invalidWorldEnvironmentSamples": 0,
+    "samplesInsideEnvironmentZones": 49,
+    "minimumAirDensityKgPerCubicMeter": 1.1024088859558106,
+    "maximumAirDensityKgPerCubicMeter": 1.2250123023986817,
+    "minimumAmbientTemperatureC": 7.947967529296875,
+    "maximumAmbientTemperatureC": 15.0,
+    "maximumMachNumber": 0.5735536813735962,
+    "maximumDynamicPressurePa": 23332.580078125,
+    "laps": [
+        {
+            "lap": 0,
+            "sampleCount": 6025,
+            "startTimeSeconds": 0.019999985827664408,
+            "endTimeSeconds": 60.269957291666667,
+            "durationSeconds": 60.249957305839,
+            "maximumSpeedMetersPerSecond": 193.67906188964845,
+            "meanSpeedMetersPerSecond": 157.55555725097657,
+            "eventCount": 187
+        }
+    ],
+    "attempts": [
+        {
+            "attemptIndex": 0,
+            "sampleCount": 5851,
+            "discontinuitySamples": 0,
+            "startTimeSeconds": 0.009999992913832162,
+            "endTimeSeconds": 58.509958538832197,
+            "durationSeconds": 58.49995854591836,
+            "startTrackDistanceMeters": 0.0,
+            "maximumTrackDistanceMeters": 9326.841796875,
+            "maximumSpeedMetersPerSecond": 193.67906188964845,
+            "meanSpeedMetersPerSecond": 161.19801330566407,
+            "maximumAbsoluteLateralOffsetMeters": 38.3643684387207,
+            "minimumRideHeightMeters": 0.02431492693722248,
+            "eventCount": 181
+        },
+        {
+            "attemptIndex": 1,
+            "sampleCount": 176,
+            "discontinuitySamples": 1,
+            "startTimeSeconds": 58.51995853174603,
+            "endTimeSeconds": 60.269957291666667,
+            "durationSeconds": 1.7499987599206364,
+            "startTrackDistanceMeters": 0.0,
+            "maximumTrackDistanceMeters": 61.77644348144531,
+            "maximumSpeedMetersPerSecond": 65.51532745361328,
+            "meanSpeedMetersPerSecond": 34.871665954589847,
+            "maximumAbsoluteLateralOffsetMeters": 0.07896050810813904,
+            "minimumRideHeightMeters": 7.67345666885376,
+            "eventCount": 6
+        }
+    ],
+    "sections": [
+        {
+            "sectionId": "section_000_road_0",
+            "sectionType": "Straight",
+            "sampleCount": 834,
+            "durationSeconds": 8.339994376525283,
+            "minimumSpeedMetersPerSecond": 0.04732994735240936,
+            "maximumSpeedMetersPerSecond": 167.94044494628907,
+            "meanSpeedMetersPerSecond": 97.58219146728516,
+            "maximumAbsoluteLateralOffsetMeters": 0.1561429351568222,
+            "minimumRideHeightMeters": 7.523425102233887,
+            "maximumRideHeightMeters": 8.083282470703125,
+            "maximumAbsoluteVerticalAcceleration": 138.9401397705078,
+            "unexpectedAirborneSamples": 0,
+            "powerLimitedSamples": 0,
+            "eventCount": 16
+        },
+        {
+            "sectionId": "section_001_road_0",
+            "sectionType": "RotationalEvent",
+            "sampleCount": 2611,
+            "durationSeconds": 26.109982394613327,
+            "minimumSpeedMetersPerSecond": 138.22532653808595,
+            "maximumSpeedMetersPerSecond": 171.0421905517578,
+            "meanSpeedMetersPerSecond": 160.20899963378907,
+            "maximumAbsoluteLateralOffsetMeters": 2.674395799636841,
+            "minimumRideHeightMeters": 7.23765230178833,
+            "maximumRideHeightMeters": 8.413437843322754,
+            "maximumAbsoluteVerticalAcceleration": 217.37838745117188,
+            "unexpectedAirborneSamples": 0,
+            "powerLimitedSamples": 0,
+            "eventCount": 85
+        },
+        {
+            "sectionId": "section_002_road_0",
+            "sectionType": "BankedCurve",
+            "sampleCount": 843,
+            "durationSeconds": 8.429994315840304,
+            "minimumSpeedMetersPerSecond": 169.85008239746095,
+            "maximumSpeedMetersPerSecond": 171.01031494140626,
+            "meanSpeedMetersPerSecond": 170.4154815673828,
+            "maximumAbsoluteLateralOffsetMeters": 10.148284912109375,
+            "minimumRideHeightMeters": 7.502063274383545,
+            "maximumRideHeightMeters": 8.297537803649903,
+            "maximumAbsoluteVerticalAcceleration": 129.8834686279297,
+            "unexpectedAirborneSamples": 0,
+            "powerLimitedSamples": 0,
+            "eventCount": 34
+        },
+        {
+            "sectionId": "section_003_road_0",
+            "sectionType": "Straight",
+            "sampleCount": 333,
+            "durationSeconds": 3.3299977546557786,
+            "minimumSpeedMetersPerSecond": 169.09539794921876,
+            "maximumSpeedMetersPerSecond": 171.10821533203126,
+            "meanSpeedMetersPerSecond": 170.39227294921876,
+            "maximumAbsoluteLateralOffsetMeters": 6.950700283050537,
+            "minimumRideHeightMeters": 6.999725818634033,
+            "maximumRideHeightMeters": 8.627324104309082,
+            "maximumAbsoluteVerticalAcceleration": 232.51129150390626,
+            "unexpectedAirborneSamples": 0,
+            "powerLimitedSamples": 0,
+            "eventCount": 17
+        },
+        {
+            "sectionId": "section_004_road_0",
+            "sectionType": "BoostStraight",
+            "sampleCount": 423,
+            "durationSeconds": 4.229997147805989,
+            "minimumSpeedMetersPerSecond": 169.904052734375,
+            "maximumSpeedMetersPerSecond": 170.93968200683595,
+            "meanSpeedMetersPerSecond": 170.41221618652345,
+            "maximumAbsoluteLateralOffsetMeters": 0.1401854008436203,
+            "minimumRideHeightMeters": 7.507030010223389,
+            "maximumRideHeightMeters": 8.45428466796875,
+            "maximumAbsoluteVerticalAcceleration": 191.9267578125,
+            "unexpectedAirborneSamples": 0,
+            "powerLimitedSamples": 0,
+            "eventCount": 8
+        },
+        {
+            "sectionId": "section_005_road_0",
+            "sectionType": "JumpRamp",
+            "sampleCount": 149,
+            "durationSeconds": 1.4899989953264595,
+            "minimumSpeedMetersPerSecond": 169.9036865234375,
+            "maximumSpeedMetersPerSecond": 170.88926696777345,
+            "meanSpeedMetersPerSecond": 170.41094970703126,
+            "maximumAbsoluteLateralOffsetMeters": 0.005876016803085804,
+            "minimumRideHeightMeters": 8.014848709106446,
+            "maximumRideHeightMeters": 8.259665489196778,
+            "maximumAbsoluteVerticalAcceleration": 74.52218627929688,
+            "unexpectedAirborneSamples": 0,
+            "powerLimitedSamples": 0,
+            "eventCount": 3
+        },
+        {
+            "sectionId": "section_006_road_0",
+            "sectionType": "AirGap",
+            "sampleCount": 241,
+            "durationSeconds": 2.409998374991119,
+            "minimumSpeedMetersPerSecond": 170.3515625,
+            "maximumSpeedMetersPerSecond": 175.21800231933595,
+            "meanSpeedMetersPerSecond": 172.86856079101563,
+            "maximumAbsoluteLateralOffsetMeters": 1.115231990814209,
+            "minimumRideHeightMeters": 0.02431492693722248,
+            "maximumRideHeightMeters": 24.189510345458986,
+            "maximumAbsoluteVerticalAcceleration": 26.467985153198243,
+            "unexpectedAirborneSamples": 0,
+            "powerLimitedSamples": 0,
+            "eventCount": 7
+        },
+        {
+            "sectionId": "section_007_road_0",
+            "sectionType": "LandingRamp",
+            "sampleCount": 317,
+            "durationSeconds": 3.1699978625401856,
+            "minimumSpeedMetersPerSecond": 175.2444610595703,
+            "maximumSpeedMetersPerSecond": 190.9728546142578,
+            "meanSpeedMetersPerSecond": 181.3230743408203,
+            "maximumAbsoluteLateralOffsetMeters": 16.419679641723634,
+            "minimumRideHeightMeters": 24.50330924987793,
+            "maximumRideHeightMeters": 188.76364135742188,
+            "maximumAbsoluteVerticalAcceleration": 16.51517105102539,
+            "unexpectedAirborneSamples": 0,
+            "powerLimitedSamples": 0,
+            "eventCount": 6
+        },
+        {
+            "sectionId": "section_008_road_0",
+            "sectionType": "RecoveryStraight",
+            "sampleCount": 274,
+            "durationSeconds": 2.7399981524795296,
+            "minimumSpeedMetersPerSecond": 189.4423065185547,
+            "maximumSpeedMetersPerSecond": 193.67906188964845,
+            "meanSpeedMetersPerSecond": 191.84686279296876,
+            "maximumAbsoluteLateralOffsetMeters": 38.3643684387207,
+            "minimumRideHeightMeters": 189.5318603515625,
+            "maximumRideHeightMeters": 417.3246765136719,
+            "maximumAbsoluteVerticalAcceleration": 14.135751724243164,
+            "unexpectedAirborneSamples": 274,
+            "powerLimitedSamples": 0,
+            "eventCount": 10
+        }
+    ],
+    "devices": [
+        {
+            "deviceId": "Propulsion.Rear.Center:connector.propulsion.fixed.baseline.01",
+            "deviceType": "Part",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.0,
+            "meanActualOutput": 0.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Propulsion.Rear.Center:thruster.main.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Propulsion",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.1840343326330185,
+            "meanActualOutput": 0.1840343326330185,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 540000.0625,
+            "peakTemperatureC": 22.256431579589845,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Braking.Front.Center:thruster.brake.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Braking",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.014511996880173684,
+            "meanActualOutput": 0.014511996880173684,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 589342.5,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Hover.Front.Left.Bottom:connector.spring.hover.balanced.01",
+            "deviceType": "SpringMount",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.08002771437168122,
+            "meanActualOutput": 0.4775104820728302,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 636
+        },
+        {
+            "deviceId": "Hover.Front.Left.Bottom:thruster.hover.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Hover",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.6002066731452942,
+            "meanActualOutput": 0.6002066731452942,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 1120000.125,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Hover.Front.Right.Bottom:connector.spring.hover.balanced.01",
+            "deviceType": "SpringMount",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.08049574494361878,
+            "meanActualOutput": 0.4880625307559967,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 635
+        },
+        {
+            "deviceId": "Hover.Front.Right.Bottom:thruster.hover.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Hover",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.6037166118621826,
+            "meanActualOutput": 0.6037166118621826,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 1120000.25,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Hover.Rear.Left.Bottom:connector.spring.hover.balanced.01",
+            "deviceType": "SpringMount",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.08445565402507782,
+            "meanActualOutput": 0.4788787364959717,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 1125
+        },
+        {
+            "deviceId": "Hover.Rear.Left.Bottom:thruster.hover.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Hover",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.6334168910980225,
+            "meanActualOutput": 0.6334168910980225,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 1119692.25,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Hover.Rear.Right.Bottom:connector.spring.hover.balanced.01",
+            "deviceType": "SpringMount",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.08463241904973984,
+            "meanActualOutput": 0.49785661697387698,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 942
+        },
+        {
+            "deviceId": "Hover.Rear.Right.Bottom:thruster.hover.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Hover",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.6347407698631287,
+            "meanActualOutput": 0.6347407698631287,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 1120000.125,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Control.Front.Left.Top:thruster.roof.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.18152163922786714,
+            "meanActualOutput": 0.17027398943901063,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 530425.4375,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Control.Front.Right.Top:thruster.roof.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.12684805691242219,
+            "meanActualOutput": 0.11856116354465485,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 515872.4375,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Control.Rear.Left.Top:thruster.roof.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.20392195880413056,
+            "meanActualOutput": 0.19513867795467378,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 486893.75,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Control.Rear.Right.Top:thruster.roof.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.18546974658966065,
+            "meanActualOutput": 0.1769113838672638,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 465498.15625,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Strafe.Left.Front:thruster.strafe.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.07071123272180557,
+            "meanActualOutput": 0.07071123272180557,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 375826.40625,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Strafe.Right.Front:thruster.strafe.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.03372941166162491,
+            "meanActualOutput": 0.03372941166162491,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 138606.984375,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Strafe.Left.Rear:thruster.strafe.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.05796932801604271,
+            "meanActualOutput": 0.05796932801604271,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 300549.71875,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Strafe.Right.Rear:thruster.strafe.balanced.01",
+            "deviceType": "Thruster",
+            "role": "Control",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.019577035680413247,
+            "meanActualOutput": 0.019577035680413247,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 105821.2265625,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Core.Main:energycore.main.balanced.01",
+            "deviceType": "Part",
+            "role": "Energy",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.0313703678548336,
+            "meanActualOutput": 0.0313703678548336,
+            "meanGrantFraction": 0.9999999403953552,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 19.99818992614746,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Cockpit.Main:cockpit.main.balanced.01",
+            "deviceType": "Part",
+            "role": "Cockpit",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.0,
+            "meanActualOutput": 0.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 19.998090744018556,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "System.PilotInterface:computer.pilotinterface.balanced.01",
+            "deviceType": "Part",
+            "role": "InternalSystem",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 120.0,
+            "meanActualOutput": 120.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "System.Drive:computer.drive.balanced.01",
+            "deviceType": "Part",
+            "role": "InternalSystem",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 60.0,
+            "meanActualOutput": 60.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "System.Hover:computer.hover.balanced.01",
+            "deviceType": "Part",
+            "role": "InternalSystem",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 120.0,
+            "meanActualOutput": 120.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "System.Stabilizer:computer.stabilizer.balanced.01",
+            "deviceType": "Part",
+            "role": "InternalSystem",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 120.0,
+            "meanActualOutput": 120.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "System.Traction:computer.traction.balanced.01",
+            "deviceType": "Part",
+            "role": "InternalSystem",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 120.0,
+            "meanActualOutput": 120.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "System.Aerodynamics:computer.aerodynamics.balanced.01",
+            "deviceType": "Part",
+            "role": "InternalSystem",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 60.0,
+            "meanActualOutput": 60.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "System.Telemetry:computer.telemetry.balanced.01",
+            "deviceType": "Part",
+            "role": "InternalSystem",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 30.0,
+            "meanActualOutput": 30.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Aero.Front.Left:connector.aero.rotary.balanced.01",
+            "deviceType": "RotaryActuator",
+            "role": "Aerodynamics",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.38559550046920779,
+            "meanActualOutput": 1.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Aero.Front.Left:fin.aero.balanced.01",
+            "deviceType": "AerodynamicFin",
+            "role": "Aerodynamics",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 157.47494506835938,
+            "meanActualOutput": 6848.31591796875,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 17166.11328125,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Aero.Front.Right:connector.aero.rotary.balanced.01",
+            "deviceType": "RotaryActuator",
+            "role": "Aerodynamics",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.3866865336894989,
+            "meanActualOutput": 1.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Aero.Front.Right:fin.aero.balanced.01",
+            "deviceType": "AerodynamicFin",
+            "role": "Aerodynamics",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 157.35781860351563,
+            "meanActualOutput": 6767.91259765625,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 17510.083984375,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Aero.Rear.Left:connector.aero.rotary.balanced.01",
+            "deviceType": "RotaryActuator",
+            "role": "Aerodynamics",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.38559550046920779,
+            "meanActualOutput": 1.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Aero.Rear.Left:fin.aero.balanced.01",
+            "deviceType": "AerodynamicFin",
+            "role": "Aerodynamics",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 157.54042053222657,
+            "meanActualOutput": 7075.85546875,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 17687.328125,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Aero.Rear.Right:connector.aero.rotary.balanced.01",
+            "deviceType": "RotaryActuator",
+            "role": "Aerodynamics",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.3866865336894989,
+            "meanActualOutput": 1.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Aero.Rear.Right:fin.aero.balanced.01",
+            "deviceType": "AerodynamicFin",
+            "role": "Aerodynamics",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 157.4156494140625,
+            "meanActualOutput": 6994.044921875,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 17590.24609375,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        },
+        {
+            "deviceId": "Cooling.Main:cooling.active.balanced.01",
+            "deviceType": "CoolingModule",
+            "role": "Cooling",
+            "sampleCount": 6025,
+            "meanRequestedOutput": 0.0,
+            "meanActualOutput": 0.0,
+            "meanGrantFraction": 1.0,
+            "peakForceN": 0.0,
+            "peakTemperatureC": 0.0,
+            "deratedSamples": 0,
+            "faultSamples": 0,
+            "physicalLimitSamples": 0
+        }
+    ],
+    "systems": [
+        {
+            "taskId": "software.pilotinterface.stock",
+            "role": "PilotInterface",
+            "sampleCount": 6025,
+            "meanRequestedRateHz": 120.0,
+            "meanGrantedRateHz": 120.0,
+            "meanMeasuredRateHz": 116.01266479492188,
+            "maximumSkippedCount": 0,
+            "belowMinimumSamples": 200,
+            "faultSamples": 0
+        },
+        {
+            "taskId": "software.hover.stock",
+            "role": "Hover",
+            "sampleCount": 6025,
+            "meanRequestedRateHz": 120.0,
+            "meanGrantedRateHz": 120.0,
+            "meanMeasuredRateHz": 116.01266479492188,
+            "maximumSkippedCount": 0,
+            "belowMinimumSamples": 200,
+            "faultSamples": 0
+        },
+        {
+            "taskId": "software.stabilizer.stock",
+            "role": "Stabilizer",
+            "sampleCount": 6025,
+            "meanRequestedRateHz": 120.0,
+            "meanGrantedRateHz": 120.0,
+            "meanMeasuredRateHz": 116.01266479492188,
+            "maximumSkippedCount": 0,
+            "belowMinimumSamples": 200,
+            "faultSamples": 0
+        },
+        {
+            "taskId": "software.drive.stock",
+            "role": "Drive",
+            "sampleCount": 6025,
+            "meanRequestedRateHz": 60.0,
+            "meanGrantedRateHz": 60.0,
+            "meanMeasuredRateHz": 57.997779846191409,
+            "maximumSkippedCount": 0,
+            "belowMinimumSamples": 200,
+            "faultSamples": 0
+        },
+        {
+            "taskId": "software.traction.stock",
+            "role": "Traction",
+            "sampleCount": 6025,
+            "meanRequestedRateHz": 120.0,
+            "meanGrantedRateHz": 120.0,
+            "meanMeasuredRateHz": 116.01266479492188,
+            "maximumSkippedCount": 0,
+            "belowMinimumSamples": 200,
+            "faultSamples": 0
+        },
+        {
+            "taskId": "software.aerodynamics.stock",
+            "role": "Aerodynamics",
+            "sampleCount": 6025,
+            "meanRequestedRateHz": 60.0,
+            "meanGrantedRateHz": 60.0,
+            "meanMeasuredRateHz": 57.997779846191409,
+            "maximumSkippedCount": 0,
+            "belowMinimumSamples": 200,
+            "faultSamples": 0
+        },
+        {
+            "taskId": "software.telemetry.stock",
+            "role": "Telemetry",
+            "sampleCount": 6025,
+            "meanRequestedRateHz": 30.0,
+            "meanGrantedRateHz": 30.0,
+            "meanMeasuredRateHz": 28.99781608581543,
+            "maximumSkippedCount": 0,
+            "belowMinimumSamples": 200,
+            "faultSamples": 0
+        }
+    ],
+    "sensors": [
+        {
+            "sensorId": "sensor.chassis.front",
+            "direction": "Front",
+            "sampleCount": 6025,
+            "validSampleCount": 6025,
+            "hitCount": 0,
+            "comparableSampleCount": 0,
+            "meanAgeSeconds": 0.010290863923728466,
+            "meanAbsoluteDistanceErrorMeters": 0.0,
+            "maximumAbsoluteDistanceErrorMeters": 0.0,
+            "meanNormalErrorDegrees": 0.0,
+            "missCount": 0
+        },
+        {
+            "sensorId": "sensor.chassis.rear",
+            "direction": "Rear",
+            "sampleCount": 6025,
+            "validSampleCount": 6025,
+            "hitCount": 0,
+            "comparableSampleCount": 0,
+            "meanAgeSeconds": 0.01429069135338068,
+            "meanAbsoluteDistanceErrorMeters": 0.0,
+            "maximumAbsoluteDistanceErrorMeters": 0.0,
+            "meanNormalErrorDegrees": 0.0,
+            "missCount": 0
+        },
+        {
+            "sensorId": "sensor.chassis.left",
+            "direction": "Left",
+            "sampleCount": 6025,
+            "validSampleCount": 6025,
+            "hitCount": 5103,
+            "comparableSampleCount": 5094,
+            "meanAgeSeconds": 0.01429069135338068,
+            "meanAbsoluteDistanceErrorMeters": 0.06772296875715256,
+            "maximumAbsoluteDistanceErrorMeters": 1.4144515991210938,
+            "meanNormalErrorDegrees": 0.25139763951301577,
+            "missCount": 5
+        },
+        {
+            "sensorId": "sensor.chassis.right",
+            "direction": "Right",
+            "sampleCount": 6025,
+            "validSampleCount": 6025,
+            "hitCount": 5195,
+            "comparableSampleCount": 5193,
+            "meanAgeSeconds": 0.01429069135338068,
+            "meanAbsoluteDistanceErrorMeters": 0.06752169132232666,
+            "maximumAbsoluteDistanceErrorMeters": 1.4422416687011719,
+            "meanNormalErrorDegrees": 0.21838341653347016,
+            "missCount": 0
+        },
+        {
+            "sensorId": "sensor.chassis.top",
+            "direction": "Top",
+            "sampleCount": 6025,
+            "validSampleCount": 6025,
+            "hitCount": 44,
+            "comparableSampleCount": 43,
+            "meanAgeSeconds": 0.01429069135338068,
+            "meanAbsoluteDistanceErrorMeters": 0.6393973231315613,
+            "maximumAbsoluteDistanceErrorMeters": 1.217529296875,
+            "meanNormalErrorDegrees": 0.13087086379528047,
+            "missCount": 1
+        },
+        {
+            "sensorId": "sensor.chassis.bottom",
+            "direction": "Bottom",
+            "sampleCount": 6025,
+            "validSampleCount": 6025,
+            "hitCount": 5194,
+            "comparableSampleCount": 5193,
+            "meanAgeSeconds": 0.010290863923728466,
+            "meanAbsoluteDistanceErrorMeters": 0.005347624886780977,
+            "maximumAbsoluteDistanceErrorMeters": 0.05886507034301758,
+            "meanNormalErrorDegrees": 0.11478883028030396,
+            "missCount": 0
+        },
+        {
+            "sensorId": "sensor_6",
+            "direction": "HoverProbe",
+            "sampleCount": 2,
+            "validSampleCount": 2,
+            "hitCount": 0,
+            "comparableSampleCount": 2,
+            "meanAgeSeconds": 0.0,
+            "meanAbsoluteDistanceErrorMeters": 0.0,
+            "maximumAbsoluteDistanceErrorMeters": 0.0,
+            "meanNormalErrorDegrees": 0.0,
+            "missCount": 0
+        },
+        {
+            "sensorId": "sensor_7",
+            "direction": "HoverProbe",
+            "sampleCount": 2,
+            "validSampleCount": 2,
+            "hitCount": 0,
+            "comparableSampleCount": 2,
+            "meanAgeSeconds": 0.0,
+            "meanAbsoluteDistanceErrorMeters": 0.0,
+            "maximumAbsoluteDistanceErrorMeters": 0.0,
+            "meanNormalErrorDegrees": 0.0,
+            "missCount": 0
+        },
+        {
+            "sensorId": "sensor_8",
+            "direction": "HoverProbe",
+            "sampleCount": 2,
+            "validSampleCount": 2,
+            "hitCount": 0,
+            "comparableSampleCount": 2,
+            "meanAgeSeconds": 0.0,
+            "meanAbsoluteDistanceErrorMeters": 0.0,
+            "maximumAbsoluteDistanceErrorMeters": 0.0,
+            "meanNormalErrorDegrees": 0.0,
+            "missCount": 0
+        },
+        {
+            "sensorId": "sensor_9",
+            "direction": "HoverProbe",
+            "sampleCount": 2,
+            "validSampleCount": 2,
+            "hitCount": 0,
+            "comparableSampleCount": 2,
+            "meanAgeSeconds": 0.0,
+            "meanAbsoluteDistanceErrorMeters": 0.0,
+            "maximumAbsoluteDistanceErrorMeters": 0.0,
+            "meanNormalErrorDegrees": 0.0,
+            "missCount": 0
+        },
+        {
+            "sensorId": "Hover.Front.Left.Bottom",
+            "direction": "HoverProbe",
+            "sampleCount": 6023,
+            "validSampleCount": 6023,
+            "hitCount": 5193,
+            "comparableSampleCount": 6021,
+            "meanAgeSeconds": 0.0,
+            "meanAbsoluteDistanceErrorMeters": 0.0,
+            "maximumAbsoluteDistanceErrorMeters": 0.0,
+            "meanNormalErrorDegrees": 0.0,
+            "missCount": 0
+        },
+        {
+            "sensorId": "Hover.Front.Right.Bottom",
+            "direction": "HoverProbe",
+            "sampleCount": 6023,
+            "validSampleCount": 6023,
+            "hitCount": 5193,
+            "comparableSampleCount": 6021,
+            "meanAgeSeconds": 0.0,
+            "meanAbsoluteDistanceErrorMeters": 0.0,
+            "maximumAbsoluteDistanceErrorMeters": 0.0,
+            "meanNormalErrorDegrees": 0.0,
+            "missCount": 0
+        },
+        {
+            "sensorId": "Hover.Rear.Left.Bottom",
+            "direction": "HoverProbe",
+            "sampleCount": 6023,
+            "validSampleCount": 6023,
+            "hitCount": 5194,
+            "comparableSampleCount": 6023,
+            "meanAgeSeconds": 0.0,
+            "meanAbsoluteDistanceErrorMeters": 0.0,
+            "maximumAbsoluteDistanceErrorMeters": 0.0,
+            "meanNormalErrorDegrees": 0.0,
+            "missCount": 0
+        },
+        {
+            "sensorId": "Hover.Rear.Right.Bottom",
+            "direction": "HoverProbe",
+            "sampleCount": 6023,
+            "validSampleCount": 6023,
+            "hitCount": 5194,
+            "comparableSampleCount": 6023,
+            "meanAgeSeconds": 0.0,
+            "meanAbsoluteDistanceErrorMeters": 0.0,
+            "maximumAbsoluteDistanceErrorMeters": 0.0,
+            "meanNormalErrorDegrees": 0.0,
+            "missCount": 0
+        }
+    ],
+    "forces": [
+        {
+            "category": "gravity",
+            "sampleCount": 6025,
+            "meanMagnitudeN": 113944.6328125,
+            "peakMagnitudeN": 113948.375,
+            "meanGravityVerticalN": -113944.6328125
+        },
+        {
+            "category": "propulsion",
+            "sampleCount": 6025,
+            "meanMagnitudeN": 88336.609375,
+            "peakMagnitudeN": 540000.0625,
+            "meanGravityVerticalN": 11891.3818359375
+        },
+        {
+            "category": "braking",
+            "sampleCount": 6025,
+            "meanMagnitudeN": 24670.3984375,
+            "peakMagnitudeN": 589342.5,
+            "meanGravityVerticalN": 6204.5634765625
+        },
+        {
+            "category": "hover",
+            "sampleCount": 6025,
+            "meanMagnitudeN": 395533.0,
+            "peakMagnitudeN": 2931392.25,
+            "meanGravityVerticalN": 183446.8125
+        },
+        {
+            "category": "roof",
+            "sampleCount": 6025,
+            "meanMagnitudeN": 105741.2265625,
+            "peakMagnitudeN": 1997442.75,
+            "meanGravityVerticalN": -66065.2265625
+        },
+        {
+            "category": "lateral",
+            "sampleCount": 6025,
+            "meanMagnitudeN": 84353.96875,
+            "peakMagnitudeN": 489941.375,
+            "meanGravityVerticalN": -19354.943359375
+        },
+        {
+            "category": "aerodynamic",
+            "sampleCount": 6025,
+            "meanMagnitudeN": 28823.873046875,
+            "peakMagnitudeN": 69062.3984375,
+            "meanGravityVerticalN": -16769.98046875
+        },
+        {
+            "category": "contact",
+            "sampleCount": 6025,
+            "meanMagnitudeN": 0.0,
+            "peakMagnitudeN": 0.0,
+            "meanGravityVerticalN": 0.0
+        },
+        {
+            "category": "expected_net",
+            "sampleCount": 6025,
+            "meanMagnitudeN": 416583.6875,
+            "peakMagnitudeN": 2748147.25,
+            "meanGravityVerticalN": -14595.408203125
+        },
+        {
+            "category": "observed_net",
+            "sampleCount": 6025,
+            "meanMagnitudeN": 416583.8125,
+            "peakMagnitudeN": 2748148.0,
+            "meanGravityVerticalN": -14595.3779296875
+        },
+        {
+            "category": "residual",
+            "sampleCount": 6025,
+            "meanMagnitudeN": 4.4094953536987309,
+            "peakMagnitudeN": 9.778066635131836,
+            "meanGravityVerticalN": 0.00507991062477231
+        }
+    ],
+    "eventTypes": [
+        {
+            "eventType": "ManualMarker",
+            "count": 2,
+            "maximumSeverity": 0
+        },
+        {
+            "eventType": "SampleRateDrop",
+            "count": 1,
+            "maximumSeverity": 1
+        },
+        {
+            "eventType": "TaskUnderMinimum",
+            "count": 2,
+            "maximumSeverity": 2
+        },
+        {
+            "eventType": "PowerStarvation",
+            "count": 1,
+            "maximumSeverity": 2
+        },
+        {
+            "eventType": "SurfaceReacquired",
+            "count": 2,
+            "maximumSeverity": 0
+        },
+        {
+            "eventType": "ThrusterSaturation",
+            "count": 45,
+            "maximumSeverity": 1
+        },
+        {
+            "eventType": "SpringTravelLimit",
+            "count": 62,
+            "maximumSeverity": 1
+        },
+        {
+            "eventType": "SectionExit",
+            "count": 8,
+            "maximumSeverity": 0
+        },
+        {
+            "eventType": "SectionEntry",
+            "count": 8,
+            "maximumSeverity": 0
+        },
+        {
+            "eventType": "SensorWorldDisagreement",
+            "count": 37,
+            "maximumSeverity": 1
+        },
+        {
+            "eventType": "SensorMiss",
+            "count": 4,
+            "maximumSeverity": 1
+        },
+        {
+            "eventType": "NearSurfaceExit",
+            "count": 1,
+            "maximumSeverity": 0
+        },
+        {
+            "eventType": "SurfaceEnvelopeDeparture",
+            "count": 1,
+            "maximumSeverity": 0
+        },
+        {
+            "eventType": "ProbeLoss",
+            "count": 1,
+            "maximumSeverity": 1
+        },
+        {
+            "eventType": "BottomingOut",
+            "count": 1,
+            "maximumSeverity": 2
+        },
+        {
+            "eventType": "FreeFlightEntered",
+            "count": 1,
+            "maximumSeverity": 0
+        },
+        {
+            "eventType": "Rollover",
+            "count": 3,
+            "maximumSeverity": 3
+        },
+        {
+            "eventType": "UnexpectedAirborne",
+            "count": 3,
+            "maximumSeverity": 2
+        },
+        {
+            "eventType": "Spin",
+            "count": 2,
+            "maximumSeverity": 2
+        },
+        {
+            "eventType": "Reset",
+            "count": 1,
+            "maximumSeverity": 0
+        },
+        {
+            "eventType": "MainframeDegraded",
+            "count": 1,
+            "maximumSeverity": 2
+        }
+    ],
+    "repeatedLocationClusters": [
+        {
+            "sectionId": "section_000_road_0",
+            "startDistanceMeters": 0.0,
+            "endDistanceMeters": 10.0,
+            "eventCount": 7,
+            "maximumSeverity": 2,
+            "eventTypes": "MainframeDegraded, PowerStarvation, SampleRateDrop, SurfaceReacquired, TaskUnderMinimum"
+        },
+        {
+            "sectionId": "section_000_road_0",
+            "startDistanceMeters": 30.0,
+            "endDistanceMeters": 40.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "ThrusterSaturation"
+        },
+        {
+            "sectionId": "section_000_road_0",
+            "startDistanceMeters": 670.0,
+            "endDistanceMeters": 680.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SpringTravelLimit, ThrusterSaturation"
+        },
+        {
+            "sectionId": "section_001_road_0",
+            "startDistanceMeters": 720.0,
+            "endDistanceMeters": 730.0,
+            "eventCount": 2,
+            "maximumSeverity": 0,
+            "eventTypes": "SectionEntry, SectionExit"
+        },
+        {
+            "sectionId": "section_001_road_0",
+            "startDistanceMeters": 800.0,
+            "endDistanceMeters": 810.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_001_road_0",
+            "startDistanceMeters": 890.0,
+            "endDistanceMeters": 900.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_001_road_0",
+            "startDistanceMeters": 1090.0,
+            "endDistanceMeters": 1100.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_001_road_0",
+            "startDistanceMeters": 1430.0,
+            "endDistanceMeters": 1440.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_001_road_0",
+            "startDistanceMeters": 1720.0,
+            "endDistanceMeters": 1730.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_001_road_0",
+            "startDistanceMeters": 1800.0,
+            "endDistanceMeters": 1810.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_001_road_0",
+            "startDistanceMeters": 1920.0,
+            "endDistanceMeters": 1930.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, ThrusterSaturation"
+        },
+        {
+            "sectionId": "section_001_road_0",
+            "startDistanceMeters": 2260.0,
+            "endDistanceMeters": 2270.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SpringTravelLimit, ThrusterSaturation"
+        },
+        {
+            "sectionId": "section_001_road_0",
+            "startDistanceMeters": 4100.0,
+            "endDistanceMeters": 4110.0,
+            "eventCount": 3,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit, ThrusterSaturation"
+        },
+        {
+            "sectionId": "section_001_road_0",
+            "startDistanceMeters": 4780.0,
+            "endDistanceMeters": 4790.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_002_road_0",
+            "startDistanceMeters": 4950.0,
+            "endDistanceMeters": 4960.0,
+            "eventCount": 2,
+            "maximumSeverity": 0,
+            "eventTypes": "SectionEntry, SectionExit"
+        },
+        {
+            "sectionId": "section_002_road_0",
+            "startDistanceMeters": 4960.0,
+            "endDistanceMeters": 4970.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_002_road_0",
+            "startDistanceMeters": 5180.0,
+            "endDistanceMeters": 5190.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_002_road_0",
+            "startDistanceMeters": 5310.0,
+            "endDistanceMeters": 5320.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_002_road_0",
+            "startDistanceMeters": 5410.0,
+            "endDistanceMeters": 5420.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_002_road_0",
+            "startDistanceMeters": 5640.0,
+            "endDistanceMeters": 5650.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_002_road_0",
+            "startDistanceMeters": 5740.0,
+            "endDistanceMeters": 5750.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_003_road_0",
+            "startDistanceMeters": 6410.0,
+            "endDistanceMeters": 6420.0,
+            "eventCount": 2,
+            "maximumSeverity": 0,
+            "eventTypes": "SectionEntry, SectionExit"
+        },
+        {
+            "sectionId": "section_003_road_0",
+            "startDistanceMeters": 6460.0,
+            "endDistanceMeters": 6470.0,
+            "eventCount": 3,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit, ThrusterSaturation"
+        },
+        {
+            "sectionId": "section_003_road_0",
+            "startDistanceMeters": 6560.0,
+            "endDistanceMeters": 6570.0,
+            "eventCount": 3,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit, ThrusterSaturation"
+        },
+        {
+            "sectionId": "section_003_road_0",
+            "startDistanceMeters": 6740.0,
+            "endDistanceMeters": 6750.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorWorldDisagreement, SpringTravelLimit"
+        },
+        {
+            "sectionId": "section_004_road_0",
+            "startDistanceMeters": 6910.0,
+            "endDistanceMeters": 6920.0,
+            "eventCount": 2,
+            "maximumSeverity": 0,
+            "eventTypes": "SectionEntry, SectionExit"
+        },
+        {
+            "sectionId": "section_005_road_0",
+            "startDistanceMeters": 7630.0,
+            "endDistanceMeters": 7640.0,
+            "eventCount": 2,
+            "maximumSeverity": 0,
+            "eventTypes": "SectionEntry, SectionExit"
+        },
+        {
+            "sectionId": "section_006_road_0",
+            "startDistanceMeters": 7890.0,
+            "endDistanceMeters": 7900.0,
+            "eventCount": 6,
+            "maximumSeverity": 1,
+            "eventTypes": "NearSurfaceExit, ProbeLoss, SectionEntry, SectionExit, SurfaceEnvelopeDeparture, ThrusterSaturation"
+        },
+        {
+            "sectionId": "section_007_road_0",
+            "startDistanceMeters": 8300.0,
+            "endDistanceMeters": 8310.0,
+            "eventCount": 2,
+            "maximumSeverity": 0,
+            "eventTypes": "SectionEntry, SectionExit"
+        },
+        {
+            "sectionId": "section_007_road_0",
+            "startDistanceMeters": 8310.0,
+            "endDistanceMeters": 8320.0,
+            "eventCount": 2,
+            "maximumSeverity": 1,
+            "eventTypes": "SensorMiss, SensorWorldDisagreement"
+        },
+        {
+            "sectionId": "section_008_road_0",
+            "startDistanceMeters": 8850.0,
+            "endDistanceMeters": 8860.0,
+            "eventCount": 3,
+            "maximumSeverity": 2,
+            "eventTypes": "SectionEntry, SectionExit, UnexpectedAirborne"
+        }
+    ],
+    "evidenceNotes": [
+        "All classifications are evidence labels; no event is asserted as a single-cause diagnosis.",
+        "World truth, craft belief, requests, execution, and forces share one physics-tick identity."
+    ],
+    "potentialInvestigationAreas": [
+        "Review world-contact versus hover-belief disagreement samples and their sensor ages.",
+        "Review high force-residual windows for unmodeled contacts or incomplete force attribution.",
+        "Review unexpected-airborne locations against track surface truth and hover probes."
+    ],
+    "rawDataFiles": [
+        "channel_schema.json",
+        "events.json",
+        "event_context.ndjson",
+        "track_report.json",
+        "samples_compact.bin",
+        "samples_compact.bin.crc32",
+        "samples_core.csv",
+        "device_samples.csv",
+        "attempt_summary.csv"
+    ]
+}

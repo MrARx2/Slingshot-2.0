@@ -1,0 +1,108 @@
+{
+    "testId": "test.v3.ballistic.gravity_only.01",
+    "testVersion": 2,
+    "sessionId": "0fad09878206",
+    "buildId": "build.hovercraft.baseline.01",
+    "buildGuid": "a2946245bc904c19a0827a4308c729be",
+    "buildOwnership": "GeneratedReference",
+    "controlPath": "MainframeScheduled",
+    "comparisonGroupId": "comparison.gravity_only_v2",
+    "finalPhase": 4,
+    "passed": true,
+    "abortReason": "",
+    "utcStarted": "2026-08-02T07:36:54.7679076Z",
+    "utcEnded": "2026-08-02T07:36:59.9279315Z",
+    "runnerOverheadMilliseconds": 0.1695,
+    "droppedSamples": 0,
+    "droppedEvents": 0,
+    "recorderOutputDirectory": "D:\\Projects\\Unity\\Slingshot2\\Slingshot-2.0\\Slingshot 2.0\\TestDriveReports\\HovercraftV3\\Controlled\\2026-08-02_073659_test.v3.ballistic.gravity_only.01_20260802_073655_0fad09878206",
+    "assertions": [
+        {
+            "assertionId": "a2.aero.zero",
+            "passed": true,
+            "expected": "0..0.001",
+            "measured": "min=0, max=0",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "forces.aero"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "a2.fin.zero",
+            "passed": true,
+            "expected": "0..0.001",
+            "measured": "min=0, max=0",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "forces.fin"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "a2.no.contact",
+            "passed": true,
+            "expected": "0..0",
+            "measured": "min=0, max=0",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "world.contactCount"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "a2.gravity.response",
+            "passed": true,
+            "expected": "-9.80665 +/- 0.25",
+            "measured": "mean=-9.80664",
+            "tolerance": 0.25,
+            "sampleTimeRange": "0.05-0.5 s",
+            "supportingChannels": [
+                "world.acceleration.y"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "a2.residual.p95",
+            "passed": true,
+            "expected": "p95 <= 100",
+            "measured": "p95=2.09375",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "forces.residual",
+                "world.contactCount",
+                "identity.dynamicsValid"
+            ],
+            "evidenceFile": "force_summary.csv"
+        },
+        {
+            "assertionId": "a2.no.false.landing",
+            "passed": true,
+            "expected": "0 events",
+            "measured": "0 events",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "events.json"
+        },
+        {
+            "assertionId": "a2.build.identity",
+            "passed": true,
+            "expected": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "measured": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "session_manifest.json"
+        }
+    ],
+    "setupWarnings": [
+        "Transient aerodynamic override is being applied to selected non-TestOnly craft build.hovercraft.baseline.01; the source asset is not modified.",
+        "Controlled runtime override disabled chassis aerodynamics.",
+        "Controlled runtime override disabled 4 aerodynamic fin device(s)."
+    ]
+}

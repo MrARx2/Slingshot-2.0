@@ -1,0 +1,624 @@
+{
+    "buildStableId": "build.hovercraft.baseline.01",
+    "buildAssetGuid": "a2946245bc904c19a0827a4308c729be",
+    "buildOwnership": "GeneratedReference",
+    "trackTestPreset": "TrackTest_Baseline",
+    "controlPath": "MainframeScheduled",
+    "buildDisplayName": "Hovercraft Baseline",
+    "manufacturer": "Lunarlight",
+    "vehicleClass": "Baseline Systems Craft",
+    "layout": "Fixed Rear Propulsion / Four-Corner Suspension / Active Aero",
+    "chassisStableId": "chassis.apex.v3.systems_integration.01",
+    "chassisDisplayName": "Apex V3 Systems Chassis",
+    "calculatedMassKg": 11619.5,
+    "calculatedCenterOfMass": {
+        "x": -0.0018073057290166617,
+        "y": -0.4756174087524414,
+        "z": -0.04103672504425049
+    },
+    "rigidbodyCenterOfMass": {
+        "x": -0.0018073057290166617,
+        "y": -0.4756174087524414,
+        "z": -0.04103672504425049
+    },
+    "rigidbodyInertiaTensor": {
+        "x": 63885.2109375,
+        "y": 71480.515625,
+        "z": 17502.93359375
+    },
+    "rigidbodyInertiaTensorRotation": {
+        "x": -0.0021007698960602285,
+        "y": 0.000011122899195470382,
+        "z": 0.000657243886962533,
+        "w": 0.9999976754188538
+    },
+    "automaticCenterOfMass": false,
+    "automaticInertiaTensor": true,
+    "installedPartCount": 37,
+    "installedParts": [
+        {
+            "stableId": "connector.propulsion.fixed.baseline.01",
+            "displayName": "Baseline Rear Fixed Adapter",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Propulsion.Rear.Center",
+            "massKg": 60.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "thruster.main.balanced.01",
+            "displayName": "V2Reference MainThruster",
+            "manufacturer": "",
+            "role": "Propulsion",
+            "socketId": "Propulsion.Rear.Center",
+            "massKg": 300.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "thruster.brake.balanced.01",
+            "displayName": "V2Reference BrakeThruster",
+            "manufacturer": "",
+            "role": "Braking",
+            "socketId": "Braking.Front.Center",
+            "massKg": 250.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "connector.spring.hover.balanced.01",
+            "displayName": "V2 Reference Hover Spring Mount",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Hover.Front.Left.Bottom",
+            "massKg": 35.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": false
+        },
+        {
+            "stableId": "thruster.hover.balanced.01",
+            "displayName": "V2Reference HoverThruster",
+            "manufacturer": "",
+            "role": "Hover",
+            "socketId": "Hover.Front.Left.Bottom",
+            "massKg": 100.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "connector.spring.hover.balanced.01",
+            "displayName": "V2 Reference Hover Spring Mount",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Hover.Front.Right.Bottom",
+            "massKg": 35.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": false
+        },
+        {
+            "stableId": "thruster.hover.balanced.01",
+            "displayName": "V2Reference HoverThruster",
+            "manufacturer": "",
+            "role": "Hover",
+            "socketId": "Hover.Front.Right.Bottom",
+            "massKg": 100.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "connector.spring.hover.balanced.01",
+            "displayName": "V2 Reference Hover Spring Mount",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Hover.Rear.Left.Bottom",
+            "massKg": 35.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": false
+        },
+        {
+            "stableId": "thruster.hover.balanced.01",
+            "displayName": "V2Reference HoverThruster",
+            "manufacturer": "",
+            "role": "Hover",
+            "socketId": "Hover.Rear.Left.Bottom",
+            "massKg": 100.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "connector.spring.hover.balanced.01",
+            "displayName": "V2 Reference Hover Spring Mount",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Hover.Rear.Right.Bottom",
+            "massKg": 35.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": false
+        },
+        {
+            "stableId": "thruster.hover.balanced.01",
+            "displayName": "V2Reference HoverThruster",
+            "manufacturer": "",
+            "role": "Hover",
+            "socketId": "Hover.Rear.Right.Bottom",
+            "massKg": 100.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "thruster.roof.balanced.01",
+            "displayName": "V2Reference RoofThruster",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Control.Front.Left.Top",
+            "massKg": 80.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "thruster.roof.balanced.01",
+            "displayName": "V2Reference RoofThruster",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Control.Front.Right.Top",
+            "massKg": 80.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "thruster.roof.balanced.01",
+            "displayName": "V2Reference RoofThruster",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Control.Rear.Left.Top",
+            "massKg": 80.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "thruster.roof.balanced.01",
+            "displayName": "V2Reference RoofThruster",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Control.Rear.Right.Top",
+            "massKg": 80.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "thruster.strafe.balanced.01",
+            "displayName": "V2Reference StrafeThruster",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Strafe.Left.Front",
+            "massKg": 75.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "thruster.strafe.balanced.01",
+            "displayName": "V2Reference StrafeThruster",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Strafe.Right.Front",
+            "massKg": 75.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "thruster.strafe.balanced.01",
+            "displayName": "V2Reference StrafeThruster",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Strafe.Left.Rear",
+            "massKg": 75.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "thruster.strafe.balanced.01",
+            "displayName": "V2Reference StrafeThruster",
+            "manufacturer": "",
+            "role": "Control",
+            "socketId": "Strafe.Right.Rear",
+            "massKg": 75.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "energycore.main.balanced.01",
+            "displayName": "V2 Reference EnergyCore",
+            "manufacturer": "",
+            "role": "Energy",
+            "socketId": "Core.Main",
+            "massKg": 600.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": false
+        },
+        {
+            "stableId": "cockpit.main.balanced.01",
+            "displayName": "V2 Reference Cockpit",
+            "manufacturer": "",
+            "role": "Cockpit",
+            "socketId": "Cockpit.Main",
+            "massKg": 400.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "computer.pilotinterface.balanced.01",
+            "displayName": "Balanced PilotInterface Computer",
+            "manufacturer": "",
+            "role": "InternalSystem",
+            "socketId": "System.PilotInterface",
+            "massKg": 22.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": true
+        },
+        {
+            "stableId": "computer.drive.balanced.01",
+            "displayName": "Balanced Drive Computer",
+            "manufacturer": "",
+            "role": "InternalSystem",
+            "socketId": "System.Drive",
+            "massKg": 22.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": true
+        },
+        {
+            "stableId": "computer.hover.balanced.01",
+            "displayName": "Balanced Hover Computer",
+            "manufacturer": "",
+            "role": "InternalSystem",
+            "socketId": "System.Hover",
+            "massKg": 22.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": true
+        },
+        {
+            "stableId": "computer.stabilizer.balanced.01",
+            "displayName": "Balanced Stabilizer Computer",
+            "manufacturer": "",
+            "role": "InternalSystem",
+            "socketId": "System.Stabilizer",
+            "massKg": 22.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": true
+        },
+        {
+            "stableId": "computer.traction.balanced.01",
+            "displayName": "Balanced Traction Computer",
+            "manufacturer": "",
+            "role": "InternalSystem",
+            "socketId": "System.Traction",
+            "massKg": 22.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": true
+        },
+        {
+            "stableId": "computer.aerodynamics.balanced.01",
+            "displayName": "Balanced Aerodynamics Computer",
+            "manufacturer": "",
+            "role": "InternalSystem",
+            "socketId": "System.Aerodynamics",
+            "massKg": 22.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": true
+        },
+        {
+            "stableId": "computer.telemetry.balanced.01",
+            "displayName": "Balanced Telemetry Computer",
+            "manufacturer": "",
+            "role": "InternalSystem",
+            "socketId": "System.Telemetry",
+            "massKg": 18.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": true
+        },
+        {
+            "stableId": "connector.aero.rotary.balanced.01",
+            "displayName": "Balanced Rotary Fin Actuator",
+            "manufacturer": "",
+            "role": "Aerodynamics",
+            "socketId": "Aero.Front.Left",
+            "massKg": 18.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "fin.aero.balanced.01",
+            "displayName": "Balanced Active Fin",
+            "manufacturer": "",
+            "role": "Aerodynamics",
+            "socketId": "Aero.Front.Left",
+            "massKg": 12.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": true
+        },
+        {
+            "stableId": "connector.aero.rotary.balanced.01",
+            "displayName": "Balanced Rotary Fin Actuator",
+            "manufacturer": "",
+            "role": "Aerodynamics",
+            "socketId": "Aero.Front.Right",
+            "massKg": 18.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "fin.aero.balanced.01",
+            "displayName": "Balanced Active Fin",
+            "manufacturer": "",
+            "role": "Aerodynamics",
+            "socketId": "Aero.Front.Right",
+            "massKg": 12.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": true
+        },
+        {
+            "stableId": "connector.aero.rotary.balanced.01",
+            "displayName": "Balanced Rotary Fin Actuator",
+            "manufacturer": "",
+            "role": "Aerodynamics",
+            "socketId": "Aero.Rear.Left",
+            "massKg": 18.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "fin.aero.balanced.01",
+            "displayName": "Balanced Active Fin",
+            "manufacturer": "",
+            "role": "Aerodynamics",
+            "socketId": "Aero.Rear.Left",
+            "massKg": 12.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": true
+        },
+        {
+            "stableId": "connector.aero.rotary.balanced.01",
+            "displayName": "Balanced Rotary Fin Actuator",
+            "manufacturer": "",
+            "role": "Aerodynamics",
+            "socketId": "Aero.Rear.Right",
+            "massKg": 18.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        },
+        {
+            "stableId": "fin.aero.balanced.01",
+            "displayName": "Balanced Active Fin",
+            "manufacturer": "",
+            "role": "Aerodynamics",
+            "socketId": "Aero.Rear.Right",
+            "massKg": 12.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": false,
+            "requiresData": true
+        },
+        {
+            "stableId": "cooling.active.balanced.01",
+            "displayName": "Balanced Active Cooling",
+            "manufacturer": "",
+            "role": "Cooling",
+            "socketId": "Cooling.Main",
+            "massKg": 55.0,
+            "localCenterOfMass": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "requiresPower": true,
+            "requiresData": true
+        }
+    ],
+    "sensorCount": 6,
+    "computerCount": 7,
+    "schedulerTaskCount": 7,
+    "mainframeDefinition": "Balanced_Mainframe",
+    "routerProfile": "Balanced_Router_Profile",
+    "hoverConfigurationId": "hover.hovercraft.baseline.01",
+    "hoverConfigurationVersion": 3,
+    "targetHoverHeight": 8.0,
+    "minimumHoverClearance": 1.0,
+    "maximumHoverRange": 80.0,
+    "nearHoverRange": 12.0,
+    "captureRange": 28.0,
+    "fallbackRange": 32.0,
+    "automaticHoverAuthorityLimit": 7.0,
+    "automaticRoofAuthorityLimit": 7.0,
+    "manualAuthorityLimit": 1.0,
+    "hoverStrength": 0.44999998807907107,
+    "hoverDamping": 0.11999999731779099,
+    "gravityCompensationEnabled": true,
+    "gravityCompensationMultiplier": 1.0,
+    "maximumCompressionMeters": 0.30000001192092898,
+    "maximumExtensionMeters": 0.11999999731779099,
+    "surfaceCurvatureFeedForward": 1.100000023841858,
+    "surfaceTrackingResponse": 12.0,
+    "maximumSurfaceTrackingAcceleration": 340.0,
+    "roofCaptureStrength": 7.0,
+    "roofCaptureDamping": 5.0,
+    "maximumRoofCaptureAcceleration": 180.0,
+    "roofCaptureDeadband": 0.3499999940395355
+}

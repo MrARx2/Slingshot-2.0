@@ -1,2 +1,0 @@
-# surface table: none
-sample,time_s,surface,evaluated,posX,posY,posZ,airflowX,airflowY,airflowZ,aoa_deg,cl,cd,liftN,dragN,totalN,torqueNm,stall01,stalled,deflection_deg,geDistance_m,geMultiplier,efficiency

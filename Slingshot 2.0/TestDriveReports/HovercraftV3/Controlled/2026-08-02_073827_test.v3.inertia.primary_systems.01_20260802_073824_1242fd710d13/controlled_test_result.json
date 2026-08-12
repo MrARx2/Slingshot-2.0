@@ -1,0 +1,44 @@
+{
+    "testId": "test.v3.inertia.primary_systems.01",
+    "testVersion": 1,
+    "sessionId": "1242fd710d13",
+    "buildId": "build.hovercraft.baseline.01",
+    "buildGuid": "a2946245bc904c19a0827a4308c729be",
+    "buildOwnership": "GeneratedReference",
+    "controlPath": "MainframeScheduled",
+    "comparisonGroupId": "comparison.inertia_roll_pitch_yaw_v1",
+    "finalPhase": 4,
+    "passed": true,
+    "abortReason": "",
+    "utcStarted": "2026-08-02T07:38:23.4149757Z",
+    "utcEnded": "2026-08-02T07:38:27.4890551Z",
+    "runnerOverheadMilliseconds": 0.3537,
+    "droppedSamples": 0,
+    "droppedEvents": 0,
+    "recorderOutputDirectory": "D:\\Projects\\Unity\\Slingshot2\\Slingshot-2.0\\Slingshot 2.0\\TestDriveReports\\HovercraftV3\\Controlled\\2026-08-02_073827_test.v3.inertia.primary_systems.01_20260802_073824_1242fd710d13",
+    "assertions": [
+        {
+            "assertionId": "f.angular.error",
+            "passed": true,
+            "expected": "0..10",
+            "measured": "min=0, max=5.40752",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "inertia.angularAccelerationError"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "f.build.identity",
+            "passed": true,
+            "expected": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "measured": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "session_manifest.json"
+        }
+    ],
+    "setupWarnings": []
+}

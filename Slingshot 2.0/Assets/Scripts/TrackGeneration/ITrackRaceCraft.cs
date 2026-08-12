@@ -22,6 +22,15 @@ namespace TrackGeneration
         void OnPlacedAtTrackStart();
     }
 
+    /// <summary>
+    /// Optional extension for craft sessions that derive recovery limits from
+    /// the generated course instead of assuming a fixed world-space floor.
+    /// </summary>
+    public interface ITrackBoundsConsumer
+    {
+        void OnTrackBoundsChanged(Bounds worldBounds);
+    }
+
     /// <summary>Runtime discovery for the scene's <see cref="ITrackRaceCraft"/>.</summary>
     public static class TrackCraftLocator
     {

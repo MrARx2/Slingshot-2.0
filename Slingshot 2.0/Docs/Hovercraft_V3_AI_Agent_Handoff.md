@@ -1,1209 +1,295 @@
-# Hovercraft V3 - Complete AI Agent Handoff
+# Hovercraft V3 — Canonical AI Agent Handoff
 
-Last updated: 2026-07-27
+Last source verification: 2026-08-01  
+Unity: 6000.5.0f1  
+Branch observed: `Jack_Hovercraft_v3`
 
-## 1. Purpose of this document
+This is the canonical handoff for Hovercraft V3. Read the repair report for gate-level evidence and incomplete verification:
 
-This is the canonical handoff for the Hovercraft V3 implementation in the
-Slingshot 2.0 Unity project. It is intended to let another AI agent continue
-work without reconstructing prior decisions from chat history.
+`Docs/Hovercraft_V3_Architecture_Aero_SurfaceCapture_Authoring_Repair_Report.md`
 
-This document describes:
+## Current status
 
-- what is implemented;
-- the non-negotiable physics architecture;
-- how craft data, sockets, connectors, and runtime assembly work;
-- the current generated Apex reference craft and its variants;
-- controls, debug tools, scenes, and editor workflows;
-- the authoritative automated test and parity state;
-- known limitations and safe extension points.
+The source repair for architecture debt, fin aerodynamics, surface capture, reset, recorder semantics, build ownership, authoring, Track Test selection, and diagnostic UI is implemented. Runtime, diagnostics, editor, and track-integration assemblies compile. Static stable-ID and GUID/meta audits pass.
 
-When documentation and code disagree, use this precedence:
+Do not claim the post-repair Unity suite, parity, or controlled Runs A–H have passed. The open Unity editor remained in Play Mode during the repair. A marker-gated focused run is queued and must complete after Play Mode exits.
 
-1. Current source under `Assets/HovercraftV3/`.
-2. Current generated assets under `Assets/HovercraftV3/Prototype/`.
-3. The newest passing test artifacts named in this document.
-4. This handoff.
-5. Older gate reports and mapping documents.
+## Non-negotiable physical architecture
 
-Some older reports contain values from before the external-hardware and
-side-outrigger refactors. Never restore an old number merely because it appears
-in an earlier report.
+The assembled craft has one non-kinematic root Rigidbody and one intended chassis collider. Installed parts do not add competing rigidbodies or gameplay colliders.
 
-## 2. Project and repository state
+Normal force authority is limited to physical runtimes:
 
-- Unity version: `6000.5.0f1`.
-- Project directory:
-  `D:\Projects\Unity\Slingshot2\Slingshot-2.0\Slingshot 2.0`
-- V3 runtime assembly: `Lunarlight.Hovercraft.V3`
-- V3 Editor assembly: `Lunarlight.Hovercraft.V3.Editor`
-- V3 test assembly: `Lunarlight.Hovercraft.V3.EditorTests`
-- Input dependency: Unity Input System.
+- `Runtime/Parts/Thrusters/RuntimeThrusterInstance.cs` applies powered thruster force at physical force origins.
+- `Runtime/Parts/Aerodynamics/RuntimeAerodynamicFinInstance.cs` applies passive aerodynamic force at each fin center of pressure.
+- `Runtime/Parts/Aerodynamics/V3CraftAerodynamicsRuntime.cs` applies airflow-derived chassis aerodynamic force/torque.
 
-As of this handoff, Git reports `Assets/HovercraftV3/` and the newest V3
-documents as untracked. Do not reset, clean, replace, or delete them on the
-assumption that Git can recover them.
+Controllers, system runtimes, Mainframe software, diagnostics, UI, and track analysis must not directly apply force/torque, write normal gameplay velocity/pose, guide along the spline, or add hidden adhesion. Recovery/reset is the explicit pose/velocity-write exception.
 
-`Temp/CodexV3UnityProject/` is an isolated Unity test mirror. It is not the
-source of truth. Source edits belong in the main project. The mirror is useful
-when the main project is open in Unity or when batch tests must not touch the
-user's active Library.
+World gravity authority is `V3WorldEnvironmentProvider`/world environment sampling and the Rigidbody gravity configuration. Gravity must be applied exactly once.
 
-## 3. Completion status
-
-The gated V3 foundation is complete. There is no open mandatory implementation
-gate.
-
-| Gate | Result | Delivered capability |
-| --- | --- | --- |
-| 0 | Pass | Measured V2 baseline, repeatable command profile, CSV/JSON telemetry |
-| 1 | Pass | Data definitions, sockets, compatibility validation, craft builder |
-| 2 | Pass | Modular V2-equivalent Apex hardware reconstruction |
-| 3 | Pass | Enforced physical behavioral parity |
-| 4 | Pass | Per-part thermal simulation and telemetry |
-| 5 | Pass | Powered rear-main gimbal using the same thruster endpoint |
-| 6 | Pass | Emergency overload, thermal derating, shutdown, lockout, recovery |
-| 7 | Pass | Player input, HUD/warnings, reset/recovery, free-drive scene |
-| 8 | Pass | Passive spring connector with a moving physical force origin |
-| 9 | Pass | Balanced, Propulsion, Stability, and Recovery power modes |
-| 10 | Pass | Unified read-only craft telemetry hub |
-| 11 | Pass | Socket, part, and capability registries |
-| 12 | Pass | Runtime mass service and post-assembly validation |
-
-Work after Gate 12 added:
-
-- inspector vehicle cards and written preset descriptions;
-- runtime thruster direction/firing/temperature visualization;
-- surface-normal versus craft-up visualization;
-- inclined, stepped, and suspension-test surfaces in free drive;
-- physical-only stabilization, yaw damping, and traction allocation;
-- visible external socket/connector/thruster construction;
-- a four-outrigger, drone-style vertical-thruster layout.
-
-## 4. Non-negotiable architecture rules
-
-### 4.1 All normal craft motion is actuator-authoritative
-
-The production control path is:
+## Execution and control flow
 
 ```text
-player or scripted V3PilotCommand
-    -> controller intent
-    -> V3ActuatorCommandRouter
-    -> V3PowerDistributor
-    -> RuntimeThrusterInstance
-    -> Rigidbody.AddForceAtPosition(..., ForceMode.Force)
+Pilot/replay/test intent
+  -> V3ControllerPipeline
+  -> Mainframe observation and Intent Bus
+  -> callback-backed software scheduler
+  -> Drive/Hover/Stabilizer/Traction/Aero system runtimes
+  -> V3ControlRouter
+  -> V3ActuatorCommandRouter
+  -> power + firmware + thermal + spool/actuator state
+  -> physical thruster/fin/chassis-aero force
+  -> root Rigidbody motion
 ```
 
-Within `Assets/HovercraftV3`, `RuntimeThrusterInstance` is the only normal
-craft-control force application site.
+Six physical directional sensors and seven physical computer/system runtimes remain required for the complete Mainframe topology. Scheduler cadence is real and bounded; a task definition is not execution.
 
-Controllers must not call:
+## Mainframe fallback policy
 
-- `Rigidbody.AddForce`;
-- `Rigidbody.AddTorque`;
-- direct position or rotation writes;
-- direct linear or angular velocity writes.
+`V3ControllerPipeline.ActiveControlPath` is the source of truth:
 
-Hover stabilization, surface alignment, yaw damping, and grounded traction all
-request a desired force/torque wrench from `V3ActuatorCommandRouter`. The router
-allocates that request over installed thrusters using their real directions,
-force ceilings, and lever arms.
+- `MainframeScheduled`: complete scheduled path executed.
+- `LegacyFallback`: the selected build explicitly permits legacy execution.
+- `FaultedNoFallback`: the complete build could not execute Mainframe control and resolved neutral.
+- `None`: uninitialized/reset-neutral state.
 
-The only intentional direct Rigidbody state changes are:
+Primary systems and complete baseline builds disable silent fallback. V2 reference builds explicitly permit legacy control. Never “repair” a complete-build fault by making fallback implicit.
 
-- free-drive manual/automatic recovery reset;
-- parity-harness scenario reset.
+## Fin aerodynamic model
 
-These are explicit scenario transitions, not normal driving physics.
+Fins use their physical local chord, lift-normal, and span frame. Runtime samples point airflow, calculates signed AoA, evaluates a bounded lift slope, positive/negative stall, post-stall lift decay, reverse-flow suppression, base/induced/separated drag, and optional structural force/moment limits. Force remains physical and is applied at the authored center of pressure.
 
-### 4.2 One craft, one Rigidbody
+Recorder and Aero UI expose relative airflow, airspeed, AoA, Cl, Cd, stall, reverse flow, lift/drag vectors, CoP, and structural state.
 
-Every assembled craft has exactly one root Rigidbody. Connectors, thrusters,
-the cockpit, and the EnergyCore are children of that body and do not receive
-independent Rigidbodies.
+## Surface-state and capture semantics
 
-The root body uses:
+`V3SurfaceState` distinguishes:
 
-- gravity enabled;
-- interpolation enabled;
-- continuous dynamic collision detection;
-- zero authored linear damping;
-- zero authored angular damping;
-- maximum angular velocity 50 rad/s.
+- `NoSurface`
+- `SurfaceDetected`
+- `NearSurfaceHover`
+- `SurfaceCaptured`
+- `SurfaceSeparating`
+- `CaptureLimited`
+- `ProbeLost`
+- `FreeFlight`
 
-Physical damping effects come from installed actuators, not Rigidbody damping.
+Keep these truths separate:
 
-### 4.3 Connectors move endpoints, not the craft root
+- surface evidence exists;
+- the surface is inside the near-hover envelope;
+- automatic capture authority is available;
+- a collider contact exists.
 
-A connector hierarchy is:
+Compatibility `V3HoverController.IsGrounded` means near-surface hover eligibility, not any distant ray hit.
+
+Capture authority is distance-curve authority multiplied by robust probe consensus. It reaches zero beyond the configured capture range (28 m in the generated systems profile). Fallback-only authority is capped, one/two/three primary-probe confidence is capped separately, disagreeing normals are rejected, and stale histories clear. Curvature feed-forward, gravity support, height control, surface alignment, and roof capture scale with the same authority. Roof capture remains installed-thruster-driven.
+
+## Product, installation, and system limits
+
+Keep ownership explicit:
+
+- Product definitions own nominal/normal/emergency physical force, spool, mass, structure, thermal limits, and firmware compatibility.
+- `SocketInstallation` owns automatic cap, explicit-manual/emergency cap, emergency permission, and local calibration. Zero cap inherits the established product limit for migration compatibility.
+- `V3HoverConfiguration` owns desired automatic hover/roof caps and capture authority tuning.
+- Runtime objects own temperature, current output/angle, sensor samples, task accumulators, and faults.
+
+The console exposes product maximum, installation cap, system cap/request, grants/limits, and actual output. Do not move runtime state into authored assets.
+
+## Dynamic reset contract
+
+Public entry:
+
+`V3CraftRuntime.ResetDynamicState(V3DynamicResetContext)`
+
+`BeforePoseReset` deterministically clears pilot input queues/current command, controllers, hover probes/normals/history, control and actuator routers, Mainframe buses, scheduler grants/accumulators/counters, system-runtime cached commands, firmware/device state, thruster spool/output, aero actuators, gimbals, and recovery thermal state. `V3FreeDriveSession` invokes before/after phases around the authorized pose/velocity reset.
+
+The pipeline deliberately suppresses authority on the first post-reset physics tick. Held input may resume on a later tick, but the discontinuity tick is neutral.
+
+## Recorder schema and event meanings
+
+Canonical identity is schema integer `6`, text `6.0`.
+
+`identity.dynamicsValid` is false on the first sample and external discontinuities. Force/torque residual aggregates exclude invalid derivative samples. Reports include contact-free residual count, mean, p95, and maximum.
+
+Physical transition vocabulary:
+
+- `SurfaceEnvelopeDeparture`: current surface evidence left sensing range.
+- `NearSurfaceExit`: near-hover eligibility ended.
+- `ProbeLoss`: all current probe evidence was lost.
+- `ContactLoss`: collider contact ended.
+- `PhysicalTakeoff`: prior support/capture ended and free flight began.
+- `FreeFlightEntered`: no contact, no near surface, and negligible capture authority.
+- `ContactLanding`: a new collider contact began.
+- `SurfaceReacquired`: surface evidence returned.
+- `OutOfBounds`: mapped craft position is outside track bounds; never a landing by itself.
+- `MappingAmbiguity`: normal jumped while the craft was outside reliable mapping confidence/bounds.
+- `TrackNormalDiscontinuity`: an in-bounds independent normal jump that warrants collider/geometry inspection.
+
+Legacy `Takeoff`/`Landing` enum values remain for compatibility but are not emitted by the detector.
+
+New recordings default to `ForensicCompact`; NDJSON is opt-in. CSV includes raw `device_samples.csv`. Controlled-run metadata includes build stable ID, asset GUID, ownership, Track Test preset, and actual control path. Diagnostics remain read-only.
+
+## Build identity and generated ownership
+
+`CraftBuildDefinition` includes:
+
+- stable build ID;
+- Unity asset GUID;
+- `V3BuildOwnership` (`GeneratedReference`, `AuthoredVariant`, `TestOnly`, `Regression`);
+- explicit legacy-fallback permission.
+
+Generated assets are generator-owned. Change their generator/source, not the generated file as normal tuning. The quarantined stale systems build is regression-owned with a unique ID; do not silently restore its old duplicate identity.
+
+Run `Tools > Hovercraft V3 > Validation > Audit Stable IDs` after build/product/scene identity changes.
+
+## Authored build workflow
+
+Open `CraftBuilderWindow`, select a generated or authored build, and use **Create Authored Variant**. Variants are created under:
+
+`Assets/HovercraftV3/Content/Builds`
+
+They receive authored ownership, a new stable ID/GUID, and fallback disabled. Hover/capture configuration and per-installation authority/calibration are deep-copied; immutable product assets remain shared references. The window supports Undo, Save, Revert, Compare Runtime to Source, and deliberate Apply Runtime Calibration. Generated builds are visibly protected from normal authored editing.
+
+Current limitation: not every stabilizer, traction, drive, aero, Router, and software-rate local override has moved into a build-owned override container.
+
+## Inertia model
+
+Production still uses Unity’s current Rigidbody/compound-collider inertia. `V3DistributedInertiaCalculator` is a comparison model only: an axis-aligned chassis box plus installed point masses through the parallel-axis theorem. The recorder captures tensor/rotation, applied torque, measured and expected angular acceleration, and error.
+
+Do not apply or hardcode a new tensor until controlled roll/pitch/yaw torque runs compare Unity automatic, distributed point-mass, compound primitive, and optional authored models.
+
+## Track Test build selection
+
+Canonical full-track scene:
+
+`Assets/HovercraftV3/Scenes/Development/V3_TrackTest.unity`
+
+It defaults to `ApexV3_SystemsIntegration.asset`. Use the Track Test generator presets for:
+
+- baseline;
+- primary systems;
+- selected authored build.
+
+All presets update the same scene/spawner/assembler; do not create scene forks merely to select a build. The world root ID is `world.root.v3_tracktest`.
+
+## Track audit status
+
+The eight schema-5 baseline normal-discontinuity events were all zero-contact, out-of-envelope nearest-centerline mappings at the track half-width boundary and 63–278 m vertical offset. They are classified as mapping ambiguity, not proven collider seams. No geometry was changed.
+
+Inspect mesh and collider triangles only for an in-bounds schema-6 event or direct geometry/collider mismatch. Keep craft-control defects separate from track defects.
+
+## Systems console
+
+The scene-owned read-only console exposes:
+
+- build ownership, GUID, schema, and actual control path/reason;
+- Mainframe/scheduler/bus/power/thermal state;
+- surface state, detection/near/contact distinction, probe confidence/age, authority and limit reason;
+- bottom/roof request → route → allocation → power → firmware → thermal → actual chain;
+- product, installation, and system authority caps;
+- per-fin AoA, Cl, Cd, stall/reverse, lift, and drag.
+
+It must remain read-only and bounded-rate.
+
+## Controlled dynamics validation workflow
+
+The permanent controlled suite lives under:
+
+- runtime: `Assets/HovercraftV3/Runtime/Diagnostics/ControlledTests`;
+- editor: `Assets/HovercraftV3/Editor/Diagnostics/ControlledTests`;
+- definitions/builds/variants/decisions: `Assets/HovercraftV3/Content/ControlledTests`;
+- isolated scene: `Assets/HovercraftV3/Scenes/Diagnostics/V3_ControlledDynamics.unity`;
+- evidence: `TestDriveReports/HovercraftV3/Controlled`.
+
+Open `Tools > Hovercraft V3 > Diagnostics > Controlled Dynamics Tests`, select a test definition and an independent craft definition, validate them, and run the selected or batch workflow. The test definition owns the repeatable scene, fixture, initial conditions, commands, failures, and assertions; the craft selector owns the build under test. A batch keeps the same selected craft across every queued definition. The result and recorder manifest store that selected build's stable ID, GUID, and ownership. CLI evidence capture uses the definition's default craft through the environment-gated `V3ControlledDynamicsTests.SelectedScenario_RunsThroughSerializedSceneAndExports` test with:
+
+`Clear Previous Test Reports...` previews file counts and sizes, then offers either the selected definition's controlled-output folder or the complete project `TestDriveReports` root. Full-root cleanup requires a second confirmation, is unavailable during active runs/batches, and never removes files outside that report root. Report packages are disposable generated evidence, but deleting them invalidates any documentation links that point to those exact captures.
 
 ```text
-V3Socket.MountTransform
-    -> connector RuntimePartInstance
-        -> ConnectorChildMount.MountTransform
-            -> endpoint RuntimePartInstance
+HOVERCRAFT_V3_RUN_CONTROLLED_CAPTURE=1
+HOVERCRAFT_V3_CONTROLLED_DEFINITION=Assets/HovercraftV3/Content/ControlledTests/Definitions/<definition>.asset
 ```
 
-The gimbal rotates its child mount. The spring translates its child mount. The
-child thruster inherits that transform, so its actual force direction or force
-origin changes. The connector does not apply a hidden craft force.
+Lifecycle phases are `Setup`, `Warmup`, `Measured`, `Cooldown`, `Complete`, and `Aborted`. Test commands acquire the exclusive test-only `V3PilotInputAdapter` owner and then use the real Mainframe/scheduler/Router/power/firmware/device path. Failure requests use `V3ControlledCraftFailureController` and normal device/computer/power states. Unsupported software/firmware/rate failures are rejected rather than emulated by script disabling.
 
-### 4.4 Generated assets have one owner
+Controlled results fail on any assertion failure or recorder sample/event drop. Packages contain schema 6 recorder outputs plus `controlled_test_result.json` and `controlled_test_result.md`. Compare compatible results with `V3ControlledComparisonReportWriter`; its CLI entry point reads `HOVERCRAFT_V3_CONTROLLED_RESULTS` as `resultA|resultB`.
 
-`V2ReferencePrototypeGenerator` owns
-`Assets/HovercraftV3/Prototype/`.
+The A2 gravity-only approximation is guarded: it uses `build.test.v3.ballistic.gravity_only.01` with `TestOnly` ownership, omits fins, and explicitly disables only chassis aerodynamics through `SetChassisAerodynamicsEnabled`. Production defaults remain enabled, and non-TestOnly definitions are rejected.
 
-Do not make durable fixes only in a generated prefab or generated
-ScriptableObject. The next generator run will overwrite them. Change the
-generator, regenerate, then verify the generated result.
+Calibration history is stored as `V3CalibrationDecision` assets under `Assets/HovercraftV3/Content/ControlledTests/Calibration`. Each decision records old/new value, expected/measured effect, accepted state, rationale, target, and evidence package references.
 
-## 5. High-level runtime architecture
+Current controlled status is documented in `Docs/Hovercraft_V3_Controlled_Dynamics_Validation_and_Calibration_Report.md`. Do not treat a serialized preset pass as completion of a broader matrix. D and F remain partial, and H is an explicit failed gate.
 
-```text
-CraftBuildDefinition
-  + ChassisDefinition
-  + PartCatalog
-  + SocketInstallation[]
-          |
-          v
-CraftBuildValidator
-          |
-          v
-V3CraftAssembler
-  1. instantiate chassis
-  2. discover stable sockets
-  3. instantiate connector/endpoint chains
-  4. calculate and apply mass + COM
-  5. initialize runtime and registries
-  6. validate instantiated topology
-  7. bind all thrusters to the root Rigidbody
-  8. install thermal/debug systems
-  9. optionally install reference controllers
- 10. initialize telemetry hub
-          |
-          v
-V3ControllerPipeline.FixedUpdate
-  -> gimbal intent/power
-  -> drive requests
-  -> hover/manual/stabilization requests
-  -> vectoring/yaw-damping requests
-  -> traction wrench request
-  -> router resolve
-  -> power allocation
-  -> thruster AddForceAtPosition
-```
+## Verification status and paths
 
-Deterministic execution-order attributes currently are:
+Source-level compilation succeeded for:
 
-- `V3ControllerPipeline`: `-1000`;
-- `V3ThermalController`: `-500`;
-- `V3CockpitWarningController`: `-250`;
-- `V3CraftTelemetryHub`: `-100`.
+- `Lunarlight.Hovercraft.V3.csproj`
+- `Lunarlight.Hovercraft.V3.Diagnostics.csproj`
+- `Lunarlight.Hovercraft.V3.Editor.csproj`
+- `Lunarlight.Hovercraft.V3.TrackIntegration.csproj`
+- `Lunarlight.Hovercraft.V3.EditorTests.csproj` as a syntax/reference check with .NET Framework 4.7.2; this is not Unity test execution.
 
-## 6. Repository map
+Static audits: no missing/orphan meta, duplicate meta GUID, duplicate stable ID, missing stable ID, or invalid world-root ID in the audited V3 scope.
 
-### Runtime data and authoring contracts
+Final Unity evidence on 2026-08-01:
 
-- `Assets/HovercraftV3/Runtime/Data/V3AssemblyTypes.cs`
-  - socket families, sizes, roles, endpoint and connector types;
-  - power, thermal, physical, and capability enums/profiles.
-- `Assets/HovercraftV3/Runtime/Data/PartDefinition.cs`
-  - shared part identity, prefab, mass, power, thermal, compatibility, and
-    capability data.
-- `Assets/HovercraftV3/Runtime/Data/ThrusterDefinition.cs`
-  - force, spool, local direction/origin, normal and overload ceilings.
-- `Assets/HovercraftV3/Runtime/Data/ConnectorDefinition.cs`
-  - connector kind and child endpoint compatibility/limits.
-- `Assets/HovercraftV3/Runtime/Data/GimbalDefinition.cs`
-- `Assets/HovercraftV3/Runtime/Data/SpringMountDefinition.cs`
-- `Assets/HovercraftV3/Runtime/Data/EnergyCoreDefinition.cs`
-- `Assets/HovercraftV3/Runtime/Data/CockpitDefinition.cs`
-- `Assets/HovercraftV3/Runtime/Data/ChassisDefinition.cs`
-- `Assets/HovercraftV3/Runtime/Data/PartCatalog.cs`
+- `TestResults/HovercraftV3/Fast/ControlledSuite-FrameworkFocused-Final.xml`: 6 passed, 0 failed, 2 intentionally skipped capture gates.
+- `TestResults/HovercraftV3/Fast/ControlledSuite-Final-V3EditMode-Rerun.xml`: 164 passed, 0 failed, 3 intentionally skipped capture gates out of 167. Serialized CraftLab, HandlingTrack, and TrackTest PlayMode integrations pass inside this assembly.
+- `TestResults/HovercraftV3/Fast/ControlledSuite-StableIdAudit-Final.xml`: pass.
+- `TestResults/HovercraftV3/Parity/ControlledSuite-EnforcedParity-Final.xml`: pass in 78.281 seconds; 7,801 V2 and 7,801 V3 samples.
 
-### Builds, sockets, and validation
+Final static audit of `Assets/HovercraftV3`: 939 asset/folder items, 939 metas, 0 missing metas, 0 orphan metas, and 0 duplicate GUIDs. The automated stable-ID/world-root audit passes. CraftLab's generator-owned root is `world.root.v3_craftlab`; HandlingTrack remains `world.root.v3_handlingtrack`.
 
-- `Assets/HovercraftV3/Runtime/Assembly/V3Socket.cs`
-- `Assets/HovercraftV3/Runtime/Assembly/ConnectorChildMount.cs`
-- `Assets/HovercraftV3/Runtime/Build/CraftBuildDefinition.cs`
-- `Assets/HovercraftV3/Runtime/Build/CraftBuildValidator.cs`
+Controlled evidence summary:
 
-### Runtime assembly and services
+- A1 ballistic: pass, 9/9, zero drops.
+- A2 gravity-only TestOnly build: pass, 7/7, zero drops.
+- B production-fin matrix: pass, 360 runtime points and seven matrix assertions.
+- C race-speed edge departure: pass, 4/4, zero drops; other speeds pending.
+- D descending fixture: pass, 3/3; loop/crest/bank/corkscrew pending.
+- E reset neutrality: pass, 6/6, zero drops.
+- F yaw/pitch inertia preset: pass, 2/2; roll and model selection pending.
+- G authored variants: regeneration persistence pass for both assets.
+- H full track: fail. Maximum 10,968.02 m of 48,230.965 m, one reset, one crash, and 18 OutOfBounds events.
 
-- `Assets/HovercraftV3/Runtime/Runtime/V3CraftAssembler.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3CraftRuntime.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3CraftMassCalculator.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3RuntimeBuildValidator.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3CraftRegistries.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3CraftTelemetryHub.cs`
+The canonical package index and superseded/degraded-run distinctions are in the controlled validation report. Older schema-5 packages remain baseline history, not post-repair proof.
 
-### Runtime parts
+## Known prototype limitations
 
-- `Assets/HovercraftV3/Runtime/Runtime/RuntimePartInstance.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/RuntimeThrusterInstance.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/RuntimeGimbalInstance.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/RuntimeSpringMountInstance.cs`
+- Current capture defaults still need controlled tuning.
+- Scenario H does not complete the benchmark and must not be reported as a passing full lap.
+- Scenario C multi-speed, Scenario D multi-section, and Scenario F roll/multi-model matrices remain incomplete.
+- Production inertia is not yet empirically selected.
+- Authored local override coverage is incomplete beyond hover/capture and installation authority/calibration.
+- Installation authority does not yet distinguish every arbitrary request source.
+- Hover probes remain controller-owned; directional sensors are still mostly readiness/diagnostic inputs.
+- Mainframe coupling and computer physical power/thermal fidelity remain prototype-level.
+- Track geometry mismatch/thin-edge/overlap detection awaits direct evidence.
+- Final cockpit art, manufacturer presentation, damage, multiplayer, audio, and other production features remain out of scope.
 
-### Control, power, and feedback
+## Safe modification rules
 
-- `Assets/HovercraftV3/Runtime/Runtime/V3ControllerPipeline.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3ActuatorCommandRouter.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3PowerDistributor.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3DriveController.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3HoverController.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3VectorController.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3TractionController.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3GimbalController.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3ThermalController.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3CockpitWarningController.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3PilotInputAdapter.cs`
+1. Preserve one root Rigidbody and one intended chassis collider.
+2. Preserve physical thruster, fin, and airflow-based chassis-aero authority.
+3. Never add controller force/torque, normal velocity/pose writes, spline guidance, or hidden adhesion.
+4. Keep gravity single-authority.
+5. Keep power, firmware, thermal, spool, and scheduler cadence authoritative.
+6. Keep six physical sensors and seven complete system runtimes for the Mainframe build.
+7. Keep diagnostics and UI read-only.
+8. Change generated content through generators; keep authored variants outside `Generated`.
+9. Preserve `.meta` files and unique stable IDs/GUIDs.
+10. Rerun focused, full, serialized-scene, parity, and controlled evidence after physical/control changes.
 
-### Runtime test-drive and debug presentation
+## Related documents
 
-- `Assets/HovercraftV3/Runtime/Runtime/V3FreeDriveSession.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3FreeDriveCamera.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3FreeDriveHud.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3ThrusterDebugView.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3ThermalDebugDisplay.cs`
-- `Assets/HovercraftV3/Runtime/Runtime/V3CockpitWarningDisplay.cs`
-
-### Editor tools and generators
-
-- `Assets/HovercraftV3/Editor/V2ReferencePrototypeGenerator.cs`
-- `Assets/HovercraftV3/Editor/CraftBuilderWindow.cs`
-- `Assets/HovercraftV3/Editor/V3CraftAssemblerEditor.cs`
-- `Assets/HovercraftV3/Editor/V3FreeDriveSceneGenerator.cs`
-- `Assets/HovercraftV3/Editor/V3ParityHarnessGenerator.cs`
-
-### Tests
-
-All V3 tests are in `Assets/HovercraftV3/Tests/Editor/`.
-
-## 7. Data model and compatibility
-
-### 7.1 Socket contract
-
-Every `V3Socket` has:
-
-- a stable, unique socket ID;
-- family and size;
-- a `MountTransform`;
-- supported mass, force, and power limits;
-- power/data availability;
-- allowed direct endpoint categories;
-- allowed connector kinds;
-- optional paired-socket and configuration-group identity.
-
-Compatibility is checked before assembly by `CraftBuildValidator`.
-
-Supported socket families currently include:
-
-- `HeavyPropulsion`;
-- `HoverVerticalControl`;
-- `LateralControl`;
-- `Cockpit`;
-- `EnergyBay`;
-- `InternalEquipment`.
-
-### 7.2 Build contract
-
-`CraftBuildDefinition` is a saved ScriptableObject containing:
-
-- vehicle identity and written driving description;
-- a `ChassisDefinition`;
-- a `PartCatalog`;
-- one `SocketInstallation` per authored socket selection.
-
-An installation can be:
-
-- empty;
-- direct endpoint;
-- connector plus child endpoint.
-
-The same endpoint definition may be installed at multiple sockets. Runtime
-instances are distinct and are indexed by both stable part ID and socket ID.
-
-### 7.3 Capabilities
-
-Capabilities are flags:
-
-- drive control;
-- hover control;
-- stabilization;
-- vectoring control;
-- thermal telemetry;
-- power distribution.
-
-The cockpit provides drive/hover/stabilization/vectoring capability. The
-EnergyCore provides power distribution. If a required capability has no
-installed provider, authoring validation rejects the build. If a provider is
-disabled at runtime, the controller pipeline removes the corresponding pilot
-authority instead of continuing through an abstract fallback.
-
-## 8. Current generated Apex V3 layout
-
-### 8.1 Chassis
-
-- Visual/collision size: `3.6 x 1.55 x 7.8 m`.
-- Chassis base mass: `8,430 kg`.
-- Current authored base COM:
-  `(0, -0.65262157, 0.004151838)`.
-- Parity COM calibration: `(0, 0, 0)`.
-- Final reference runtime mass: `11,000 kg`.
-- Final reference runtime COM: `(0, -0.5, 0)`.
-- One root BoxCollider.
-
-Socket, connector, thruster, cockpit, EnergyCore, and outrigger primitive
-visuals are collider-free. The single chassis collider prevents hidden
-overlapping compound shapes and keeps the V3 inertia tensor equal to the V2
-reference.
-
-Outrigger visuals are part of the chassis presentation and do not have
-independent part mass entries. Their structural mass is implicitly included in
-the chassis base mass.
-
-### 8.2 Hardware orientation rule
-
-`ThrusterDefinition.LocalThrustDirection` is local `+Z`.
-
-The visible hardware extends along local `-Z`, opposite the applied thrust.
-This rule works for front, rear, side, upper, and lower hardware and is
-important for future art replacement.
-
-### 8.3 Four drone-style outriggers
-
-There are four thin side extensions:
-
-- front-left;
-- front-right;
-- rear-left;
-- rear-right.
-
-Each extension is approximately:
-
-- `0.85 m` across the craft;
-- `0.22 m` tall;
-- `0.95 m` long.
-
-Their centers are at approximately:
-
-- `x = +/-2.175 m`;
-- `y = 0`;
-- `z = +/-3 m`.
-
-Each carries:
-
-- a hover socket underneath;
-- a roof/downforce socket on top;
-- a strafe socket on the outer end.
-
-The direct hover and roof thruster bodies are intentionally shallow. Their
-complete socket-plus-thruster stacks remain inside the chassis's original
-vertical silhouette, keeping the craft wide, long, and low. The spring variant
-may extend slightly below this envelope because it intentionally adds moving
-suspension travel.
-
-### 8.4 Stable socket IDs
-
-Heavy propulsion:
-
-- `Propulsion.Rear.Center`
-- `Braking.Front.Center`
-
-Bottom hover:
-
-- `Hover.Front.Left.Bottom`
-- `Hover.Front.Right.Bottom`
-- `Hover.Rear.Left.Bottom`
-- `Hover.Rear.Right.Bottom`
-
-Top control/downforce:
-
-- `Control.Front.Left.Top`
-- `Control.Front.Right.Top`
-- `Control.Rear.Left.Top`
-- `Control.Rear.Right.Top`
-
-Lateral:
-
-- `Strafe.Left.Front`
-- `Strafe.Right.Front`
-- `Strafe.Left.Rear`
-- `Strafe.Right.Rear`
-
-Internal:
-
-- `Core.Main`
-- `Cockpit.Main`
-
-Total sockets: 16. Thruster sockets: 14.
-
-### 8.5 Prototype colors
-
-- chassis: dark blue-gray;
-- outriggers: lighter slate;
-- sockets: yellow;
-- connectors: orange;
-- thrusters: blue;
-- EnergyCore: green;
-- cockpit: cyan.
-
-These are orientation/readability aids, not final art.
-
-## 9. Reference hardware
-
-| Part | Count | Mass each | Base force/output |
-| --- | ---: | ---: | --- |
-| Rear main thruster | 1 | 300 kg | 480 kN base; 720 kN normal installed ceiling; 900 kN overload |
-| Front brake thruster | 1 | 250 kg | 1.7 MN physical ceiling; 380 kN normal drive request plus traction authority |
-| Bottom hover thruster | 4 | 100 kg | 160 kN base; up to 7x installed output |
-| Top control thruster | 4 | 80 kg | 160 kN base; up to 7x installed output |
-| Lateral thruster | 4 | 75 kg | 800 kN physical ceiling; normal strafe command is 0.19 = 152 kN |
-| EnergyCore | 1 | 600 kg | 4,500 continuous; 4,500 propulsion; 1,000 systems |
-| Cockpit/control rack | 1 | 400 kg | drive, hover, stabilization, vectoring capabilities |
-
-Reference installed part mass is `2,570 kg`, producing the `11,000 kg` total
-with the `8,430 kg` chassis.
-
-The EnergyCore has no temporary peak output in the reference asset.
-
-## 10. Current craft presets
-
-### Apex V3 Reference
-
-- Asset:
-  `Assets/HovercraftV3/Prototype/Builds/ApexV3_V2Reference.asset`
-- Assembler prefab:
-  `Assets/HovercraftV3/Prototype/Prefabs/ApexV3_V2Reference_Assembler.prefab`
-- Layout: direct-mount / balanced.
-- Mass: `11,000 kg`.
-- Installed runtime parts: 16.
-- Purpose: parity baseline and control craft for comparisons.
-
-### Apex V3 Vector
-
-- Asset:
-  `Assets/HovercraftV3/Prototype/Builds/ApexV3_MainGimbalDemo.asset`
-- Assembler prefab:
-  `Assets/HovercraftV3/Prototype/Prefabs/ApexV3_MainGimbalDemo_Assembler.prefab`
-- Layout: rear-main gimbal.
-- Mass: `11,120 kg`.
-- Installed runtime parts: 17.
-- Reuses the exact same main thruster definition.
-- Gimbal:
-  - mass `120 kg`;
-  - pitch and yaw `+/-30 degrees`;
-  - speed `180 deg/s`;
-  - angular acceleration `720 deg/s^2`;
-  - actuator torque telemetry ceiling `25,000 Nm`;
-  - powered systems part.
-
-The main thruster is a child of the gimbal's actuated mount. Both the moving
-connector visual and the thruster visibly swivel.
-
-### Apex V3 Terrain
-
-- Asset:
-  `Assets/HovercraftV3/Prototype/Builds/ApexV3_HoverSpringDemo.asset`
-- Assembler prefab:
-  `Assets/HovercraftV3/Prototype/Prefabs/ApexV3_HoverSpringDemo_Assembler.prefab`
-- Layout: front-left spring hover.
-- Mass: `11,035 kg`.
-- Installed runtime parts: 17.
-- Reuses the exact same hover thruster definition.
-- Spring:
-  - mass `35 kg`;
-  - compression travel `0.30 m`;
-  - extension travel `0.12 m`;
-  - total travel `0.42 m`;
-  - stiffness `600,000 N/m`;
-  - damping `18,000 Ns/m`;
-  - maximum integration step `1/240 s`.
-
-Only the front-left hover corner uses a spring. This is intentionally a
-single-corner demonstrator, not a complete four-corner suspension package.
-
-## 11. Assembly lifecycle
-
-`V3CraftAssembler.Rebuild()` performs the following:
-
-1. Validate the saved build.
-2. Destroy the previous assembled runtime root.
-3. Instantiate the chassis under `runtimeParent`, or under the assembler if
-   `runtimeParent` is null.
-4. Discover all `V3Socket` children and index them by stable socket ID.
-5. Instantiate each selected connector at the socket mount.
-6. Resolve its `ConnectorChildMount`.
-7. Instantiate the selected endpoint directly under the socket mount or under
-   the connector child mount.
-8. Calculate and apply mass and center of mass.
-9. Initialize `V3CraftRuntime`.
-10. Initialize socket, part, and capability registries.
-11. Perform independent runtime topology and mass validation.
-12. Bind every runtime thruster to the one root Rigidbody.
-13. Initialize thruster debug and thermal systems.
-14. Optionally install the reference controller pipeline.
-15. Initialize the telemetry hub.
-
-The Runtime Parent field is optional. Leave it empty unless the generated craft
-must be placed under a specific transform.
-
-## 12. Mass, registries, validation, and telemetry
-
-### Mass
-
-`V3CraftMassCalculator` calculates:
-
-```text
-total mass =
-    chassis base mass
-    + every installed connector mass
-    + every installed endpoint mass
-```
-
-Center of mass is a mass-weighted sum of the chassis base COM and every
-instantiated part's transformed local COM. It then adds the explicitly visible
-`ParityCenterOfMassCalibration`, which is zero for the current reference.
-
-The generator assembles a temporary reference craft and recalibrates the
-chassis base COM so regenerating after socket geometry changes still lands on
-the required final COM.
-
-### Registries
-
-- `V3SocketRegistry`: stable socket lookup, pairing, groups.
-- `V3PartRegistry`: all runtime instances by socket and stable part ID;
-  connector and typed endpoint resolution.
-- `V3CapabilityRegistry`: aggregate provided/required capabilities and active
-  operational providers.
-
-Connector and endpoint instances deliberately share the same parent socket ID.
-The registry preserves both records.
-
-### Runtime validation
-
-`V3RuntimeBuildValidator` independently verifies:
-
-- all required runtime services exist;
-- exactly one root Rigidbody exists;
-- runtime socket count matches the chassis;
-- connector/endpoint chain counts and definitions match the saved build;
-- endpoints are children of connector moving mounts;
-- required capabilities are satisfied;
-- runtime mass and COM match the calculator.
-
-An invalid runtime assembly is destroyed before reference controllers are
-installed.
-
-### Telemetry
-
-`V3CraftTelemetryHub` is the read-only observation boundary. It exposes:
-
-- build identity;
-- mass and COM;
-- Rigidbody motion;
-- socket/capability/validation state;
-- systems and propulsion power;
-- power mode and allocation by priority;
-- thermal aggregates;
-- per-part runtime state;
-- thruster forces;
-- gimbal motion and torque telemetry;
-- spring displacement, load, and energy telemetry.
-
-Do not add command or mutation responsibilities to the telemetry hub.
-
-## 13. Controller and force behavior
-
-### Drive
-
-`V3DriveController` maps signed throttle to:
-
-- rear main for positive drive;
-- front brake thruster for reverse/braking.
-
-Current calibration:
-
-- throttle rise `4.5/s`;
-- throttle fall `5/s`;
-- main installed multiplier `1.5`;
-- brake drive multiplier `0.22352941`;
-- emergency main multiplier `1.25` on top of the normal request.
-
-### Hover and surface stabilization
-
-`V3HoverController` probes from each installed bottom hover-thruster force
-origin.
-
-Current values:
-
-- target distance from the external force origin: `3.075 m`;
-- sphere radius `0.1 m`;
-- range `7 m`;
-- fallback sphere radius `0.35 m`;
-- track mask: layer 8;
-- height gain `0.45`;
-- vertical damping `0.12`;
-- corner angular damping `0.08`;
-- pitch sensitivity `0.589`;
-- surface alignment strength `60`;
-- surface alignment damping `4`;
-- maximum alignment acceleration `60`;
-- speed stiffness from `80` to `600`;
-- maximum stiffness multiplier `3.5`.
-
-Ground normals are averaged from the four bottom probes. Desired alignment
-acceleration is converted to required world torque, then submitted across the
-installed bottom and roof thrusters. There is no direct stabilization torque.
-
-### Vectoring and yaw damping
-
-`V3VectorController` uses the four lateral thrusters.
-
-Current values:
-
-- strafe sensitivity `0.19`;
-- steering sensitivity `0.2975`;
-- steering yaw authority `2.8`;
-- yaw damping `5.35`.
-
-Yaw damping is converted to required world torque and solved over the lateral
-thrusters.
-
-### Traction
-
-`V3TractionController` acts only when grounded. It computes desired local
-lateral and longitudinal acceleration from velocity and grip-breaker state,
-converts that to a force request, and submits the wrench over:
-
-- four lateral thrusters;
-- rear main;
-- front brake.
-
-It does not apply drag or modify velocity directly.
-
-### Gimbal
-
-`V3GimbalController` sends pitch/yaw intent to installed gimbals, resolves
-their systems power, and advances the powered mount. It uses a `0.2 s`
-transient input hold and returns at `4 input units/s`.
-
-The gimbal itself does not torque the root craft. Its physical effect comes
-from the child main thruster's changed direction.
-
-## 14. Actuator routing and power
-
-### Router
-
-`V3ActuatorCommandRouter` owns one entry per thruster socket and aggregates
-requests by:
-
-- channel: drive, base hover, stabilization, vectoring, manual;
-- priority: optional, drive, vectoring, stabilization, critical.
-
-For general force/torque requests, `SubmitWrench` builds candidates from the
-actual installed thrusters and their:
-
-- world force directions;
-- force origins;
-- COM-relative lever arms;
-- force ceilings;
-- existing requests;
-- thermal limits;
-- overload authorization.
-
-It uses a bounded non-negative iterative allocation. It never invents a force
-direction that the installed hardware cannot produce.
-
-### Power modes
-
-`V3PowerDistributor` reserves systems power, applies EnergyCore ceilings, and
-allocates propulsion demand in priority tiers. Demand within one tier is
-scaled proportionally, avoiding installation-order bias.
-
-| Mode | Priority order |
-| --- | --- |
-| Balanced | Critical -> Stability -> Steering -> Drive -> Optional |
-| Propulsion | Critical -> Drive -> Steering -> Stability -> Optional |
-| Stability | Stability -> Critical -> Steering -> Drive -> Optional |
-| Recovery | Critical -> Stability -> Drive -> Steering -> Optional |
-
-Modes may feel identical while the core has sufficient headroom. Their effect
-appears when total requested power exceeds available power.
-
-Tab cycles:
-
-```text
-Balanced -> Propulsion -> Stability -> Recovery -> Balanced
-```
-
-## 15. Thermal and overload behavior
-
-Each `RuntimePartInstance` owns its thermal state:
-
-- current temperature;
-- generated heat;
-- passive cooling;
-- output limit;
-- protection state;
-- lockout timer.
-
-Protection states:
-
-- Normal;
-- Warning;
-- Overheated;
-- CoolingLockout;
-- Recovered.
-
-Generated heat depends on actual output. Passive cooling is proportional to
-temperature above ambient. Above the safe threshold, output progressively
-derates. At overheat, the part locks out. Restart requires both:
-
-- cooling to the restart temperature;
-- expiry of the minimum cooling lockout.
-
-Default generated thermal profile:
-
-- ambient `20 C`;
-- safe `90 C`;
-- overheat `120 C`;
-- restart `75 C`;
-- minimum lockout `2 s`;
-- overload heat multiplier `2.2`.
-
-The main thruster has deliberately lower thermal capacity and cooling plus a
-less severe hot output limit so sustained overload can visibly reach warning
-and shutdown while normal driving remains viable.
-
-Emergency overload is explicit pilot intent. Holding Ctrl authorizes the
-router to use the overload ceiling for that frame. It does not bypass power or
-thermal limits.
-
-## 16. Player controls
-
-Keyboard/mouse:
-
-| Input | Action |
-| --- | --- |
-| W / S | Forward throttle / braking-reverse |
-| A / D | Strafe left / right |
-| Mouse X / Y | Yaw / pitch |
-| Arrow keys | Held gimbal/yaw test through gamepad-look action |
-| E | Manual lift |
-| Q | Roof downforce |
-| Shift | Grip breaker / drift |
-| Ctrl | Emergency overload |
-| R | Toggle stabilization |
-| Tab | Cycle power allocation mode |
-| Backspace | Reset craft |
-| F1 | Toggle free-drive HUD |
-| F2 | Toggle thruster debug visualization |
-| Escape | Release cursor and pause pilot input |
-| Left click | Recapture cursor and resume pilot input |
-
-Gamepad:
-
-- triggers: signed throttle;
-- left stick X: strafe;
-- right stick: yaw/pitch;
-- right shoulder: lift;
-- left shoulder: downforce;
-- east face button: grip breaker;
-- south face button: overload;
-- Start: stabilization;
-- D-pad up: power mode;
-- Select: reset.
-
-Input actions are created at runtime by `V3PilotInputAdapter`. Binding overrides
-can be serialized to and restored from JSON.
-
-## 17. Debugging and free-drive testing
-
-### Free-drive scene
-
-Scene:
-
-`Assets/HovercraftV3/FreeDrive/Scenes/V3_FreeDrive_Test.unity`
-
-Generate or refresh it with:
-
-`Tools > Hovercraft V3 > Generate Free Drive Test Scene`
-
-It includes:
-
-- flat driving space;
-- lane guides;
-- inclined surfaces;
-- stepped and bumpy suspension-test features;
-- spawn/recovery support;
-- camera and HUD;
-- test controls described above.
-
-The default generated scene uses the reference assembler. To test another
-preset, change the assembler's `Build` field or place the desired assembler
-prefab.
-
-### Thruster debug
-
-Press F2 in free drive.
-
-- Thin arrow: installed facing/thrust direction.
-- Thick/long arrow: actual force while firing.
-- Arrow length/width: force magnitude.
-- Blue -> green -> yellow -> red: individual temperature.
-- Red/locked state: thermal lockout.
-- Purple: averaged ground/surface normal.
-- White: current craft up direction.
-- `G pitch/yaw`: live gimbal angles.
-
-World labels show socket ID, output, force in kN, and temperature.
-
-### Inspector vehicle card
-
-`V3CraftAssemblerEditor` displays:
-
-- name, class, layout, summary, and driving notes;
-- mass;
-- dimensions;
-- forward/braking/hover/lateral force;
-- power;
-- balance/COM information;
-- installed hardware;
-- all power-mode descriptions.
-
-This is the intended "car selection" information surface for the current
-prototype stage.
-
-## 18. Editor authoring workflow
-
-### Regenerate canonical prototype assets
-
-Unity menu:
-
-`Tools > Hovercraft V3 > Generate V2 Reference Prototype`
-
-This regenerates:
-
-- chassis and part prefabs;
-- materials;
-- definitions;
-- part catalog;
-- all three build assets;
-- all three assembler prefabs.
-
-### Build editor
-
-Unity menu:
-
-`Tools > Hovercraft V3 > Craft Builder`
-
-The window supports:
-
-- creating/loading a build asset;
-- editing vehicle identity and written description;
-- selecting direct endpoints or connector/endpoint chains;
-- compatibility explanations;
-- mass and power summaries;
-- complete build validation;
-- resetting selections to the V2 reference;
-- saving the build;
-- rebuilding a selected assembler.
-
-### Runtime assembler
-
-Place one of the assembler prefabs or add `V3CraftAssembler` to a GameObject.
-
-- Assign `Build`.
-- Keep `Assemble On Start` enabled for normal use.
-- Keep `Install Reference Controllers` enabled for a player-drivable craft.
-- `Runtime Parent` is optional.
-
-Use the component context menu `Rebuild V3 Craft` when required.
-
-## 19. Automated verification
-
-### Current passing state
-
-Fast EditMode suite:
-
-`Temp/CodexV3UnityProject/TestResults-outriggers-fast.xml`
-
-- total: 80;
-- passed: 79;
-- failed: 0;
-- skipped: 1.
-
-The skipped test is the intentionally opt-in, 78-second parity capture.
-
-Enforced parity capture:
-
-`Temp/CodexV3UnityProject/TestResults-outriggers-parity.xml`
-
-- total: 1;
-- passed: 1;
-- failed: 0.
-
-Latest telemetry run ID: `20260727_160919`.
-
-| Metric | V2 | V3 |
-| --- | ---: | ---: |
-| Mass | 11,000 kg | 11,000 kg |
-| COM | `(0,-0.5,0)` | `(0,-0.5,~0)` |
-| Inertia tensor | `(60722.30,67650,16832.29)` | identical |
-| Idle clearance | 3.4080 m | 3.4050 m |
-| Maximum speed | 7063.40 km/h | 7077.86 km/h |
-| Time to 500 km/h | 2.2001 s | 2.2001 s |
-| Time to 1000 km/h | 4.3201 s | 4.3001 s |
-| Brake/reverse distance | 788.06 m | 794.73 m |
-| Peak yaw rate | 413.405 deg/s | 413.152 deg/s |
-| Peak side speed | 13.095 km/h | 12.610 km/h |
-| Peak pitch | 3.5569 deg | 3.5590 deg |
-
-Asset audit after the outrigger regeneration:
-
-- 132 V3 assets/directories and metadata GUIDs checked;
-- zero missing `.meta` files;
-- zero orphan `.meta` files;
-- zero duplicate V3 GUIDs;
-- four generated outriggers;
-- 14 external socket visuals;
-- 14 endpoint mounts;
-- one chassis BoxCollider.
-
-### Important test files
-
-- `CraftBuildValidatorTests.cs`: compatibility and authoring errors.
-- `V2ReferencePrototypeTests.cs`: reference topology, mass, COM, external
-  hardware, outrigger layout, one-body/one-collider rules.
-- `V3HandlingControllerTests.cs`: controller math and physical allocation.
-- `V3ParityHarnessTests.cs`: generated scene and hard parity assertions.
-- `V3ThermalFoundationTests.cs`: thermal behavior.
-- `V3OverloadProtectionTests.cs`: overload and protection state machine.
-- `V3GimbalVariationTests.cs`: moving gimbal hierarchy and physical effect.
-- `V3SpringMountVariationTests.cs`: spring limits, hierarchy, and coupled hover.
-- `V3PowerDistributionModeTests.cs`: allocation modes and constrained power.
-- `V3CraftTelemetryHubTests.cs`: telemetry ownership/snapshots.
-- `V3CraftRegistryTests.cs`: runtime identity and capabilities.
-- `V3CraftKernelServicesTests.cs`: mass and runtime validation.
-- `V3PlayerFeedbackAndRecoveryTests.cs`: input, warnings, reset, slope/air tests.
-
-### Batch test guidance
-
-Unity executable:
-
-`C:\Program Files\Unity\Hub\Editor\6000.5.0f1\Editor\Unity.exe`
-
-When using `-runTests`, do not add `-quit`; Unity's test runner exits itself.
-
-Fast suite arguments:
-
-```text
--batchmode
--nographics
--projectPath "<isolated project path>"
--runTests
--testPlatform EditMode
--assemblyNames Lunarlight.Hovercraft.V3.EditorTests
--testResults "<absolute results XML path>"
--logFile "<absolute log path>"
-```
-
-Parity capture additionally requires:
-
-```text
-environment:
-HOVERCRAFT_V3_RUN_PARITY_CAPTURE=1
-
-argument:
--testFilter Lunarlight.Hovercraft.V3.Tests.V3ParityHarnessTests.ParityScene_CompletesFullProfileAndExportsTelemetry
-```
-
-Parity output is written below:
-
-`Application.persistentDataPath/HovercraftV3/Parity/`
-
-For the isolated project on this machine that has been:
-
-`C:\Users\Jack_\AppData\LocalLow\DefaultCompany\CodexV3UnityProject\HovercraftV3\Parity`
-
-Unity sometimes emits an initial licensing-client handshake warning before
-successfully resolving the installed entitlement. Judge the run by the Unity
-process exit code, XML result, and subsequent licensing resolution—not by that
-initial line alone.
-
-## 20. Parity harness
-
-Scene:
-
-`Assets/HovercraftV3/Parity/Scenes/V2_V3_FlatGround_Parity.unity`
-
-Profile:
-
-`Assets/HovercraftV3/Parity/Profiles/V2_V3_Parity_Command_Profile.asset`
-
-Generate/refresh:
-
-`Tools > Hovercraft V3 > Generate Gate 3 Parity Harness`
-
-The 78-second profile covers:
-
-- settle;
-- idle hover;
-- acceleration;
-- braking/reverse from 500 km/h;
-- yaw pulses;
-- strafe;
-- pitch response.
-
-Scenario boundaries deliberately reset both craft to equivalent state.
-
-Hard assertion tolerances:
-
-- mass, speed, acceleration time, brake distance: 2% relative;
-- center of mass: 0.05 m absolute;
-- idle clearance: 0.05 m absolute;
-- yaw, strafe, pitch: 5% relative.
-
-The V2 clone translates its configured forces into legacy
-`ForceMode.Acceleration` units. V3 uses native newtons and
-`ForceMode.Force`.
-
-## 21. Known limitations and intentional non-goals
-
-These are not unfinished gates, but future work must understand them:
-
-1. Prototype visuals are cubes, not final vehicle art.
-2. Only the chassis has a collider. External parts are real mass/power/thermal
-   and actuator entities but do not have separate collision hitboxes.
-3. Part damage, detachable hardware, and per-part collision responses are not
-   implemented.
-4. Outriggers are chassis visuals, not equippable mass-bearing definitions.
-5. The terrain preset has one spring corner only.
-6. The vector preset has one rear-main gimbal only.
-7. Power modes intentionally feel identical until power is constrained.
-8. The current hover target is calibrated from the external hover-thruster
-   force origins. Moving those origins requires parity revalidation.
-9. The free-drive recovery operation writes Rigidbody pose/velocity by design.
-   Do not copy that behavior into normal controllers.
-10. The separate aerodynamics documents describe systems under
-    `Assets/Scripts/Hovercraft_Setup/Aerodynamics/`. The generated Apex V3
-    reference chassis does not currently install that system. Do not assume
-    those reports describe the active `Assets/HovercraftV3` controller stack.
-11. Final player balance and presentation still require broader hands-on
-    playtesting.
-
-## 22. Safe extension recipes
-
-### Add a new endpoint part
-
-1. Derive a ScriptableObject definition from `EndpointDefinition`.
-2. Give it stable identity, role, size, physical/power/thermal profiles, and
-   compatible parent families.
-3. Create a prefab with the appropriate runtime instance component.
-4. Add it to a `PartCatalog`.
-5. Extend `V3CraftAssembler.InstantiatePart` only if it needs a new specialized
-   runtime instance.
-6. Add validation and registry/telemetry coverage.
-7. Add tests before adding it to generated builds.
-
-### Add a new connector
-
-1. Derive from `ConnectorDefinition`.
-2. Author a prefab containing `ConnectorChildMount`.
-3. The endpoint must be instantiated below that mount.
-4. Connector motion may change only the child mount.
-5. Do not add a second Rigidbody or direct root force.
-6. Extend validation, runtime type selection, telemetry, and tests.
-
-### Change socket or outrigger geometry
-
-1. Edit `V2ReferencePrototypeGenerator`.
-2. Preserve stable socket IDs unless performing an explicit migration.
-3. Preserve local `+Z` as thrust and local `-Z` as visible hardware direction.
-4. Regenerate all prototype assets.
-5. Confirm 16 sockets, 14 external mounts, one Rigidbody, and one collider.
-6. Confirm reference mass and final COM.
-7. Run the full fast suite.
-8. Run the opt-in physical parity capture.
-9. Retune controller intent only if the new real lever arms/inertia require it;
-   never add compensating virtual force or torque.
-
-### Add part hitboxes
-
-This is future work. Do not simply restore the old primitive colliders. Design
-explicit, non-overlapping compound hitboxes and decide:
-
-- whether they affect Rigidbody inertia;
-- whether part hitboxes are collision-only, damage-only, or both;
-- how chassis base mass and COM should change;
-- whether the one-root-Rigidbody rule remains;
-- how parity will be retained or intentionally superseded.
-
-### Add a new controller effect
-
-1. Express the desired force/torque intent.
-2. Choose eligible installed socket IDs.
-3. Submit through `V3ActuatorCommandRouter`.
-4. Let power and thermal systems constrain output.
-5. Verify loss of authority when required parts are disabled.
-6. Add a physical integration test proving there is no direct Rigidbody force.
-
-## 23. Do-not-regress checklist
-
-Before considering a Hovercraft V3 change complete, confirm:
-
-- [ ] No controller-level `AddForce` or `AddTorque`.
-- [ ] No normal-driving Rigidbody pose or velocity writes.
-- [ ] Exactly one root Rigidbody.
-- [ ] Exactly one current prototype chassis collider.
-- [ ] Connector endpoint is below the moving child mount.
-- [ ] Thruster visual moves with gimbal/spring articulation.
-- [ ] Stable socket IDs are unchanged or explicitly migrated.
-- [ ] Mass calculator includes every installed connector and endpoint.
-- [ ] Runtime validator passes.
-- [ ] Capability loss removes corresponding control authority.
-- [ ] Power shortage is resolved by the selected allocation mode.
-- [ ] Thermal derating and lockout constrain actual output.
-- [ ] Debug/telemetry read authoritative runtime state only.
-- [ ] Generator source and generated assets agree.
-- [ ] No missing, orphan, or duplicate `.meta` GUIDs.
-- [ ] Fast suite has zero failures.
-- [ ] Physical parity capture passes after geometry, collider, force, mass, COM,
-      or controller-gain changes.
-
-## 24. Related reports
-
-Current summary:
-
-- `Docs/Hovercraft_V3_Final_Audit_2026-07-27.md`
+- `Docs/Hovercraft_V3_Controlled_Dynamics_Validation_and_Calibration_Report.md`
+- `Docs/Hovercraft_V3_Architecture_Aero_SurfaceCapture_Authoring_Repair_Report.md`
+- `Docs/Hovercraft_V3_Forensic_Dynamics_Recorder_Implementation_Report.md`
+- `Docs/Hovercraft_V3_Forensic_Dynamics_Recorder_Usage.md`
+- `Docs/Hovercraft_V3_Forensic_Dynamics_Recorder_Schema.md`
+- `Docs/Hovercraft_V3_Mainframe_Systems_Integration_Implementation_Report.md`
+- `Docs/Hovercraft_V3_Runtime_Systems_Physical_Sensors_Scheduler_Repair_Report.md`
 - `Docs/Hovercraft_V3_V2_Mapping.md`
-
-Gate reports:
-
-- `Docs/Hovercraft_V3_Gate3_Parity_Report.md`
-- `Docs/Hovercraft_V3_Gate4_Thermal_Report.md`
-- `Docs/Hovercraft_V3_Gate5_Gimbal_Report.md`
-- `Docs/Hovercraft_V3_Gate6_Overload_Thermal_Protection_Report.md`
-- `Docs/Hovercraft_V3_Gate7_Player_Feedback_Recovery_Report.md`
-- `Docs/Hovercraft_V3_Gate8_Spring_Mount_Report.md`
-- `Docs/Hovercraft_V3_Gate9_Power_Distribution_Report.md`
-- `Docs/Hovercraft_V3_Gate10_Craft_Telemetry_Hub_Report.md`
-- `Docs/Hovercraft_V3_Gate11_Runtime_Registries_Report.md`
-- `Docs/Hovercraft_V3_Gate12_Mass_Runtime_Validation_Report.md`
-
-## 25. Recommended next phase
-
-The foundation is ready for product work. Reasonable next tracks are:
-
-- replace primitive art while preserving transforms and socket conventions;
-- add deliberately designed per-part hitboxes and a damage model;
-- expand the part catalog and create more genuinely distinct vehicle builds;
-- upgrade the builder into a player-facing garage/configurator;
-- install or adapt the project aerodynamics system for the Apex V3 chassis;
-- perform broader player handling/balance tests.
-
-Whichever track is selected, preserve the physical actuator authority rule and
-run parity before and after any change that alters mass, COM, collider inertia,
-force origin, force direction, or controller gains.

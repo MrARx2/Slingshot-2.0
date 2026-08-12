@@ -1,0 +1,78 @@
+{
+    "testId": "test.v3.selected_craft.integrity.01",
+    "testVersion": 2,
+    "sessionId": "d27c33d91119",
+    "buildId": "build.hovercraft.baseline.01",
+    "buildGuid": "a2946245bc904c19a0827a4308c729be",
+    "buildOwnership": "GeneratedReference",
+    "controlPath": "MainframeScheduled",
+    "comparisonGroupId": "comparison.selected_craft_integrity_v1",
+    "finalPhase": 4,
+    "passed": true,
+    "abortReason": "",
+    "utcStarted": "2026-08-02T07:38:36.0806993Z",
+    "utcEnded": "2026-08-02T07:38:38.0813850Z",
+    "runnerOverheadMilliseconds": 0.1087,
+    "droppedSamples": 0,
+    "droppedEvents": 0,
+    "recorderOutputDirectory": "D:\\Projects\\Unity\\Slingshot2\\Slingshot-2.0\\Slingshot 2.0\\TestDriveReports\\HovercraftV3\\Controlled\\2026-08-02_073837_test.v3.selected_craft.integrity.01_20260802_073836_d27c33d91119",
+    "assertions": [
+        {
+            "assertionId": "g.build.identity",
+            "passed": true,
+            "expected": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "measured": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "session_manifest.json"
+        },
+        {
+            "assertionId": "g.no.contact",
+            "passed": true,
+            "expected": "0..0",
+            "measured": "min=0, max=0",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "world.contactCount"
+            ],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "g.residual.p95",
+            "passed": true,
+            "expected": "p95 <= 100",
+            "measured": "p95=0.4375",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [
+                "forces.residual",
+                "world.contactCount",
+                "identity.dynamicsValid"
+            ],
+            "evidenceFile": "force_summary.csv"
+        },
+        {
+            "assertionId": "g.no.reset",
+            "passed": true,
+            "expected": "0 events",
+            "measured": "0 events",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "events.json"
+        },
+        {
+            "assertionId": "g.no.mainframe.degraded",
+            "passed": true,
+            "expected": "0 events",
+            "measured": "0 events",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "events.json"
+        }
+    ],
+    "setupWarnings": []
+}

@@ -1,0 +1,6 @@
+event_id,type,severity,timestamp_s,tick,sample_index,attempt_index,reset_reason,track_distance_m,section_id,speed_mps,world_state,manual,notes
+"manual_0001",ManualMarker,0,0,-1,-1,0,"",0,"",0,Unknown,true,"Controlled phase: Measured"
+"SampleRateDrop_00000000",SampleRateDrop,1,0.0099999929138321619,0,0,0,"",0,"",0,Unknown,false,"Measured sensor rate fell below 75% of its grant."
+"TaskUnderMinimum_00000000",TaskUnderMinimum,2,0.0099999929138321619,0,0,0,"",0,"",0,Unknown,false,"A software task measured below its minimum useful rate."
+"PowerStarvation_00000000",PowerStarvation,2,0.0099999929138321619,0,0,0,"",0,"",0,Unknown,false,"Requested power exceeded granted power."
+"manual_0005",ManualMarker,0,1.0099992842970522,100,100,0,"",0,"",9.8022184371948242,Unknown,true,"Controlled phase: Cooldown"

@@ -1,0 +1,82 @@
+{
+    "testId": "test.v3.reset_neutrality.primary_systems.01",
+    "testVersion": 1,
+    "sessionId": "47c32bea57c7",
+    "buildId": "build.hovercraft.baseline.01",
+    "buildGuid": "a2946245bc904c19a0827a4308c729be",
+    "buildOwnership": "GeneratedReference",
+    "controlPath": "MainframeScheduled",
+    "comparisonGroupId": "comparison.reset_neutrality_v1",
+    "finalPhase": 4,
+    "passed": true,
+    "abortReason": "",
+    "utcStarted": "2026-08-02T07:38:11.5223892Z",
+    "utcEnded": "2026-08-02T07:38:15.7787559Z",
+    "runnerOverheadMilliseconds": 1.4514,
+    "droppedSamples": 0,
+    "droppedEvents": 0,
+    "recorderOutputDirectory": "D:\\Projects\\Unity\\Slingshot2\\Slingshot-2.0\\Slingshot 2.0\\TestDriveReports\\HovercraftV3\\Controlled\\2026-08-02_073815_test.v3.reset_neutrality.primary_systems.01_20260802_073812_47c32bea57c7",
+    "assertions": [
+        {
+            "assertionId": "e.reset.event",
+            "passed": true,
+            "expected": "1 events",
+            "measured": "1 events",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "events.json"
+        },
+        {
+            "assertionId": "e.bottom.neutral",
+            "passed": true,
+            "expected": "forces.bottom <= 1 by 1.1 s (within 0.1 s after 1 s)",
+            "measured": "reached at 1.02 s",
+            "tolerance": 0.0,
+            "sampleTimeRange": "1-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "e.roof.neutral",
+            "passed": true,
+            "expected": "forces.roof <= 1 by 1.1 s (within 0.1 s after 1 s)",
+            "measured": "reached at 1.02 s",
+            "tolerance": 0.0,
+            "sampleTimeRange": "1-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "e.propulsion.neutral",
+            "passed": true,
+            "expected": "forces.propulsion <= 1 by 1.1 s (within 0.1 s after 1 s)",
+            "measured": "reached at 1.02 s",
+            "tolerance": 0.0,
+            "sampleTimeRange": "1-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "e.discontinuity.invalid",
+            "passed": true,
+            "expected": "identity.dynamicsValid <= 0 by 1.1 s (within 0.1 s after 1 s)",
+            "measured": "reached at 1.02 s",
+            "tolerance": 0.0,
+            "sampleTimeRange": "1-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "samples_compact.bin"
+        },
+        {
+            "assertionId": "e.build.identity",
+            "passed": true,
+            "expected": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "measured": "build.hovercraft.baseline.01 / a2946245bc904c19a0827a4308c729be / GeneratedReference",
+            "tolerance": 0.0,
+            "sampleTimeRange": "0-340282300000000000000000000000000000000 s",
+            "supportingChannels": [],
+            "evidenceFile": "session_manifest.json"
+        }
+    ],
+    "setupWarnings": []
+}

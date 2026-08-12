@@ -185,7 +185,7 @@ Schema bumped to **1.1**; two new streams (files only appear when data exists):
   surface — stable-ID table in the header, position, airflow, AoA, Cl/Cd,
   lift/drag/total force, estimated torque, stall, deflection, GE
   distance/multiplier, efficiency.
-- Airborne events (Takeoff, Landing, UnexpectedLaunch) carry the full aero
+- Physical transition events (`PhysicalTakeoff`, `ContactLanding`, `FreeFlightEntered`, and unexpected-airborne classifications) carry the full aero
   force balance in their detail: velocity, vertical velocity, gravity, hover
   force, GE, body aero, surface aero, torque, AoA, side-slip, probe state,
   up-vs-surface-normal, forward-vs-airflow.
