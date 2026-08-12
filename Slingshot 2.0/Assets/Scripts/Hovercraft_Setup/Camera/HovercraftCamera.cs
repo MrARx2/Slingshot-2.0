@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Hovercraft camera rig for racing + trick gameplay.
@@ -381,13 +382,39 @@ public class HovercraftCamera : MonoBehaviour
     [Range(0f, 1f)] public float tpFovZoomCompensation = 1f;
 
     [Tooltip("Extra FOV added by boost / grip breaker.")]
-    public float boostExtraFOV = 7f;
+    public float boostExtraFOV = 10f;
+
+    [Header("Boost Kick")]
+    [Tooltip("Metres the third-person camera eases back behind the craft at full boost (acceleration setback). Smoothed, so keep it modest.")]
+    public float boostThirdPersonSetback = 1.5f;
+
+    [Tooltip("Metres the first-person view recoils backward at full boost. Kept restrained so the cockpit never leaves the craft.")]
+    public float boostFirstPersonRecoil = 0.09f;
+
+    [Tooltip("How quickly boost presentation attacks after the gameplay signal begins.")]
+    public float boostVisualAttackResponse = 24f;
+
+    [Tooltip("How quickly boost presentation relaxes after the burst ends.")]
+    public float boostVisualReleaseResponse = 6f;
+
+    [Tooltip("Length of the short visual onset pulse. This affects only camera presentation, never craft forces.")]
+    [Range(0.05f, 0.5f)] public float boostOnsetPulseDuration = 0.22f;
+
+    [Tooltip("Strength of the immediate boost onset pulse relative to the sustained boost envelope.")]
+    [Range(0f, 1f)] public float boostOnsetPulseStrength = 0.72f;
+
+    [Tooltip("Extra presentation scale for held Overcharge. Preserves existing camera tuning while giving discharge a stronger sustained read.")]
+    [FormerlySerializedAs("nitroPresentationScale")]
+    [Range(1f, 1.75f)] public float overchargePresentationScale = 1.35f;
 
     [Tooltip("If true, Grip Breaker from CraftCore / TractionCore adds FOV.")]
     public bool useGripBreakerAsBoostFOV = true;
 
     [Tooltip("Exponential FOV smoothing speed. Higher = faster response.")]
     public float fovSmoothSpeed = 8f;
+
+    [Tooltip("FOV response while widening. Higher than the release response makes acceleration read immediately without a hard snap.")]
+    public float fovAttackSpeed = 18f;
 
     // ══════════════════════════════════════════════════════════════
     //  COLLISION AVOIDANCE (third person)
@@ -454,6 +481,9 @@ public class HovercraftCamera : MonoBehaviour
 
     // FOV / boost
     private float _boostAmount;
+    private float _boostVisual;
+    private float _boostOnsetPulse;
+    private bool _boostSignalWasActive;
 
     private bool _initialized;
 
@@ -507,6 +537,7 @@ public class HovercraftCamera : MonoBehaviour
         float dt = Mathf.Min(Time.deltaTime, maxCameraDeltaTime);
 
         HandleInputKeys();
+        UpdateBoostFeedback(dt);
 
         UpdateGroundedState(dt);
         UpdateReferenceUp(dt);
@@ -577,11 +608,22 @@ public class HovercraftCamera : MonoBehaviour
         _isGrounded = grounded;
     }
 
-    /// <summary>Drives the boost FOV kick (0..1). Grip breaker is added automatically when enabled.</summary>
+    /// <summary>Drives the boost presentation signal (0..1). Grip breaker remains independent.</summary>
     public void SetBoostAmount(float amount)
     {
-        _boostAmount = Mathf.Clamp01(amount);
+        float next = Mathf.Clamp01(amount);
+        bool active = next > 0.01f;
+        if (active && !_boostSignalWasActive)
+            _boostOnsetPulse = 1f;
+
+        _boostSignalWasActive = active;
+        _boostAmount = next;
     }
+
+    /// <summary>Smoothed camera-only boost response for UI/effects that want the same timing.</summary>
+    public float BoostVisual01 => Mathf.Clamp01(Mathf.Max(
+        _boostVisual,
+        _boostOnsetPulse * Mathf.Clamp01(boostOnsetPulseStrength * overchargePresentationScale)));
 
     /// <summary>
     /// Snaps the camera to its ideal pose for the current perspective and clears
@@ -618,6 +660,8 @@ public class HovercraftCamera : MonoBehaviour
         _smoothedOffset = Vector3.zero;
         _offsetVelocity = Vector3.zero;
         _collisionFraction = 1f;
+        _boostVisual = _boostAmount;
+        _boostOnsetPulse = 0f;
 
         if (currentPerspective == CameraPerspective.ThirdPerson)
         {
@@ -1204,6 +1248,13 @@ public class HovercraftCamera : MonoBehaviour
         // only changes of direction/distance are eased.
         Vector3 desiredOffset = ComputeThirdPersonOffset(speedT);
 
+        // Boost setback: fold the fall-back into the offset BEFORE smoothing so the
+        // camera eases back and returns instead of snapping (a hard add here read as a
+        // teleport). The envelope already ramps _boostAmount, so this is doubly smooth.
+        float boostKick = Mathf.Clamp01(_boostVisual);
+        if (boostKick > 0f && boostThirdPersonSetback > 0f)
+            desiredOffset -= target.forward * (boostThirdPersonSetback * overchargePresentationScale * boostKick);
+
         _smoothedOffset = Vector3.SmoothDamp(
             _smoothedOffset,
             desiredOffset,
@@ -1379,7 +1430,14 @@ public class HovercraftCamera : MonoBehaviour
     {
         // Position: hard-locked to the mount point. Any world-space smoothing at
         // 250+ m/s would put the "cockpit" camera meters outside the craft.
-        transform.position = target.TransformPoint(ActiveProfile.mountOffset);
+        // A restrained backward recoil at boost onset sells the acceleration without
+        // ever letting the cockpit drift out of the craft.
+        Vector3 mountOffset = ActiveProfile.mountOffset;
+        float fpBoost = Mathf.Clamp01(_boostVisual);
+        if (fpBoost > 0f && boostFirstPersonRecoil > 0f)
+            mountOffset -= Vector3.forward * (boostFirstPersonRecoil * overchargePresentationScale * fpBoost);
+
+        transform.position = target.TransformPoint(mountOffset);
 
         Quaternion desiredRotation = ComputeFirstPersonRotation();
         float rotationLerp = ExpSmoothing(fpRotationResponse, dt);
@@ -1479,16 +1537,29 @@ public class HovercraftCamera : MonoBehaviour
 
     private void UpdateFOV(float speedT, float dt)
     {
-        float boost = Mathf.Clamp01(_boostAmount);
+        float boost = BoostVisual01;
 
         if (useGripBreakerAsBoostFOV && craftCore != null && craftCore.traction != null)
             boost = Mathf.Max(boost, craftCore.traction.GripBreakerAmount);
 
         CameraProfile profile = ActiveProfile;
-        float targetFov = Mathf.Lerp(profile.fovBase, profile.fovMax, speedT) + boostExtraFOV * boost;
+        float targetFov = Mathf.Lerp(profile.fovBase, profile.fovMax, speedT)
+                        + boostExtraFOV * overchargePresentationScale * boost;
 
-        float fovLerp = ExpSmoothing(fovSmoothSpeed, dt);
+        float response = targetFov > _cam.fieldOfView ? fovAttackSpeed : fovSmoothSpeed;
+        float fovLerp = ExpSmoothing(response, dt);
         _cam.fieldOfView = Mathf.Lerp(_cam.fieldOfView, targetFov, fovLerp);
+    }
+
+    private void UpdateBoostFeedback(float dt)
+    {
+        float response = _boostAmount > _boostVisual
+            ? boostVisualAttackResponse
+            : boostVisualReleaseResponse;
+        _boostVisual = Mathf.Lerp(_boostVisual, _boostAmount, ExpSmoothing(response, dt));
+
+        float duration = Mathf.Max(0.01f, boostOnsetPulseDuration);
+        _boostOnsetPulse = Mathf.MoveTowards(_boostOnsetPulse, 0f, dt / duration);
     }
 
     // ══════════════════════════════════════════════════════════════

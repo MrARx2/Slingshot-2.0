@@ -92,6 +92,7 @@ namespace TrackGeneration
             ConnectorAudit(sb, sections, resolved);
             WallWaveHotspots(sb, sections, resolved);
             DiscontinuityScan(sb, sections);
+            TrackMeshIntegrityDiagnostics.Append(sb, sections, resolved); // read-only surface measurement
             QuarterDissection(sb, generator, sections);
             SectionDump(sb, sections);
             ReportTail(sb, generator);
@@ -566,6 +567,18 @@ namespace TrackGeneration
             var report = generator.LastReport;
             if (report == null) return;
 
+            if (report.FeatureExitRecords.Count > 0)
+            {
+                sb.AppendLine("── FEATURE PLAN RESULTS (Stage A: exact measured exits) ──");
+                foreach (var r in report.FeatureExitRecords) sb.AppendLine("  " + r);
+                sb.AppendLine();
+            }
+            if (report.TransitionRecords.Count > 0)
+            {
+                sb.AppendLine("── TRANSITION RESOLVER (Stage C: boundary classification, reporting only) ──");
+                foreach (var t in report.TransitionRecords) sb.AppendLine("  " + t);
+                sb.AppendLine();
+            }
             if (report.ConnectorDecisions.Count > 0)
             {
                 sb.AppendLine("── PLAN-TIME CONNECTOR DECISIONS ──");
@@ -584,6 +597,19 @@ namespace TrackGeneration
                 foreach (var w in report.Warnings) sb.AppendLine("  " + w);
                 sb.AppendLine();
             }
+            var reasonCounts = report.FailureCountsByReason();
+            if (reasonCounts.Count > 0)
+            {
+                int total = report.TotalFailureCount;
+                sb.AppendLine($"── FAILURE MODE BREAKDOWN ({total} failed attempts) ──");
+                foreach (var (reason, count) in reasonCounts)
+                    sb.AppendLine($"  {count,5} ({(total > 0 ? 100f * count / total : 0f),4:F0}%)  {reason}");
+                sb.AppendLine();
+            }
+            sb.AppendLine(report.AngleReliefEnabled
+                ? $"── CLOSURE ANGLE RELIEF ── ON | invoked on {report.AngleReliefAttempts} candidate solves, closed {report.AngleReliefClosures} to tolerance"
+                : "── CLOSURE ANGLE RELIEF ── OFF (flag disabled this run)");
+            sb.AppendLine();
             if (report.Failures.Count > 0)
             {
                 sb.AppendLine($"── FAILURES ({report.Failures.Count}; last 12) ──");

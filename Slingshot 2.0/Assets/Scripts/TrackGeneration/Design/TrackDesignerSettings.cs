@@ -262,6 +262,9 @@ namespace TrackGeneration.Design
         [Tooltip("Cross-section sample points per SIDE (total profile points = 2×resolution + 1). Higher = smoother bowl, more vertices. Points concentrate on the curved walls automatically.")]
         [Range(4, 96)] public int ProfileResolution = 32;
 
+        [Tooltip("COLLISION cross-section resolution (capped by the render resolution above). The physics collider is built at this detail, NOT the render detail — too coarse and hover nodes feel a normal 'cliff' crossing the floor→wall shoulder (the felt wobble). The wall-concentrating warp puts most of these points on the shoulder/wall where they matter. Higher = cleaner road/wall contact, more collider triangles. 10 was the old (rough) value.")]
+        [Range(8, 96)] public int ColliderProfileResolution = 40;
+
         [Header("Dynamic Turn Rounding")]
         [Tooltip("Turn interiors progressively lose their flat center and become continuously rounded bowls; straights keep the configured center-flat ratio. Driven by the same smooth field as banking — no ridge can appear where the flat disappears.")]
         public bool DynamicTurnRounding = true;
@@ -452,11 +455,11 @@ namespace TrackGeneration.Design
 
         [Header("Full Pipe Shape")]
         [Tooltip("Full-pipe body duration window, seconds at design speed (includes the closure and opening spans).")]
-        [Range(2f, 12f)] public float MinFullPipeSeconds = 3f;
-        [Range(2f, 12f)] public float MaxFullPipeSeconds = 6f;
+        [Range(2f, 12f)] public float MinFullPipeSeconds = 5f;
+        [Range(2f, 12f)] public float MaxFullPipeSeconds = 9f;
 
         [Tooltip("Pipe diameter as a fraction of the road width (radius = width × scale / 2).")]
-        [Range(0.5f, 1.25f)] public float FullPipeRadiusScale = 0.8f;
+        [Range(0.5f, 1.25f)] public float FullPipeRadiusScale = 1.1f;
 
         [Tooltip("Duration of the pipe closure (and reopening) span, seconds. Short closures are physical walls at 1300 km/h.")]
         [Range(0.6f, 3f)] public float PipeTransitionSeconds = 1.2f;
@@ -708,6 +711,25 @@ namespace TrackGeneration.Design
 
         [Tooltip("Performance budget: total rings for the WHOLE track. Small tracks keep the full Meters Per Ring density; huge tracks (long Rollercoaster laps) automatically spread this budget instead of exploding the vertex count.")]
         [Range(8000, 100000)] public int TargetTotalRings = 20000;
+
+        [Header("Dynamic Topology (experimental)")]
+        [Tooltip("EXPERIMENTAL (Stage D). When on, a gap's mandatory lead straight is dropped where the transition resolver says the neighbours weld directly AND the closure capacity check still passes — letting a corkscrew flow straight out of a curve with no dead straight. Off = current behavior exactly. Scoped to the inline-corkscrew pilot; expands in later stages.")]
+        public bool DynamicFeatureAdjacency = false;
+
+        [Tooltip("EXPERIMENTAL (Stage E). When on, ordinary corner magnitudes are quantized to canonical 45°/90°/180° turn demands solved exactly to close the lap, instead of the continuous ±20°-step winding balancer. Changes generated layouts (flag-gated so saved seeds stay reproducible with it OFF). Half-loops stay 180°; internal geometry remains smooth.")]
+        public bool UseCanonicalTurns = false;
+
+        [Tooltip("EXPERIMENTAL (closure relief, §7 extension). When on, the 2D closure solver may nudge plain corner angles by a bounded ±4° in equal-and-opposite pairs (net heading — and any canonical token — preserved) to close position residuals the radius/straight solver leaves behind, before spending an S-bend rescue. Targets the near-miss ClosurePositionFailure tail. Off = current behavior exactly. Best paired with Use Canonical Turns, which otherwise removes this angular freedom.")]
+        public bool ClosureAngleRelief = false;
+
+        [Tooltip("EXPERIMENTAL. When on, the dual-road quarter fitter gets a larger adaptive attempt budget (its per-attempt state already homes in on corner count, clearance and length/balance target, so more iterations converge more often). A road-B fit attempt is far cheaper than re-rolling a whole candidate, so this trades a little plan-time for fewer 'Dual Road Quarter could not be built' failures — the dominant RequiredFeatureMissing bucket. Off = current behavior exactly.")]
+        public bool RobustDualQuarterFit = false;
+
+        [Tooltip("EXPERIMENTAL (Stage F pilot). When on, at most one gentle-to-medium corner per lap is realized as a DIRECTIONAL CORKSCREW — a barrel roll whose axis also turns by the corner's own angle (its stamped plan-view heading equals the corner, so lap closure is preserved by construction). Barrels are long, so expect a few more length-budget failures. Off = corners are ordinary curves exactly as before. VERIFY IN PLAY: confirm the craft stays in through the turning+inverting barrel.")]
+        public bool DirectionalCorkscrews = false;
+
+        [Tooltip("EXPERIMENTAL. When on, barrel/corkscrew regions (road roll ≥120°) are exempt from the global ring-budget relaxation, so their WIDE ROLLING FLOOR keeps its facet-target density instead of coarsening to a multi-metre twist that launches the craft off the floor edge at speed. Straights/level regions absorb the budget instead. Changes ring DENSITY only — never road width, path, walls, or corkscrew proportions. Off = current behavior exactly.")]
+        public bool SmoothCorkscrewFloor = false;
 
         public void Sanitize()
         {

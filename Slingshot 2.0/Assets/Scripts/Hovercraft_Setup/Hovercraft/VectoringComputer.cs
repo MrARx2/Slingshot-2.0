@@ -98,22 +98,10 @@ public class VectoringComputer : MonoBehaviour
         float throttle = Mathf.Max(0f, command.throttle);
         float brake = Mathf.Max(0f, -command.throttle);
 
-        OverchargeTarget overchargeTarget = lockedOverchargeTarget != OverchargeTarget.None
-            ? lockedOverchargeTarget
-            : SelectOverchargeTarget(command);
-        bool overcharging = command.overchargeHeld;
-
-        // When Space is held, the selected thruster group is captured by
-        // Overcharge and does NOT direct-fire until Space is released.
-        if (overcharging && overchargeTarget == OverchargeTarget.MainThruster)
-        {
-            throttle = 0f;
-        }
-
-        if (overcharging && overchargeTarget == OverchargeTarget.BrakeThruster)
-        {
-            brake = 0f;
-        }
+        // BOOST is now an instant one-shot on the main thruster. It no longer
+        // captures throttle/brake and no longer selects a target group, so W/S
+        // throttle and Q/E vertical thrusters stay fully independent while boosting.
+        _ = lockedOverchargeTarget; // retained for signature back-compat; unused
 
         // Stabilizer has two states:
         // Armed  = allowed to catch/stabilize when close enough.
@@ -131,14 +119,12 @@ public class VectoringComputer : MonoBehaviour
         float manualRoofRequest =
             command.roofThrustersHeld
             && !verticalLockedByStabilizer
-            && !(overcharging && overchargeTarget == OverchargeTarget.RoofThrusters)
                 ? 1f
                 : 0f;
 
         float manualBottomRequest =
             command.bottomThrustersHeld
             && !verticalLockedByStabilizer
-            && !(overcharging && overchargeTarget == OverchargeTarget.BottomThrusters)
                 ? 1f
                 : 0f;
 
@@ -159,9 +145,8 @@ public class VectoringComputer : MonoBehaviour
 
             wantsGripBreaker = command.gripBreakerHeld,
 
-            wantsOvercharge = command.overchargeHeld,
-            overchargeReleased = command.overchargeReleased,
-            overchargeTarget = overchargeTarget,
+            boostHeld = command.overchargeHeld,
+            boostPressed = command.overchargePressed,
 
             stabilizerArmed = _stabilizerArmed,
             verticalThrustersLockedByStabilizer = verticalLockedByStabilizer,

@@ -172,14 +172,22 @@ namespace TrackGeneration.Planning
             int forcedFirstSign = 0;
             int balanceRejects = 0;
 
-            for (int attempt = 0; attempt < 18; attempt++)
+            // The per-attempt adaptive state (kDelta, forcedFirstSign, radiusScale,
+            // targetLength) converges, so more iterations rescue more fits. A road-B fit
+            // attempt is far cheaper than re-rolling a whole candidate. The unwind switch
+            // stays at the budget's HALFWAY point so most attempts still chase the wound
+            // target and only later ones try the unwound hail-mary (unchanged at 18).
+            int maxFitAttempts = cfg.RobustDualQuarterFit ? 40 : 18;
+            int unwindFrom = maxFitAttempts / 2;
+
+            for (int attempt = 0; attempt < maxFitAttempts; attempt++)
             {
                 // Late attempts may unwind a heavily wound quarter the other way.
                 // (Alternating wound/unwound from attempt 0 was measured HARMFUL —
                 // the hail-mary unwound attempts pollute the adaptive kDelta state
                 // and halve the tries at the usually-correct wound target.)
                 float windedTarget = deltaHeading;
-                if (attempt >= 9 && Mathf.Abs(deltaHeading) > 180f)
+                if (attempt >= unwindFrom && Mathf.Abs(deltaHeading) > 180f)
                     windedTarget = deltaHeading - Mathf.Sign(deltaHeading) * 360f;
 
                 int k = Mathf.Clamp(kBase + kDelta, 2, 10);

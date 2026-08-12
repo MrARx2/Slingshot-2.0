@@ -270,6 +270,14 @@ namespace TrackGeneration.Macro
         public int RenderRingBudget;   // designer performance budget — retopology spreads it over huge tracks
         public List<int> SubdivisionLadder = new List<int>(); // approved ascending interval-count tiers
 
+        // ── Dynamic topology (Stage D/E, experimental) ──
+        public bool DynamicFeatureAdjacency;
+        public bool UseCanonicalTurns;
+        public bool ClosureAngleRelief;
+        public bool RobustDualQuarterFit;
+        public bool DirectionalCorkscrews;
+        public bool SmoothCorkscrewFloor;
+
         // ── Closure ──
         public float ClosureReserveFraction;
         public float ClosurePositionTolerance;
@@ -414,6 +422,7 @@ namespace TrackGeneration.Macro
                 WallCurve01 = wallCurve,
                 CenterFlatWidthRatio = flatCenter / (flatCenter + 2f * wallSize),
                 ProfileResolution = Mathf.Clamp(settings.Road.ProfileResolution, limits.MinHalfPipeProfileResolution, limits.MaxHalfPipeProfileResolution),
+                ColliderProfileResolution = Mathf.Clamp(settings.Road.ColliderProfileResolution, 8, 96),
                 SafetyLipHeight = r.ClampReport(settings.Road.SafetyLipHeight, limits.MinSafetyLipHeight, limits.MaxSafetyLipHeight, "Road.SafetyLipHeight") * roadScale,
                 MinTurnCenterFlatRatio = Mathf.Clamp(settings.Road.MinimumTurnCenterFlatRatio, 0f, limits.MaxHalfPipeCenterFlatRatio),
                 MaxOverhangAngleDeg = r.ClampReport(settings.Road.MaxOverhangAngle, 0f, limits.MaxOverhangAngleLimit, "Road.MaxOverhangAngle"),
@@ -652,6 +661,12 @@ namespace TrackGeneration.Macro
             r.SubdivisionLadder.AddRange(limits.SubdivisionLadder);
 
             // ══ Closure ══
+            r.DynamicFeatureAdjacency = settings.Generation.DynamicFeatureAdjacency;
+            r.UseCanonicalTurns = settings.Generation.UseCanonicalTurns;
+            r.ClosureAngleRelief = settings.Generation.ClosureAngleRelief;
+            r.RobustDualQuarterFit = settings.Generation.RobustDualQuarterFit;
+            r.DirectionalCorkscrews = settings.Generation.DirectionalCorkscrews;
+            r.SmoothCorkscrewFloor = settings.Generation.SmoothCorkscrewFloor;
             r.ClosureReserveFraction = settings.Generation.ClosureReserveFraction;
             r.ClosurePositionTolerance = limits.ClosurePositionTolerance;
             r.ClosureForwardTolerance = limits.ClosureForwardTolerance;

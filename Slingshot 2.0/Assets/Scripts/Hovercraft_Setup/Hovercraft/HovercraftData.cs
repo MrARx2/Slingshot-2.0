@@ -80,6 +80,14 @@ public struct CraftIntent
 
     public bool wantsGripBreaker;
 
+    // One-shot: true the frame the player presses BOOST (Space). Consumed by
+    // OverchargeCore to trigger a single forward burst. There is no hold-to-charge
+    // and no per-target selection anymore — BOOST is always the main thruster.
+    public bool boostHeld;
+    public bool boostPressed;
+
+    // Retained for serialization/back-compat with older readers; no longer used by
+    // the boost mechanic. Always default/false under the instant-boost design.
     public bool wantsOvercharge;
     public bool overchargeReleased;
     public OverchargeTarget overchargeTarget;
@@ -172,7 +180,8 @@ public struct EnergyState
         stabilizerPower01 = 1f,
         otherPower01 = 1f,
         performancePowerScale01 = 1f,
-        baseHoverProtected = true
+        baseHoverProtected = true,
+        stabilizerProtected = true
     };
 
     public float totalBudget;
@@ -213,6 +222,10 @@ public struct EnergyState
     // Base automatic hover can be protected outside the performance budget.
     // This keeps the craft from collapsing when the player steers/charges/boosts.
     public bool baseHoverProtected;
+
+    // Automatic surface retention can also remain outside the player performance
+    // budget so loops/walls cannot drain propulsion merely by requiring stability.
+    public bool stabilizerProtected;
 }
 
 

@@ -90,7 +90,7 @@ public class CraftCore : MonoBehaviour, TrackGeneration.ITrackRaceCraft
     [Tooltip("Manual vertical thruster array. Q fires roof/downforce, E fires bottom/lift.")]
     public AttitudeControlArray attitude;
 
-    [Tooltip("Space-held charge/release burst system.")]
+    [Tooltip("Space-held controllable Overcharge system tied to the shared POWER BUS.")]
     public OverchargeCore overcharge;
 
     [Tooltip("Live performance power distribution bus. Scales drive/vectoring/manual thrusters/overcharge when several systems compete.")]
@@ -113,6 +113,16 @@ public class CraftCore : MonoBehaviour, TrackGeneration.ITrackRaceCraft
 
     private Rigidbody _rb;
     private ThrusterBus _thrusterBus;
+    private HovercraftCamera _boostCamera;
+    private float _nextBoostCameraScan;
+
+    /// <summary>Lazily finds the active camera so we can push the boost signal to it.</summary>
+    private void EnsureBoostCamera()
+    {
+        if (_boostCamera != null || Time.unscaledTime < _nextBoostCameraScan) return;
+        _nextBoostCameraScan = Time.unscaledTime + 1f;
+        _boostCamera = FindAnyObjectByType<HovercraftCamera>();
+    }
 
     // ══════════════════════════════════════════════════════════════
     //  LIFECYCLE
@@ -209,13 +219,11 @@ public class CraftCore : MonoBehaviour, TrackGeneration.ITrackRaceCraft
         telemetry.SampleTelemetry();
 
         // ── 3. Evaluate intent ───────────────────────────────────
-        // The locked overcharge target keeps the capture logic in sync with the
-        // charge OverchargeCore is actually running (changing held keys mid-charge
-        // must not un-capture the charging thruster group).
+        // BOOST is an instant one-shot now — there is no charge target to keep in
+        // sync, so intent no longer needs the (removed) overcharge capture state.
         vectoring.EvaluateIntent(
             pilotInput.CurrentCommand,
-            telemetry.CurrentTelemetry,
-            overcharge != null ? overcharge.ChargingTarget : OverchargeTarget.None
+            telemetry.CurrentTelemetry
         );
 
         // ── 4. Evaluate traction (optional) ──────────────────────
@@ -269,6 +277,15 @@ public class CraftCore : MonoBehaviour, TrackGeneration.ITrackRaceCraft
             telemetry.CurrentTelemetry,
             lastEnergy
         );
+
+        // ── 9b. Drive the synchronized camera boost response ─────
+        // Onset-synced: the camera reacts the instant the burst begins, scaled by the
+        // reactor-granted intensity, not by the speed the craft eventually reaches.
+        if (overcharge != null)
+        {
+            EnsureBoostCamera();
+            _boostCamera?.SetBoostAmount(overcharge.CameraBoost01);
+        }
 
         // ── 10. Apply traction forces (optional) ─────────────────
         traction?.ApplyTractionForces(telemetry.CurrentTelemetry);

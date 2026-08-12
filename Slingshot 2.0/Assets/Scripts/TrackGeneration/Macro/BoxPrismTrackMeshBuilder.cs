@@ -57,8 +57,11 @@ namespace TrackGeneration.Macro
         // This matters far more than it looks: collider triangles scale linearly with
         // it, and PhysX must RE-COOK every one of them whenever Unity restores the
         // scene (which it does on every Play Mode exit). At render resolution the
-        // track cooks ~8.7 M triangles per restore; this cuts it to ~3 M.
-        private const int ColliderProfileResolution = 10;
+        // track cooks ~8.7 M triangles per restore; the old fixed 10 cut it to ~3 M —
+        // but that made the floor→wall shoulder a ~35° collider 'cliff' the hover nodes
+        // feel (measured). It is now designer-tunable via
+        // TrackRoadProfileSettings.ColliderProfileResolution (default 40), still capped
+        // by the render resolution and never finer than it.
 
         private readonly TrackRoadProfileSettings _profile;
         private readonly TrackRoadProfileSettings _colliderProfile;
@@ -91,7 +94,7 @@ namespace TrackGeneration.Macro
                 MinTurnCenterFlatRatio = _profile.MinTurnCenterFlatRatio,
                 MaxOverhangAngleDeg = _profile.MaxOverhangAngleDeg,
                 OverhangRadius = _profile.OverhangRadius,
-                ProfileResolution = Mathf.Min(ColliderProfileResolution, _profile.ProfileResolution)
+                ProfileResolution = Mathf.Min(Mathf.Max(8, _profile.ColliderProfileResolution), _profile.ProfileResolution)
             };
 
             int n = InnerPointCount;

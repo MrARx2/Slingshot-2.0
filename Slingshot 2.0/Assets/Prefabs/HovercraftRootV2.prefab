@@ -317,6 +317,7 @@ Transform:
   m_Children:
   - {fileID: 2850027237411572208}
   - {fileID: 2013546064773339165}
+  - {fileID: 9100000000000000002}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 84.679, z: 0}
 --- !u!54 &3560214523555550976
@@ -611,9 +612,9 @@ MonoBehaviour:
   totalPowerOutput: 100
   powerCostPerForce: 1
   protectBaseHover: 1
-  vectoringPriorityBias: 1.35
-  overchargeChargeThrottleEquivalent: 1
-  overchargeChargeCostMultiplier: 1
+  protectStabilizer: 1
+  steeringReserve01: 0.28
+  boostReserve01: 0.62
   currentEnergy:
     totalBudget: 100
     totalRequested: 0
@@ -647,6 +648,7 @@ MonoBehaviour:
     otherPower01: 1
     performancePowerScale01: 1
     baseHoverProtected: 1
+    stabilizerProtected: 1
 --- !u!114 &585946567544012928
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -721,21 +723,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TractionCore
   rb: {fileID: 0}
-  lateralGrip: 7
-  longitudinalGrip: 6
-  coastingGrip: 0.25
-  lateralGripBreaker: 0.35
-  longitudinalGripBreaker: 0.25
+  lateralGrip: 6.5
+  longitudinalGrip: 5.5
+  coastingGrip: 0.3
+  lateralGripBreaker: 0.28
+  longitudinalGripBreaker: 0.18
   coastingGripBreaker: 0.05
-  gripBreakRate: 6
-  gripRecoveryRate: 4
+  gripBreakRate: 8
+  gripRecoveryRate: 5
   gripRecoverySpeedPenalty: 0.035
   gripRecoveryExponent: 1.6
   counterTrajectoryMinSpeed: 0.4
   counterTrajectoryGripMultiplier: 1
-  gripBreakerSteerMultiplier: 1.25
-  maxGripAcceleration: 90
-  driftSpeedConservation: 0.15
+  gripBreakerSteerMultiplier: 1.3
+  maxGripAcceleration: 105
+  driftSpeedConservation: 0.2
   carveBiteNormal: 5
   carveBiteGripBreaker: 0.2
 --- !u!114 &2263899714270234766
@@ -855,7 +857,7 @@ MonoBehaviour:
   thrusterBus: {fileID: 0}
   mainThruster: {fileID: 0}
   brakeThruster: {fileID: 0}
-  throttleRampSpeed: 3
+  throttleRampSpeed: 4.8
 --- !u!114 &5412978084836890870
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -874,8 +876,8 @@ MonoBehaviour:
   strafeFR: {fileID: 0}
   strafeBL: {fileID: 0}
   strafeBR: {fileID: 0}
-  steerSensitivity: 0.2
-  steeringYawAuthority: 2.25
+  steerSensitivity: 0.24
+  steeringYawAuthority: 2.7
   edgeShiftCanAssistYaw: 0
   edgeShiftCanFireStrafeThrusters: 1
   carveYawAssistFromLean: 0.35
@@ -886,7 +888,7 @@ MonoBehaviour:
   minimumStrafeAuthorityWhenTilted: 0.2
   strafeSafetyStartRollRate: 120
   strafeSafetyFullRollRate: 300
-  yawDamping: 4
+  yawDamping: 3.2
   gripBreakerYawDampingMultiplier: 0.35
 --- !u!114 &7302965889752632134
 MonoBehaviour:
@@ -976,6 +978,26 @@ MonoBehaviour:
     indicatorRenderer: {fileID: 0}
     originalTrailWidth: 0
     resolvedNode: {fileID: 0}
+  boostTrailWidthMultiplier: 3.4
+  boostEmissionMultiplier: 4.8
+  autoBuildCinematicWake: 1
+  disableLegacyTrailRenderers: 1
+  plasmaWakeTexture: {fileID: 2800000, guid: b6a6df9511ce45b8b925e51bb56053fb, type: 3}
+  idleWakeWidth: 0.055
+  cruiseWakeWidth: 0.34
+  overchargeWakeWidth: 1.25
+  cruiseWakeTime: 0.26
+  overchargeWakeTime: 0.72
+  cinematicSpeedKmh: 1800
+  propulsionWakePlacementRoot: {fileID: 9100000000000000002}
+  plasmaEffectsPlacementRoot: {fileID: 0}
+  leftNozzleOffset: {x: -0.52, y: 0.04, z: -0.08}
+  rightNozzleOffset: {x: 0.52, y: 0.04, z: -0.08}
+  idleWakeColor: {r: 0.28, g: 0.72, b: 0.66, a: 1}
+  cruiseWakeColor: {r: 0.4, g: 1.15, b: 1.45, a: 1}
+  overchargeCoreColor: {r: 2.2, g: 2, b: 1.65, a: 1}
+  overchargeTailColor: {r: 0.82, g: 0.34, b: 1.55, a: 1}
+  overchargeEdgeColor: {r: 1.35, g: 0.16, b: 0.55, a: 1}
 --- !u!114 &879554670063209943
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1009,18 +1031,26 @@ MonoBehaviour:
   thrusterBus: {fileID: 0}
   mainThruster: {fileID: 0}
   brakeThruster: {fileID: 0}
-  chargeRate: 1.5
-  minimumReleaseCharge: 0.2
-  allowRetargetWhileCharging: 1
-  stabilizerBlocksRoofOvercharge: 1
-  minBurstThrottle: 10
-  maxBurstThrottle: 50
-  minBurstDuration: 0.2
-  maxBurstDuration: 0.5
-  charge01: 0
-  chargingTarget: 0
-  activeBurstTarget: 0
-  burstRemaining: 0
+  fullBurnDuration: 3.2
+  regenerationDelay: 0.9
+  rechargeDuration: 7
+  rechargeBusDemand: 50
+  minimumIgnitionReserve01: 0.025
+  sustainedThrottle: 1.35
+  ignitionThrottleBonus: 1.15
+  ignitionPunchDuration: 0.22
+  burnAttackResponse: 22
+  burnReleaseResponse: 8
+  lowReserveOutputScale: 0.68
+  overchargeReserve01: 1
+  burnEnvelope01: 0
+  grantPower01: 1
+  chargeGrantPower01: 1
+  requestedBoostStrength: 0
+  regenerationDelayRemaining: 0
+  ignitionRemaining: 0
+  isBurning: 0
+  boostSequenceId: 0
 --- !u!114 &4724508117979035402
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1036,22 +1066,29 @@ MonoBehaviour:
   craftCore: {fileID: 4248071510234734182}
   showHUD: 1
   autoFindCraftCore: 1
-  margin: {x: 24, y: 20}
-  barWidth: 220
-  barHeight: 12
-  rowHeight: 20
-  uiScale: 1
-  showSpeedPanel: 1
-  showSystemsPanel: 1
-  showEnergyPanel: 1
-  panelColor: {r: 0, g: 0, b: 0, a: 0.55}
-  textColor: {r: 1, g: 1, b: 1, a: 1}
-  mutedColor: {r: 0.55, g: 0.55, b: 0.55, a: 1}
-  cyanColor: {r: 0.25, g: 0.82, b: 1, a: 1}
-  greenColor: {r: 0.35, g: 1, b: 0.45, a: 1}
-  yellowColor: {r: 1, g: 0.75, b: 0.25, a: 1}
-  redColor: {r: 1, g: 0.25, b: 0.2, a: 1}
-  purpleColor: {r: 0.85, g: 0.45, b: 1, a: 1}
+  margin: {x: 28, y: 24}
+  uiScale: 0.9
+  animate: 1
+  showPeripheralSpeedStreaks: 1
+  speedStreaksStartMps: 85
+  speedStreaksFullMps: 340
+  speedStreakOpacity: 0.55
+  speedGaugeMaxKmh: 2000
+  dangerSpeedKmh: 1800
+  highSpeedKmh: 1000
+  extremeSpeedKmh: 1500
+  speedCruiseGreen: {r: 0.49, g: 0.78, b: 0.56, a: 1}
+  speedElectricBlue: {r: 0.36, g: 0.59, b: 0.82, a: 1}
+  speedExtremeMagenta: {r: 0.76, g: 0.42, b: 0.64, a: 1}
+  speedCandyRed: {r: 1, g: 0.1, b: 0.26, a: 1}
+  accent: {r: 0.32, g: 0.68, b: 0.66, a: 1}
+  accentHot: {r: 0.82, g: 0.43, b: 0.58, a: 1}
+  panelColor: {r: 0.035, g: 0.05, b: 0.055, a: 0.9}
+  textColor: {r: 0.93, g: 0.91, b: 0.86, a: 1}
+  mutedColor: {r: 0.5, g: 0.57, b: 0.56, a: 1}
+  goodColor: {r: 0.49, g: 0.78, b: 0.56, a: 1}
+  warnColor: {r: 0.88, g: 0.65, b: 0.35, a: 1}
+  dangerColor: {r: 0.92, g: 0.36, b: 0.34, a: 1}
 --- !u!1 &2820191063850448634
 GameObject:
   m_ObjectHideFlags: 0
@@ -2275,3 +2312,197 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 06652d85778aa574d8c46848b5a2b100, type: 3}
   m_PrefabInstance: {fileID: 6382311807657140595}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &9100000000000000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9100000000000000002}
+  - component: {fileID: 9100000000000000003}
+  m_Layer: 0
+  m_Name: Propulsion Wake Placement Rig
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &9100000000000000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9100000000000000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 9100000000000000012}
+  - {fileID: 9100000000000000022}
+  m_Father: {fileID: 4455442690710395105}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &9100000000000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9100000000000000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3058a40e47164c388a445e046b0e218a, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PropulsionWakeTuning
+  overallLength: 1
+  exhaustBodyLength: 1
+  filamentLength: 1
+  memoryLength: 1
+  showMemoryRibbons: 1
+  maximumMemoryLengthMeters: 12
+  memorySmoothness: 0.72
+  preventForwardWrap: 1
+  forwardWrapAllowance: 0.35
+  clearOnSharpDirectionChange: 1
+  directionChangeClearAngle: 52
+  teleportClearDistance: 18
+  leftEffectOffset: {x: 0, y: 0, z: 0}
+  rightEffectOffset: {x: 0, y: 0, z: 0}
+  stretchedParticlePivot: 0.5
+  width: 1
+  coreSize: 1
+  plumeSize: 1
+  filamentSize: 1
+  ribbonSize: 1
+  particleStretch: 1
+  showHotCore: 1
+  showPlasmaPlume: 1
+  showIonFilaments: 1
+  leftCoreOffset: {x: 0, y: 0, z: 0}
+  rightCoreOffset: {x: 0, y: 0, z: 0}
+  leftCoreRotation: {x: 0, y: 0, z: 0}
+  rightCoreRotation: {x: 0, y: 0, z: 0}
+  leftPlumeOffset: {x: 0, y: 0, z: 0}
+  rightPlumeOffset: {x: 0, y: 0, z: 0}
+  leftPlumeRotation: {x: 0, y: 0, z: 0}
+  rightPlumeRotation: {x: 0, y: 0, z: 0}
+  leftFilamentOffset: {x: 0, y: 0, z: 0}
+  rightFilamentOffset: {x: 0, y: 0, z: 0}
+  leftFilamentRotation: {x: 0, y: 0, z: 0}
+  rightFilamentRotation: {x: 0, y: 0, z: 0}
+  leftRibbonOffset: {x: 0, y: 0, z: 0}
+  rightRibbonOffset: {x: 0, y: 0, z: 0}
+  leftRibbonRotation: {x: 0, y: 0, z: 0}
+  rightRibbonRotation: {x: 0, y: 0, z: 0}
+  showPlasmaSparks: 1
+  showPlasmaChamber: 1
+  leftPlasmaOffset: {x: 0, y: 0, z: 0}
+  rightPlasmaOffset: {x: 0, y: 0, z: 0}
+  leftChamberOffset: {x: 0, y: 0, z: 0}
+  rightChamberOffset: {x: 0, y: 0, z: 0}
+  leftMoteOffset: {x: 0, y: 0, z: 0}
+  rightMoteOffset: {x: 0, y: 0, z: 0}
+  leftMoteRotation: {x: 0, y: 0, z: 0}
+  rightMoteRotation: {x: 0, y: 0, z: 0}
+  showPlasmaMotes: 1
+  moteAmount: 1
+  moteSize: 1
+  moteSpeed: 1
+  moteSpread: 1
+  moteLifetime: 1
+  moteTurbulence: 1
+  leftSparkOffset: {x: 0, y: 0, z: 0}
+  rightSparkOffset: {x: 0, y: 0, z: 0}
+  leftSparkRotation: {x: 0, y: 0, z: 0}
+  rightSparkRotation: {x: 0, y: 0, z: 0}
+  plasmaChamberColor: {r: 0.42, g: 1.35, b: 1.8, a: 1}
+  chamberSize: 1
+  chamberIntensity: 1
+  plasmaSparkColor: {r: 2.2, g: 1.25, b: 0.62, a: 1}
+  sparkAmount: 1
+  sparkSize: 1
+  sparkSpeed: 1
+  sparkSpread: 1
+  sparkLifetime: 1
+  sparkStreakLength: 1
+  sparkTrailAmount: 0.55
+  sparkTurbulence: 1
+  overchargeSparkBoost: 1
+  sparkSpawnRadius: 1
+  sparkSpeedVariation: 0.65
+  sparkDrag: 0.25
+  sparkGravity: 0
+  sparkTrailLifetime: 1
+  sparkTrailWidth: 1
+  idleSparkPresence: 1
+  throttleSparkResponse: 1
+  ignitionSparkBurst: 1
+  sparkFlickerSpeed: 1
+  sparkTurbulenceFrequency: 1
+  particleDensity: 1
+--- !u!1 &9100000000000000011
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9100000000000000012}
+  m_Layer: 0
+  m_Name: LEFT EXHAUST - PLACE ON NOZZLE
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &9100000000000000012
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9100000000000000011}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
+  m_LocalPosition: {x: -0.52, y: 0.04, z: -1.58}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 9100000000000000002}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
+--- !u!1 &9100000000000000021
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9100000000000000022}
+  m_Layer: 0
+  m_Name: RIGHT EXHAUST - PLACE ON NOZZLE
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &9100000000000000022
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9100000000000000021}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
+  m_LocalPosition: {x: 0.52, y: 0.04, z: -1.58}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 9100000000000000002}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}

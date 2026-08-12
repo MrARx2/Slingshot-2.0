@@ -34,13 +34,13 @@ public class TractionCore : MonoBehaviour
 
     [Header("Grip — Normal Profile")]
     [Tooltip("Sideways traction. Higher = less sideways drift.")]
-    public float lateralGrip = 7f;
+    public float lateralGrip = 6.5f;
 
     [Tooltip("Counter-trajectory traction when thrusting against current motion direction.")]
-    public float longitudinalGrip = 6f;
+    public float longitudinalGrip = 5.5f;
 
     [Tooltip("Forward/backward coasting drag when no throttle/brake is pressed.")]
-    public float coastingGrip = 0.25f;
+    public float coastingGrip = 0.3f;
 
     // ══════════════════════════════════════════════════════════════
     //  TUNING — DRIFT (GRIP BREAKER) PROFILE
@@ -48,10 +48,10 @@ public class TractionCore : MonoBehaviour
 
     [Header("Grip Breaker — Drift Profile")]
     [Tooltip("Lateral grip when fully drifting.")]
-    public float lateralGripBreaker = 0.35f;
+    public float lateralGripBreaker = 0.28f;
 
     [Tooltip("Longitudinal grip when fully drifting.")]
-    public float longitudinalGripBreaker = 0.25f;
+    public float longitudinalGripBreaker = 0.18f;
 
     [Tooltip("Coasting grip when fully drifting.")]
     public float coastingGripBreaker = 0.05f;
@@ -62,10 +62,10 @@ public class TractionCore : MonoBehaviour
 
     [Header("Grip Transition")]
     [Tooltip("How fast grip breaker transitions from normal to drift while held (units/sec).")]
-    public float gripBreakRate = 6f;
+    public float gripBreakRate = 8f;
 
     [Tooltip("How fast grip recovers after releasing grip breaker (units/sec).")]
-    public float gripRecoveryRate = 4f;
+    public float gripRecoveryRate = 5f;
 
     [Tooltip("Recovery speed penalty per unit of velocity.")]
     public float gripRecoverySpeedPenalty = 0.035f;
@@ -86,14 +86,14 @@ public class TractionCore : MonoBehaviour
 
     [Tooltip("Yaw steering sensitivity multiplier when grip breaker is fully active.")]
     [Range(0f, 3f)]
-    public float gripBreakerSteerMultiplier = 1.25f;
+    public float gripBreakerSteerMultiplier = 1.3f;
 
     [Tooltip("Maximum grip acceleration to prevent violent snap-back at high speed.")]
-    public float maxGripAcceleration = 90f;
+    public float maxGripAcceleration = 105f;
 
     [Tooltip("How much lateral slide energy becomes forward drive during grip recovery.")]
     [Range(0f, 1f)]
-    public float driftSpeedConservation = 0.15f;
+    public float driftSpeedConservation = 0.2f;
 
     // ══════════════════════════════════════════════════════════════
     //  TUNING — CARVE BITE

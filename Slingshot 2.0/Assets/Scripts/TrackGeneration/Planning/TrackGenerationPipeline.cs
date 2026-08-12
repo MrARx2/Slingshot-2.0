@@ -68,6 +68,10 @@ namespace TrackGeneration.Planning
             var builder = new TrackCandidateBuilder();
             var candidates = new List<Candidate>();
 
+            // Closure-relief diagnostics accumulate across this sweep's candidates.
+            TrackTopologyPlanner.AngleReliefAttempts = 0;
+            TrackTopologyPlanner.AngleReliefClosures = 0;
+
             int attempts = 0;
             for (; attempts < cfg.MaxAttempts; attempts++)
             {
@@ -152,6 +156,9 @@ namespace TrackGeneration.Planning
             result.ValidCandidateCount = candidates.Count;
             result.Report.AttemptsEvaluated = attempts;
             result.Report.ValidCandidateCount = candidates.Count;
+            result.Report.AngleReliefEnabled = cfg.ClosureAngleRelief;
+            result.Report.AngleReliefAttempts = TrackTopologyPlanner.AngleReliefAttempts;
+            result.Report.AngleReliefClosures = TrackTopologyPlanner.AngleReliefClosures;
 
             if (candidates.Count == 0)
             {
@@ -175,6 +182,12 @@ namespace TrackGeneration.Planning
             // plus any planning notes (dual-quarter demotions).
             result.Report.ConnectorDecisions.AddRange(best.Plan.ConnectorDecisions);
             result.Report.SubdivisionRegions.AddRange(best.Layout.SubdivisionRegions);
+            result.Report.FeatureExitRecords.AddRange(best.Plan.FeatureExitRecords);
+
+            // Stage C: classify every content boundary of the SELECTED candidate from
+            // its real built frames — reporting only, the dry run for Stage D.
+            foreach (var decision in TransitionResolver.Resolve(best.Layout.Sections, cfg))
+                result.Report.TransitionRecords.Add(decision.ToString());
             result.Report.Warnings.AddRange(best.Plan.Warnings);
 
             return result;

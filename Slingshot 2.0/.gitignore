@@ -53,6 +53,9 @@ sysinfo.txt
 *.stackdump
 *.traceevents
 
+# Generated track diagnostic reports
+/TrackReport_*.txt
+
 # Package manager cache/local artifacts
 .npm/
 node_modules/

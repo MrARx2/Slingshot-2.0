@@ -82,93 +82,31 @@ namespace TrackGeneration.Planning
                     onAlternateRoad = false;
                 }
 
-                // ── Ordinary sections ──
-                TrackConnectionFrame[] frames;
-                switch (def.SectionType)
+                // ── Ordinary sections: ONE shared dispatch (Stage A) — the same
+                // calculation plan-result measurement uses. Candidate-level weld
+                // corrections (landing-ramp grade snap) follow below.
+                TrackConnectionFrame[] frames = SectionFrameBuilders.BuildSectionFrames(frame, def, ctx);
+
+                if (def.SectionType == TrackMacroSectionType.LandingRamp)
                 {
-                    case TrackMacroSectionType.BankedCurve:
-                    case TrackMacroSectionType.BankedHairpin:
-                        frames = SectionFrameBuilders.BuildArc(frame, def.TurnAngle * def.TurnSign, def.Radius, def.BankingAngle, ctx);
-                        break;
-
-                    case TrackMacroSectionType.SCurve:
-                        frames = SectionFrameBuilders.BuildComposedArcs(frame,
-                            new[] { def.TurnAngle * def.TurnSign, -def.TurnAngle * def.TurnSign },
-                            new[] { def.Radius, def.Radius }, def.BankingAngle, ctx);
-                        break;
-
-                    case TrackMacroSectionType.Chicane:
-                        frames = SectionFrameBuilders.BuildComposedArcs(frame,
-                            new[] { def.TurnAngle * def.TurnSign, -2f * def.TurnAngle * def.TurnSign, def.TurnAngle * def.TurnSign },
-                            new[] { def.Radius, def.Radius, def.Radius }, def.BankingAngle, ctx);
-                        break;
-
-                    case TrackMacroSectionType.JumpRamp:
-                        frames = SectionFrameBuilders.BuildKeyframedPitchRamp(frame, def.Length,
-                            SectionFrameBuilders.LaunchRampKeys(def.SecondaryPitchDeg, def.PitchChange), ctx);
-                        break;
-
-                    case TrackMacroSectionType.LandingRamp:
+                    // The numeric descent lands within centimeters of grade; snap the
+                    // exit ring exactly (a weld inside tolerance, not a warp).
+                    // Entry is the landing mouth at LandingHeight above grade and
+                    // ElevationChange = -LandingHeight, so grade = entry + ElevationChange.
+                    float gradeY = frame.Position.y + def.ElevationChange;
+                    var lastF = frames[frames.Length - 1];
+                    if (Mathf.Abs(lastF.Position.y - gradeY) > cfg.JumpLandingTolerance)
                     {
-                        frames = SectionFrameBuilders.BuildKeyframedPitchRamp(frame, def.Length,
-                            SectionFrameBuilders.LandingRampKeys(def.PitchChange, def.SecondaryPitchDeg), ctx);
-
-                        // The numeric descent lands within centimeters of grade; snap the
-                        // exit ring exactly (a weld inside tolerance, not a warp).
-                        // Entry is the landing mouth at LandingHeight above grade and
-                        // ElevationChange = -LandingHeight, so grade = entry + ElevationChange.
-                        float gradeY = frame.Position.y + def.ElevationChange;
-                        var lastF = frames[frames.Length - 1];
-                        if (Mathf.Abs(lastF.Position.y - gradeY) > cfg.JumpLandingTolerance)
-                        {
-                            Fail(GenerationFailureReason.TransitionRateExceeded,
-                                $"Landing ramp '{def.DebugName}' missed grade by {lastF.Position.y - gradeY:F2}m (tolerance {cfg.JumpLandingTolerance:F1}m).");
-                            return null;
-                        }
-                        lastF.Position = new Vector3(lastF.Position.x, gradeY, lastF.Position.z);
-                        lastF.Forward = SectionFrameBuilders.Flatten(lastF.Forward);
-                        lastF.Right = SectionFrameBuilders.Flatten(lastF.Right);
-                        lastF.Up = Vector3.up;
-                        lastF.PitchAngle = 0f;
-                        frames[frames.Length - 1] = lastF;
-                        break;
+                        Fail(GenerationFailureReason.TransitionRateExceeded,
+                            $"Landing ramp '{def.DebugName}' missed grade by {lastF.Position.y - gradeY:F2}m (tolerance {cfg.JumpLandingTolerance:F1}m).");
+                        return null;
                     }
-
-                    case TrackMacroSectionType.Loop:
-                        frames = SectionFrameBuilders.BuildLoop(frame, def, ctx);
-                        break;
-
-                    case TrackMacroSectionType.Corkscrew:
-                        frames = SectionFrameBuilders.BuildCorkscrew(frame, def, ctx);
-                        break;
-
-                    case TrackMacroSectionType.Spiral:
-                        frames = SectionFrameBuilders.BuildSpiral(frame, def, ctx);
-                        break;
-
-                    case TrackMacroSectionType.HalfLoopTwist:
-                        frames = SectionFrameBuilders.BuildHalfLoopRollout(frame, def, ctx);
-                        break;
-
-                    case TrackMacroSectionType.RotationalEvent:
-                        frames = SectionFrameBuilders.BuildRotationalEvent(frame, def, ctx);
-                        break;
-
-                    case TrackMacroSectionType.FullPipe:
-                        frames = SectionFrameBuilders.BuildFullPipe(frame, def, ctx);
-                        break;
-
-                    case TrackMacroSectionType.WallrideTurn:
-                        frames = SectionFrameBuilders.BuildWallrideTurn(frame, def, ctx);
-                        break;
-
-                    case TrackMacroSectionType.AirGap:
-                        frames = System.Array.Empty<TrackConnectionFrame>();
-                        break;
-
-                    default:
-                        frames = SectionFrameBuilders.BuildStraight(frame, def, ctx);
-                        break;
+                    lastF.Position = new Vector3(lastF.Position.x, gradeY, lastF.Position.z);
+                    lastF.Forward = SectionFrameBuilders.Flatten(lastF.Forward);
+                    lastF.Right = SectionFrameBuilders.Flatten(lastF.Right);
+                    lastF.Up = Vector3.up;
+                    lastF.PitchAngle = 0f;
+                    frames[frames.Length - 1] = lastF;
                 }
 
                 var section = MakeSection(def, layout.Sections.Count, frames);
@@ -197,25 +135,11 @@ namespace TrackGeneration.Planning
                     // Dual-quarter gaps land laterally off the flight midline (lane A on
                     // the choice jump in, back to the midline on the convergence out).
                     section.StartFrame = frame; // the launch lip
-                    Vector3 dirH = SectionFrameBuilders.Flatten(frame.Forward);
-                    Vector3 landingPos = frame.Position + dirH * def.PlanHorizontalLength
-                                       + SectionFrameBuilders.Flatten(frame.Right) * def.PlanLateralOffset
-                                       + Vector3.up * def.ElevationChange;
-
-                    float arrivalRad = def.PitchChange * Mathf.Deg2Rad;
-                    Vector3 arrivalFwd = (dirH * Mathf.Cos(arrivalRad) + Vector3.up * Mathf.Sin(arrivalRad)).normalized;
-
-                    var landing = frame;
-                    landing.Position = landingPos;
-                    landing.Forward = arrivalFwd;
-                    landing.Right = SectionFrameBuilders.Flatten(frame.Right);
-                    landing.Up = Vector3.Cross(arrivalFwd, landing.Right).normalized;
-                    landing.PitchAngle = def.PitchChange;
-                    landing.BankAngle = 0f;
-                    landing.ArcLength = frame.ArcLength + def.Length;
-                    // The gap's own width defines the arrival road (branch-zone catches
-                    // are BROAD two-lane sections even when the launch side was narrow).
-                    if (def.Width > 1f) landing.Width = def.Width;
+                    // Shared ballistic-arrival math (Stage A): the same function
+                    // plan-result measurement uses. The gap's own width defines the
+                    // arrival road (branch-zone catches are BROAD two-lane sections
+                    // even when the launch side was narrow).
+                    var landing = SectionFrameBuilders.AirGapLanding(frame, def);
 
                     frame = landing;
                     section.EndFrame = landing;

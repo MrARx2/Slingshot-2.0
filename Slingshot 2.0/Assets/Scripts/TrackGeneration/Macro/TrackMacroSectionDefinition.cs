@@ -306,6 +306,9 @@ namespace TrackGeneration.Macro
         [Tooltip("Turn-complex this section belongs to (same-direction turn bridges group their two corners + connector). Empty for standalone sections. Reporting/surface-pass metadata — does NOT change pattern atomicity.")]
         public string TurnComplexId;
 
+        [Tooltip("Authoritative semantic identity of the element this section belongs to (Stage A). Default None = legacy data; consumers fall back to PatternId/type inference for None.")]
+        public SemanticElementId SemanticElement;
+
         [Tooltip("Orientation/heading contract of this section, used by the sequence-grammar validator.")]
         public SectionConnectionContract Contract;
 

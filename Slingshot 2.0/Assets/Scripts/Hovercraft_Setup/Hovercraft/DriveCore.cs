@@ -32,7 +32,7 @@ public class DriveCore : MonoBehaviour
 
     [Header("Propulsion")]
     [Tooltip("How quickly throttle ramps toward target value (units per second via MoveTowards).")]
-    public float throttleRampSpeed = 3f;
+    public float throttleRampSpeed = 4.8f;
 
     // ══════════════════════════════════════════════════════════════
     //  PUBLIC READ STATE

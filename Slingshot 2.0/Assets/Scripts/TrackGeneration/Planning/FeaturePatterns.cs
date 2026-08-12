@@ -629,8 +629,8 @@ namespace TrackGeneration.Planning
             return Mathf.Min(wholeUnits, maxUnits);
         }
 
-        internal static TrackMacroSectionDefinition MakeCorkscrewDef(ResolvedTrackGenerationConfig cfg,
-            ref Unity.Mathematics.Random rng, float signedRoll, string patternId)
+        public static TrackMacroSectionDefinition MakeCorkscrewDef(ResolvedTrackGenerationConfig cfg,
+            ref Unity.Mathematics.Random rng, float signedRoll, string patternId, float horizontalTurn = 0f)
         {
             int units = Mathf.Max(1, Mathf.RoundToInt(Mathf.Abs(signedRoll) / cfg.RotationUnitDegrees));
             units = ClampUnitsToAchievableBarrel(cfg, units);
@@ -731,6 +731,12 @@ namespace TrackGeneration.Planning
             float yawBias = 0f;
             if (rng.NextFloat() >= 0.55f)
                 yawBias = (rng.NextBool() ? 1f : -1f) * (rng.NextBool() ? 8f : 15f);
+            // A directional corkscrew's net plan-view heading MUST equal its requested
+            // turn token exactly (the canonical solver consumes it as a ±45/±90 demand),
+            // so a randomly-biased yaw that would otherwise leave a stray residual in the
+            // stamped TurnAngle is suppressed. Inline corkscrews (horizontalTurn == 0) keep
+            // the original draw and stay byte-identical.
+            if (Mathf.Abs(horizontalTurn) > 0.001f) yawBias = 0f;
             var phase = new RotationalPhaseDefinition
             {
                 Axis = RotationalPhaseAxis.RoadRoll,
@@ -740,7 +746,7 @@ namespace TrackGeneration.Planning
                 SecondHalfLength = length * (1f - split),
                 FirstHalfRadius = radius,
                 SecondHalfRadius = secondRadius,
-                HorizontalTurnDegrees = 0f,
+                HorizontalTurnDegrees = horizontalTurn,
                 FirstHalfYawBiasDegrees = yawBias,
                 SecondHalfYawBiasDegrees = yawBias,
                 VerticalDriftDegrees = verticalDrift,
@@ -763,7 +769,8 @@ namespace TrackGeneration.Planning
                 RequiresRecoveryAfter = false,
                 LockLength = true,
                 PatternId = patternId,
-                DebugName = $"Corkscrew_{units}u_{(signedRoll >= 0 ? "R" : "L")}_H1R{radius:F0}_H2R{secondRadius:F0}_Orbit{centerlineOrbit:F0}",
+                DebugName = $"Corkscrew_{units}u_{(signedRoll >= 0 ? "R" : "L")}_H1R{radius:F0}_H2R{secondRadius:F0}_Orbit{centerlineOrbit:F0}" +
+                            (Mathf.Abs(horizontalTurn) > 0.001f ? $"_Turn{horizontalTurn:+0;-0}" : ""),
                 RotationalPhases = new List<RotationalPhaseDefinition> { phase },
                 Contract = new SectionConnectionContract
                 {

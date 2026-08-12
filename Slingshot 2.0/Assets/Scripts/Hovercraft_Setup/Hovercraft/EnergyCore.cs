@@ -25,21 +25,20 @@ public class EnergyCore : MonoBehaviour
     [Tooltip("Global conversion from thruster force capability into power draw. Higher values make all thrusters more energy-hungry.")]
     public float powerCostPerForce = 1f;
 
-    [Tooltip("If true, automatic base hover requests are granted before the shared performance budget. This prevents normal hover from collapsing when the player drives/steers/charges.")]
+    [Tooltip("If true, automatic base hover requests are granted before the shared performance budget. This prevents normal hover from collapsing when the player drives, steers or boosts.")]
     public bool protectBaseHover = true;
 
     [Header("Channel Priority / Feel")]
-    [Tooltip("When the reactor is overloaded, vectoring/steering receives this priority bias before drive/other performance channels. Keeps steering responsive under power load. 1 = no bias.")]
-    [Range(0.1f, 4f)]
-    public float vectoringPriorityBias = 1.35f;
+    [Tooltip("Keep automatic surface-retention/stabilizer demand outside the player performance BUS, like base hover. This prevents loops and wall transitions from starving propulsion.")]
+    public bool protectStabilizer = true;
 
-    [Header("Overcharge Charging")]
-    [Tooltip("Charging a thruster draws power based on the selected thruster group's max output. This is the virtual throttle used for that cost calculation.")]
-    [Range(0f, 2f)]
-    public float overchargeChargeThrottleEquivalent = 1f;
+    [Tooltip("Fraction of the shared BUS reserved for steering while overloaded. Unused reserve immediately returns to the other channels.")]
+    [Range(0f, 1f)]
+    public float steeringReserve01 = 0.28f;
 
-    [Tooltip("Extra multiplier for overcharge charging cost. 1 = same draw as running the selected thruster group at the charge throttle equivalent.")]
-    public float overchargeChargeCostMultiplier = 1f;
+    [Tooltip("Fraction of the shared BUS reserved for Overcharge discharge or regeneration while overloaded. Unused reserve immediately returns to other systems.")]
+    [Range(0f, 1f)]
+    public float boostReserve01 = 0.62f;
 
     [Header("Debug / Read Only")]
     [SerializeField] private EnergyState currentEnergy = EnergyState.Full;
@@ -86,31 +85,63 @@ public class EnergyCore : MonoBehaviour
             AccumulateChannelPower(entry, entry.otherThrottle, ThrusterPowerChannel.Other, costPerForce, bus.masterThrottleMultiplier, ref baseHoverRequest, ref driveRequest, ref vectoringRequest, ref roofRequest, ref bottomRequest, ref overchargeRequest, ref stabilizerRequest, ref otherRequest);
         }
 
-        // Overcharge charging is a virtual load. It does not fire a thruster yet,
-        // but it still pulls reactor output. Its cost is derived from the selected
-        // thruster group, so bigger upgrade parts naturally charge more slowly.
-        float virtualOverchargeChargeRequest = ComputeOverchargeChargeRequest(bus, overcharge, costPerForce);
+        // Discharging Overcharge draws real power through the main thruster above.
+        // Regenerating the stored reserve is also a real BUS load, represented as
+        // virtual demand because it does not directly drive a ThrusterNode.
+        float overchargeBurstRequest = overchargeRequest;
+        float virtualOverchargeChargeRequest = overcharge != null
+            ? Mathf.Max(0f, overcharge.RequestedRechargePower)
+            : 0f;
         overchargeRequest += virtualOverchargeChargeRequest;
 
         float nonHoverPerformanceRequest = driveRequest + vectoringRequest + roofRequest + bottomRequest + overchargeRequest + stabilizerRequest + otherRequest;
+        float sharedRequest = nonHoverPerformanceRequest
+                            - (protectStabilizer ? stabilizerRequest : 0f)
+                            + (protectBaseHover ? 0f : baseHoverRequest);
 
-        float priorityBias = Mathf.Max(0.1f, vectoringPriorityBias);
+        // Strict priority allocator. Unlike the former bias multiplier, this can
+        // never grant more shared power than the BUS reports. That makes overload
+        // a gameplay rule the player can learn instead of a cosmetic meter.
+        float remainingBudget = budget;
+        float stabilizerGranted = protectStabilizer ? stabilizerRequest : 0f;
 
-        // Use a central, reactor-level priority bias instead of per-system cost
-        // tuning. Vectoring still consumes power based on its actual thrusters,
-        // but when overloaded it loses less authority than drive/optional systems.
-        // This keeps steering/carve response alive under power load.
-        float effectiveVectoringRequest = vectoringRequest / priorityBias;
-        float effectivePerformanceRequest = driveRequest + effectiveVectoringRequest + roofRequest + bottomRequest + overchargeRequest + stabilizerRequest + otherRequest;
-        if (!protectBaseHover)
-            effectivePerformanceRequest += baseHoverRequest;
+        float steeringReserve = budget * Mathf.Clamp01(steeringReserve01);
+        float vectoringGuaranteed = Mathf.Min(vectoringRequest, steeringReserve, remainingBudget);
+        remainingBudget -= vectoringGuaranteed;
 
-        float performanceScale = effectivePerformanceRequest > budget
-            ? Mathf.Clamp01(budget / Mathf.Max(0.001f, effectivePerformanceRequest))
+        float activeBoostReserve = budget * Mathf.Clamp01(boostReserve01);
+        float overchargeGuaranteed = Mathf.Min(overchargeRequest, activeBoostReserve, remainingBudget);
+        remainingBudget -= overchargeGuaranteed;
+
+        float residualBaseHover = protectBaseHover ? 0f : baseHoverRequest;
+        float residualStabilizer = protectStabilizer ? 0f : stabilizerRequest;
+        float residualVectoring = Mathf.Max(0f, vectoringRequest - vectoringGuaranteed);
+        float residualOvercharge = Mathf.Max(0f, overchargeRequest - overchargeGuaranteed);
+        float residualRequest = residualBaseHover + driveRequest + residualVectoring + roofRequest +
+                                bottomRequest + residualOvercharge + residualStabilizer + otherRequest;
+        float residualScale = residualRequest > remainingBudget
+            ? Mathf.Clamp01(remainingBudget / Mathf.Max(0.001f, residualRequest))
             : 1f;
 
-        float vectoringScale = Mathf.Clamp01(performanceScale * priorityBias);
-        float baseHoverScale = protectBaseHover ? 1f : performanceScale;
+        float baseHoverGranted = protectBaseHover ? baseHoverRequest : baseHoverRequest * residualScale;
+        float driveGranted = driveRequest * residualScale;
+        float vectoringGranted = vectoringGuaranteed + residualVectoring * residualScale;
+        float roofGranted = roofRequest * residualScale;
+        float bottomGranted = bottomRequest * residualScale;
+        float overchargeGranted = overchargeGuaranteed + residualOvercharge * residualScale;
+        stabilizerGranted += residualStabilizer * residualScale;
+        float otherGranted = otherRequest * residualScale;
+
+        float baseHoverScale = GetPower01(baseHoverRequest, baseHoverGranted);
+        float driveScale = GetPower01(driveRequest, driveGranted);
+        float vectoringScale = GetPower01(vectoringRequest, vectoringGranted);
+        float roofScale = GetPower01(roofRequest, roofGranted);
+        float bottomScale = GetPower01(bottomRequest, bottomGranted);
+        float overchargeScale = GetPower01(overchargeRequest, overchargeGranted);
+        float overchargeBurstGranted = overchargeBurstRequest * overchargeScale;
+        float overchargeChargeGranted = virtualOverchargeChargeRequest * overchargeScale;
+        float stabilizerScale = GetPower01(stabilizerRequest, stabilizerGranted);
+        float otherScale = GetPower01(otherRequest, otherGranted);
 
         // Second pass: apply granted scale per channel back onto the actual thruster requests.
         foreach (var entry in bus.thrusters)
@@ -128,13 +159,13 @@ public class EnergyCore : MonoBehaviour
 
             float grantedRawThrottle =
                 entry.baseHoverThrottle * baseHoverScale +
-                entry.driveThrottle * performanceScale +
+                entry.driveThrottle * driveScale +
                 entry.vectoringThrottle * vectoringScale +
-                entry.roofThrottle * performanceScale +
-                entry.bottomThrottle * performanceScale +
-                entry.overchargeThrottle * performanceScale +
-                entry.stabilizerThrottle * performanceScale +
-                entry.otherThrottle * performanceScale;
+                entry.roofThrottle * roofScale +
+                entry.bottomThrottle * bottomScale +
+                entry.overchargeThrottle * overchargeScale +
+                entry.stabilizerThrottle * stabilizerScale +
+                entry.otherThrottle * otherScale;
 
             float finalThrottle = grantedRawThrottle * entry.forceMultiplier * bus.masterThrottleMultiplier;
 
@@ -150,24 +181,19 @@ public class EnergyCore : MonoBehaviour
             entry.lastPowerScale = requestedPower > 0.001f ? Mathf.Clamp01(grantedPower / requestedPower) : 1f;
         }
 
-        float driveGranted = driveRequest * performanceScale;
-        float vectoringGranted = vectoringRequest * vectoringScale;
-        float roofGranted = roofRequest * performanceScale;
-        float bottomGranted = bottomRequest * performanceScale;
-        float overchargeGranted = overchargeRequest * performanceScale;
-        float stabilizerGranted = stabilizerRequest * performanceScale;
-        float baseHoverGranted = baseHoverRequest * baseHoverScale;
-        float otherGranted = otherRequest * performanceScale;
-
         float totalRequested = baseHoverRequest + nonHoverPerformanceRequest;
         float totalGranted = baseHoverGranted + driveGranted + vectoringGranted + roofGranted + bottomGranted + overchargeGranted + stabilizerGranted + otherGranted;
+        float sharedGranted = totalGranted
+                            - (protectBaseHover ? baseHoverGranted : 0f)
+                            - (protectStabilizer ? stabilizerGranted : 0f);
+        float performanceScale = sharedRequest > 0.001f ? Mathf.Clamp01(sharedGranted / sharedRequest) : 1f;
 
         currentEnergy = new EnergyState
         {
             totalBudget = budget,
             totalRequested = totalRequested,
             totalGranted = totalGranted,
-            overload01 = Mathf.Clamp01(effectivePerformanceRequest <= budget ? 0f : (effectivePerformanceRequest - budget) / budget),
+            overload01 = Mathf.Clamp01(sharedRequest <= budget ? 0f : (sharedRequest - budget) / budget),
 
             baseHoverRequest = baseHoverRequest,
             baseHoverGranted = baseHoverGranted,
@@ -191,13 +217,14 @@ public class EnergyCore : MonoBehaviour
             vectoringPower01 = GetPower01(vectoringRequest, vectoringGranted),
             roofPower01 = GetPower01(roofRequest, roofGranted),
             bottomPower01 = GetPower01(bottomRequest, bottomGranted),
-            overchargePower01 = GetPower01(overchargeRequest, overchargeGranted),
-            overchargeChargePower01 = virtualOverchargeChargeRequest > 0.001f ? GetPower01(overchargeRequest, overchargeGranted) : 1f,
-            overchargeBurstPower01 = GetPower01(overchargeRequest - virtualOverchargeChargeRequest, overchargeGranted - virtualOverchargeChargeRequest * performanceScale),
+            overchargePower01 = overchargeScale,
+            overchargeChargePower01 = GetPower01(virtualOverchargeChargeRequest, overchargeChargeGranted),
+            overchargeBurstPower01 = GetPower01(overchargeBurstRequest, overchargeBurstGranted),
             stabilizerPower01 = GetPower01(stabilizerRequest, stabilizerGranted),
             baseHoverPower01 = GetPower01(baseHoverRequest, baseHoverGranted),
             otherPower01 = GetPower01(otherRequest, otherGranted),
             baseHoverProtected = protectBaseHover,
+            stabilizerProtected = protectStabilizer,
             performancePowerScale01 = performanceScale
         };
 
@@ -246,66 +273,6 @@ public class EnergyCore : MonoBehaviour
 
         float finalThrottleIfGranted = rawThrottle * entry.forceMultiplier * masterMultiplier;
         return entry.node.GetPowerDraw(finalThrottleIfGranted, costPerForce);
-    }
-
-    private float ComputeOverchargeChargeRequest(ThrusterBus bus, OverchargeCore overcharge, float costPerForce)
-    {
-        if (bus == null || overcharge == null || !overcharge.IsCharging)
-            return 0f;
-
-        float throttle = Mathf.Max(0f, overchargeChargeThrottleEquivalent);
-        float multiplier = Mathf.Max(0f, overchargeChargeCostMultiplier);
-        if (throttle <= 0f || multiplier <= 0f)
-            return 0f;
-
-        float sum = 0f;
-        switch (overcharge.ChargingTarget)
-        {
-            case OverchargeTarget.BottomThrusters:
-                sum += SumPowerForList(bus.HoverNodes, throttle, costPerForce, bus.masterThrottleMultiplier);
-                break;
-            case OverchargeTarget.RoofThrusters:
-                sum += SumPowerForList(bus.RoofNodes, throttle, costPerForce, bus.masterThrottleMultiplier);
-                break;
-            case OverchargeTarget.MainThruster:
-                sum += SumPowerByRole(bus, ThrusterNode.ThrusterRole.Main, throttle, costPerForce);
-                break;
-            case OverchargeTarget.BrakeThruster:
-                sum += SumPowerByRole(bus, ThrusterNode.ThrusterRole.Brake, throttle, costPerForce);
-                break;
-        }
-
-        return sum * multiplier;
-    }
-
-    private static float SumPowerByRole(ThrusterBus bus, ThrusterNode.ThrusterRole role, float throttle, float costPerForce)
-    {
-        if (bus == null || bus.thrusters == null)
-            return 0f;
-
-        float sum = 0f;
-        foreach (var entry in bus.thrusters)
-        {
-            if (entry == null || entry.node == null || !entry.enabled || entry.node.role != role)
-                continue;
-            sum += ComputeEntryPower(entry, throttle, costPerForce, bus.masterThrottleMultiplier);
-        }
-        return sum;
-    }
-
-    private static float SumPowerForList(System.Collections.Generic.List<ThrusterBus.ThrusterNodeEntry> entries, float throttle, float costPerForce, float masterMultiplier)
-    {
-        if (entries == null)
-            return 0f;
-
-        float sum = 0f;
-        foreach (var entry in entries)
-        {
-            if (entry == null || entry.node == null || !entry.enabled)
-                continue;
-            sum += ComputeEntryPower(entry, throttle, costPerForce, masterMultiplier);
-        }
-        return sum;
     }
 
     private static float GetPower01(float request, float granted)

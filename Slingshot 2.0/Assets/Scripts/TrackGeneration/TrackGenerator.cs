@@ -118,6 +118,24 @@ namespace TrackGeneration
             _seedManager = GetComponent<TrackSeedManager>();
         }
 
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            // Procedural track meshes can contain several gigabytes of vertex/index data.
+            // They are reproducible from the saved seed and settings, so keep them in the
+            // editor scene for preview and play, but never embed them in the .unity file.
+            if (!Application.isPlaying && trackRoot != null)
+                MarkGeneratedHierarchyTransient(trackRoot.gameObject);
+        }
+
+        /// <summary>Editor save guard for tracks created before transient serialization was introduced.</summary>
+        public void PrepareGeneratedTrackForEditorSave()
+        {
+            if (!Application.isPlaying && trackRoot != null)
+                MarkGeneratedHierarchyTransient(trackRoot.gameObject);
+        }
+#endif
+
         private void Start()
         {
             bool adoptedExisting = keepEditorTrackOnPlay && TryAdoptExistingTrack();
@@ -509,6 +527,11 @@ namespace TrackGeneration
                 tempRootObj.name = $"GeneratedTrack_{seed.BaseSeed}";
                 trackRoot = tempRootObj.transform;
 
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+                    MarkGeneratedHierarchyTransient(tempRootObj);
+#endif
+
                 CurrentMacroSections = layout.Sections;
                 CurrentLayout = layout;
                 UpdateGeneratedMeshStats();
@@ -586,6 +609,37 @@ namespace TrackGeneration
             }
         }
 
+#if UNITY_EDITOR
+        private static void MarkGeneratedHierarchyTransient(GameObject root)
+        {
+            if (root == null) return;
+
+            foreach (Transform item in root.GetComponentsInChildren<Transform>(true))
+            {
+                item.gameObject.hideFlags |= HideFlags.DontSaveInEditor;
+                foreach (Component component in item.GetComponents<Component>())
+                {
+                    if (component != null)
+                        component.hideFlags |= HideFlags.DontSaveInEditor;
+                }
+            }
+
+            foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (filter.sharedMesh != null &&
+                    !UnityEditor.EditorUtility.IsPersistent(filter.sharedMesh))
+                    filter.sharedMesh.hideFlags |= HideFlags.DontSaveInEditor;
+            }
+
+            foreach (MeshCollider collider in root.GetComponentsInChildren<MeshCollider>(true))
+            {
+                if (collider.sharedMesh != null &&
+                    !UnityEditor.EditorUtility.IsPersistent(collider.sharedMesh))
+                    collider.sharedMesh.hideFlags |= HideFlags.DontSaveInEditor;
+            }
+        }
+#endif
+
         private static void ReleaseMesh(UnityEngine.Mesh mesh)
         {
             if (mesh == null) return;
@@ -617,6 +671,10 @@ namespace TrackGeneration
             var visualizer = trackRoot.GetComponent<MacroTrackDebugVisualizer>();
             if (visualizer != null && visualizer.Sections != null && visualizer.Sections.Count > 0)
             {
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+                    MarkGeneratedHierarchyTransient(trackRoot.gameObject);
+#endif
                 CurrentMacroSections = visualizer.Sections;
                 UpdateGeneratedMeshStats();
                 Debug.Log($"[TrackGenerator] Keeping editor-generated track (seed {visualizer.Seed}, {visualizer.Sections.Count} sections).");

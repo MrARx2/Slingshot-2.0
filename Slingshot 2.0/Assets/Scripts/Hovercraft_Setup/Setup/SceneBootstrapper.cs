@@ -123,7 +123,7 @@ public class SceneBootstrapper : MonoBehaviour
         SetupLighting();
 
         Debug.Log("<b>[Hovercraft V2]</b> Setup complete! Press Play to test the modular craft.");
-        Debug.Log("<b>[Hovercraft V2]</b> Controls: W/S = Throttle/Brake, Mouse X = Steering, Mouse Y = Pitch shift, A/D = Edge shift, Shift = Grip breaker, Space = Overcharge (hold + release), Q/E = Roof/Bottom thrusters, R = Stabilizer toggle, P = Cycle camera view, O = Camera ground orientation, F2 = Debug HUD.");
+        Debug.Log("<b>[Hovercraft V2]</b> Controls: W/S = Throttle/Brake, Mouse X = Steering, Mouse Y = Pitch shift, A/D = Edge shift, Shift = Grip breaker, Space = BOOST (instant, 10s cooldown), Q/E = Roof/Bottom thrusters, R = Stabilizer toggle, P = Cycle camera view, O = Camera ground orientation, F2 = Debug HUD.");
 
         Selection.activeGameObject = craft;
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(

@@ -12,6 +12,31 @@ using TrackGeneration.Planning;
 
 namespace TrackGeneration.Editor
 {
+    internal sealed class TrackGeneratorSceneSaveGuard : AssetModificationProcessor
+    {
+        private static string[] OnWillSaveAssets(string[] paths)
+        {
+            bool savingScene = false;
+            foreach (string path in paths)
+            {
+                if (path.EndsWith(".unity", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    savingScene = true;
+                    break;
+                }
+            }
+
+            if (!savingScene)
+                return paths;
+
+            foreach (TrackGenerator generator in
+                Object.FindObjectsByType<TrackGenerator>(FindObjectsInactive.Include))
+                generator.PrepareGeneratedTrackForEditorSave();
+
+            return paths;
+        }
+    }
+
     /// <summary>
     /// Designer-facing inspector for the track generator, organized for the intended
     /// workflow: generate → keep what looks good → lock settings/layout → randomize
@@ -46,6 +71,13 @@ namespace TrackGeneration.Editor
         private readonly System.Diagnostics.Stopwatch _footerWatch = new System.Diagnostics.Stopwatch();
         private readonly PassTiming _headerTiming = new PassTiming();
         private readonly PassTiming _footerTiming = new PassTiming();
+
+        // Bumped whenever a toolbar button runs a generator command (generate, randomize,
+        // regenerate, …). A generate runs 300 attempts synchronously inside the toolbar's
+        // own IMGUI callback, so its seconds land inside the header stopwatch — that is a
+        // user command executing, NOT expensive work leaking into idle repaints. Passes in
+        // which the epoch advanced are excluded from the repaint-timing stats and warning.
+        private static long _commandEpoch;
 
         // Temporary proof counters. None of these schedule updates or request repaints.
         private static int _activeEditorCount;
@@ -187,14 +219,20 @@ namespace TrackGeneration.Editor
             // ── Header: toolbar + report card + locks (bounded IMGUI) ──
             root.Add(new IMGUIContainer(() =>
             {
+                long epochBefore = _commandEpoch;
                 _headerWatch.Restart();
                 DrawTopToolbar(generator);
                 DrawReportCard(generator);
                 DrawLockPanel(generator);
                 DrawInspectorDiagnostics(generator);
                 _headerWatch.Stop();
-                _headerTiming.Record(_headerWatch.Elapsed.TotalMilliseconds, Event.current.type);
-                WarnIfSlow("header", _headerWatch.Elapsed.TotalMilliseconds);
+                // A toolbar button may have run a synchronous generator command this pass;
+                // its seconds are the command, not repaint leakage — don't record or warn.
+                if (_commandEpoch == epochBefore)
+                {
+                    _headerTiming.Record(_headerWatch.Elapsed.TotalMilliseconds, Event.current.type);
+                    WarnIfSlow("header", _headerWatch.Elapsed.TotalMilliseconds);
+                }
             }));
 
             // ── Settings: retained-mode property fields ──
@@ -339,6 +377,7 @@ namespace TrackGeneration.Editor
         /// <summary>Any command that regenerates or mutates settings invalidates the caches.</summary>
         private void AfterGeneratorCommand(TrackGenerator generator)
         {
+            _commandEpoch++; // mark this IMGUI pass as command-driven, not an idle repaint
             _cache.MarkSettingsDirty(); // relaxation policies may have adjusted settings
             EditorUtility.SetDirty(generator);
         }
@@ -565,9 +604,10 @@ namespace TrackGeneration.Editor
                         if (EditorUtility.DisplayDialog("Clear Track",
                                 "Destroy the current generated track?", "Clear", "Cancel"))
                         {
-                            Undo.RegisterFullObjectHierarchyUndo(generator.gameObject, "Clear Track");
-                            if (generator.TrackRoot != null)
-                                Undo.RegisterFullObjectHierarchyUndo(generator.TrackRoot.gameObject, "Clear Track");
+                            // A generated track may hold several GB of procedural mesh data.
+                            // Registering that hierarchy with Undo duplicates it in memory and
+                            // can freeze the editor before it has a chance to clear the track.
+                            Undo.RecordObject(generator, "Clear Track");
                             generator.ClearTrack();
                             EditorUtility.SetDirty(generator);
                         }
@@ -777,6 +817,18 @@ namespace TrackGeneration.Editor
             sb.AppendLine(report.Success ? "GENERATED SUCCESSFULLY" : "GENERATION FAILED");
             sb.AppendLine($"Seed: {report.Seed}   Command: {report.RegenerationCommand}");
             sb.AppendLine($"Attempts: {report.AttemptsEvaluated}   Valid candidates: {report.ValidCandidateCount}   Score: {report.SelectedCandidateScore:F1}");
+            sb.AppendLine(report.AngleReliefEnabled
+                ? $"Closure relief: ON — invoked on {report.AngleReliefAttempts} solves, closed {report.AngleReliefClosures}"
+                : "Closure relief: OFF (flag disabled this run)");
+            var reasons = report.FailureCountsByReason();
+            if (reasons.Count > 0)
+            {
+                int totF = report.TotalFailureCount;
+                sb.Append("Failure modes:");
+                foreach (var (reason, count) in reasons)
+                    sb.Append($" {reason} {count} ({(totF > 0 ? 100f * count / totF : 0f):F0}%);");
+                sb.AppendLine();
+            }
             if (metrics != null && report.Success)
             {
                 sb.AppendLine($"Estimated lap: {metrics.EstimatedNeutralLapTimeSeconds:F1}s   Length: {metrics.LapLengthMeters / 1000f:F2}km   Turns: {metrics.TurnCount}");

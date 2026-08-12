@@ -1,0 +1,196 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &100000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 400000}
+  - component: {fileID: 11400000}
+  m_Layer: 0
+  m_Name: Propulsion Wake Placement Rig
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &400000
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 400001}
+  - {fileID: 400002}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3058a40e47164c388a445e046b0e218a, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PropulsionWakeTuning
+  overallLength: 1
+  exhaustBodyLength: 1
+  filamentLength: 1
+  memoryLength: 1
+  showMemoryRibbons: 1
+  maximumMemoryLengthMeters: 12
+  memorySmoothness: 0.72
+  preventForwardWrap: 1
+  forwardWrapAllowance: 0.35
+  clearOnSharpDirectionChange: 1
+  directionChangeClearAngle: 52
+  teleportClearDistance: 18
+  leftEffectOffset: {x: 0, y: 0, z: 0}
+  rightEffectOffset: {x: 0, y: 0, z: 0}
+  stretchedParticlePivot: 0.5
+  width: 1
+  coreSize: 1
+  plumeSize: 1
+  filamentSize: 1
+  ribbonSize: 1
+  particleStretch: 1
+  showHotCore: 1
+  showPlasmaPlume: 1
+  showIonFilaments: 1
+  leftCoreOffset: {x: 0, y: 0, z: 0}
+  rightCoreOffset: {x: 0, y: 0, z: 0}
+  leftCoreRotation: {x: 0, y: 0, z: 0}
+  rightCoreRotation: {x: 0, y: 0, z: 0}
+  leftPlumeOffset: {x: 0, y: 0, z: 0}
+  rightPlumeOffset: {x: 0, y: 0, z: 0}
+  leftPlumeRotation: {x: 0, y: 0, z: 0}
+  rightPlumeRotation: {x: 0, y: 0, z: 0}
+  leftFilamentOffset: {x: 0, y: 0, z: 0}
+  rightFilamentOffset: {x: 0, y: 0, z: 0}
+  leftFilamentRotation: {x: 0, y: 0, z: 0}
+  rightFilamentRotation: {x: 0, y: 0, z: 0}
+  leftRibbonOffset: {x: 0, y: 0, z: 0}
+  rightRibbonOffset: {x: 0, y: 0, z: 0}
+  leftRibbonRotation: {x: 0, y: 0, z: 0}
+  rightRibbonRotation: {x: 0, y: 0, z: 0}
+  showPlasmaSparks: 1
+  showPlasmaChamber: 1
+  leftPlasmaOffset: {x: 0, y: 0, z: 0}
+  rightPlasmaOffset: {x: 0, y: 0, z: 0}
+  leftChamberOffset: {x: 0, y: 0, z: 0}
+  rightChamberOffset: {x: 0, y: 0, z: 0}
+  leftMoteOffset: {x: 0, y: 0, z: 0}
+  rightMoteOffset: {x: 0, y: 0, z: 0}
+  leftMoteRotation: {x: 0, y: 0, z: 0}
+  rightMoteRotation: {x: 0, y: 0, z: 0}
+  showPlasmaMotes: 1
+  moteAmount: 1
+  moteSize: 1
+  moteSpeed: 1
+  moteSpread: 1
+  moteLifetime: 1
+  moteTurbulence: 1
+  leftSparkOffset: {x: 0, y: 0, z: 0}
+  rightSparkOffset: {x: 0, y: 0, z: 0}
+  leftSparkRotation: {x: 0, y: 0, z: 0}
+  rightSparkRotation: {x: 0, y: 0, z: 0}
+  plasmaChamberColor: {r: 0.42, g: 1.35, b: 1.8, a: 1}
+  chamberSize: 1
+  chamberIntensity: 1
+  plasmaSparkColor: {r: 2.2, g: 1.25, b: 0.62, a: 1}
+  sparkAmount: 1
+  sparkSize: 1
+  sparkSpeed: 1
+  sparkSpread: 1
+  sparkLifetime: 1
+  sparkStreakLength: 1
+  sparkTrailAmount: 0.55
+  sparkTurbulence: 1
+  overchargeSparkBoost: 1
+  sparkSpawnRadius: 1
+  sparkSpeedVariation: 0.65
+  sparkDrag: 0.25
+  sparkGravity: 0
+  sparkTrailLifetime: 1
+  sparkTrailWidth: 1
+  idleSparkPresence: 1
+  throttleSparkResponse: 1
+  ignitionSparkBurst: 1
+  sparkFlickerSpeed: 1
+  sparkTurbulenceFrequency: 1
+  particleDensity: 1
+--- !u!1 &100001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 400001}
+  m_Layer: 0
+  m_Name: LEFT EXHAUST - PLACE ON NOZZLE
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &400001
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
+  m_LocalPosition: {x: -0.52, y: 0.04, z: -1.58}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 400000}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
+--- !u!1 &100002
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 400002}
+  m_Layer: 0
+  m_Name: RIGHT EXHAUST - PLACE ON NOZZLE
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &400002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100002}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
+  m_LocalPosition: {x: 0.52, y: 0.04, z: -1.58}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 400000}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}

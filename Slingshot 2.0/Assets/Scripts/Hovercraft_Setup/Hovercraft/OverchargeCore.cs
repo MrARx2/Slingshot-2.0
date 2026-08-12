@@ -1,16 +1,12 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
-/// Space-held charge/release burst system.
-/// <para>
-/// Hold Space to charge the selected thruster group. Release Space to fire
-/// a burst. Selection rules:
-/// Space alone = bottom thrusters.
-/// Space + Q = roof thrusters.
-/// Space + E = bottom thrusters.
-/// Space + W = main thruster.
-/// Space + S = brake thruster.
-/// </para>
+/// Controllable OVERCHARGE system.
+/// Holding Space burns a finite reserve into the main propulsion thruster. A fresh
+/// press adds a short ignition kick, while the held portion remains smooth and fully
+/// controllable. Releasing Space preserves the remaining reserve, which then draws
+/// from the shared POWER BUS while it regenerates.
 /// </summary>
 public class OverchargeCore : MonoBehaviour
 {
@@ -18,182 +14,212 @@ public class OverchargeCore : MonoBehaviour
     [HideInInspector] public ThrusterNode mainThruster;
     [HideInInspector] public ThrusterNode brakeThruster;
 
-    [Header("Charge")]
-    [Tooltip("How fast the overcharge fills per second.")]
-    public float chargeRate = 1.5f;
+    [Header("Overcharge Reserve")]
+    [Tooltip("Seconds of continuous Overcharge available from a full reserve.")]
+    [FormerlySerializedAs("boostDuration")]
+    [Min(0.25f)] public float fullBurnDuration = 3.2f;
 
-    [Tooltip("Minimum charge required before release creates a burst.")]
-    [Range(0f, 1f)]
-    public float minimumReleaseCharge = 0.08f;
+    [Tooltip("Delay after releasing Overcharge before regeneration begins.")]
+    [Min(0f)] public float regenerationDelay = 0.9f;
 
-    [Tooltip("If true, changing held keys while Space is down changes the selected target. If false, target locks when charging begins.")]
-    public bool allowRetargetWhileCharging = false;
+    [Tooltip("Seconds required to regenerate from empty to full after the delay.")]
+    [FormerlySerializedAs("cooldownDuration")]
+    [Min(0.1f)] public float rechargeDuration = 7f;
 
-    [Header("Stabilizer Interaction")]
-    [Tooltip("If true, an armed stabilizer blocks roof overcharge unless the craft is inverted/recovering. Bottom overcharge is still allowed for jump bursts.")]
-    public bool stabilizerBlocksRoofOvercharge = true;
+    [Tooltip("POWER BUS demand while the Overcharge reserve regenerates. At the standard 100-unit BUS, 50 consumes half of the available performance power.")]
+    [Min(0f)] public float rechargeBusDemand = 50f;
 
-    [Header("Burst")]
-    [Tooltip("Burst throttle at minimum meaningful charge.")]
-    public float minBurstThrottle = 1.25f;
+    [Tooltip("Minimum reserve needed to ignite. Prevents empty-tank input chatter.")]
+    [Range(0f, 0.15f)] public float minimumIgnitionReserve01 = 0.025f;
 
-    [Tooltip("Burst throttle at full charge.")]
-    public float maxBurstThrottle = 4.0f;
+    [Header("Overcharge Force")]
+    [Tooltip("Additional main-thruster throttle while Overcharge is held.")]
+    [FormerlySerializedAs("boostThrottle")]
+    [Min(0f)] public float sustainedThrottle = 1.35f;
 
-    [Tooltip("Burst duration at minimum meaningful charge.")]
-    public float minBurstDuration = 0.06f;
+    [Tooltip("Extra throttle layered over the sustained burn at ignition.")]
+    [Min(0f)] public float ignitionThrottleBonus = 1.15f;
 
-    [Tooltip("Burst duration at full charge.")]
-    public float maxBurstDuration = 0.22f;
+    [Tooltip("Duration of the sharp ignition kick.")]
+    [Range(0.05f, 0.5f)] public float ignitionPunchDuration = 0.22f;
+
+    [Tooltip("How quickly sustained Overcharge reaches full output after the button is held.")]
+    [Min(0.1f)] public float burnAttackResponse = 22f;
+
+    [Tooltip("How quickly presentation relaxes after Overcharge is released.")]
+    [Min(0.1f)] public float burnReleaseResponse = 8f;
+
+    [Tooltip("Sustained output at the final drops of Overcharge. The taper warns the player instead of cutting force abruptly.")]
+    [Range(0.25f, 1f)] public float lowReserveOutputScale = 0.68f;
 
     [Header("Read Only")]
-    [SerializeField] private float charge01;
-    [SerializeField] private OverchargeTarget chargingTarget;
-    [SerializeField] private OverchargeTarget activeBurstTarget;
-    [SerializeField] private float burstRemaining;
+    [FormerlySerializedAs("nitroReserve01")]
+    [SerializeField, Range(0f, 1f)] private float overchargeReserve01 = 1f;
+    [SerializeField, Range(0f, 1f)] private float burnEnvelope01;
+    [SerializeField, Range(0f, 1f)] private float grantPower01 = 1f;
+    [SerializeField, Range(0f, 1f)] private float chargeGrantPower01 = 1f;
+    [SerializeField] private float requestedBoostStrength;
+    [SerializeField] private float regenerationDelayRemaining;
+    [SerializeField] private float ignitionRemaining;
+    [SerializeField] private bool isBurning;
+    [SerializeField] private int boostSequenceId;
 
-    public float Charge01 => charge01;
-    public OverchargeTarget ChargingTarget => chargingTarget;
-    public OverchargeTarget ActiveBurstTarget => activeBurstTarget;
-    public bool IsCharging => chargingTarget != OverchargeTarget.None;
-    public bool IsBursting => burstRemaining > 0f;
+    private float _deniedAtTime = -999f;
 
-    private float _burstThrottle;
-    private float _burstDuration;
-    private int _lastReleaseFrame = -1;
+    public bool CanBoost => overchargeReserve01 >= Mathf.Max(0.001f, minimumIgnitionReserve01);
+    public bool IsBoosting => isBurning;
+    public bool IsRecharging => !isBurning && overchargeReserve01 < 0.999f && regenerationDelayRemaining <= 0f;
+
+    // Compatibility names used by existing camera/HUD consumers.
+    public float BoostReadiness01 => OverchargeReserve01;
+    public float BoostEnvelope01 => Mathf.Clamp01(burnEnvelope01);
+    public float OverchargeReserve01 => Mathf.Clamp01(overchargeReserve01);
+    public float NitroReserve01 => OverchargeReserve01;
+    public float RechargeDelayRemaining => Mathf.Max(0f, regenerationDelayRemaining);
+    public float RequestedRechargePower => IsRecharging ? Mathf.Max(0f, rechargeBusDemand) : 0f;
+    public float RechargePower01 => Mathf.Clamp01(chargeGrantPower01);
+
+    public float CooldownRemaining => RechargeDelayRemaining
+        + (1f - OverchargeReserve01) * Mathf.Max(0.1f, rechargeDuration);
+    public float CooldownDuration => Mathf.Max(0.1f, rechargeDuration);
+
+    public float RequestedBoostStrength => Mathf.Max(0f, requestedBoostStrength);
+    public float GrantedBoostStrength => RequestedBoostStrength * Mathf.Clamp01(grantPower01);
+
+    /// <summary>
+    /// Actual Overcharge presentation strength. Sustained burn keeps a strong camera/trail
+    /// response; ignition briefly pushes the signal to its crest.
+    /// </summary>
+    public float CameraBoost01
+    {
+        get
+        {
+            float sustained = BoostEnvelope01 * 0.82f;
+            float ignition = Ignition01 * 0.42f;
+            return Mathf.Clamp01((sustained + ignition) * Mathf.Clamp01(grantPower01));
+        }
+    }
+
+    public float Ignition01 => ignitionPunchDuration <= 0.001f
+        ? 0f
+        : Mathf.Clamp01(ignitionRemaining / ignitionPunchDuration);
+
+    public int BoostSequenceId => boostSequenceId;
+    public bool BoostDeniedRecently => Time.time - _deniedAtTime <= 0.4f;
 
     public void TickOvercharge(CraftIntent intent, CraftTelemetry telemetry, EnergyState energy)
     {
-        float dt = Time.fixedDeltaTime;
+        float dt = Mathf.Max(0.0001f, Time.fixedDeltaTime);
+        grantPower01 = Mathf.Clamp01(energy.overchargeBurstPower01);
+        chargeGrantPower01 = Mathf.Clamp01(energy.overchargeChargePower01);
 
-        if (intent.wantsOvercharge)
+        bool wantsBurn = intent.boostHeld;
+        bool hasReserve = overchargeReserve01 > 0.0001f;
+        bool canContinueBurn = isBurning && hasReserve;
+        bool canIgnite = !isBurning && CanBoost;
+
+        if (wantsBurn && (canContinueBurn || canIgnite))
         {
-            if (chargingTarget == OverchargeTarget.None)
+            if (!isBurning)
             {
-                chargingTarget = intent.overchargeTarget != OverchargeTarget.None
-                    ? intent.overchargeTarget
-                    : OverchargeTarget.BottomThrusters;
-
-                charge01 = 0f;
-            }
-            else if (allowRetargetWhileCharging && intent.overchargeTarget != OverchargeTarget.None)
-            {
-                chargingTarget = intent.overchargeTarget;
-            }
-
-            charge01 = Mathf.Clamp01(charge01 + chargeRate * Mathf.Clamp01(energy.overchargeChargePower01) * dt);
-        }
-
-        if (intent.overchargeReleased && intent.commandFrame != _lastReleaseFrame)
-        {
-            _lastReleaseFrame = intent.commandFrame;
-
-            if (chargingTarget != OverchargeTarget.None && charge01 >= minimumReleaseCharge)
-            {
-                if (CanReleaseBurst(chargingTarget, intent))
-                {
-                    StartBurst(chargingTarget, charge01);
-                }
+                if (CanBoost)
+                    BeginBurn();
+                else
+                    _deniedAtTime = Time.time;
             }
 
-            chargingTarget = OverchargeTarget.None;
-            charge01 = 0f;
-        }
-
-        if (!intent.wantsOvercharge && chargingTarget != OverchargeTarget.None && !intent.overchargeReleased)
-        {
-            // Safety: if input state is interrupted without a release event, cancel charge.
-            chargingTarget = OverchargeTarget.None;
-            charge01 = 0f;
-        }
-
-        if (burstRemaining > 0f)
-        {
-            ApplyBurst();
-            burstRemaining -= dt;
-
-            if (burstRemaining <= 0f)
+            if (isBurning)
             {
-                burstRemaining = 0f;
-                activeBurstTarget = OverchargeTarget.None;
-                _burstThrottle = 0f;
-                _burstDuration = 0f;
+                regenerationDelayRemaining = Mathf.Max(0f, regenerationDelay);
+
+                float reserveShape = Mathf.SmoothStep(0f, 1f,
+                    Mathf.InverseLerp(0f, 0.25f, overchargeReserve01));
+                float targetEnvelope = Mathf.Lerp(lowReserveOutputScale, 1f, reserveShape);
+                burnEnvelope01 = ExpApproach(
+                    burnEnvelope01, targetEnvelope, burnAttackResponse, dt);
+
+                requestedBoostStrength = sustainedThrottle * burnEnvelope01
+                                       + ignitionThrottleBonus * Ignition01;
+                ApplyBoost(requestedBoostStrength);
+
+                ignitionRemaining = Mathf.Max(0f, ignitionRemaining - dt);
+                overchargeReserve01 = Mathf.Max(0f,
+                    overchargeReserve01 - dt / Mathf.Max(0.25f, fullBurnDuration));
+            }
+        }
+        else
+        {
+            if (wantsBurn && intent.boostPressed)
+                _deniedAtTime = Time.time;
+
+            isBurning = false;
+            ignitionRemaining = 0f;
+            requestedBoostStrength = 0f;
+            burnEnvelope01 = ExpApproach(
+                burnEnvelope01, 0f, burnReleaseResponse, dt);
+
+            // The player must release an empty trigger before the reserve can
+            // regenerate. This prevents automatic sputter/re-ignition while held.
+            if (wantsBurn)
+            {
+                regenerationDelayRemaining = Mathf.Max(
+                    regenerationDelayRemaining, regenerationDelay);
+            }
+            else if (regenerationDelayRemaining > 0f)
+            {
+                regenerationDelayRemaining = Mathf.Max(0f,
+                    regenerationDelayRemaining - dt);
+            }
+            else if (overchargeReserve01 < 1f)
+            {
+                overchargeReserve01 = Mathf.Min(1f,
+                    overchargeReserve01
+                    + dt / Mathf.Max(0.1f, rechargeDuration) * chargeGrantPower01);
             }
         }
     }
 
-    private bool CanReleaseBurst(OverchargeTarget target, CraftIntent intent)
+    private void BeginBurn()
     {
-        if (!stabilizerBlocksRoofOvercharge)
-        {
-            return true;
-        }
+        isBurning = true;
+        ignitionRemaining = Mathf.Max(0.01f, ignitionPunchDuration);
+        regenerationDelayRemaining = Mathf.Max(0f, regenerationDelay);
+        boostSequenceId++;
+    }
 
-        // Stabilizer owns vertical thrusters, but bottom overcharge is the
-        // intentional exception for jump bursts. Roof overcharge is allowed
-        // only for upside-down recovery.
-        if (intent.verticalThrustersLockedByStabilizer && target == OverchargeTarget.RoofThrusters)
-        {
-            return intent.recoveryOverrideActive;
-        }
+    private void ApplyBoost(float throttle)
+    {
+        if (thrusterBus == null || throttle <= 0f)
+            return;
 
+        if (mainThruster != null)
+            thrusterBus.AddThrottle(mainThruster, throttle, ThrusterPowerChannel.Overcharge);
+        else
+            thrusterBus.AddThrottle(
+                ThrusterNode.ThrusterRole.Main, null, throttle,
+                ThrusterPowerChannel.Overcharge);
+    }
+
+    private static float ExpApproach(float current, float target, float response, float dt)
+        => Mathf.Lerp(current, target,
+            1f - Mathf.Exp(-Mathf.Max(0.1f, response) * dt));
+
+    public bool TryTriggerBoostForTest()
+    {
+        if (!CanBoost || isBurning) return false;
+        BeginBurn();
         return true;
     }
 
-    private void StartBurst(OverchargeTarget target, float charge)
+    public void ResetBoostState()
     {
-        float c = Mathf.Clamp01(charge);
-
-        activeBurstTarget = target;
-        _burstThrottle = Mathf.Lerp(minBurstThrottle, maxBurstThrottle, c);
-        _burstDuration = Mathf.Lerp(minBurstDuration, maxBurstDuration, c);
-        burstRemaining = _burstDuration;
-    }
-
-    private void ApplyBurst()
-    {
-        if (thrusterBus == null || activeBurstTarget == OverchargeTarget.None)
-        {
-            return;
-        }
-
-        // Optional tiny taper so it does not feel like a perfectly square force.
-        float duration = Mathf.Max(0.001f, _burstDuration);
-        float t = 1f - Mathf.Clamp01(burstRemaining / duration);
-        float envelope = Mathf.Lerp(1f, 0.65f, t);
-        float throttle = _burstThrottle * envelope;
-
-        switch (activeBurstTarget)
-        {
-            case OverchargeTarget.BottomThrusters:
-                thrusterBus.AddThrottle(ThrusterNode.ThrusterRole.Hover, null, throttle, ThrusterPowerChannel.Overcharge);
-                break;
-
-            case OverchargeTarget.RoofThrusters:
-                thrusterBus.AddThrottle(ThrusterNode.ThrusterRole.Roof, null, throttle, ThrusterPowerChannel.Overcharge);
-                break;
-
-            case OverchargeTarget.MainThruster:
-                if (mainThruster != null)
-                {
-                    thrusterBus.AddThrottle(mainThruster, throttle, ThrusterPowerChannel.Overcharge);
-                }
-                else
-                {
-                    thrusterBus.AddThrottle(ThrusterNode.ThrusterRole.Main, null, throttle, ThrusterPowerChannel.Overcharge);
-                }
-                break;
-
-            case OverchargeTarget.BrakeThruster:
-                if (brakeThruster != null)
-                {
-                    thrusterBus.AddThrottle(brakeThruster, throttle, ThrusterPowerChannel.Overcharge);
-                }
-                else
-                {
-                    thrusterBus.AddThrottle(ThrusterNode.ThrusterRole.Brake, null, throttle, ThrusterPowerChannel.Overcharge);
-                }
-                break;
-        }
+        overchargeReserve01 = 1f;
+        burnEnvelope01 = 0f;
+        requestedBoostStrength = 0f;
+        regenerationDelayRemaining = 0f;
+        ignitionRemaining = 0f;
+        isBurning = false;
+        grantPower01 = 1f;
+        chargeGrantPower01 = 1f;
     }
 }

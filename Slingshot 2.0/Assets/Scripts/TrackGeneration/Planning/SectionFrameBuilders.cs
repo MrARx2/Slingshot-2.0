@@ -253,6 +253,101 @@ namespace TrackGeneration.Planning
             return m;
         }
 
+        /// <summary>
+        /// THE single section-geometry dispatch (Stage A). Maps a macro definition to
+        /// its frame builder — the exact switch the candidate builder executes, factored
+        /// out so plan-time result measurement and runtime candidate building are the
+        /// same calculation by construction, never two implementations.
+        ///
+        /// Candidate-level concerns deliberately stay OUTSIDE: the landing-ramp
+        /// grade snap/validation (a weld correction inside rulebook tolerance) and
+        /// air-gap ballistics (<see cref="AirGapLanding"/> — air gaps build no frames).
+        /// </summary>
+        public static TrackConnectionFrame[] BuildSectionFrames(in TrackConnectionFrame entry,
+            TrackMacroSectionDefinition def, in FrameBuildContext ctx)
+        {
+            switch (def.SectionType)
+            {
+                case TrackMacroSectionType.BankedCurve:
+                case TrackMacroSectionType.BankedHairpin:
+                    return BuildArc(entry, def.TurnAngle * def.TurnSign, def.Radius, def.BankingAngle, ctx);
+
+                case TrackMacroSectionType.SCurve:
+                    return BuildComposedArcs(entry,
+                        new[] { def.TurnAngle * def.TurnSign, -def.TurnAngle * def.TurnSign },
+                        new[] { def.Radius, def.Radius }, def.BankingAngle, ctx);
+
+                case TrackMacroSectionType.Chicane:
+                    return BuildComposedArcs(entry,
+                        new[] { def.TurnAngle * def.TurnSign, -2f * def.TurnAngle * def.TurnSign, def.TurnAngle * def.TurnSign },
+                        new[] { def.Radius, def.Radius, def.Radius }, def.BankingAngle, ctx);
+
+                case TrackMacroSectionType.JumpRamp:
+                    return BuildKeyframedPitchRamp(entry, def.Length,
+                        LaunchRampKeys(def.SecondaryPitchDeg, def.PitchChange), ctx);
+
+                case TrackMacroSectionType.LandingRamp:
+                    return BuildKeyframedPitchRamp(entry, def.Length,
+                        LandingRampKeys(def.PitchChange, def.SecondaryPitchDeg), ctx);
+
+                case TrackMacroSectionType.Loop:
+                    return BuildLoop(entry, def, ctx);
+
+                case TrackMacroSectionType.Corkscrew:
+                    return BuildCorkscrew(entry, def, ctx);
+
+                case TrackMacroSectionType.Spiral:
+                    return BuildSpiral(entry, def, ctx);
+
+                case TrackMacroSectionType.HalfLoopTwist:
+                    return BuildHalfLoopRollout(entry, def, ctx);
+
+                case TrackMacroSectionType.RotationalEvent:
+                    return BuildRotationalEvent(entry, def, ctx);
+
+                case TrackMacroSectionType.FullPipe:
+                    return BuildFullPipe(entry, def, ctx);
+
+                case TrackMacroSectionType.WallrideTurn:
+                    return BuildWallrideTurn(entry, def, ctx);
+
+                case TrackMacroSectionType.AirGap:
+                    return System.Array.Empty<TrackConnectionFrame>();
+
+                default:
+                    return BuildStraight(entry, def, ctx);
+            }
+        }
+
+        /// <summary>
+        /// The landing frame an air gap delivers from its launch-lip frame — the exact
+        /// ballistic-arrival math the candidate builder applies (position from the plan
+        /// scalars, arrival pitch from <c>PitchChange</c>, bank zeroed, catch width).
+        /// One implementation, used by candidate building AND plan-result measurement.
+        /// </summary>
+        public static TrackConnectionFrame AirGapLanding(in TrackConnectionFrame lip,
+            TrackMacroSectionDefinition def)
+        {
+            Vector3 dirH = Flatten(lip.Forward);
+            Vector3 landingPos = lip.Position + dirH * def.PlanHorizontalLength
+                               + Flatten(lip.Right) * def.PlanLateralOffset
+                               + Vector3.up * def.ElevationChange;
+
+            float arrivalRad = def.PitchChange * Mathf.Deg2Rad;
+            Vector3 arrivalFwd = (dirH * Mathf.Cos(arrivalRad) + Vector3.up * Mathf.Sin(arrivalRad)).normalized;
+
+            var landing = lip;
+            landing.Position = landingPos;
+            landing.Forward = arrivalFwd;
+            landing.Right = Flatten(lip.Right);
+            landing.Up = Vector3.Cross(arrivalFwd, landing.Right).normalized;
+            landing.PitchAngle = def.PitchChange;
+            landing.BankAngle = 0f;
+            landing.ArcLength = lip.ArcLength + def.Length;
+            if (def.Width > 1f) landing.Width = def.Width;
+            return landing;
+        }
+
         public static float HoldProfile(float u, float easeFrac, TrackBlendCurve curve)
         {
             if (u < easeFrac) return TrackBlend.Evaluate(curve, u / easeFrac);

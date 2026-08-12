@@ -164,6 +164,11 @@ namespace TrackGeneration.Planning
         public int ValidCandidateCount;
         public float SelectedCandidateScore;
 
+        [Tooltip("Closure angle relief (§7): whether the flag was on this run, how many candidates invoked it, and how many it closed to tolerance. 0/0 with the flag on means no candidate reached the closure solve with ≥2 eligible plain corners.")]
+        public bool AngleReliefEnabled;
+        public int AngleReliefAttempts;
+        public int AngleReliefClosures;
+
         public List<GenerationAttemptFailure> Failures = new List<GenerationAttemptFailure>();
         public List<string> Warnings = new List<string>();
         public List<RelaxedSettingRecord> RelaxedSettings = new List<RelaxedSettingRecord>();
@@ -191,6 +196,12 @@ namespace TrackGeneration.Planning
 
         [Tooltip("Per-region subdivision tiers of the selected candidate.")]
         public List<SubdivisionRegionRecord> SubdivisionRegions = new List<SubdivisionRegionRecord>();
+
+        [Tooltip("Stage A: exact measured exit of every feature group (heading/displacement/elevation/roll), computed by the same builders the candidate uses.")]
+        public List<string> FeatureExitRecords = new List<string>();
+
+        [Tooltip("Stage C: per-boundary transition classification (DirectWeld / AdaptiveBlend / ExplicitRecovery / Rejected) with per-channel blend demands. Reporting only — no geometry changes.")]
+        public List<string> TransitionRecords = new List<string>();
 
         [Tooltip("Per-dual-quarter route time estimates for each craft archetype.")]
         public List<QuarterRouteBalance> QuarterBalance = new List<QuarterRouteBalance>();

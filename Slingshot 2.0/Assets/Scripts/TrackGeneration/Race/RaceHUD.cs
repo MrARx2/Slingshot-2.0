@@ -3,13 +3,8 @@ using UnityEngine;
 namespace TrackGeneration.Race
 {
     /// <summary>
-    /// Time-attack HUD: current lap timer, checkpoint progress, the last 5 laps, and the
-    /// session-best lap with its average speed. Draws in the top-left corner — CraftHUD
-    /// owns the other three corners.
-    /// <para>
-    /// Auto-finds the active <see cref="RaceCourse"/> and re-finds it after the track is
-    /// regenerated (the course is destroyed and rebuilt with the track root).
-    /// </para>
+    /// Compact player-facing time-attack HUD. Empty lap-history rows are never shown;
+    /// the panel grows only when the player has useful results to read.
     /// </summary>
     public class RaceHUD : MonoBehaviour
     {
@@ -20,27 +15,27 @@ namespace TrackGeneration.Race
         public bool showHUD = true;
 
         [Header("Layout")]
-        public Vector2 margin = new Vector2(24f, 20f);
-        [Range(0.6f, 1.6f)] public float uiScale = 1.0f;
+        public Vector2 margin = new Vector2(28f, 24f);
+        [Range(0.6f, 1.6f)] public float uiScale = 0.9f;
         public float rowHeight = 19f;
 
         [Header("Colors")]
-        public Color panelColor = new Color(0f, 0f, 0f, 0.42f);
-        public Color textColor = new Color(0.92f, 0.97f, 1f, 1f);
-        public Color mutedColor = new Color(0.45f, 0.52f, 0.58f, 1f);
-        public Color cyanColor = new Color(0.25f, 0.82f, 1f, 1f);
-        public Color greenColor = new Color(0.35f, 1f, 0.45f, 1f);
-        public Color yellowColor = new Color(1f, 0.75f, 0.25f, 1f);
-        public Color redColor = new Color(1f, 0.25f, 0.2f, 1f);
+        public Color panelColor = new Color(0.035f, 0.05f, 0.055f, 0.90f);
+        public Color textColor = new Color(0.93f, 0.91f, 0.86f, 1f);
+        public Color mutedColor = new Color(0.50f, 0.57f, 0.56f, 1f);
+        public Color cyanColor = new Color(0.32f, 0.68f, 0.66f, 1f);
+        public Color greenColor = new Color(0.49f, 0.78f, 0.56f, 1f);
+        public Color yellowColor = new Color(0.88f, 0.65f, 0.35f, 1f);
+        public Color redColor = new Color(0.92f, 0.36f, 0.34f, 1f);
 
-        private const int LapHistoryRows = 5;
+        private const int LapHistoryRows = 2;
 
         private GUIStyle _headerStyle;
         private GUIStyle _labelStyle;
         private GUIStyle _smallStyle;
         private GUIStyle _largeStyle;
-
-        // Course lookup scans the scene — retry at most once per second while none exists.
+        private GUIStyle _rightSmallStyle;
+        private float _styleScale = -1f;
         private float _nextCourseSearchTime;
 
         private void Update()
@@ -54,124 +49,107 @@ namespace TrackGeneration.Race
 
         private void EnsureStyles()
         {
-            if (_labelStyle != null) return;
+            float s = S;
+            if (_labelStyle != null && Mathf.Approximately(_styleScale, s)) return;
+            _styleScale = s;
 
-            _headerStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = Mathf.RoundToInt(14f * uiScale),
-                fontStyle = FontStyle.Bold,
-                normal = { textColor = textColor }
-            };
+            _headerStyle = NewStyle(15f, FontStyle.Bold, TextAnchor.UpperLeft, textColor);
+            _labelStyle = NewStyle(13f, FontStyle.Bold, TextAnchor.UpperLeft, textColor);
+            _smallStyle = NewStyle(11f, FontStyle.Bold, TextAnchor.UpperLeft, mutedColor);
+            _largeStyle = NewStyle(27f, FontStyle.Bold, TextAnchor.UpperLeft, cyanColor);
+            _rightSmallStyle = NewStyle(11f, FontStyle.Bold, TextAnchor.UpperRight, mutedColor);
+        }
 
-            _labelStyle = new GUIStyle(GUI.skin.label)
+        private GUIStyle NewStyle(float size, FontStyle fontStyle, TextAnchor anchor, Color color)
+        {
+            return new GUIStyle(GUI.skin.label)
             {
-                fontSize = Mathf.RoundToInt(13f * uiScale),
-                normal = { textColor = textColor }
-            };
-
-            _smallStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = Mathf.RoundToInt(11f * uiScale),
-                normal = { textColor = textColor }
-            };
-
-            _largeStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = Mathf.RoundToInt(26f * uiScale),
-                fontStyle = FontStyle.Bold,
-                normal = { textColor = textColor }
+                fontSize = Mathf.RoundToInt(size * S),
+                fontStyle = fontStyle,
+                alignment = anchor,
+                wordWrap = false,
+                clipping = TextClipping.Overflow,
+                padding = new RectOffset(0, 0, 0, 0),
+                normal = { textColor = color }
             };
         }
 
         private void OnGUI()
         {
             if (!showHUD || course == null) return;
-
             EnsureStyles();
 
-            float width = 300f * uiScale;
-            float x = margin.x;
-            float y = margin.y;
-            float pad = 12f * uiScale;
+            var laps = course.Laps;
+            int historyRows = Mathf.Min(LapHistoryRows, laps.Count);
+            bool showHistory = historyRows > 0;
 
-            float height = (10f + 22f + 34f + 20f + 6f + 18f + LapHistoryRows * rowHeight + 6f + rowHeight + 10f) * uiScale;
-            DrawPanel(new Rect(x, y, width, height));
+            float s = S;
+            float width = 238f * s;
+            float pad = 16f * s;
+            float height = (course.LapInProgress ? 88f : 64f) * s;
+            if (showHistory) height += (24f + historyRows * rowHeight + 23f) * s;
 
-            float rowY = y + 10f * uiScale;
-            float innerWidth = width - pad * 2f;
+            Rect panel = new Rect(margin.x, margin.y, width, height);
+            DrawPanel(panel);
 
-            // Header
-            GUI.color = textColor;
-            GUI.Label(new Rect(x + pad, rowY, innerWidth, 22f * uiScale), "TIME ATTACK", _headerStyle);
-            rowY += 22f * uiScale;
-
-            // Current lap time + lap number
-            if (course.LapInProgress)
-            {
-                GUI.color = cyanColor;
-                GUI.Label(new Rect(x + pad, rowY, innerWidth, 34f * uiScale), FormatTime(course.CurrentLapTime), _largeStyle);
-                DrawRightAligned(new Rect(x + pad, rowY + 12f * uiScale, innerWidth, rowHeight * uiScale), $"LAP {course.CurrentLapNumber}", mutedColor);
-            }
-            else
-            {
-                GUI.color = mutedColor;
-                GUI.Label(new Rect(x + pad, rowY, innerWidth, 34f * uiScale), "--:--.---", _largeStyle);
-                DrawRightAligned(new Rect(x + pad, rowY + 12f * uiScale, innerWidth, rowHeight * uiScale), "CROSS THE LINE", mutedColor);
-            }
-            rowY += 34f * uiScale;
-
-            // Checkpoint progress
+            float x = panel.x + pad;
+            float y = panel.y + 11f * s;
+            float innerWidth = panel.width - pad * 2f;
             int cpTotal = course.CheckpointCount;
             int cpDone = Mathf.Min(course.NextCheckpointIndex, cpTotal);
             Color cpColor = !course.LapInProgress ? mutedColor : cpDone >= cpTotal ? greenColor : yellowColor;
-            DrawKeyValue(new Rect(x + pad, rowY, innerWidth, 20f * uiScale), "CHECKPOINTS", $"{cpDone}/{cpTotal}", cpColor);
-            rowY += (20f + 6f) * uiScale;
 
-            // Lap history header
-            GUI.color = mutedColor;
-            GUI.Label(new Rect(x + pad, rowY, innerWidth, 18f * uiScale), "LAST LAPS", _smallStyle);
-            rowY += 18f * uiScale;
+            GUI.color = Color.white;
+            GUI.Label(new Rect(x, y, innerWidth, 18f * s), "TIME ATTACK", _smallStyle);
+            DrawRightAligned(new Rect(x, y, innerWidth, 18f * s), $"CP {cpDone}/{cpTotal}", cpColor);
+            y += 17f * s;
 
-            // Last 5 laps, newest first
-            var laps = course.Laps;
-            for (int row = 0; row < LapHistoryRows; row++)
+            if (course.LapInProgress)
             {
-                Rect rect = new Rect(x + pad, rowY, innerWidth, rowHeight * uiScale);
-                int lapIdx = laps.Count - 1 - row;
-                if (lapIdx >= 0)
-                {
-                    LapRecord lap = laps[lapIdx];
-                    bool isBest = course.BestLap != null && lap == course.BestLap;
-                    Color timeColor = !lap.Valid ? mutedColor : isBest ? greenColor : textColor;
-
-                    GUI.color = mutedColor;
-                    GUI.Label(rect, $"L{lap.LapNumber}", _smallStyle);
-                    GUI.color = timeColor;
-                    GUI.Label(new Rect(rect.x + 42f * uiScale, rect.y, rect.width, rect.height), FormatTime(lap.TimeSeconds), _labelStyle);
-                    DrawRightAligned(rect, lap.Valid ? $"{lap.AverageSpeedKmh:0} KM/H" : "INVALID", lap.Valid ? mutedColor : redColor);
-                }
-                else
-                {
-                    GUI.color = mutedColor;
-                    GUI.Label(rect, "—", _smallStyle);
-                }
-                rowY += rowHeight * uiScale;
-            }
-            rowY += 6f * uiScale;
-
-            // Session best
-            Rect bestRect = new Rect(x + pad, rowY, innerWidth, rowHeight * uiScale);
-            if (course.BestLap != null)
-            {
-                GUI.color = mutedColor;
-                GUI.Label(bestRect, "BEST", _smallStyle);
-                GUI.color = greenColor;
-                GUI.Label(new Rect(bestRect.x + 42f * uiScale, bestRect.y, bestRect.width, bestRect.height), FormatTime(course.BestLap.TimeSeconds), _labelStyle);
-                DrawRightAligned(bestRect, $"AVG {course.BestLap.AverageSpeedKmh:0} KM/H", greenColor);
+                GUI.color = Color.white;
+                GUI.Label(new Rect(x, y, innerWidth, 31f * s), FormatTime(course.CurrentLapTime), _largeStyle);
+                y += 30f * s;
+                DrawKeyValue(new Rect(x, y, innerWidth, 18f * s), "CURRENT", $"LAP {course.CurrentLapNumber}", mutedColor);
+                y += 20f * s;
             }
             else
             {
-                DrawKeyValue(bestRect, "BEST", "NO VALID LAP", mutedColor);
+                GUI.color = Color.white;
+                GUI.Label(new Rect(x, y + 4f * s, innerWidth, 25f * s), "CROSS START LINE", _headerStyle);
+                y += 31f * s;
+            }
+
+            if (showHistory)
+            {
+                GUI.color = new Color(cyanColor.r, cyanColor.g, cyanColor.b, 0.30f);
+                GUI.DrawTexture(new Rect(x, y + 2f * s, innerWidth, 1f * s), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+                GUI.Label(new Rect(x, y + 7f * s, innerWidth, 16f * s), "RECENT", _smallStyle);
+                y += 23f * s;
+
+                for (int row = 0; row < historyRows; row++)
+                {
+                    LapRecord lap = laps[laps.Count - 1 - row];
+                    bool isBest = course.BestLap != null && lap == course.BestLap;
+                    Color timeColor = !lap.Valid ? mutedColor : isBest ? greenColor : textColor;
+                    Rect r = new Rect(x, y, innerWidth, rowHeight * s);
+
+                    GUI.color = Color.white;
+                    GUI.Label(r, $"L{lap.LapNumber}", _smallStyle);
+                    Color previous = _labelStyle.normal.textColor;
+                    _labelStyle.normal.textColor = timeColor;
+                    GUI.Label(new Rect(r.x + 31f * s, r.y, r.width, r.height), FormatTime(lap.TimeSeconds), _labelStyle);
+                    _labelStyle.normal.textColor = previous;
+                    DrawRightAligned(r, isBest ? "BEST" : lap.Valid ? $"{lap.AverageSpeedKmh:0}" : "INVALID",
+                        isBest ? greenColor : lap.Valid ? mutedColor : redColor);
+                    y += rowHeight * s;
+                }
+
+                if (course.BestLap != null)
+                {
+                    Rect best = new Rect(x, y + 2f * s, innerWidth, rowHeight * s);
+                    DrawKeyValue(best, "SESSION BEST", FormatTime(course.BestLap.TimeSeconds), greenColor);
+                }
             }
 
             GUI.color = Color.white;
@@ -180,30 +158,41 @@ namespace TrackGeneration.Race
         private static string FormatTime(float seconds)
         {
             int minutes = (int)(seconds / 60f);
-            float rem = seconds - minutes * 60f;
-            return $"{minutes}:{rem:00.000}";
+            float remainder = seconds - minutes * 60f;
+            return $"{minutes}:{remainder:00.000}";
         }
 
         private void DrawKeyValue(Rect rect, string key, string value, Color valueColor)
         {
-            GUI.color = mutedColor;
+            GUI.color = Color.white;
             GUI.Label(rect, key, _smallStyle);
             DrawRightAligned(rect, value, valueColor);
         }
 
         private void DrawRightAligned(Rect rect, string text, Color color)
         {
-            GUI.color = color;
-            GUIStyle style = new GUIStyle(_smallStyle) { alignment = TextAnchor.UpperRight };
-            GUI.Label(rect, text, style);
+            Color guiColor = GUI.color;
+            Color previous = _rightSmallStyle.normal.textColor;
             GUI.color = Color.white;
+            _rightSmallStyle.normal.textColor = color;
+            GUI.Label(rect, text, _rightSmallStyle);
+            _rightSmallStyle.normal.textColor = previous;
+            GUI.color = guiColor;
         }
 
         private void DrawPanel(Rect rect)
         {
+            float s = S;
+            GUI.color = new Color(0f, 0f, 0f, 0.30f);
+            GUI.DrawTexture(new Rect(rect.x + 5f * s, rect.y + 7f * s, rect.width, rect.height), Texture2D.whiteTexture);
             GUI.color = panelColor;
-            GUI.Box(rect, GUIContent.none);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = new Color(cyanColor.r, cyanColor.g, cyanColor.b, 0.48f);
+            GUI.DrawTexture(new Rect(rect.x + 14f * s, rect.y, rect.width - 28f * s, 2f * s), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.x, rect.y + 14f * s, 1f * s, rect.height - 28f * s), Texture2D.whiteTexture);
             GUI.color = Color.white;
         }
+
+        private float S => uiScale * Mathf.Clamp(Screen.height / 1080f, 0.8f, 2.4f);
     }
 }

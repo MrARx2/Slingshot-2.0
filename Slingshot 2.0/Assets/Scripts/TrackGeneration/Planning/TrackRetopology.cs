@@ -128,6 +128,7 @@ namespace TrackGeneration.Planning
             public int RawRequirement;
             public int Intervals;
             public string LimitingFactor = "base spacing";
+            public bool IsRollHeavy;   // corkscrew/barrel: wide floor rotates → protect its density
 
             public SubdivisionRegionRecord ToRecord(int index)
             {
@@ -171,12 +172,15 @@ namespace TrackGeneration.Planning
                 float spacing = baseSpacing;
                 string limiting = "base spacing";
                 float maxSectionLength = 0f;
+                float rollMin = float.MaxValue, rollMax = float.MinValue;
 
                 foreach (var sec in seg)
                 {
                     var frames = sec.SubdivisionFrames;
                     for (int i = 1; i < frames.Length; i++)
                     {
+                        rollMin = Mathf.Min(rollMin, frames[i].AccumulatedRoadRoll);
+                        rollMax = Mathf.Max(rollMax, frames[i].AccumulatedRoadRoll);
                         float ds = frames[i].ArcLength - frames[i - 1].ArcLength;
                         if (ds <= 1e-3f) continue;
 
@@ -226,12 +230,17 @@ namespace TrackGeneration.Planning
                 totalLength += length;
                 totalSectionCount += seg.Count;
 
+                // A region whose road roll spans ≥120° is a barrel/corkscrew: its wide
+                // floor rotates, so relaxing its facet launches the craft off the floor edge.
+                bool rollHeavy = rollMax > rollMin && (rollMax - rollMin) >= 120f;
+
                 regions.Add(new Region
                 {
                     Sections = seg,
                     Length = Mathf.Max(0.01f, length),
                     DemandSpacing = spacing,
-                    LimitingFactor = limiting
+                    LimitingFactor = limiting,
+                    IsRollHeavy = rollHeavy
                 });
             }
 
@@ -246,11 +255,50 @@ namespace TrackGeneration.Planning
 
             if (expectedRings > budget)
             {
-                float relax = expectedRings / budget;
+                bool anyRollHeavy = false;
+                foreach (var r in regions) if (r.IsRollHeavy) { anyRollHeavy = true; break; }
+
+                float protectedRings = 0f, relaxableRings = 0f;
                 foreach (var r in regions)
                 {
-                    r.DemandSpacing *= relax;
-                    r.LimitingFactor = "ring budget";
+                    float rings = r.Length / r.DemandSpacing;
+                    if (r.IsRollHeavy) protectedRings += rings; else relaxableRings += rings;
+                }
+
+                // Only protect the barrels if doing so still leaves the other regions a
+                // workable share of the budget — otherwise protecting them would silently
+                // blow the HARD ring cap, so fall back to relaxing everything uniformly.
+                bool protectRoll = cfg.SmoothCorkscrewFloor && anyRollHeavy
+                                   && protectedRings <= budget * 0.85f;
+                if (protectRoll)
+                {
+                    // Keep barrel/corkscrew floors at their demanded density — relaxing THEM
+                    // is what turns a small facet into a multi-metre twist on the wide rolling
+                    // floor (the felt launch). Absorb the overflow on the other regions.
+                    // NOTE (known limitation): a "region" is a whole continuous road run, so
+                    // this preserves density across the region CONTAINING the barrel, not just
+                    // the barrel span. True localization needs sub-region density (split at the
+                    // rotational-event boundaries) — a separate change.
+                    float otherBudget = Mathf.Max(1f, budget - protectedRings);
+                    if (relaxableRings > otherBudget)
+                    {
+                        float relax = relaxableRings / otherBudget;
+                        foreach (var r in regions)
+                            if (!r.IsRollHeavy)
+                            {
+                                r.DemandSpacing *= relax;
+                                r.LimitingFactor = "ring budget";
+                            }
+                    }
+                }
+                else
+                {
+                    float relax = expectedRings / budget;
+                    foreach (var r in regions)
+                    {
+                        r.DemandSpacing *= relax;
+                        r.LimitingFactor = "ring budget";
+                    }
                 }
             }
 

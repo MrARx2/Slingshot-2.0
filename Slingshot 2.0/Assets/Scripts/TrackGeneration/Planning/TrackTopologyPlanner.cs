@@ -20,6 +20,16 @@ namespace TrackGeneration.Planning
         /// <summary>Non-fatal planning notes (dual-quarter demotions, infeasible selections).</summary>
         public List<string> Warnings = new List<string>();
 
+        /// <summary>
+        /// Stage A: exact measured plan results for every emitted feature group
+        /// (consecutive defs sharing a PatternId), built with the same section
+        /// builders the candidate uses. Populated only for successful plans.
+        /// </summary>
+        public List<FeaturePlanResult> FeatureResults = new List<FeaturePlanResult>();
+
+        /// <summary>Stage A: formatted result lines for the serialized report.</summary>
+        public List<string> FeatureExitRecords = new List<string>();
+
         public GenerationFailureReason Failure = GenerationFailureReason.None;
         public string FailureMessage = "";
 
@@ -253,7 +263,63 @@ namespace TrackGeneration.Planning
                 return plan;
             }
 
+            // ── 8. Stage A: exact measured plan results for every feature group.
+            // Runs only on plans that survived every gate above (≈ candidates), so the
+            // extra frame builds cost a bounded handful per generation, not per attempt.
+            ComputeFeatureResults(cfg, plan);
+
             return plan;
+        }
+
+        /// <summary>
+        /// Stage A consumption: measures the achieved result of every feature group
+        /// (consecutive defs sharing a non-empty PatternId) by building its frames from
+        /// a canonical origin entry with the same builders the candidate uses, then
+        /// cross-checks the legacy stamped plan scalars. Mismatches are WARNINGS in
+        /// Stage A — behavior must not change; the editor tests assert them hard.
+        /// Deterministic and rng-free.
+        /// </summary>
+        private void ComputeFeatureResults(ResolvedTrackGenerationConfig cfg, TopologyPlan plan)
+        {
+            var defs = plan.Defs;
+            var ctx = FrameBuildContext.From(cfg);
+
+            for (int i = 0; i < defs.Count;)
+            {
+                string pid = defs[i]?.PatternId;
+                if (string.IsNullOrEmpty(pid)) { i++; continue; }
+
+                int start = i;
+                while (i < defs.Count && defs[i] != null && defs[i].PatternId == pid) i++;
+
+                var element = defs[start].SemanticElement;
+                var entry = TrackConnectionFrame.Origin(defs[start].Width);
+                var result = FeaturePlanning.ComputePlanResult(defs, start, i, entry, ctx, element, pid);
+
+                plan.FeatureResults.Add(result);
+                plan.FeatureExitRecords.Add(result.ToString());
+                if (result.Failed)
+                {
+                    plan.Warnings.Add($"[StageA] {pid}: plan-result measurement failed — {result.FailureReason}");
+                    continue;
+                }
+
+                // Cross-check against the legacy stamped scalars where a single
+                // rotational def carries them (loop/corkscrew/half-loop family).
+                if (i - start == 1 && defs[start].SectionType == TrackMacroSectionType.RotationalEvent)
+                {
+                    var d = defs[start];
+                    float dispErr = Mathf.Abs(result.PlanDisplacement.y - d.PlanHorizontalLength);
+                    float latErr = Mathf.Abs(result.PlanDisplacement.x - d.PlanLateralOffset);
+                    float elevErr = Mathf.Abs(result.ElevationChange - d.ElevationChange);
+                    float headErr = Mathf.Abs(Mathf.DeltaAngle(result.HeadingContributionDeg, d.TurnAngle));
+                    if (dispErr > 0.1f || latErr > 0.1f || elevErr > 0.1f || headErr > 0.1f)
+                        plan.Warnings.Add(
+                            $"[StageA] {pid}: measured exit diverges from stamped plan scalars " +
+                            $"(fwd {dispErr:F3}m, lat {latErr:F3}m, elev {elevErr:F3}m, heading {headErr:F3}°) — " +
+                            "plan/runtime disagreement, investigate before Stage B.");
+                }
+            }
         }
 
         /// <summary>Planned length of one dual quarter's gate suites (entry choice jump + exit convergence jump).</summary>
@@ -424,10 +490,17 @@ namespace TrackGeneration.Planning
             }
 
             // Balance the signed sum to exactly ±360 so the lap closes in heading.
-            if (!BalanceCornerSum(corners, ref rng))
+            // Stage E (opt-in): exact canonical 45/90/180 token solve; else the legacy
+            // continuous ±20°-step balancer (byte-identical old path when the flag is off).
+            bool balanced = cfg.UseCanonicalTurns
+                ? SolveCanonicalTokens(corners)
+                : BalanceCornerSum(corners, ref rng);
+            if (!balanced)
             {
                 plan.Fail(GenerationFailureReason.ClosureHeadingFailure,
-                    $"Could not balance {corners.Count} signed corners to ±360°.");
+                    cfg.UseCanonicalTurns
+                        ? $"No canonical 45/90/180 token sequence over {corners.Count} corners closes the lap to ±360°."
+                        : $"Could not balance {corners.Count} signed corners to ±360°.");
                 return corners;
             }
 
@@ -460,6 +533,31 @@ namespace TrackGeneration.Planning
                     plan.Fail(GenerationFailureReason.RequiredFeatureMissing,
                         $"Required {cfg.Wallrides.MinimumCount} wallride turns but only {assigned} corners in the 60–140° window were available.");
                     return corners;
+                }
+            }
+
+            // ── Stage F (pilot): directional corkscrews. One eligible corner per lap is
+            // realized as a barrel that ALSO turns by its own magnitude. Reuses the
+            // IsSpecial/Realization path and MakeCorkscrewDef(horizontalTurn); the stamped
+            // plan-view TurnAngle equals the corner, so heading closure is preserved by
+            // construction. Runs AFTER the canonical solve so the magnitude is a clean
+            // token when that flag is on. Flag-gated; off = no change.
+            //
+            // ±45 ONLY: a 90° turning barrel measured ~3.4km of arc (blowing the length cap
+            // → InsufficientLengthBudget) and packed too much curvature into the ring budget
+            // (max facet 3.1° vs 0.5° target). The gentle ±45 barrel stays smooth and
+            // affordable. Widen this window only after the 90° geometry is stretched/eased.
+            if (cfg.DirectionalCorkscrews)
+            {
+                var dcoEligible = new List<CornerSlot>();
+                foreach (var c in corners)
+                    if (!c.IsSpecial && !c.IsHalfLoop && c.Magnitude >= 40 && c.Magnitude <= 50)
+                        dcoEligible.Add(c);
+                if (dcoEligible.Count > 0)
+                {
+                    var pick = dcoEligible[rngs.Feature.NextInt(dcoEligible.Count)];
+                    pick.IsSpecial = true;
+                    pick.Realization = TrackPatternType.Corkscrew;
                 }
             }
 
@@ -586,6 +684,99 @@ namespace TrackGeneration.Planning
             }
 
             return sum == target;
+        }
+
+        /// <summary>
+        /// Stage E: assigns each corner an exact canonical token (±45/±90/±180) whose
+        /// signed sum closes the lap to ±360°, by bounded exact dynamic programming over
+        /// residual in 45° units. Deterministic — no rng: among all closing assignments
+        /// it picks, per corner, the token nearest the magnitude the layout drew, so
+        /// quantized layouts stay close to the continuous ones. Half-loops and hairpin
+        /// realizations are pinned to ±180 with their drawn sign; direction preference
+        /// is honoured by targeting the sign of the drawn winding.
+        /// </summary>
+        private static bool SolveCanonicalTokens(List<CornerSlot> corners)
+        {
+            int n = corners.Count;
+            if (n == 0) return false;
+
+            const int U = 45;                       // one 45° unit
+            int drawnSum = 0;
+            foreach (var c in corners) drawnSum += c.SignedAngle;
+            int targetUnits = drawnSum >= 0 ? 8 : -8;   // ±360°
+
+            // Per-corner candidate signed tokens (in 45° units) and their cost = how far
+            // the token is from the drawn magnitude (keeps the quantized plan faithful).
+            var options = new List<(int units, int cost)>[n];
+            for (int i = 0; i < n; i++)
+            {
+                var c = corners[i];
+                var list = new List<(int, int)>();
+                int drawnUnits = Mathf.Clamp(Mathf.RoundToInt(c.Magnitude / (float)U), 1, 4);
+
+                void Add(int mag) // mag in units: 1,2,4
+                {
+                    int cost = Mathf.Abs(mag - drawnUnits);
+                    list.Add((c.Sign * mag, cost));
+                    list.Add((-c.Sign * mag, cost + 4));   // flipping is allowed but costlier
+                }
+
+                if (c.IsHalfLoop || (c.IsSpecial && c.Realization == TrackPatternType.Hairpin))
+                {
+                    // Pinned reversal: exactly ±180, keep its drawn sign (no flip).
+                    list.Add((c.Sign * 4, 0));
+                }
+                else if (c.IsSpecial)
+                {
+                    Add(2); Add(4);                 // double-apex / tighten / open: 90 or 180
+                }
+                else
+                {
+                    Add(1); Add(2);                 // ordinary: 45 or 90
+                    if (c.AllowHairpinMagnitude) Add(4);
+                }
+                options[i] = list;
+            }
+
+            // DP over residual. Offset so index 0 = residual -4n.
+            int span = 4 * n;
+            int width = 2 * span + 1;
+            var best = new int[n + 1, width];
+            var pick = new int[n + 1, width];
+            for (int s = 0; s < n + 1; s++)
+                for (int r = 0; r < width; r++) best[s, r] = int.MaxValue;
+            best[0, span] = 0;                       // residual 0 before any corner
+
+            for (int i = 0; i < n; i++)
+            {
+                for (int r = 0; r < width; r++)
+                {
+                    if (best[i, r] == int.MaxValue) continue;
+                    int baseCost = best[i, r];
+                    var opts = options[i];
+                    for (int o = 0; o < opts.Count; o++)
+                    {
+                        int nr = r + opts[o].units;
+                        if (nr < 0 || nr >= width) continue;
+                        int nc = baseCost + opts[o].cost;
+                        if (nc < best[i + 1, nr]) { best[i + 1, nr] = nc; pick[i + 1, nr] = o; }
+                    }
+                }
+            }
+
+            int endR = span + targetUnits;
+            if (endR < 0 || endR >= width || best[n, endR] == int.MaxValue) return false;
+
+            // Reconstruct.
+            int cur = endR;
+            for (int i = n; i > 0; i--)
+            {
+                int o = pick[i, cur];
+                int units = options[i - 1][o].units;
+                corners[i - 1].SignedAngle = units * U;
+                cur -= units;
+            }
+            return true;
         }
 
         // ═══════════════════════════ 2. Gap features ═══════════════════════════
@@ -1011,6 +1202,50 @@ namespace TrackGeneration.Planning
 
         // ═══════════════════════════ 3/4. Definition emission ═══════════════════════════
 
+        private static bool IsCorkscrewFeature(TrackPatternType f)
+            => f == TrackPatternType.Corkscrew || f == TrackPatternType.DoubleCorkscrew;
+
+        /// <summary>
+        /// Stage D interim capacity floor (deterministic, structural). A lead straight
+        /// may be dropped only while enough full-length adjustable straights remain to
+        /// keep the closure solver's lever budget healthy: at most one drop per quarter,
+        /// and never below half of the non-reserved gaps kept as full levers. The full
+        /// residual-aware capacity model (architecture §7) supersedes this later.
+        /// </summary>
+        private static bool CanDropLeadStraight(int cornerCount, int closureGaps, int gap, TopologyPlan plan)
+        {
+            int nonReserved = Mathf.Max(0, cornerCount - closureGaps);
+            int floor = Mathf.CeilToInt(nonReserved * 0.5f);
+
+            int quarter = -1;
+            foreach (var q in plan.Quarters)
+                if (gap >= q.GapStart && gap < q.GapEnd) { quarter = q.Index; break; }
+
+            int dropsTotal = 0, dropsThisQuarter = 0;
+            foreach (var w in plan.Warnings)
+            {
+                if (!w.StartsWith("[StageD] gap ")) continue;
+                dropsTotal++;
+                // "[StageD] gap N: ..." — cheap quarter attribution via re-scan.
+                int g = ParseStageDGap(w);
+                if (g < 0) continue;
+                foreach (var q in plan.Quarters)
+                    if (g >= q.GapStart && g < q.GapEnd) { if (q.Index == quarter) dropsThisQuarter++; break; }
+            }
+
+            if (dropsThisQuarter >= 1) return false;
+            return (nonReserved - dropsTotal - 1) >= floor;
+        }
+
+        private static int ParseStageDGap(string warning)
+        {
+            const string key = "[StageD] gap ";
+            int start = key.Length;
+            int end = warning.IndexOf(':', start);
+            if (end < 0) return -1;
+            return int.TryParse(warning.Substring(start, end - start), out int g) ? g : -1;
+        }
+
         private void EmitDefinitions(ResolvedTrackGenerationConfig cfg, TopologyPlan plan, List<CornerSlot> corners,
             Dictionary<int, TrackPatternType> featureByGap, int closureGaps, PlanRandomStreams rngs)
         {
@@ -1056,10 +1291,32 @@ namespace TrackGeneration.Planning
                 float pacedT = Mathf.Lerp(rngs.Layout.NextFloat(), wave, cfg.PacingVariation * 0.7f);
                 float pacedLength = Mathf.Lerp(cfg.MinStraightLength, cfg.MaxStraightLength, pacedT);
 
+                // ── Stage D (experimental, opt-in): drop the mandatory lead straight to
+                // a bare weld connector when a corkscrew flows out of the preceding
+                // corner AND the closure capacity floor still holds. Default OFF —
+                // ships identical to before. The rng draw above is UNCONDITIONAL so
+                // enabling the flag never shifts the deterministic stream elsewhere.
+                bool droppedLead = false;
+                TrackPatternType droppedBefore = default;
+                if (cfg.DynamicFeatureAdjacency && gap > 0 && !inClosureReserve &&
+                    featureByGap.TryGetValue(gap, out var peekFeature) &&
+                    IsCorkscrewFeature(peekFeature) &&
+                    CanDropLeadStraight(corners.Count, closureGaps, gap, plan))
+                {
+                    pacedLength = Mathf.Max(cfg.MinimumConnectorLength, MinAdjustableStraight);
+                    droppedLead = true;
+                    droppedBefore = peekFeature;
+                }
+
                 // Every gap opens with an ADJUSTABLE plain straight (the closure solver's levers).
                 var lead = SectionDefs.Straight(TrackMacroSectionType.Straight, pacedLength, width,
-                    $"Straight_{gap:D2}");
+                    droppedLead ? $"CorkscrewWeld_{gap:D2}" : $"Straight_{gap:D2}");
                 lead.IsClosure = inClosureReserve;
+                if (droppedLead)
+                {
+                    lead.SemanticElement = Macro.SemanticElementId.ClosureTransfer;
+                    plan.Warnings.Add($"[StageD] gap {gap}: lead straight dropped to weld connector before {droppedBefore} (capacity floor held)");
+                }
                 defs.Add(lead);
 
                 // Gap content: one feature pattern. Dual-quarter Road A is eligible;
@@ -1067,6 +1324,7 @@ namespace TrackGeneration.Planning
                 if (!inClosureReserve && featureByGap.TryGetValue(gap, out TrackPatternType feature))
                 {
                     string patternId = $"{feature}_{patternCounter++}";
+                    int defsBefore = defs.Count;
                     if (!FeaturePatternLibrary.TryGet(feature, out var pattern) ||
                         !pattern.TryPlan(cfg, patternId, ref rngs.Feature, defs))
                     {
@@ -1074,12 +1332,30 @@ namespace TrackGeneration.Planning
                             $"Pattern {feature} could not find a legal parameterization under the resolved config.");
                         return;
                     }
+                    // Stage A: authoritative identity, stamped at emission (no behavior change).
+                    FeaturePlanning.StampRange(defs, defsBefore, FeaturePlanning.ElementOf(feature));
                     plan.CountPattern(feature);
                 }
 
                 // The corner that closes this gap.
+                int cornerDefsBefore = defs.Count;
                 EmitCorner(cfg, plan, corners[gap], patternCounter++, inClosureReserve, ref rngs.Feature);
                 if (plan.Failed) return;
+
+                // Stage A: corner-realization identity. Mirrors EmitCorner's own
+                // dispatch: half-loop reservation → its pattern; special realization →
+                // that element; default → hairpin at hairpin magnitude, else ordinary.
+                var cornerSlot = corners[gap];
+                SemanticElementId cornerElement = cornerSlot.IsHalfLoop
+                    ? FeaturePlanning.ElementOf(cornerSlot.HalfLoopType)
+                    : cornerSlot.IsSpecial
+                        ? (cornerSlot.Realization == TrackPatternType.Corkscrew
+                            ? SemanticElementId.DirectionalCorkscrew   // Stage F: barrel realizing a turn
+                            : FeaturePlanning.ElementOf(cornerSlot.Realization))
+                        : (cornerSlot.Magnitude >= 150
+                            ? SemanticElementId.Hairpin
+                            : SemanticElementId.OrdinaryCurve);
+                FeaturePlanning.StampRange(defs, cornerDefsBefore, cornerElement);
 
                 StampFrom(firstDef, quarter);
             }
@@ -1328,6 +1604,43 @@ namespace TrackGeneration.Planning
                     defs.Add(b);
                     break;
                 }
+                case TrackPatternType.Corkscrew:
+                {
+                    // Stage F: directional corkscrew realizing this corner. The barrel's
+                    // axis turns by sign*angle; MakeCorkscrewDef stamps a plan-view whose
+                    // TurnAngle equals that, so the corner's heading contribution — and lap
+                    // closure — is unchanged from the ordinary curve it replaces.
+                    //
+                    // Roll HANDEDNESS is a safety choice, not a random one. At the barrel's
+                    // mid-phase the road is inverted and the turn's lateral load peaks; the
+                    // wrong roll sign tilts that load off the road and ejects the craft.
+                    // Build both handednesses from the SAME rng state and keep the one that
+                    // presses the craft onto the road hardest (max of the min floor margin).
+                    string pid = $"DirectionalCorkscrew_{patternCounter}";
+                    float rollMag = cfg.CorkscrewRollDegrees;
+                    var rngSaved = rng;
+                    var rollPlus = CorkscrewPattern.MakeCorkscrewDef(cfg, ref rng, +rollMag, pid, sign * angle);
+                    rng = rngSaved;
+                    var rollMinus = CorkscrewPattern.MakeCorkscrewDef(cfg, ref rng, -rollMag, pid, sign * angle);
+                    float marginPlus = DirectionalCorkscrewFloorMargin(rollPlus, cfg);
+                    float marginMinus = DirectionalCorkscrewFloorMargin(rollMinus, cfg);
+                    float bestMargin = Mathf.Max(marginPlus, marginMinus);
+
+                    if (bestMargin <= 0f)
+                    {
+                        // Neither handedness keeps the craft on the road through the turn —
+                        // degrade to an ordinary curve rather than emit an ejector. Closure
+                        // is unaffected (same heading token).
+                        defs.Add(Corner(angle, RadiusFor(angle), $"BankedCurve_{angle}deg_{dir}"));
+                        break;
+                    }
+
+                    var dco = marginPlus >= marginMinus ? rollPlus : rollMinus;
+                    defs.Add(dco);
+                    defs.Add(SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight, cfg.DefaultRecoveryLength, width,
+                        "RecoveryStraight", locked: true, pid));
+                    break;
+                }
                 default:
                 {
                     bool hairpin = angle >= 150;
@@ -1340,6 +1653,43 @@ namespace TrackGeneration.Planning
                     break;
                 }
             }
+        }
+
+        /// <summary>
+        /// Worst-case floor-containment margin (m/s²) of a directional corkscrew: builds its
+        /// real frames and, at every ring, measures how hard the effective load (centripetal
+        /// from the built curvature + gravity) presses the craft onto the road surface. A
+        /// positive minimum means the craft stays pressed against the road all the way
+        /// through — including the inverted mid-barrel where the turn's lateral load peaks.
+        /// A negative value means the load tilts off the surface and the craft is ejected.
+        /// Convention-free: derived from Position/Forward/Up, so it needs no hardcoded sign.
+        /// </summary>
+        public static float DirectionalCorkscrewFloorMargin(TrackMacroSectionDefinition def,
+            ResolvedTrackGenerationConfig cfg)
+        {
+            var frames = SectionFrameBuilders.BuildRotationalEvent(
+                TrackConnectionFrame.Origin(def.Width), def, FrameBuildContext.From(cfg));
+            if (frames == null || frames.Length < 3) return float.NegativeInfinity;
+
+            // The craft meets a corkscrew below top speed — the same fraction the barrel is
+            // sized against, so the containment test and the barrel sizing agree.
+            float v = Mathf.Max(1f, cfg.DesignSpeedMps * CorkscrewPattern.CorkscrewHoldSpeedFraction);
+            float g = Mathf.Max(0.01f, Mathf.Abs(Physics.gravity.y));
+            Vector3 gVec = Vector3.up * -g;
+
+            float minMargin = float.MaxValue;
+            for (int i = 1; i < frames.Length - 1; i++)
+            {
+                float ds = 0.5f * (frames[i + 1].Position - frames[i - 1].Position).magnitude;
+                if (ds < 1e-3f) continue;
+                // v²·dT/ds ≈ centripetal acceleration vector (magnitude v²κ toward the centre
+                // of curvature). Captures the TOTAL curvature — barrel orbit, turn, elevation.
+                Vector3 aC = (v * v) * (frames[i + 1].Forward - frames[i - 1].Forward) / (2f * ds);
+                Vector3 support = aC - gVec;               // force/mass the road must supply
+                float margin = Vector3.Dot(support, frames[i].Up); // >0 ⇒ pressed onto the floor
+                if (margin < minMargin) minMargin = margin;
+            }
+            return minMargin == float.MaxValue ? float.NegativeInfinity : minMargin;
         }
 
         // ═══════════════════════════ 5. 2D closure solve ═══════════════════════════
@@ -1392,6 +1742,17 @@ namespace TrackGeneration.Planning
                 // Curves are exactly linear in radius. Elevated straights are not quite
                 // linear in physical length, so always trust a fresh exact walk here.
                 gap = -RewalkEndPos(defs);
+
+                // Closure angle relief (§7 extension): when radius/straight authority leaves
+                // a residual, nudge plain corner angles in equal-and-opposite pairs (net
+                // heading, and any canonical token, preserved) to absorb it before an S-bend.
+                if (cfg.ClosureAngleRelief && gap.magnitude > cfg.ClosurePositionTolerance)
+                {
+                    AngleReliefAttempts++;
+                    if (TryCloseWithAngleRelief(cfg, defs, cfg.ClosurePositionTolerance))
+                        AngleReliefClosures++;
+                    gap = -RewalkEndPos(defs);
+                }
 
                 if (gap.magnitude <= cfg.ClosurePositionTolerance)
                 {
@@ -1977,6 +2338,106 @@ namespace TrackGeneration.Planning
             }
 
             return pos;
+        }
+
+        /// <summary>Diagnostics for closure angle relief: candidates that invoked it and how many
+        /// it closed to tolerance this generation. Reset by the pipeline before each candidate sweep.</summary>
+        internal static int AngleReliefAttempts;
+        internal static int AngleReliefClosures;
+
+        /// <summary>
+        /// Closure angle relief (§7 extension). Plain corner angles are normally frozen closure inputs
+        /// (the radius/straight solver moves only lengths). Here we grant a bounded ±4° of
+        /// angular authority, applied strictly in EQUAL-AND-OPPOSITE pairs so the signed
+        /// corner sum — and therefore lap heading closure and any canonical 45/90/180 token —
+        /// is preserved exactly, while the intervening geometry rotates enough to walk the
+        /// far end onto the origin. Each iteration finite-differences every eligible corner's
+        /// end-position derivative, then applies the single antisymmetric pair that removes
+        /// the most residual (closed-form scalar step, no matrix). Returns true once the walk
+        /// closes within tolerance. Radius is never touched; feature-internal and alternate-road
+        /// arcs are never touched. No-op geometry unless the plan actually closes tighter.
+        /// </summary>
+        private static bool TryCloseWithAngleRelief(ResolvedTrackGenerationConfig cfg,
+            List<TrackMacroSectionDefinition> defs, float tol)
+        {
+            const float maxNudgeDeg = 4f;   // cumulative per-corner bound
+            const float diffStepDeg = 0.5f; // finite-difference probe
+            const int maxIters = 12;
+
+            var idx = new List<int>();
+            for (int i = 0; i < defs.Count; i++)
+            {
+                var d = defs[i];
+                if (d.RoadId == 1) continue;                       // alternate roads don't drive the walk
+                if (!string.IsNullOrEmpty(d.PatternId)) continue;  // never touch feature-internal arcs
+                if (d.SectionType == TrackMacroSectionType.BankedCurve ||
+                    d.SectionType == TrackMacroSectionType.BankedHairpin)
+                    idx.Add(i);
+            }
+            if (idx.Count < 2) return false; // need a pair to stay heading-neutral
+
+            var applied = new float[idx.Count]; // cumulative signed-angle delta (deg) per corner
+            var col = new Vector2[idx.Count];   // dEnd/dSignedAngle per corner
+
+            for (int iter = 0; iter < maxIters; iter++)
+            {
+                Vector2 end = RewalkEndPos(defs);
+                Vector2 gap = -end;
+                if (gap.magnitude <= tol) return true;
+
+                for (int k = 0; k < idx.Count; k++)
+                {
+                    var d = defs[idx[k]];
+                    float baseAngle = d.TurnAngle;
+                    d.TurnAngle = baseAngle + diffStepDeg * d.TurnSign; // +diffStep of SIGNED angle
+                    col[k] = (RewalkEndPos(defs) - end) / diffStepDeg;
+                    d.TurnAngle = baseAngle;                            // exact restore
+                }
+
+                // Best antisymmetric pair: +delta on a, -delta on b keeps the corner sum
+                // fixed; the resulting end shift is (col[a]-col[b])*delta.
+                int bestA = -1, bestB = -1;
+                float bestDelta = 0f, bestReduce = 1e-3f; // ignore negligible steps
+                for (int a = 0; a < idx.Count; a++)
+                    for (int b = a + 1; b < idx.Count; b++)
+                    {
+                        Vector2 dir = col[a] - col[b];
+                        float dd = Vector2.Dot(dir, dir);
+                        if (dd < 1e-9f) continue;
+
+                        float delta = Vector2.Dot(dir, gap) / dd;
+                        // Clamp so both cumulative nudges stay inside ±maxNudge.
+                        float lo = Mathf.Max(-maxNudgeDeg - applied[a], applied[b] - maxNudgeDeg);
+                        float hi = Mathf.Min(maxNudgeDeg - applied[a], applied[b] + maxNudgeDeg);
+                        if (hi <= lo) continue;
+                        delta = Mathf.Clamp(delta, lo, hi);
+
+                        // Predicted squared-gap reduction: 2·delta·(dir·gap) − delta²·|dir|².
+                        float reduce = 2f * delta * Vector2.Dot(dir, gap) - delta * delta * dd;
+                        if (reduce > bestReduce)
+                        {
+                            bestReduce = reduce; bestA = a; bestB = b; bestDelta = delta;
+                        }
+                    }
+
+                if (bestA < 0) return false; // no pair helps within the bound — hand back to S-bend
+
+                ApplyAngleDelta(cfg, defs[idx[bestA]], +bestDelta);
+                ApplyAngleDelta(cfg, defs[idx[bestB]], -bestDelta);
+                applied[bestA] += bestDelta;
+                applied[bestB] -= bestDelta;
+            }
+
+            return RewalkEndPos(defs).magnitude <= tol;
+        }
+
+        /// <summary>Shifts a plain corner's SIGNED angle by deltaDeg, keeping its turn sign,
+        /// and re-derives the dependent arc length so lap-length accounting stays exact.</summary>
+        private static void ApplyAngleDelta(ResolvedTrackGenerationConfig cfg,
+            TrackMacroSectionDefinition d, float deltaDeg)
+        {
+            d.TurnAngle = Mathf.Max(1f, d.TurnAngle + deltaDeg * d.TurnSign);
+            d.Length = SectionFrameBuilders.EasedArcLength(d.TurnAngle, d.Radius);
         }
 
         // ═══════════════════════════ 6. Cheap 2D self-proximity ═══════════════════════════

@@ -48,13 +48,13 @@ public class VectorThrusterArray : MonoBehaviour
     [Header("Mouse Steering")]
     [Tooltip("Yaw steering sensitivity from Mouse X (yawRequest). This IS primary steering.")]
     [Range(0f, 2f)]
-    public float steerSensitivity = 0.85f;
+    public float steerSensitivity = 0.24f;
 
     [Header("Primary Steering Authority")]
     [Tooltip("Main yaw authority multiplier. If the craft rotates too slowly, tune this first.")]
     [FormerlySerializedAs("yawAuthorityMultiplier")]
     [Range(0f, 6f)]
-    public float steeringYawAuthority = 2.25f;
+    public float steeringYawAuthority = 2.7f;
 
     [Header("Optional Keyboard Assist — OFF by default")]
     [Tooltip("If false, A/D edge shift never adds yaw. Keep this false when mouse should be the only steering input.")]
@@ -103,7 +103,7 @@ public class VectorThrusterArray : MonoBehaviour
 
     [Header("Yaw Damping")]
     [Tooltip("Base yaw damping torque coefficient.")]
-    public float yawDamping = 2.75f;
+    public float yawDamping = 3.2f;
 
     [Tooltip("How much yaw damping is reduced when grip breaker (drift) is active. 0 = no damping in drift; 1 = full damping in drift.")]
     [Range(0f, 1f)]

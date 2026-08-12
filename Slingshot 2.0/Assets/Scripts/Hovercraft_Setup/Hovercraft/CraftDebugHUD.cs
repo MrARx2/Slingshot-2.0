@@ -163,7 +163,7 @@ public class CraftDebugHUD : MonoBehaviour
         y += 6f;
         DrawStabilizer(ref y, x);
         y += 6f;
-        DrawOvercharge(ref y, x);
+        DrawBoost(ref y, x);
         y += 6f;
         DrawEnergy(ref y, x);
         y += 6f;
@@ -222,30 +222,37 @@ public class CraftDebugHUD : MonoBehaviour
         DrawMiniBar(ref y, x, "Roof", hover.AverageAutoRoofThrottle / Mathf.Max(0.001f, hover.roofStabilizerMaxThrottle), warningColor);
     }
 
-    private void DrawOvercharge(ref float y, float x)
+    private void DrawBoost(ref float y, float x)
     {
-        OverchargeCore over = craftCore.overcharge;
-        if (over == null)
+        OverchargeCore boost = craftCore.overcharge;
+        if (boost == null)
         {
-            DrawLabel(ref y, x, "Overcharge", "missing", dangerColor);
+            DrawLabel(ref y, x, "Boost", "missing", dangerColor);
             return;
         }
 
-        string target = over.IsCharging
-            ? over.ChargingTarget.ToString()
-            : over.IsBursting
-                ? over.ActiveBurstTarget.ToString()
-                : "Idle";
+        string status;
+        Color c;
+        if (boost.IsBoosting)
+        {
+            status = $"BOOSTING  env {(boost.BoostEnvelope01 * 100f):0}%  grant {(boost.GrantedBoostStrength):0.0}";
+            c = normalColor;
+        }
+        else if (boost.CanBoost)
+        {
+            status = "READY";
+            c = goodColor;
+        }
+        else
+        {
+            status = $"COOLDOWN {boost.CooldownRemaining:0.0}s";
+            c = warningColor;
+        }
 
-        string status = over.IsCharging
-            ? $"CHARGING {target} {(over.Charge01 * 100f):0}%"
-            : over.IsBursting
-                ? $"BURST {target}"
-                : "IDLE";
-
-        Color c = over.IsCharging ? warningColor : over.IsBursting ? dangerColor : mutedColor;
-        DrawLabel(ref y, x, "Overcharge", status, c);
-        DrawMiniBar(ref y, x, "Charge", over.Charge01, warningColor);
+        DrawLabel(ref y, x, "Boost", status, c);
+        DrawMiniBar(ref y, x, "Readiness", boost.BoostReadiness01, boost.CanBoost ? goodColor : warningColor);
+        DrawMiniBar(ref y, x, "Envelope", boost.BoostEnvelope01, normalColor);
+        DrawLabel(ref y, x, "Seq", boost.BoostSequenceId.ToString(), mutedColor);
     }
 
     private void DrawEnergy(ref float y, float x)
@@ -258,8 +265,14 @@ public class CraftDebugHUD : MonoBehaviour
         }
 
         EnergyState e = energy.CurrentEnergy;
-        string header = $"{e.totalGranted:0}/{e.totalBudget:0} used";
-        if (e.totalRequested > e.totalBudget)
+        float protectedRequest = (e.baseHoverProtected ? e.baseHoverRequest : 0f)
+                               + (e.stabilizerProtected ? e.stabilizerRequest : 0f);
+        float protectedGranted = (e.baseHoverProtected ? e.baseHoverGranted : 0f)
+                               + (e.stabilizerProtected ? e.stabilizerGranted : 0f);
+        float sharedRequested = Mathf.Max(0f, e.totalRequested - protectedRequest);
+        float sharedGranted = Mathf.Max(0f, e.totalGranted - protectedGranted);
+        string header = $"{sharedGranted:0}/{e.totalBudget:0} shared";
+        if (sharedRequested > e.totalBudget)
         {
             header += $"  OVERLOAD {(e.overload01 * 100f):0}%";
         }
@@ -271,7 +284,7 @@ public class CraftDebugHUD : MonoBehaviour
         DrawEnergyBar(ref y, x, "Roof Q", e.roofRequest, e.roofGranted, e.totalBudget, e.roofPower01);
         DrawEnergyBar(ref y, x, "Bottom E", e.bottomRequest, e.bottomGranted, e.totalBudget, e.bottomPower01);
         DrawEnergyBar(ref y, x, "Overcharge", e.overchargeRequest, e.overchargeGranted, e.totalBudget, e.overchargePower01);
-        DrawEnergyBar(ref y, x, "Stabilizer", e.stabilizerRequest, e.stabilizerGranted, e.totalBudget, e.stabilizerPower01);
+        DrawEnergyBar(ref y, x, e.stabilizerProtected ? "Stabilizer [safe]" : "Stabilizer", e.stabilizerRequest, e.stabilizerGranted, Mathf.Max(e.totalBudget, e.stabilizerGranted), e.stabilizerPower01);
     }
 
     private void DrawGrip(ref float y, float x)

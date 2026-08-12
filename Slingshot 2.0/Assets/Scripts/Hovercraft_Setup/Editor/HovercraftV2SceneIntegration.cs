@@ -82,11 +82,9 @@ public static class HovercraftV2SceneIntegration
             var sensor = hovercraftCamera.GetComponent<TrackSectionSensor>();
             if (sensor != null) sensor.target = craft.transform;
         }
-        foreach (CraftHUD hud in Object.FindObjectsByType<CraftHUD>(
-                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+        foreach (CraftHUD hud in Object.FindObjectsByType<CraftHUD>(FindObjectsInactive.Include))
             hud.craftCore = core;
-        foreach (CraftDebugHUD hud in Object.FindObjectsByType<CraftDebugHUD>(
-                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+        foreach (CraftDebugHUD hud in Object.FindObjectsByType<CraftDebugHUD>(FindObjectsInactive.Include))
             hud.craftCore = core;
 
         EditorSceneManager.MarkSceneDirty(scene);

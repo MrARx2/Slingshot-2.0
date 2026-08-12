@@ -92,6 +92,9 @@ namespace TrackGeneration.Macro
         [Tooltip("Number of cross-section sample points per SIDE (total profile points = 2*resolution + 1). Points are distributed toward the curved walls, where the resolution is actually visible.")]
         public int ProfileResolution = 32;
 
+        [Tooltip("Resolution used to build the COLLISION cross-section (capped by ProfileResolution). Coarse colliders give the hover system a normal 'cliff' at the floor→wall shoulder; the wall-concentrating warp puts most of these points where the surface curves.")]
+        public int ColliderProfileResolution = 40;
+
         [Tooltip("Height of the optional outer safety lip at the very top edge (meters). 0 = none. Realized as a small inward capture curl, not a raised fin.")]
         public float SafetyLipHeight = 1.0f;
 
