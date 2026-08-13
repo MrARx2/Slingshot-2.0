@@ -40,6 +40,19 @@ public class EnergyCore : MonoBehaviour
     [Range(0f, 1f)]
     public float boostReserve01 = 0.62f;
 
+    [Header("Two-Slot BUS (power channels)")]
+    [Tooltip("How many control channels the BUS funds at FULL power at once. 2 = two 'directions' at 100%. A third+ active channel is throttled, not denied.")]
+    [Range(1f, 4f)] public float maxConcurrentChannels = 2f;
+
+    [Tooltip("Below this control engagement (peak throttle 0..1) a channel is idle and claims no BUS slot.")]
+    [Range(0f, 0.25f)] public float channelActivationDeadzone = 0.03f;
+
+    [Tooltip("Overload priority — higher keeps more power when the BUS is over budget. Steer is highest so you never lose control.")]
+    public float steerPriority = 4f;
+    public float boostPriority = 3f;
+    public float drivePriority = 2f;
+    public float verticalPriority = 1f;
+
     [Header("Debug / Read Only")]
     [SerializeField] private EnergyState currentEnergy = EnergyState.Full;
 
@@ -69,6 +82,10 @@ public class EnergyCore : MonoBehaviour
         float stabilizerRequest = 0f;
         float otherRequest = 0f;
 
+        // Peak control engagement per channel (0..1-ish) — how hard each direction is
+        // being driven this tick. Drives the "slot" demand for the two-slot BUS below.
+        float drivePeak = 0f, vectoringPeak = 0f, roofPeak = 0f, bottomPeak = 0f, overchargePeak = 0f;
+
         // First pass: compute power demand per channel from the actual thruster hardware.
         foreach (var entry in bus.thrusters)
         {
@@ -83,65 +100,70 @@ public class EnergyCore : MonoBehaviour
             AccumulateChannelPower(entry, entry.overchargeThrottle, ThrusterPowerChannel.Overcharge, costPerForce, bus.masterThrottleMultiplier, ref baseHoverRequest, ref driveRequest, ref vectoringRequest, ref roofRequest, ref bottomRequest, ref overchargeRequest, ref stabilizerRequest, ref otherRequest);
             AccumulateChannelPower(entry, entry.stabilizerThrottle, ThrusterPowerChannel.Stabilizer, costPerForce, bus.masterThrottleMultiplier, ref baseHoverRequest, ref driveRequest, ref vectoringRequest, ref roofRequest, ref bottomRequest, ref overchargeRequest, ref stabilizerRequest, ref otherRequest);
             AccumulateChannelPower(entry, entry.otherThrottle, ThrusterPowerChannel.Other, costPerForce, bus.masterThrottleMultiplier, ref baseHoverRequest, ref driveRequest, ref vectoringRequest, ref roofRequest, ref bottomRequest, ref overchargeRequest, ref stabilizerRequest, ref otherRequest);
+
+            drivePeak = Mathf.Max(drivePeak, entry.driveThrottle);
+            vectoringPeak = Mathf.Max(vectoringPeak, entry.vectoringThrottle);
+            roofPeak = Mathf.Max(roofPeak, entry.roofThrottle);
+            bottomPeak = Mathf.Max(bottomPeak, entry.bottomThrottle);
+            overchargePeak = Mathf.Max(overchargePeak, entry.overchargeThrottle);
         }
 
-        // Discharging Overcharge draws real power through the main thruster above.
-        // Regenerating the stored reserve is also a real BUS load, represented as
-        // virtual demand because it does not directly drive a ThrusterNode.
-        float overchargeBurstRequest = overchargeRequest;
-        float virtualOverchargeChargeRequest = overcharge != null
-            ? Mathf.Max(0f, overcharge.RequestedRechargePower)
-            : 0f;
-        overchargeRequest += virtualOverchargeChargeRequest;
+        // ── Two-slot BUS allocation ──────────────────────────────────
+        // Each active control channel claims a "slot" = budget / maxConcurrent, scaled
+        // by how hard it is being driven. TWO full channels = 100% of the BUS. A third+
+        // active channel is NOT denied — every active channel is throttled instead,
+        // weighted by priority so higher-priority channels lose the least
+        // (Steer > Boost > Drive > Vertical). Auto hover and the stabilizer are free and
+        // funded outside this budget, so the craft never falls or flips from overload.
+        float slot = budget / Mathf.Max(1f, maxConcurrentChannels);
+        float dz = Mathf.Clamp01(channelActivationDeadzone);
 
-        float nonHoverPerformanceRequest = driveRequest + vectoringRequest + roofRequest + bottomRequest + overchargeRequest + stabilizerRequest + otherRequest;
-        float sharedRequest = nonHoverPerformanceRequest
-                            - (protectStabilizer ? stabilizerRequest : 0f)
-                            + (protectBaseHover ? 0f : baseHoverRequest);
+        float steerEngage = EngageLevel(vectoringPeak, dz);
+        float boostEngage = EngageLevel(overchargePeak, dz);
+        float driveEngage = EngageLevel(drivePeak, dz);
+        float roofEngage = EngageLevel(roofPeak, dz);
+        float bottomEngage = EngageLevel(bottomPeak, dz);
+        float vertEngage = Mathf.Max(roofEngage, bottomEngage);
 
-        // Strict priority allocator. Unlike the former bias multiplier, this can
-        // never grant more shared power than the BUS reports. That makes overload
-        // a gameplay rule the player can learn instead of a cosmetic meter.
-        float remainingBudget = budget;
-        float stabilizerGranted = protectStabilizer ? stabilizerRequest : 0f;
+        // Channel order: 0 Steer, 1 Boost, 2 Drive, 3 Vertical.
+        float[] slotDemand =
+        {
+            slot * steerEngage,
+            slot * boostEngage,
+            slot * driveEngage,
+            slot * vertEngage
+        };
+        float[] slotWeight =
+        {
+            Mathf.Max(0.01f, steerPriority),
+            Mathf.Max(0.01f, boostPriority),
+            Mathf.Max(0.01f, drivePriority),
+            Mathf.Max(0.01f, verticalPriority)
+        };
+        float[] slotScale = { 1f, 1f, 1f, 1f };
+        AllocateBus(budget, slotDemand, slotWeight, slotScale);
 
-        float steeringReserve = budget * Mathf.Clamp01(steeringReserve01);
-        float vectoringGuaranteed = Mathf.Min(vectoringRequest, steeringReserve, remainingBudget);
-        remainingBudget -= vectoringGuaranteed;
+        float vectoringScale = slotScale[0];
+        float overchargeScale = slotScale[1];
+        float driveScale = slotScale[2];
+        float roofScale = slotScale[3];
+        float bottomScale = slotScale[3];
+        float baseHoverScale = 1f;   // auto hover: free, always granted
+        float stabilizerScale = 1f;  // auto stabilizer: free, always granted
+        float otherScale = 1f;
 
-        float activeBoostReserve = budget * Mathf.Clamp01(boostReserve01);
-        float overchargeGuaranteed = Mathf.Min(overchargeRequest, activeBoostReserve, remainingBudget);
-        remainingBudget -= overchargeGuaranteed;
+        // What the two-slot budget actually funds this tick (for the BUS readout).
+        float controllableRequest = slotDemand[0] + slotDemand[1] + slotDemand[2] + slotDemand[3];
+        float controllableGranted = slotDemand[0] * slotScale[0] + slotDemand[1] * slotScale[1]
+                                  + slotDemand[2] * slotScale[2] + slotDemand[3] * slotScale[3];
 
-        float residualBaseHover = protectBaseHover ? 0f : baseHoverRequest;
-        float residualStabilizer = protectStabilizer ? 0f : stabilizerRequest;
-        float residualVectoring = Mathf.Max(0f, vectoringRequest - vectoringGuaranteed);
-        float residualOvercharge = Mathf.Max(0f, overchargeRequest - overchargeGuaranteed);
-        float residualRequest = residualBaseHover + driveRequest + residualVectoring + roofRequest +
-                                bottomRequest + residualOvercharge + residualStabilizer + otherRequest;
-        float residualScale = residualRequest > remainingBudget
-            ? Mathf.Clamp01(remainingBudget / Mathf.Max(0.001f, residualRequest))
-            : 1f;
-
-        float baseHoverGranted = protectBaseHover ? baseHoverRequest : baseHoverRequest * residualScale;
-        float driveGranted = driveRequest * residualScale;
-        float vectoringGranted = vectoringGuaranteed + residualVectoring * residualScale;
-        float roofGranted = roofRequest * residualScale;
-        float bottomGranted = bottomRequest * residualScale;
-        float overchargeGranted = overchargeGuaranteed + residualOvercharge * residualScale;
-        stabilizerGranted += residualStabilizer * residualScale;
-        float otherGranted = otherRequest * residualScale;
-
-        float baseHoverScale = GetPower01(baseHoverRequest, baseHoverGranted);
-        float driveScale = GetPower01(driveRequest, driveGranted);
-        float vectoringScale = GetPower01(vectoringRequest, vectoringGranted);
-        float roofScale = GetPower01(roofRequest, roofGranted);
-        float bottomScale = GetPower01(bottomRequest, bottomGranted);
-        float overchargeScale = GetPower01(overchargeRequest, overchargeGranted);
-        float overchargeBurstGranted = overchargeBurstRequest * overchargeScale;
-        float overchargeChargeGranted = virtualOverchargeChargeRequest * overchargeScale;
-        float stabilizerScale = GetPower01(stabilizerRequest, stabilizerGranted);
-        float otherScale = GetPower01(otherRequest, otherGranted);
+        // Nitro regeneration uses only LEFTOVER budget: it never steals a direction's
+        // slot and stalls while the BUS is fully committed (a rule the player can learn).
+        float rechargeRequest = overcharge != null ? Mathf.Max(0f, overcharge.RequestedRechargePower) : 0f;
+        float leftover = Mathf.Max(0f, budget - controllableGranted);
+        float rechargeScale = rechargeRequest > 0.001f
+            ? Mathf.Clamp01(Mathf.Min(rechargeRequest, leftover) / rechargeRequest)
+            : (leftover > 0.001f ? 1f : 0f);
 
         // Second pass: apply granted scale per channel back onto the actual thruster requests.
         foreach (var entry in bus.thrusters)
@@ -181,51 +203,56 @@ public class EnergyCore : MonoBehaviour
             entry.lastPowerScale = requestedPower > 0.001f ? Mathf.Clamp01(grantedPower / requestedPower) : 1f;
         }
 
-        float totalRequested = baseHoverRequest + nonHoverPerformanceRequest;
-        float totalGranted = baseHoverGranted + driveGranted + vectoringGranted + roofGranted + bottomGranted + overchargeGranted + stabilizerGranted + otherGranted;
-        float sharedGranted = totalGranted
-                            - (protectBaseHover ? baseHoverGranted : 0f)
-                            - (protectStabilizer ? stabilizerGranted : 0f);
-        float performanceScale = sharedRequest > 0.001f ? Mathf.Clamp01(sharedGranted / sharedRequest) : 1f;
+        // Reactor readout in BUS/slot terms so the UI can show each channel and its
+        // "THROTTLED xx%" (power01 = granted fraction). Base hover / stabilizer are free.
+        // Totals INCLUDE the protected systems so the HUD's (total − protected)/budget
+        // math resolves to the controllable two-slot load; performancePowerScale01 is
+        // the overall controllable grant fraction, which drives the HUD "THROTTLED xx%".
+        float baseHoverGrantedFree = baseHoverRequest;   // free / full
+        float stabilizerGrantedFree = stabilizerRequest; // free / full
+        float busPerfScale = controllableRequest > 0.001f
+            ? Mathf.Clamp01(controllableGranted / controllableRequest)
+            : 1f;
 
         currentEnergy = new EnergyState
         {
             totalBudget = budget,
-            totalRequested = totalRequested,
-            totalGranted = totalGranted,
-            overload01 = Mathf.Clamp01(sharedRequest <= budget ? 0f : (sharedRequest - budget) / budget),
+            totalRequested = controllableRequest + baseHoverRequest + stabilizerRequest,
+            totalGranted = controllableGranted + baseHoverGrantedFree + stabilizerGrantedFree,
+            overload01 = Mathf.Clamp01(controllableRequest <= budget ? 0f : (controllableRequest - budget) / budget),
 
             baseHoverRequest = baseHoverRequest,
-            baseHoverGranted = baseHoverGranted,
-            driveRequest = driveRequest,
-            vectoringRequest = vectoringRequest,
-            roofRequest = roofRequest,
-            bottomRequest = bottomRequest,
-            overchargeRequest = overchargeRequest,
+            baseHoverGranted = baseHoverGrantedFree, // free / full
+
+            driveRequest = slotDemand[2],
+            vectoringRequest = slotDemand[0],
+            roofRequest = slot * roofEngage,
+            bottomRequest = slot * bottomEngage,
+            overchargeRequest = slotDemand[1],
             stabilizerRequest = stabilizerRequest,
             otherRequest = otherRequest,
 
-            driveGranted = driveGranted,
-            vectoringGranted = vectoringGranted,
-            roofGranted = roofGranted,
-            bottomGranted = bottomGranted,
-            overchargeGranted = overchargeGranted,
-            stabilizerGranted = stabilizerGranted,
-            otherGranted = otherGranted,
+            driveGranted = slotDemand[2] * driveScale,
+            vectoringGranted = slotDemand[0] * vectoringScale,
+            roofGranted = slot * roofEngage * roofScale,
+            bottomGranted = slot * bottomEngage * bottomScale,
+            overchargeGranted = slotDemand[1] * overchargeScale,
+            stabilizerGranted = stabilizerGrantedFree,
+            otherGranted = otherRequest,
 
-            drivePower01 = GetPower01(driveRequest, driveGranted),
-            vectoringPower01 = GetPower01(vectoringRequest, vectoringGranted),
-            roofPower01 = GetPower01(roofRequest, roofGranted),
-            bottomPower01 = GetPower01(bottomRequest, bottomGranted),
+            drivePower01 = driveScale,
+            vectoringPower01 = vectoringScale,
+            roofPower01 = roofScale,
+            bottomPower01 = bottomScale,
             overchargePower01 = overchargeScale,
-            overchargeChargePower01 = GetPower01(virtualOverchargeChargeRequest, overchargeChargeGranted),
-            overchargeBurstPower01 = GetPower01(overchargeBurstRequest, overchargeBurstGranted),
-            stabilizerPower01 = GetPower01(stabilizerRequest, stabilizerGranted),
-            baseHoverPower01 = GetPower01(baseHoverRequest, baseHoverGranted),
-            otherPower01 = GetPower01(otherRequest, otherGranted),
+            overchargeChargePower01 = rechargeScale,
+            overchargeBurstPower01 = overchargeScale,
+            stabilizerPower01 = 1f,
+            baseHoverPower01 = 1f,
+            otherPower01 = 1f,
             baseHoverProtected = protectBaseHover,
             stabilizerProtected = protectStabilizer,
-            performancePowerScale01 = performanceScale
+            performancePowerScale01 = busPerfScale
         };
 
         return currentEnergy;
@@ -280,5 +307,64 @@ public class EnergyCore : MonoBehaviour
         if (request <= 0.001f)
             return 1f;
         return Mathf.Clamp01(granted / request);
+    }
+
+    /// <summary>Control engagement 0..1 from a channel's peak throttle, gated by a deadzone.</summary>
+    private static float EngageLevel(float peakThrottle, float deadzone)
+    {
+        float e = Mathf.Clamp01(peakThrottle);
+        return e <= deadzone ? 0f : e;
+    }
+
+    /// <summary>
+    /// Priority-weighted soft BUS allocator. If total demand fits the budget, every
+    /// channel is granted in full (scale = 1). When it doesn't, the budget is
+    /// water-filled by weight so higher-priority channels keep more — nothing is hard
+    /// denied, each active channel is simply throttled by a different amount. Writes a
+    /// granted fraction [0..1] per channel into <paramref name="scaleOut"/>.
+    /// </summary>
+    internal static void AllocateBus(float budget, float[] demand, float[] weight, float[] scaleOut)
+    {
+        int n = demand.Length;
+
+        float sumDemand = 0f;
+        for (int i = 0; i < n; i++) sumDemand += Mathf.Max(0f, demand[i]);
+
+        if (sumDemand <= budget || sumDemand <= 1e-6f)
+        {
+            for (int i = 0; i < n; i++) scaleOut[i] = 1f;
+            return;
+        }
+
+        float[] granted = new float[n];
+        bool[] satisfied = new bool[n];
+        float remaining = budget;
+
+        // A few passes redistribute any weight-share a channel couldn't use (because it
+        // hit its own demand) to the still-hungry channels, again by weight.
+        for (int pass = 0; pass <= n && remaining > 1e-5f; pass++)
+        {
+            float wSum = 0f;
+            for (int i = 0; i < n; i++)
+                if (!satisfied[i] && demand[i] > 1e-6f) wSum += Mathf.Max(0.01f, weight[i]);
+            if (wSum <= 1e-6f) break;
+
+            float distributed = 0f;
+            bool anyNewlySatisfied = false;
+            for (int i = 0; i < n; i++)
+            {
+                if (satisfied[i] || demand[i] <= 1e-6f) continue;
+                float share = remaining * Mathf.Max(0.01f, weight[i]) / wSum;
+                float give = Mathf.Min(share, demand[i] - granted[i]);
+                granted[i] += give;
+                distributed += give;
+                if (granted[i] >= demand[i] - 1e-6f) { satisfied[i] = true; anyNewlySatisfied = true; }
+            }
+            remaining -= distributed;
+            if (!anyNewlySatisfied) break; // stable split reached
+        }
+
+        for (int i = 0; i < n; i++)
+            scaleOut[i] = demand[i] > 1e-6f ? Mathf.Clamp01(granted[i] / demand[i]) : 1f;
     }
 }

@@ -95,12 +95,12 @@ public class CraftFeedbackSystem : MonoBehaviour
     [Tooltip("List of bindings connecting thruster nodes to their trail renderers and indicators.")]
     public List<ThrusterVisualBinding> thrusterVisuals = new List<ThrusterVisualBinding>();
 
-    [Header("Boost Visual Response")]
+    [Header("Boost Visual Response (Legacy Fallback)")]
     [Tooltip("Main-engine trail width multiplier at the crest of a boost.")]
-    [Range(1f, 5f)] public float boostTrailWidthMultiplier = 3.4f;
+    [HideInInspector, Range(1f, 5f)] public float boostTrailWidthMultiplier = 3.4f;
 
     [Tooltip("Additional main-engine emission multiplier at the crest of a boost.")]
-    [Range(1f, 8f)] public float boostEmissionMultiplier = 4.8f;
+    [HideInInspector, Range(1f, 8f)] public float boostEmissionMultiplier = 4.8f;
 
     [Header("Cinematic Propulsion Wake")]
     [Tooltip("Automatically creates a layered rear-engine wake when no authored main-engine trail is assigned.")]
@@ -108,41 +108,41 @@ public class CraftFeedbackSystem : MonoBehaviour
     [Tooltip("Disables the two original Trail prefab renderers so only the cinematic propulsion system is visible.")]
     public bool disableLegacyTrailRenderers = true;
     [Tooltip("Soft additive plasma sprite used by the nozzle, ion, spark, shock, and ghost-wake layers.")]
-    public Texture2D plasmaWakeTexture;
-    [Min(0.005f)] public float idleWakeWidth = 0.055f;
-    [Min(0.05f)] public float cruiseWakeWidth = 0.34f;
-    [Min(0.1f)] public float overchargeWakeWidth = 1.25f;
-    [Range(0.05f, 1f)] public float cruiseWakeTime = 0.26f;
-    [Range(0.1f, 2f)] public float overchargeWakeTime = 0.72f;
-    [Min(100f)] public float cinematicSpeedKmh = 1800f;
+    [HideInInspector] public Texture2D plasmaWakeTexture;
+    [HideInInspector, Min(0.005f)] public float idleWakeWidth = 0.055f;
+    [HideInInspector, Min(0.05f)] public float cruiseWakeWidth = 0.34f;
+    [HideInInspector, Min(0.1f)] public float overchargeWakeWidth = 1.25f;
+    [HideInInspector, Range(0.05f, 1f)] public float cruiseWakeTime = 0.26f;
+    [HideInInspector, Range(0.1f, 2f)] public float overchargeWakeTime = 0.72f;
+    [HideInInspector, Min(100f)] public float cinematicSpeedKmh = 1800f;
     [Tooltip("Optional placement prefab root. When assigned (or found below this craft), its two named anchors override the fallback offsets.")]
     public Transform propulsionWakePlacementRoot;
     [HideInInspector]
     [UnityEngine.Serialization.FormerlySerializedAs("plasmaEffectsPlacementRoot")]
     public Transform legacyExhaustEffectsPlacementRoot;
     [Tooltip("Fallback only: left exhaust outlet relative to Main_Rear when no placement rig is present.")]
-    public Vector3 leftNozzleOffset = new Vector3(-0.52f, 0.04f, -0.08f);
+    [HideInInspector] public Vector3 leftNozzleOffset = new Vector3(-0.52f, 0.04f, -0.08f);
     [Tooltip("Fallback only: right exhaust outlet relative to Main_Rear when no placement rig is present.")]
-    public Vector3 rightNozzleOffset = new Vector3(0.52f, 0.04f, -0.08f);
-    [ColorUsage(true, true)] public Color idleWakeColor = new Color(0.28f, 0.72f, 0.66f, 1f);
-    [ColorUsage(true, true)] public Color cruiseWakeColor = new Color(0.40f, 1.15f, 1.45f, 1f);
-    [ColorUsage(true, true)] public Color overchargeCoreColor = new Color(2.2f, 2.0f, 1.65f, 1f);
-    [ColorUsage(true, true)] public Color overchargeTailColor = new Color(0.82f, 0.34f, 1.55f, 1f);
-    [ColorUsage(true, true)] public Color overchargeEdgeColor = new Color(1.35f, 0.16f, 0.55f, 1f);
+    [HideInInspector] public Vector3 rightNozzleOffset = new Vector3(0.52f, 0.04f, -0.08f);
+    [HideInInspector, ColorUsage(true, true)] public Color idleWakeColor = new Color(0.28f, 0.72f, 0.66f, 1f);
+    [HideInInspector, ColorUsage(true, true)] public Color cruiseWakeColor = new Color(0.40f, 1.15f, 1.45f, 1f);
+    [HideInInspector, ColorUsage(true, true)] public Color overchargeCoreColor = new Color(2.2f, 2.0f, 1.65f, 1f);
+    [HideInInspector, ColorUsage(true, true)] public Color overchargeTailColor = new Color(0.82f, 0.34f, 1.55f, 1f);
+    [HideInInspector, ColorUsage(true, true)] public Color overchargeEdgeColor = new Color(1.35f, 0.16f, 0.55f, 1f);
 
     [Header("Exhaust Spark Collision")]
     [Tooltip("Sparks bounce off the track and the craft over their lifetime for a grounded, physical feel.")]
-    public bool sparkCollision = true;
+    [HideInInspector] public bool sparkCollision = true;
     [Tooltip("Surfaces the sparks collide with. Include the track/ground and the craft layers.")]
-    public LayerMask sparkCollisionMask = ~0;
+    [HideInInspector] public LayerMask sparkCollisionMask = ~0;
     [Tooltip("How bouncy sparks are off a surface (0 = stick, 1 = perfectly elastic).")]
-    [Range(0f, 1f)] public float sparkBounce = 0.42f;
+    [HideInInspector, Range(0f, 1f)] public float sparkBounce = 0.42f;
     [Tooltip("Speed lost each bounce. Higher = sparks settle faster.")]
-    [Range(0f, 1f)] public float sparkDampen = 0.35f;
+    [HideInInspector, Range(0f, 1f)] public float sparkDampen = 0.35f;
     [Tooltip("Lifetime burned on each bounce so sparks skip a couple of times then die, never litter.")]
-    [Range(0f, 1f)] public float sparkLifetimeLoss = 0.28f;
+    [HideInInspector, Range(0f, 1f)] public float sparkLifetimeLoss = 0.28f;
     [Tooltip("High = per-particle raycasts (most accurate, costs more). Off = cheaper approximate collision.")]
-    public bool sparkHighQualityCollision = true;
+    [HideInInspector] public bool sparkHighQualityCollision = true;
 
     [Header("Corona Discharge — Setup")]
     [Tooltip("Creates a separate, non-physical ionized shell over the authored craft meshes. Original paint materials are never replaced or modified.")]
@@ -163,6 +163,13 @@ public class CraftFeedbackSystem : MonoBehaviour
     [Tooltip("Primary corona color while Overcharge is active. This replaces the normal Corona Color instead of bleaching it toward white.")]
     [ColorUsage(true, true), InspectorName("Overcharge Color")]
     public Color coronaOverchargeColor = new Color(0.95f, 0.18f, 1.55f, 1f);
+
+    [Tooltip("Corona color while the Grip Breaker is engaged (drifting). Blends over the normal color the same way Overcharge does — but for slides. Orange by default.")]
+    [ColorUsage(true, true), InspectorName("Grip Break Color")]
+    public Color coronaGripBreakColor = new Color(1.55f, 0.55f, 0.08f, 1f);
+    [Tooltip("How strongly a grip break recolors and excites the corona.")]
+    [Range(0f, 1f), InspectorName("Grip Break Impact")]
+    public float coronaGripBreakImpact = 0.85f;
     [Tooltip("Color of the small electrical hot points crawling across the craft.")]
     [ColorUsage(true, true), InspectorName("Spark Color")]
     public Color coronaSparkColor = new Color(0.25f, 1.8f, 2.2f, 1f);
@@ -261,8 +268,12 @@ public class CraftFeedbackSystem : MonoBehaviour
     private Material _coreWakeMaterial;
     private Material _filamentWakeMaterial;
     private Material _memoryWakeMaterial;
+    private Material _plasmaEchoMaterial;
+    private Material _plasmaEchoCoreMaterial;
     private Material _sparkWakeMaterial;
     private Texture2D _fallbackWakeTexture;
+    private Texture2D _plasmaEchoTexture;
+    private Texture2D _plasmaEchoCoreTexture;
     private readonly List<WakeLayer> _wakeLayers = new List<WakeLayer>();
     private Transform _wakeRoot;
     private Transform _leftWakeProxy;
@@ -274,6 +285,10 @@ public class CraftFeedbackSystem : MonoBehaviour
     private PropulsionWakeTuning _wakeTuning;
     private TrailRenderer _ghostLeft;
     private TrailRenderer _ghostRight;
+    private TrailRenderer _plasmaEchoLeft;
+    private TrailRenderer _plasmaEchoRight;
+    private TrailRenderer _plasmaEchoCoreLeft;
+    private TrailRenderer _plasmaEchoCoreRight;
     private ParticleSystem _coreLeft;
     private ParticleSystem _coreRight;
     private ParticleSystem _nozzleLeft;
@@ -282,14 +297,18 @@ public class CraftFeedbackSystem : MonoBehaviour
     private ParticleSystem _ionRight;
     private ParticleSystem _motesLeft;
     private ParticleSystem _motesRight;
-    private ParticleSystem _chamberLeft;
-    private ParticleSystem _chamberRight;
+    private ParticleSystem _thrustersPlasmaLeft;
+    private ParticleSystem _thrustersPlasmaRight;
     private ParticleSystem _sparksLeft;
     private ParticleSystem _sparksRight;
     private ParticleSystem _shockBurst;
     private Light _wakeLight;
     private int _lastWakeSequence = int.MinValue;
     private float _ignitionFlash;
+    private float _smoothedWakeDrive;
+    private float _smoothedWakeOvercharge;
+    private float _leftPathMoteAccumulator;
+    private float _rightPathMoteAccumulator;
     // Reused across frames so recoloring the plume never allocates a Gradient.
     private Gradient _wakeGradient;
     private GradientColorKey[] _wakeColorKeys;
@@ -304,6 +323,7 @@ public class CraftFeedbackSystem : MonoBehaviour
     private Transform _coronaRoot;
     private float _coronaIntensity;
     private float _coronaIgnition;
+    private float _coronaGrip;
 
     // ══════════════════════════════════════════════════════════════
     //  LIFECYCLE
@@ -378,10 +398,18 @@ public class CraftFeedbackSystem : MonoBehaviour
             Destroy(_filamentWakeMaterial);
         if (_memoryWakeMaterial != null)
             Destroy(_memoryWakeMaterial);
+        if (_plasmaEchoMaterial != null)
+            Destroy(_plasmaEchoMaterial);
+        if (_plasmaEchoCoreMaterial != null)
+            Destroy(_plasmaEchoCoreMaterial);
         if (_sparkWakeMaterial != null)
             Destroy(_sparkWakeMaterial);
         if (_fallbackWakeTexture != null)
             Destroy(_fallbackWakeTexture);
+        if (_plasmaEchoTexture != null)
+            Destroy(_plasmaEchoTexture);
+        if (_plasmaEchoCoreTexture != null)
+            Destroy(_plasmaEchoCoreTexture);
     }
 
     private void OnDrawGizmos()
@@ -447,9 +475,10 @@ public class CraftFeedbackSystem : MonoBehaviour
 
         // ── 2. Update Thruster Node Visuals ─────────────────────────
         UpdateThrusterVisuals();
-        UpdateCoronaOverlay(telemetry);
+        float gripBreak01 = Mathf.Clamp01(traction.gripBreakerAmount);
+        UpdateCoronaOverlay(telemetry, gripBreak01);
         // Keep the layered propulsion wake synchronized with live craft telemetry.
-        UpdateParticleWake(telemetry);
+        UpdateParticleWake(telemetry, gripBreak01);
     }
 
     private void BuildCoronaOverlayIfNeeded()
@@ -520,7 +549,7 @@ public class CraftFeedbackSystem : MonoBehaviour
     private static float SafeScaleRatio(float value, float divisor)
         => Mathf.Abs(divisor) > 0.00001f ? value / divisor : value;
 
-    private void UpdateCoronaOverlay(CraftTelemetry telemetry)
+    private void UpdateCoronaOverlay(CraftTelemetry telemetry, float gripBreakAmount)
     {
         if (_coronaRenderers.Count == 0 || coronaOverlayMaterial == null) return;
 
@@ -529,6 +558,13 @@ public class CraftFeedbackSystem : MonoBehaviour
         float outlineWidth01 = Mathf.Clamp01(coronaOutlineWidth);
         float activity01 = Mathf.Clamp01(coronaElectricalActivity);
         float impact01 = Mathf.Clamp01(coronaOverchargeImpact);
+
+        // Grip-break drift excites and recolours the corona toward orange, exactly the
+        // way Overcharge pushes it violet. Smoothed so entering/exiting a slide fades.
+        float gripImpact = Mathf.Clamp01(coronaGripBreakImpact);
+        float gripTarget = Mathf.Clamp01(gripBreakAmount) * gripImpact;
+        _coronaGrip = Mathf.Lerp(_coronaGrip, gripTarget, 1f - Mathf.Exp(-9f * Time.deltaTime));
+        float grip01 = _coronaGrip;
         float derivedEdgeTightness = Mathf.Lerp(14f, 2.8f, outlineWidth01);
         float derivedBandWidth = Mathf.Lerp(0.055f, 0.32f, outlineWidth01);
         float derivedOutlineStrength = Mathf.Lerp(1.05f, 1.75f, outlineWidth01);
@@ -561,6 +597,8 @@ public class CraftFeedbackSystem : MonoBehaviour
         float overcharge01 = Mathf.Clamp01(boost01 * 0.9f + ignition01 * 0.18f);
         float target = Mathf.Max(speed01,
             boost01 * Mathf.Lerp(0.42f, 1.05f, impact01));
+        // A slide lights the corona even at low speed, like boost does.
+        target = Mathf.Max(target, grip01 * Mathf.Lerp(0.4f, 0.95f, gripImpact));
         target = Mathf.Clamp(target + ignition01 * Mathf.Lerp(0.025f, 0.18f, impact01), 0f, 1.35f);
         _coronaIntensity = Mathf.MoveTowards(_coronaIntensity, target,
             Time.deltaTime * Mathf.Max(1f, coronaResponse));
@@ -571,15 +609,22 @@ public class CraftFeedbackSystem : MonoBehaviour
         float chroma = Mathf.Clamp01(coronaChromaSeparation
             + overcharge01 * Mathf.Lerp(0.02f, 0.16f, impact01));
         float surfaceFill = Mathf.Clamp01(coronaWholeMeshCoverage * 0.16f
-            + overcharge01 * Mathf.Lerp(0.018f, 0.14f, impact01));
+            + overcharge01 * Mathf.Lerp(0.018f, 0.14f, impact01)
+            + grip01 * Mathf.Lerp(0.02f, 0.12f, gripImpact));
         // Keep the render shell physically tight to the authored visual model.
         // The previous 0.075-unit ignition expansion created the visible bubble.
         float shellExpansion = Mathf.Lerp(0.0002f, 0.0025f, outlineWidth01)
             + ignition01 * Mathf.Lerp(0.0005f, 0.004f, impact01);
         float electricalMultiplier = Mathf.Lerp(1f,
             Mathf.Lerp(1.08f, 1.65f, impact01), overcharge01);
+        electricalMultiplier = Mathf.Max(electricalMultiplier,
+            Mathf.Lerp(1f, Mathf.Lerp(1.1f, 1.6f, gripImpact), grip01));
 
-        _coronaBlock.SetColor("_MainColor", coronaMainColor);
+        // Base corona colour bends toward the grip-break colour (orange) during a
+        // slide, the same way Overcharge recolours it violet through _BoostBlend. When
+        // both happen, the Overcharge blend still layers its violet on top.
+        Color mainColor = Color.Lerp(coronaMainColor, coronaGripBreakColor, grip01);
+        _coronaBlock.SetColor("_MainColor", mainColor);
         _coronaBlock.SetColor("_OverchargeColor", coronaOverchargeColor);
         _coronaBlock.SetColor("_SparkColor", coronaSparkColor);
         _coronaBlock.SetColor("_OuterColor", coronaOuterFringeColor);
@@ -781,6 +826,7 @@ public class CraftFeedbackSystem : MonoBehaviour
     private void BuildParticleWake()
     {
         ResolveWakeAnchors();
+        SyncWakeTuningAuthority();
         _usingAuthoredWakePlacement = HasAuthoredWakePlacement();
         GameObject wakeRootObject = new GameObject(_usingAuthoredWakePlacement
             ? "Cinematic Propulsion Wake [AUTHORED ANCHORS]"
@@ -800,6 +846,16 @@ public class CraftFeedbackSystem : MonoBehaviour
         _memoryWakeMaterial = CreateWakeMaterial(
             "Exhaust Memory", cruiseWakeColor, overchargeTailColor,
             0.48f, 5.5f, 1.25f, 4.6f, 0.11f, 0.92f);
+        _plasmaEchoMaterial = CreateWakeMaterial(
+            "Vector Plasma Sheath", cruiseWakeColor, overchargeEdgeColor,
+            0.72f, 9.5f, 1.8f, 4.2f, 0.035f, 1f);
+        _plasmaEchoCoreMaterial = CreateWakeMaterial(
+            "Vector Plasma Core", overchargeCoreColor, cruiseWakeColor,
+            1.8f, 24f, 4.8f, 7f, 0.012f, 1f);
+        _plasmaEchoTexture = CreateIonLanceTexture(false);
+        _plasmaEchoCoreTexture = CreateIonLanceTexture(true);
+        SetMaterialTexture(_plasmaEchoMaterial, _plasmaEchoTexture);
+        SetMaterialTexture(_plasmaEchoCoreMaterial, _plasmaEchoCoreTexture);
         _sparkWakeMaterial = CreateWakeMaterial(
             "Exhaust Effect Sparks", overchargeCoreColor, overchargeEdgeColor,
             4.1f, 22f, 3.4f, 10.5f, 0.16f, 0.64f);
@@ -814,6 +870,10 @@ public class CraftFeedbackSystem : MonoBehaviour
 
         _ghostLeft = CreateGhostTrail("Memory_L", _leftWakeProxy);
         _ghostRight = CreateGhostTrail("Memory_R", _rightWakeProxy);
+        _plasmaEchoLeft = CreatePlasmaEchoTrail("PlasmaEcho_L", _leftWakeProxy);
+        _plasmaEchoRight = CreatePlasmaEchoTrail("PlasmaEcho_R", _rightWakeProxy);
+        _plasmaEchoCoreLeft = CreatePlasmaEchoCoreTrail("PlasmaEchoCore_L", _leftWakeProxy);
+        _plasmaEchoCoreRight = CreatePlasmaEchoCoreTrail("PlasmaEchoCore_R", _rightWakeProxy);
 
         _coreLeft = CreateParticleLayer("Core_L", _leftWakeProxy, false,
             _coreWakeMaterial);
@@ -843,12 +903,12 @@ public class CraftFeedbackSystem : MonoBehaviour
         ConfigurePlasmaMotes(_motesLeft);
         ConfigurePlasmaMotes(_motesRight);
 
-        _chamberLeft = CreateParticleLayer("ExhaustChamber_L", _leftPlasmaProxy, false,
+        _thrustersPlasmaLeft = CreateParticleLayer("ThrustersPlasmaEffect_L", _leftPlasmaProxy, false,
             _sparkWakeMaterial);
-        _chamberRight = CreateParticleLayer("ExhaustChamber_R", _rightPlasmaProxy, false,
+        _thrustersPlasmaRight = CreateParticleLayer("ThrustersPlasmaEffect_R", _rightPlasmaProxy, false,
             _sparkWakeMaterial);
-        ConfigurePlasmaChamber(_chamberLeft);
-        ConfigurePlasmaChamber(_chamberRight);
+        ConfigureThrustersPlasmaEffect(_thrustersPlasmaLeft);
+        ConfigureThrustersPlasmaEffect(_thrustersPlasmaRight);
 
         _sparksLeft = CreateParticleLayer("ExhaustSparks_L", _leftPlasmaProxy, true,
             _sparkWakeMaterial);
@@ -885,6 +945,49 @@ public class CraftFeedbackSystem : MonoBehaviour
         _wakeTuning = propulsionWakePlacementRoot != null
             ? propulsionWakePlacementRoot.GetComponent<PropulsionWakeTuning>()
             : null;
+    }
+
+    private void SyncWakeTuningAuthority()
+    {
+        if (_wakeTuning == null)
+            return;
+
+        plasmaWakeTexture = _wakeTuning.plasmaTexture;
+        float brightness = Mathf.Clamp(_wakeTuning.plasmaBrightness, 0.1f, 3f);
+        Color plasma = ScaleRgb(_wakeTuning.plasmaColor, brightness);
+        Color overcharge = ScaleRgb(_wakeTuning.overchargePlasmaColor,
+            brightness * Mathf.Clamp(_wakeTuning.overchargeIntensityMultiplier, 1f, 3f));
+        idleWakeColor = ScaleRgb(plasma, 0.46f);
+        cruiseWakeColor = plasma;
+        overchargeCoreColor = overcharge;
+        overchargeTailColor = overcharge;
+        overchargeEdgeColor = Color.Lerp(plasma, overcharge, 0.72f);
+
+        idleWakeWidth = Mathf.Max(0.005f, _wakeTuning.idleWakeWidth);
+        cruiseWakeWidth = Mathf.Max(0.05f, _wakeTuning.cruiseWakeWidth);
+        overchargeWakeWidth = Mathf.Max(0.1f, _wakeTuning.overchargeWakeWidth);
+        cruiseWakeTime = Mathf.Clamp(_wakeTuning.cruiseWakeTime, 0.05f, 1f);
+        overchargeWakeTime = Mathf.Clamp(_wakeTuning.overchargeWakeTime, 0.1f, 2f);
+        cinematicSpeedKmh = Mathf.Max(100f, _wakeTuning.fullEffectSpeedKmh);
+        boostTrailWidthMultiplier = Mathf.Clamp(
+            _wakeTuning.authoredTrailOverchargeWidth, 1f, 5f);
+        boostEmissionMultiplier = Mathf.Clamp(
+            _wakeTuning.authoredTrailOverchargeEmission, 1f, 8f);
+
+        sparkCollision = _wakeTuning.sparkSurfaceCollision;
+        sparkCollisionMask = _wakeTuning.sparkCollisionMask;
+        sparkBounce = Mathf.Clamp01(_wakeTuning.sparkCollisionBounce);
+        sparkDampen = Mathf.Clamp01(_wakeTuning.sparkCollisionDamping);
+        sparkLifetimeLoss = Mathf.Clamp01(_wakeTuning.sparkCollisionLifetimeLoss);
+        sparkHighQualityCollision = _wakeTuning.highQualitySparkCollision;
+    }
+
+    private static Color ScaleRgb(Color color, float scale)
+    {
+        color.r *= scale;
+        color.g *= scale;
+        color.b *= scale;
+        return color;
     }
 
     private Transform FindWakePlacementRoot()
@@ -1025,6 +1128,121 @@ public class CraftFeedbackSystem : MonoBehaviour
             new Keyframe(0.70f, 0.06f),
             new Keyframe(1f, 0f));
         return ghost;
+    }
+
+    private TrailRenderer CreatePlasmaEchoTrail(string layerName, Transform nozzleProxy)
+    {
+        GameObject echoObject = CreateWakeObject(layerName, nozzleProxy);
+        TrailRenderer echo = echoObject.AddComponent<TrailRenderer>();
+        echo.material = _plasmaEchoMaterial;
+        echo.emitting = false;
+        echo.time = 0.008f;
+        echo.startWidth = 0.018f;
+        echo.endWidth = 0f;
+        echo.minVertexDistance = 0.020f;
+        echo.numCornerVertices = 5;
+        echo.numCapVertices = 2;
+        echo.alignment = LineAlignment.View;
+        echo.textureMode = LineTextureMode.Stretch;
+        echo.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        echo.receiveShadows = false;
+        echo.widthCurve = new AnimationCurve(
+            new Keyframe(0f, 0.48f),
+            new Keyframe(0.055f, 1f),
+            new Keyframe(0.24f, 0.72f),
+            new Keyframe(0.52f, 0.36f),
+            new Keyframe(0.80f, 0.09f),
+            new Keyframe(1f, 0f));
+        return echo;
+    }
+
+    private TrailRenderer CreatePlasmaEchoCoreTrail(string layerName, Transform nozzleProxy)
+    {
+        GameObject coreObject = CreateWakeObject(layerName, nozzleProxy);
+        TrailRenderer core = coreObject.AddComponent<TrailRenderer>();
+        core.material = _plasmaEchoCoreMaterial;
+        core.emitting = false;
+        core.time = 0.006f;
+        core.startWidth = 0.007f;
+        core.endWidth = 0f;
+        core.minVertexDistance = 0.020f;
+        core.numCornerVertices = 4;
+        core.numCapVertices = 2;
+        core.alignment = LineAlignment.View;
+        core.textureMode = LineTextureMode.Stretch;
+        core.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        core.receiveShadows = false;
+        core.widthCurve = new AnimationCurve(
+            new Keyframe(0f, 0.60f),
+            new Keyframe(0.035f, 1f),
+            new Keyframe(0.25f, 0.78f),
+            new Keyframe(0.56f, 0.34f),
+            new Keyframe(0.82f, 0.06f),
+            new Keyframe(1f, 0f));
+        return core;
+    }
+
+    private Texture2D CreateIonLanceTexture(bool core)
+    {
+        const int textureWidth = 256;
+        const int textureHeight = 64;
+        Texture2D texture = new Texture2D(textureWidth, textureHeight,
+            TextureFormat.RGBA32, false, true)
+        {
+            name = core ? "Runtime Ion Lance Core" : "Runtime Ion Lance Sheath",
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear
+        };
+
+        Color[] pixels = new Color[textureWidth * textureHeight];
+        for (int y = 0; y < textureHeight; y++)
+        {
+            float cross = Mathf.Abs((y + 0.5f) / textureHeight * 2f - 1f);
+            for (int x = 0; x < textureWidth; x++)
+            {
+                float longitudinal = (x + 0.5f) / textureWidth;
+                float broadNoise = Mathf.PerlinNoise(
+                    longitudinal * (core ? 5.5f : 8.5f), core ? 2.17f : 7.83f);
+                float fineNoise = Mathf.PerlinNoise(
+                    longitudinal * (core ? 13f : 19f), core ? 11.41f : 17.23f);
+                // Continuous energy prevents the repeated perpendicular bars that
+                // made the previous version read as a glowing ladder. Variation is
+                // confined mostly to the soft sheath; sparks provide the breakup.
+                float energyVariation = core
+                    ? Mathf.Lerp(0.88f, 1f, broadNoise)
+                    : Mathf.Lerp(0.68f, 1f, broadNoise * 0.72f + fineNoise * 0.28f);
+                float radial = core
+                    ? Mathf.Exp(-cross * cross * 48f)
+                    : Mathf.Exp(-cross * cross * 7.2f) * 0.68f
+                        + Mathf.Exp(-cross * cross * 30f) * 0.32f;
+                float headFeather = Mathf.SmoothStep(0f, 0.018f, longitudinal);
+                float tailFeather = 1f - Mathf.SmoothStep(0.58f, 1f, longitudinal);
+                float edgeInstability = core
+                    ? 1f
+                    : Mathf.Lerp(0.82f, 1f,
+                        Mathf.PerlinNoise(longitudinal * 12f, cross * 2.8f + 3.1f));
+                float alpha = Mathf.Clamp01(radial * energyVariation
+                    * headFeather * tailFeather * edgeInstability);
+                float whiteCore = core ? radial : Mathf.Exp(-cross * cross * 28f) * 0.30f;
+                pixels[y * textureWidth + x] = new Color(
+                    Mathf.Clamp01(0.18f + whiteCore * 0.82f),
+                    Mathf.Clamp01(0.72f + whiteCore * 0.28f),
+                    1f,
+                    alpha);
+            }
+        }
+        texture.SetPixels(pixels);
+        texture.Apply(false, true);
+        return texture;
+    }
+
+    private static void SetMaterialTexture(Material material, Texture texture)
+    {
+        if (material == null || texture == null)
+            return;
+        material.mainTexture = texture;
+        if (material.HasProperty("_BaseMap")) material.SetTexture("_BaseMap", texture);
+        if (material.HasProperty("_MainTex")) material.SetTexture("_MainTex", texture);
     }
 
     private GameObject CreateWakeObject(string layerName, Transform parent)
@@ -1384,7 +1602,9 @@ public class CraftFeedbackSystem : MonoBehaviour
         collision.type = ParticleSystemCollisionType.World;
         collision.mode = ParticleSystemCollisionMode.Collision3D;
         collision.collidesWith = sparkCollisionMask;
-        collision.enableDynamicColliders = true; // collide with the moving craft, not just static track
+        // Roads and walls are static generated colliders. Ignoring dynamic colliders
+        // prevents the exhaust from colliding with its own hovercraft.
+        collision.enableDynamicColliders = false;
         collision.quality = sparkHighQualityCollision
             ? ParticleSystemCollisionQuality.High
             : ParticleSystemCollisionQuality.Medium;
@@ -1397,7 +1617,7 @@ public class CraftFeedbackSystem : MonoBehaviour
         collision.sendCollisionMessages = false;
     }
 
-    private void ConfigurePlasmaChamber(ParticleSystem particles)
+    private void ConfigureThrustersPlasmaEffect(ParticleSystem particles)
     {
         ParticleSystem.MainModule main = particles.main;
         main.duration = 5f;
@@ -1572,9 +1792,11 @@ public class CraftFeedbackSystem : MonoBehaviour
         return new ParticleSystem.MinMaxGradient(gradient);
     }
 
-    private void UpdateParticleWake(CraftTelemetry telemetry)
+    private void UpdateParticleWake(CraftTelemetry telemetry, float gripBreak01)
     {
-        if (_wakeEngine == null || _ghostLeft == null || _ghostRight == null)
+        if (_wakeEngine == null || _ghostLeft == null || _ghostRight == null ||
+            _plasmaEchoLeft == null || _plasmaEchoRight == null ||
+            _plasmaEchoCoreLeft == null || _plasmaEchoCoreRight == null)
             return;
 
         if (!_usingAuthoredWakePlacement && Time.unscaledTime >= _nextWakeAnchorSearchTime)
@@ -1586,12 +1808,12 @@ public class CraftFeedbackSystem : MonoBehaviour
                 _usingAuthoredWakePlacement = true;
                 if (_wakeRoot != null)
                     _wakeRoot.name = "Cinematic Propulsion Wake [AUTHORED ANCHORS]";
-                _ghostLeft.Clear();
-                _ghostRight.Clear();
+                ClearMovementTrails();
             }
         }
 
         SyncWakeProxies();
+        SyncWakeTuningAuthority();
         ApplyWakeLayerPlacement();
         ApplyMemoryRibbonSafety();
 
@@ -1601,8 +1823,18 @@ public class CraftFeedbackSystem : MonoBehaviour
         float throttle01 = Mathf.Clamp01(_wakeEngine.Throttle);
         float boost01 = _boostCore != null ? _boostCore.CameraBoost01 : 0f;
         float ignition01 = _boostCore != null ? _boostCore.Ignition01 : 0f;
-        float driveEnergy = Mathf.Clamp01(Mathf.Max(throttle01, speed01 * 0.58f));
-        float cinematic = Mathf.Clamp01(boost01 * 0.90f + ignition01 * 0.48f);
+        float targetDriveEnergy = Mathf.Clamp01(Mathf.Max(throttle01, speed01 * 0.58f));
+        float targetCinematic = Mathf.Clamp01(boost01 * 0.90f + ignition01 * 0.48f);
+        float visualResponse = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.visualResponse, 1f, 30f)
+            : 12f;
+        float responseT = 1f - Mathf.Exp(-visualResponse * Mathf.Max(0f, Time.deltaTime));
+        _smoothedWakeDrive = Mathf.Lerp(_smoothedWakeDrive, targetDriveEnergy, responseT);
+        _smoothedWakeOvercharge = Mathf.Lerp(_smoothedWakeOvercharge,
+            targetCinematic, responseT);
+        float driveEnergy = _smoothedWakeDrive;
+        float cinematic = _smoothedWakeOvercharge;
+        UpdateWakeMaterialPalette(cinematic);
         float flicker = 0.94f + Mathf.PerlinNoise(Time.time * 18f, 0.37f) * 0.12f;
         float densityScale = WakeDensityScale;
         UpdateParticlePivots();
@@ -1612,8 +1844,7 @@ public class CraftFeedbackSystem : MonoBehaviour
         {
             _lastWakeSequence = _boostCore.BoostSequenceId;
             _ignitionFlash = 1f;
-            _ghostLeft.Clear();
-            _ghostRight.Clear();
+            ClearMovementTrails();
             EmitOverchargeBurst();
         }
         _ignitionFlash = Mathf.MoveTowards(_ignitionFlash, 0f, Time.deltaTime * 4.6f);
@@ -1634,21 +1865,32 @@ public class CraftFeedbackSystem : MonoBehaviour
                 : 0f;
         SetParticleRate(_ionLeft, filamentRate);
         SetParticleRate(_ionRight, filamentRate);
-        SetParticleRate(_motesLeft, moteRate);
-        SetParticleRate(_motesRight, moteRate);
+        bool pathMotes = _wakeTuning == null || _wakeTuning.followMemoryPath;
+        SetParticleRate(_motesLeft, pathMotes ? 0f : moteRate);
+        SetParticleRate(_motesRight, pathMotes ? 0f : moteRate);
         UpdateFilaments(_ionLeft, speed01, cinematic,
             WakeWidthScale * WakeFilamentSize);
         UpdateFilaments(_ionRight, speed01, cinematic,
             WakeWidthScale * WakeFilamentSize);
         UpdatePlasmaMotes(_motesLeft, driveEnergy, cinematic);
         UpdatePlasmaMotes(_motesRight, driveEnergy, cinematic);
-        UpdatePlasmaChamber(_chamberLeft, driveEnergy, cinematic, flicker);
-        UpdatePlasmaChamber(_chamberRight, driveEnergy, cinematic, flicker);
+        UpdateThrustersPlasmaEffect(_thrustersPlasmaLeft, driveEnergy, cinematic, flicker);
+        UpdateThrustersPlasmaEffect(_thrustersPlasmaRight, driveEnergy, cinematic, flicker);
         UpdatePlasmaSparks(_sparksLeft, driveEnergy, cinematic, flicker);
         UpdatePlasmaSparks(_sparksRight, driveEnergy, cinematic, flicker);
+        ConfigureSparkCollision(_sparksLeft);
+        ConfigureSparkCollision(_sparksRight);
 
         UpdateGhostTrail(_ghostLeft, speedKmh, speed01, cinematic);
         UpdateGhostTrail(_ghostRight, speedKmh, speed01, cinematic);
+        UpdateMemoryPathMotes(_motesLeft, _ghostLeft, moteRate, cinematic,
+            ref _leftPathMoteAccumulator);
+        UpdateMemoryPathMotes(_motesRight, _ghostRight, moteRate, cinematic,
+            ref _rightPathMoteAccumulator);
+        UpdatePlasmaEcho(_plasmaEchoLeft, _plasmaEchoCoreLeft, _ghostLeft,
+            speedKmh, speed01, cinematic, throttle01, boost01, gripBreak01);
+        UpdatePlasmaEcho(_plasmaEchoRight, _plasmaEchoCoreRight, _ghostRight,
+            speedKmh, speed01, cinematic, throttle01, boost01, gripBreak01);
 
         if (_wakeLight != null)
         {
@@ -1699,10 +1941,20 @@ public class CraftFeedbackSystem : MonoBehaviour
             _wakeTuning.leftRibbonRotation);
         SetLayerLocalTransform(_ghostRight, _wakeTuning.rightRibbonOffset,
             _wakeTuning.rightRibbonRotation);
+        SetLayerLocalTransform(_plasmaEchoLeft, _wakeTuning.leftRibbonOffset,
+            _wakeTuning.leftRibbonRotation);
+        SetLayerLocalTransform(_plasmaEchoRight, _wakeTuning.rightRibbonOffset,
+            _wakeTuning.rightRibbonRotation);
+        SetLayerLocalTransform(_plasmaEchoCoreLeft, _wakeTuning.leftRibbonOffset,
+            _wakeTuning.leftRibbonRotation);
+        SetLayerLocalTransform(_plasmaEchoCoreRight, _wakeTuning.rightRibbonOffset,
+            _wakeTuning.rightRibbonRotation);
 
-        SetLayerLocalTransform(_chamberLeft, _wakeTuning.leftChamberOffset,
+        SetLayerLocalTransform(_thrustersPlasmaLeft,
+            _wakeTuning.leftThrustersPlasmaOffset,
             Vector3.zero);
-        SetLayerLocalTransform(_chamberRight, _wakeTuning.rightChamberOffset,
+        SetLayerLocalTransform(_thrustersPlasmaRight,
+            _wakeTuning.rightThrustersPlasmaOffset,
             Vector3.zero);
         SetLayerLocalTransform(_motesLeft, _wakeTuning.leftMoteOffset,
             _wakeTuning.leftMoteRotation);
@@ -1736,13 +1988,15 @@ public class CraftFeedbackSystem : MonoBehaviour
             return;
         }
 
-        ghost.startWidth = Mathf.Lerp(0.010f, 0.030f, speed01)
-            + cinematic * 0.075f + _ignitionFlash * 0.028f;   // present at speed, fatter under boost
-        ghost.startWidth *= WakeWidthScale * WakeRibbonSize;
-        // Trails a little longer under boost so the purple reads as a lingering
-        // after-image behind the bright plasma core, not a stub.
-        float requestedTime = (Mathf.Lerp(0.008f, 0.030f, speed01) + cinematic * 0.075f)
-            * WakeMemoryLength;
+        float memoryResponse = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.memoryOverchargeResponse, 0f, 2f)
+            : 0.25f;
+        ghost.startWidth = (Mathf.Lerp(0.010f, 0.030f, speed01)
+            + cinematic * 0.030f * memoryResponse + _ignitionFlash * 0.010f)
+            * WakeRibbonSize;
+        // Movement history no longer inherits the live-plasma master length.
+        float requestedTime = (Mathf.Lerp(0.008f, 0.030f, speed01)
+            + cinematic * 0.025f * memoryResponse) * WakeMemoryLength;
         float speedMetersPerSecond = Mathf.Max(0.1f, speedKmh / 3.6f);
         float maximumLength = _wakeTuning != null
             ? Mathf.Clamp(_wakeTuning.maximumMemoryLengthMeters, 0.5f, 60f)
@@ -1759,13 +2013,108 @@ public class CraftFeedbackSystem : MonoBehaviour
         // cyan plume — that's why the purple "disappeared".) It now holds a fixed
         // violet identity; speed and boost drive its presence, and the ignition punch
         // tips it toward magenta.
-        Color memoryColor = overchargeTailColor;
-        memoryColor = Color.Lerp(memoryColor, overchargeEdgeColor, _ignitionFlash * 0.4f);
-        float presence = Mathf.Clamp01(0.35f + speed01 * 0.55f + cinematic * 0.6f);
-        memoryColor.a = Mathf.Clamp01(Mathf.Lerp(0.3f, 0.95f, presence) + _ignitionFlash * 0.15f);
+        Color memoryColor = _wakeTuning != null
+            ? _wakeTuning.memoryColor
+            : overchargeTailColor;
+        float opacity = _wakeTuning != null
+            ? Mathf.Clamp01(_wakeTuning.memoryOpacity)
+            : 0.62f;
+        float presence = Mathf.Clamp01(0.35f + speed01 * 0.55f
+            + cinematic * 0.25f * memoryResponse);
+        memoryColor.a = opacity * presence;
         ghost.startColor = memoryColor;
         ghost.endColor = new Color(
-            overchargeTailColor.r, overchargeTailColor.g, overchargeTailColor.b, 0f);
+            memoryColor.r, memoryColor.g, memoryColor.b, 0f);
+    }
+
+    private void UpdatePlasmaEcho(TrailRenderer sheath, TrailRenderer core,
+        TrailRenderer memory,
+        float speedKmh, float speed01, float cinematic, float throttle01,
+        float boost01, float gripBreak01)
+    {
+        if (sheath == null || core == null || memory == null)
+            return;
+
+        bool enabled = _wakeTuning == null || _wakeTuning.followMemoryPath;
+        bool emitting = enabled && (speedKmh > 110f || cinematic > 0.08f);
+        sheath.emitting = emitting;
+        core.emitting = emitting;
+        if (!enabled)
+        {
+            if (sheath.positionCount > 0)
+                sheath.Clear();
+            if (core.positionCount > 0)
+                core.Clear();
+            return;
+        }
+
+        float echoLength = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.plasmaEchoLength, 0.05f, 1f)
+            : 0.38f;
+        float throttleLength = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.throttleTrailLengthResponse, 0f, 2f)
+            : 0.72f;
+        float boostLength = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.boostTrailLengthResponse, 0f, 2f)
+            : 1.25f;
+        float gripBreakLength = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.gripBreakTrailLengthResponse, 0f, 2f)
+            : 0.82f;
+        float echoWidth = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.plasmaEchoWidth, 0.1f, 2f)
+            : 0.72f;
+        float opacity = _wakeTuning != null
+            ? Mathf.Clamp01(_wakeTuning.plasmaEchoOpacity)
+            : 0.58f;
+        float overchargeResponse = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.overchargeEchoIntensity, 0f, 2.5f)
+            : 1.35f;
+
+        // Both layers sample the same movement trajectory as the memory ribbon.
+        // Their short lifetimes and different silhouettes create a hot lance near
+        // the nozzle instead of a second pair of long, uniform laser beams.
+        // Each gameplay input contributes independently. The small idle term keeps
+        // a tight nozzle signature without making speed alone grow a long beam.
+        float liveLength = 0.08f
+            + Mathf.Clamp01(throttle01) * throttleLength
+            + Mathf.Clamp01(boost01) * boostLength
+            + Mathf.Clamp01(gripBreak01) * gripBreakLength;
+        float sheathTime = Mathf.Max(0.002f,
+            memory.time * echoLength * Mathf.Clamp(liveLength, 0.05f, 3f));
+        sheath.time = sheathTime;
+        core.time = Mathf.Max(0.002f, sheathTime * Mathf.Lerp(0.60f, 0.78f, cinematic));
+        sheath.minVertexDistance = memory.minVertexDistance;
+        core.minVertexDistance = memory.minVertexDistance;
+        float flickerSeed = ReferenceEquals(sheath, _plasmaEchoLeft) ? 0.17f : 0.73f;
+        float electricalFlicker = 0.94f + Mathf.PerlinNoise(
+            Time.time * 15f, flickerSeed) * 0.09f;
+        // Saturating scale keeps the trail elegant even if both global thickness
+        // and ribbon width are pushed high in the rig.
+        float controlledRibbonScale = Mathf.Lerp(0.78f, 1.22f,
+            Mathf.InverseLerp(0.2f, 3f, WakeRibbonSize));
+        float masterWidth = Mathf.Lerp(0.012f, 0.038f, speed01) * echoWidth
+            * controlledRibbonScale * (1f + cinematic * 0.18f * overchargeResponse);
+        sheath.startWidth = masterWidth * electricalFlicker;
+        core.startWidth = masterWidth * Mathf.Lerp(0.18f, 0.25f, cinematic);
+
+        Color violetEdge = new Color(0.72f, 0.22f, 1.25f, 1f);
+        float overchargeArt = Mathf.SmoothStep(0.18f, 1f,
+            Mathf.Clamp01(cinematic * overchargeResponse));
+        Color sheathColor = Color.Lerp(cruiseWakeColor, violetEdge,
+            overchargeArt * 0.32f);
+        float presence = Mathf.Clamp01(0.28f + speed01 * 0.58f
+            + cinematic * 0.32f * overchargeResponse);
+        sheathColor.a = opacity * presence * 0.46f * electricalFlicker;
+        sheath.startColor = sheathColor;
+        sheath.endColor = new Color(
+            sheathColor.r * 0.45f, sheathColor.g * 0.65f, sheathColor.b, 0f);
+
+        Color coreColor = Color.Lerp(
+            new Color(0.72f, 1.35f, 1.7f, 1f), overchargeCoreColor,
+            Mathf.Clamp01(cinematic * overchargeResponse));
+        coreColor.a = Mathf.Clamp01(opacity * presence * (0.60f + cinematic * 0.18f));
+        core.startColor = coreColor;
+        core.endColor = new Color(coreColor.r, coreColor.g, coreColor.b, 0f);
     }
 
     private void UpdatePlasmaMotes(ParticleSystem particles, float driveEnergy,
@@ -1803,6 +2152,59 @@ public class CraftFeedbackSystem : MonoBehaviour
             ? Mathf.Clamp(_wakeTuning.moteTurbulence, 0.2f, 3f)
             : 1f;
         noise.strength = (0.48f + cinematic * 0.40f) * moteTurbulence;
+    }
+
+    private void UpdateMemoryPathMotes(ParticleSystem particles, TrailRenderer memory,
+        float requestedRate, float cinematic, ref float accumulator)
+    {
+        if (particles == null || memory == null)
+            return;
+
+        bool followPath = _wakeTuning == null || _wakeTuning.followMemoryPath;
+        bool visible = _wakeTuning == null || _wakeTuning.showPlasmaMotes;
+        if (!followPath || !visible || !memory.emitting || memory.positionCount < 2)
+        {
+            accumulator = 0f;
+            return;
+        }
+
+        // Automatic cone emission produces straight, square-looking fragments.
+        // Instead, place sparse details directly on the already safety-checked
+        // world-space history so loops, rolls and Grip Break arcs remain coherent.
+        accumulator += Mathf.Max(0f, requestedRate) * Mathf.Max(0f, Time.deltaTime);
+        int emitCount = Mathf.Min(Mathf.FloorToInt(accumulator), 5);
+        if (emitCount <= 0)
+            return;
+        accumulator -= emitCount;
+
+        float moteSize = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.moteSize, 0.2f, 3f)
+            : 1f;
+        float opacity = _wakeTuning != null
+            ? Mathf.Clamp01(_wakeTuning.plasmaEchoOpacity)
+            : 0.34f;
+        Color pathColor = Color.Lerp(cruiseWakeColor, overchargeTailColor,
+            Mathf.Clamp01(cinematic * 0.45f));
+        pathColor.a = Mathf.Clamp01(opacity * 0.72f);
+
+        int positionCount = memory.positionCount;
+        for (int i = 0; i < emitCount; i++)
+        {
+            int index = Random.Range(0, positionCount);
+            ParticleSystem.EmitParams emit = new ParticleSystem.EmitParams
+            {
+                position = memory.GetPosition(index),
+                velocity = Vector3.zero,
+                startColor = pathColor,
+                startLifetime = Mathf.Lerp(0.08f, 0.20f, Random.value)
+                    * (1f + cinematic * 0.35f),
+                startSize = Mathf.Lerp(0.012f, 0.038f, Random.value)
+                    * WakeWidthScale * moteSize,
+                rotation = Random.Range(0f, 360f),
+                applyShapeToPosition = false
+            };
+            particles.Emit(emit, 1);
+        }
     }
 
     private void UpdatePlasmaSparks(ParticleSystem particles, float driveEnergy,
@@ -1927,32 +2329,32 @@ public class CraftFeedbackSystem : MonoBehaviour
         renderer.lengthScale = 2.8f * streak;
     }
 
-    private void UpdatePlasmaChamber(ParticleSystem particles, float driveEnergy,
+    private void UpdateThrustersPlasmaEffect(ParticleSystem particles, float driveEnergy,
         float cinematic, float flicker)
     {
         if (particles == null) return;
-        bool visible = _wakeTuning == null || _wakeTuning.showPlasmaChamber;
+        bool visible = _wakeTuning == null || _wakeTuning.showThrustersPlasmaEffect;
         ParticleSystem.EmissionModule emission = particles.emission;
-        float chamberIntensity = _wakeTuning != null
-            ? Mathf.Clamp(_wakeTuning.chamberIntensity, 0f, 3f)
+        float plasmaIntensity = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.thrustersPlasmaIntensity, 0f, 3f)
             : 1f;
         emission.rateOverTime = visible
             ? (52f + driveEnergy * 70f + cinematic * 115f)
-                * WakeDensityScale * chamberIntensity
+                * WakeDensityScale * plasmaIntensity
             : 0f;
 
         ParticleSystem.MainModule main = particles.main;
-        float chamberScale = _wakeTuning != null
-            ? Mathf.Clamp(_wakeTuning.chamberSize, 0.2f, 3f)
+        float plasmaScale = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.thrustersPlasmaSize, 0.2f, 3f)
             : 1f;
-        float sizeScale = WakeWidthScale * chamberScale;
+        float sizeScale = WakeWidthScale * plasmaScale;
         main.startSize = new ParticleSystem.MinMaxCurve(
             (0.10f + cinematic * 0.06f) * sizeScale * flicker,
             (0.21f + driveEnergy * 0.07f + cinematic * 0.17f) * sizeScale * flicker);
-        Color chamberColor = _wakeTuning != null
-            ? _wakeTuning.plasmaChamberColor
+        Color sourceColor = _wakeTuning != null
+            ? _wakeTuning.thrustersPlasmaColor
             : cruiseWakeColor;
-        main.startColor = Color.Lerp(chamberColor, overchargeCoreColor,
+        main.startColor = Color.Lerp(sourceColor, overchargeCoreColor,
             Mathf.Clamp01(cinematic + _ignitionFlash * 0.55f));
 
         ParticleSystem.ShapeModule shape = particles.shape;
@@ -1990,13 +2392,24 @@ public class CraftFeedbackSystem : MonoBehaviour
         }
 
         if (clear)
-        {
-            _ghostLeft?.Clear();
-            _ghostRight?.Clear();
-        }
+            ClearMovementTrails();
 
         _previousWakePosition = currentPosition;
         _previousWakeForward = currentForward;
+    }
+
+    private void ClearMovementTrails()
+    {
+        _ghostLeft?.Clear();
+        _ghostRight?.Clear();
+        _plasmaEchoLeft?.Clear();
+        _plasmaEchoRight?.Clear();
+        _plasmaEchoCoreLeft?.Clear();
+        _plasmaEchoCoreRight?.Clear();
+        _motesLeft?.Clear(true);
+        _motesRight?.Clear(true);
+        _leftPathMoteAccumulator = 0f;
+        _rightPathMoteAccumulator = 0f;
     }
 
     private bool TrailWrapsForward(TrailRenderer trail, float allowance)
@@ -2025,9 +2438,14 @@ public class CraftFeedbackSystem : MonoBehaviour
                 * flicker * WakeDensityScale
             : 0f;
         ParticleSystem.MainModule main = particles.main;
+        float overchargeLength = _wakeTuning != null
+            ? Mathf.Lerp(1f, Mathf.Clamp(
+                _wakeTuning.overchargeLengthMultiplier, 1f, 3f), cinematic)
+            : 1f;
         main.startLifetime = new ParticleSystem.MinMaxCurve(
-            (0.10f + cinematic * 0.035f) * WakeBodyLength,
-            (0.19f + driveEnergy * 0.07f + cinematic * 0.10f) * WakeBodyLength);
+            (0.10f + cinematic * 0.035f) * WakeBodyLength * overchargeLength,
+            (0.19f + driveEnergy * 0.07f + cinematic * 0.10f)
+                * WakeBodyLength * overchargeLength);
         main.startSpeed = new ParticleSystem.MinMaxCurve(
             2.2f + driveEnergy * 2.8f + cinematic * 4.5f,
             4.6f + driveEnergy * 5.2f + cinematic * 8.4f);
@@ -2049,9 +2467,14 @@ public class CraftFeedbackSystem : MonoBehaviour
                 * flicker * WakeDensityScale
             : 0f;
         ParticleSystem.MainModule main = particles.main;
+        float overchargeLength = _wakeTuning != null
+            ? Mathf.Lerp(1f, Mathf.Clamp(
+                _wakeTuning.overchargeLengthMultiplier, 1f, 3f), cinematic)
+            : 1f;
         main.startLifetime = new ParticleSystem.MinMaxCurve(
-            (0.045f + cinematic * 0.012f) * WakeBodyLength,
-            (0.082f + driveEnergy * 0.022f + cinematic * 0.035f) * WakeBodyLength);
+            (0.045f + cinematic * 0.012f) * WakeBodyLength * overchargeLength,
+            (0.082f + driveEnergy * 0.022f + cinematic * 0.035f)
+                * WakeBodyLength * overchargeLength);
         main.startSpeed = new ParticleSystem.MinMaxCurve(
             6.5f + driveEnergy * 6f + cinematic * 8f,
             11f + driveEnergy * 11f + cinematic * 17f);
@@ -2069,6 +2492,71 @@ public class CraftFeedbackSystem : MonoBehaviour
         emission.rateOverTime = Mathf.Max(0f, rate);
     }
 
+    private void UpdateWakeMaterialPalette(float overcharge01)
+    {
+        Color plasma = cruiseWakeColor;
+        Color overcharge = overchargeCoreColor;
+        Color current = Color.Lerp(plasma, overcharge, Mathf.Clamp01(overcharge01));
+        float intensity = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.plasmaBrightness, 0.1f, 3f)
+            : 1f;
+        SetWakeMaterialPalette(_wakeMaterial, current, overchargeEdgeColor,
+            1.55f * intensity);
+        SetWakeMaterialPalette(_coreWakeMaterial, overcharge, current,
+            3.4f * intensity);
+        SetWakeMaterialPalette(_filamentWakeMaterial, current, overchargeEdgeColor,
+            2.25f * intensity);
+
+        Color memory = _wakeTuning != null ? _wakeTuning.memoryColor : overchargeTailColor;
+        SetWakeMaterialPalette(_memoryWakeMaterial, memory, memory,
+            0.48f * Mathf.Max(0.1f, _wakeTuning != null
+                ? _wakeTuning.memoryOpacity : 0.62f));
+        float echoOpacity = _wakeTuning != null
+            ? Mathf.Clamp01(_wakeTuning.plasmaEchoOpacity)
+            : 0.58f;
+        float echoResponse = _wakeTuning != null
+            ? Mathf.Clamp(_wakeTuning.overchargeEchoIntensity, 0f, 3f)
+            : 1.35f;
+        Color violetEdge = new Color(0.72f, 0.22f, 1.25f, 1f);
+        float overchargeArt = Mathf.SmoothStep(0.18f, 1f,
+            Mathf.Clamp01(overcharge01 * echoResponse));
+        Color echo = Color.Lerp(plasma, violetEdge, overchargeArt * 0.32f);
+        SetWakeMaterialPalette(_plasmaEchoMaterial, echo, violetEdge,
+            (0.48f + overchargeArt * 0.42f) * intensity *
+            Mathf.Lerp(0.28f, 0.82f, echoOpacity));
+        Color lanceCore = Color.Lerp(
+            new Color(0.72f, 1.35f, 1.7f, 1f), overcharge,
+            Mathf.Clamp01(overcharge01 * echoResponse));
+        SetWakeMaterialPalette(_plasmaEchoCoreMaterial, lanceCore, echo,
+            (1.35f + overchargeArt * 0.75f) * intensity *
+            Mathf.Lerp(0.38f, 0.88f, echoOpacity));
+        // The ion lance owns a procedural texture distinct from the configurable
+        // nozzle-plasma texture. Restore it after the shared palette helper.
+        SetMaterialTexture(_plasmaEchoMaterial, _plasmaEchoTexture);
+        SetMaterialTexture(_plasmaEchoCoreMaterial, _plasmaEchoCoreTexture);
+        Color spark = _wakeTuning != null ? _wakeTuning.plasmaSparkColor : overcharge;
+        SetWakeMaterialPalette(_sparkWakeMaterial, spark, current, 4.1f * intensity);
+    }
+
+    private void SetWakeMaterialPalette(Material material, Color tint,
+        Color edge, float intensity)
+    {
+        if (material == null)
+            return;
+        Texture texture = _wakeTuning != null && _wakeTuning.plasmaTexture != null
+            ? _wakeTuning.plasmaTexture
+            : (plasmaWakeTexture != null ? plasmaWakeTexture : _fallbackWakeTexture);
+        if (texture != null)
+        {
+            material.mainTexture = texture;
+            if (material.HasProperty("_BaseMap")) material.SetTexture("_BaseMap", texture);
+            if (material.HasProperty("_MainTex")) material.SetTexture("_MainTex", texture);
+        }
+        if (material.HasProperty("_Tint")) material.SetColor("_Tint", tint);
+        if (material.HasProperty("_EdgeColor")) material.SetColor("_EdgeColor", edge);
+        if (material.HasProperty("_Intensity")) material.SetFloat("_Intensity", intensity);
+    }
+
     private float WakeOverallLength => _wakeTuning != null
         ? Mathf.Clamp(_wakeTuning.overallLength, 0.1f, 4f)
         : 1f;
@@ -2081,9 +2569,9 @@ public class CraftFeedbackSystem : MonoBehaviour
         ? Mathf.Clamp(_wakeTuning.filamentLength, 0.1f, 3f)
         : 1f);
 
-    private float WakeMemoryLength => WakeOverallLength * (_wakeTuning != null
+    private float WakeMemoryLength => _wakeTuning != null
         ? Mathf.Clamp(_wakeTuning.memoryLength, 0.1f, 3f)
-        : 1f);
+        : 1f;
 
     private float WakeWidthScale => _wakeTuning != null
         ? Mathf.Clamp(_wakeTuning.width, 0.25f, 2.5f)

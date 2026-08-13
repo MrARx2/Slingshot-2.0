@@ -95,6 +95,20 @@ namespace TrackGeneration.Editor
             return SaveToDisk();
         }
 
+        /// <summary>
+        /// True when a complete track layout is already held in memory for this
+        /// generator (regardless of whether the disk cache write succeeded). Enough to
+        /// rebuild the preview for the current Play session.
+        /// </summary>
+        private static bool HasUsableInMemoryPreview(TrackGenerator generator)
+        {
+            if (generator == null) return false;
+            string key = CacheKey(generator.gameObject.scene.path, GetHierarchyPath(generator.transform));
+            return Previews.TryGetValue(key, out CachedPreview cached)
+                && cached?.Layout?.Sections != null
+                && cached.Layout.Sections.Count > 0;
+        }
+
         internal static void Forget(TrackGenerator generator)
         {
             if (generator == null) return;
@@ -133,19 +147,32 @@ namespace TrackGeneration.Editor
                 foreach (TrackGenerator generator in
                     Object.FindObjectsByType<TrackGenerator>(FindObjectsInactive.Include))
                 {
-                    if (!Capture(generator))
+                    if (Capture(generator))
+                        continue;
+
+                    // Capture returned false. Only a genuinely MISSING layout can
+                    // strand the craft in empty space and justify cancelling Play.
+                    // A mere disk-write hiccup (the Library cache file momentarily
+                    // locked by an indexer / AV, etc.) leaves the in-memory layout
+                    // intact and fully usable for this session — proceed rather than
+                    // forcing the user to click Play a second time.
+                    if (HasUsableInMemoryPreview(generator))
                     {
-                        allPreviewsReady = false;
-                        Debug.LogError(
-                            $"[TrackGenerator] Play Mode was stopped because the preview cache for " +
-                            $"'{generator.name}' could not be verified. The editor preview will be repaired " +
-                            "after the Play transition is cancelled; then press Play again.");
+                        Debug.LogWarning(
+                            $"[TrackGenerator] Preview cache for '{generator.name}' could not be written " +
+                            "to disk, but the in-memory layout is valid — continuing into Play Mode.");
+                        continue;
                     }
+
+                    allPreviewsReady = false;
+                    Debug.LogError(
+                        $"[TrackGenerator] Play Mode was stopped because no preview layout is cached for " +
+                        $"'{generator.name}'. Generate the track once, then press Play again.");
                 }
 
                 // A track made from DontSaveInEditor meshes is deliberately omitted
-                // from Unity's Play Mode scene copy. Entering Play without its compact
-                // layout cache can only strand the craft in empty space, so fail safely.
+                // from Unity's Play Mode scene copy. Entering Play without ANY cached
+                // layout can only strand the craft in empty space, so fail safely.
                 if (!allPreviewsReady)
                 {
                     cancelledPlayTransitionNeedsRepair = true;

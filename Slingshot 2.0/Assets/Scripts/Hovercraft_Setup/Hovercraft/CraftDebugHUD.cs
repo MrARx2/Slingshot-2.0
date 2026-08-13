@@ -277,14 +277,17 @@ public class CraftDebugHUD : MonoBehaviour
             header += $"  OVERLOAD {(e.overload01 * 100f):0}%";
         }
 
-        DrawLabel(ref y, x, "Energy Bus", header, e.overload01 > 0f ? warningColor : goodColor);
-        DrawEnergyBar(ref y, x, "Base Hover", e.baseHoverRequest, e.baseHoverGranted, Mathf.Max(e.totalBudget, e.totalGranted), e.baseHoverPower01);
+        DrawLabel(ref y, x, "Reactor BUS", header, e.overload01 > 0f ? warningColor : goodColor);
+        // The four control slots (Steer > Boost > Drive > Vertical), then the free
+        // auto systems. Each bar's right column shows its THROTTLE % when over budget.
+        DrawEnergyBar(ref y, x, "Steer", e.vectoringRequest, e.vectoringGranted, e.totalBudget, e.vectoringPower01);
+        DrawEnergyBar(ref y, x, "Boost", e.overchargeRequest, e.overchargeGranted, e.totalBudget, e.overchargePower01);
         DrawEnergyBar(ref y, x, "Drive", e.driveRequest, e.driveGranted, e.totalBudget, e.drivePower01);
-        DrawEnergyBar(ref y, x, "Vector", e.vectoringRequest, e.vectoringGranted, e.totalBudget, e.vectoringPower01);
-        DrawEnergyBar(ref y, x, "Roof Q", e.roofRequest, e.roofGranted, e.totalBudget, e.roofPower01);
-        DrawEnergyBar(ref y, x, "Bottom E", e.bottomRequest, e.bottomGranted, e.totalBudget, e.bottomPower01);
-        DrawEnergyBar(ref y, x, "Overcharge", e.overchargeRequest, e.overchargeGranted, e.totalBudget, e.overchargePower01);
-        DrawEnergyBar(ref y, x, e.stabilizerProtected ? "Stabilizer [safe]" : "Stabilizer", e.stabilizerRequest, e.stabilizerGranted, Mathf.Max(e.totalBudget, e.stabilizerGranted), e.stabilizerPower01);
+        DrawEnergyBar(ref y, x, "Vertical Q/E",
+            Mathf.Max(e.roofRequest, e.bottomRequest), Mathf.Max(e.roofGranted, e.bottomGranted),
+            e.totalBudget, Mathf.Min(e.roofPower01, e.bottomPower01));
+        DrawEnergyBar(ref y, x, "Hover [free]", e.baseHoverRequest, e.baseHoverGranted, Mathf.Max(e.totalBudget, e.totalGranted), e.baseHoverPower01);
+        DrawEnergyBar(ref y, x, e.stabilizerProtected ? "Stabilizer [free]" : "Stabilizer", e.stabilizerRequest, e.stabilizerGranted, Mathf.Max(e.totalBudget, e.stabilizerGranted), e.stabilizerPower01);
     }
 
     private void DrawGrip(ref float y, float x)
@@ -335,8 +338,12 @@ public class CraftDebugHUD : MonoBehaviour
         DrawBar(r, request01, new Color(0.18f, 0.18f, 0.18f, 1f), mutedColor);
         DrawBar(r, grant01, fill, Color.clear);
 
-        GUI.color = textColor;
-        GUI.Label(new Rect(x + 95f + barWidth, y, 70f, rowHeight), $"{granted:0}/{request:0}", _smallStyle);
+        // Right column: when the channel is being throttled by the BUS, call it out as
+        // "THR xx%"; otherwise just show the granted power.
+        bool throttled = request > 0.001f && power01 < 0.985f;
+        string right = throttled ? $"THR {(power01 * 100f):0}%" : $"{granted:0}";
+        GUI.color = throttled ? warningColor : textColor;
+        GUI.Label(new Rect(x + 95f + barWidth, y, 92f, rowHeight), right, _smallStyle);
         GUI.color = Color.white;
         y += rowHeight;
     }

@@ -46,11 +46,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3058a40e47164c388a445e046b0e218a, type: 3}
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::PropulsionWakeTuning
+  plasmaTexture: {fileID: 2800000, guid: b6a6df9511ce45b8b925e51bb56053fb, type: 3}
+  plasmaColor: {r: 0.22, g: 1.35, b: 1.9, a: 1}
+  overchargePlasmaColor: {r: 0.4, g: 1.8, b: 2.5, a: 1}
+  plasmaBrightness: 1
+  overchargeLengthMultiplier: 1.55
+  overchargeIntensityMultiplier: 1.65
+  visualResponse: 12
+  fullEffectSpeedKmh: 1800
+  idleWakeWidth: 0.055
+  cruiseWakeWidth: 0.34
+  overchargeWakeWidth: 1.25
+  cruiseWakeTime: 0.26
+  overchargeWakeTime: 0.72
+  authoredTrailOverchargeWidth: 3.4
+  authoredTrailOverchargeEmission: 4.8
   overallLength: 1
   exhaustBodyLength: 1
   filamentLength: 1
   memoryLength: 1
   showMemoryRibbons: 1
+  memoryColor: {r: 0.34, g: 0.82, b: 1.35, a: 1}
+  memoryOpacity: 0.62
+  memoryOverchargeResponse: 0.25
+  followMemoryPath: 1
+  plasmaEchoLength: 0.16
+  throttleTrailLengthResponse: 0.72
+  boostTrailLengthResponse: 1.25
+  gripBreakTrailLengthResponse: 0.82
+  plasmaEchoWidth: 0.72
+  plasmaEchoOpacity: 0.34
+  overchargeEchoIntensity: 1.55
   maximumMemoryLengthMeters: 12
   memorySmoothness: 0.72
   preventForwardWrap: 1
@@ -87,11 +113,13 @@ MonoBehaviour:
   leftRibbonRotation: {x: 0, y: 0, z: 0}
   rightRibbonRotation: {x: 0, y: 0, z: 0}
   showPlasmaSparks: 1
-  showPlasmaChamber: 1
-  leftPlasmaOffset: {x: 0, y: 0, z: 0}
-  rightPlasmaOffset: {x: 0, y: 0, z: 0}
-  leftChamberOffset: {x: 0, y: 0, z: 0}
-  rightChamberOffset: {x: 0, y: 0, z: 0}
+  showThrustersPlasmaEffect: 1
+  leftExhaustEffectOffset: {x: 0, y: 0, z: 0}
+  rightExhaustEffectOffset: {x: 0, y: 0, z: 0}
+  leftExhaustEffectRotation: {x: 0, y: 0, z: 0}
+  rightExhaustEffectRotation: {x: 0, y: 0, z: 0}
+  leftThrustersPlasmaOffset: {x: 0, y: 0, z: 0}
+  rightThrustersPlasmaOffset: {x: 0, y: 0, z: 0}
   leftMoteOffset: {x: 0, y: 0, z: 0}
   rightMoteOffset: {x: 0, y: 0, z: 0}
   leftMoteRotation: {x: 0, y: 0, z: 0}
@@ -107,9 +135,9 @@ MonoBehaviour:
   rightSparkOffset: {x: 0, y: 0, z: 0}
   leftSparkRotation: {x: 0, y: 0, z: 0}
   rightSparkRotation: {x: 0, y: 0, z: 0}
-  plasmaChamberColor: {r: 0.42, g: 1.35, b: 1.8, a: 1}
-  chamberSize: 1
-  chamberIntensity: 1
+  thrustersPlasmaColor: {r: 0.42, g: 1.35, b: 1.8, a: 1}
+  thrustersPlasmaSize: 1
+  thrustersPlasmaIntensity: 1
   plasmaSparkColor: {r: 2.2, g: 1.25, b: 0.62, a: 1}
   sparkAmount: 1
   sparkSize: 1
@@ -120,6 +148,14 @@ MonoBehaviour:
   sparkTrailAmount: 0.55
   sparkTurbulence: 1
   overchargeSparkBoost: 1
+  sparkSurfaceCollision: 1
+  sparkCollisionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  sparkCollisionBounce: 0.12
+  sparkCollisionDamping: 0.42
+  sparkCollisionLifetimeLoss: 0.22
+  highQualitySparkCollision: 1
   sparkSpawnRadius: 1
   sparkSpeedVariation: 0.65
   sparkDrag: 0.25

@@ -443,8 +443,10 @@ public class HovercraftCamera : MonoBehaviour
     // ══════════════════════════════════════════════════════════════
 
     [Header("Clip Planes")]
-    public float tpNearClip = 0.3f;
-    public float fpNearClip = 0.06f;
+    [Tooltip("Third-person near clip. Cannot be 0 (Unity needs a positive near plane); ~0.05 is effectively as close as it goes. Lower = less clipping into the craft/ground on steep descents, at the cost of some distant depth precision.")]
+    [Range(0.01f, 1f)] public float tpNearClip = 0.05f;
+    [Tooltip("First-person near clip. Kept small so the cockpit view never clips the hull.")]
+    [Range(0.01f, 1f)] public float fpNearClip = 0.05f;
 
     [Header("Cursor")]
     public bool lockCursorOnStart = true;

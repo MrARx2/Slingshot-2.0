@@ -586,7 +586,7 @@ namespace TrackGeneration
                 // Guidance visuals: center-flat guide lines + wall marker bands
                 // (non-colliding overlay meshes; break only at air gaps/open edges).
                 TrackGuideMarkingBuilder.Build(layout.Sections, resolved.RoadProfile, Designer.Visual,
-                    tempRootObj.transform, RoadLineMaterial);
+                    tempRootObj.transform, RoadLineMaterial, resolved.RoadWidth);
 
                 // Validate the built objects before committing.
                 int meshCount = 0;

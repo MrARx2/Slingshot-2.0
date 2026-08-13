@@ -7,16 +7,35 @@ public sealed class PropulsionWakeTuningEditor : Editor
     private enum HandleElement
     {
         ExhaustPipe,
-        ExhaustEffect
+        ThrustersPlasmaEffect
     }
 
     private enum HandleSide { Left, Right }
 
     private SerializedProperty _overallLength;
+    private SerializedProperty _plasmaTexture;
+    private SerializedProperty _plasmaColor;
+    private SerializedProperty _overchargePlasmaColor;
+    private SerializedProperty _plasmaBrightness;
+    private SerializedProperty _overchargeLength;
+    private SerializedProperty _overchargeIntensity;
+    private SerializedProperty _visualResponse;
+    private SerializedProperty _fullEffectSpeed;
     private SerializedProperty _bodyLength;
     private SerializedProperty _filamentLength;
     private SerializedProperty _memoryLength;
     private SerializedProperty _showMemory;
+    private SerializedProperty _memoryColor;
+    private SerializedProperty _memoryOpacity;
+    private SerializedProperty _memoryOverchargeResponse;
+    private SerializedProperty _followMemoryPath;
+    private SerializedProperty _plasmaEchoLength;
+    private SerializedProperty _throttleTrailLengthResponse;
+    private SerializedProperty _boostTrailLengthResponse;
+    private SerializedProperty _gripBreakTrailLengthResponse;
+    private SerializedProperty _plasmaEchoWidth;
+    private SerializedProperty _plasmaEchoOpacity;
+    private SerializedProperty _overchargeEchoIntensity;
     private SerializedProperty _maximumMemoryLength;
     private SerializedProperty _memorySmoothness;
     private SerializedProperty _preventForwardWrap;
@@ -36,9 +55,9 @@ public sealed class PropulsionWakeTuningEditor : Editor
     private SerializedProperty _showSparks;
     private SerializedProperty _leftExhaustEffectOffset;
     private SerializedProperty _rightExhaustEffectOffset;
-    private SerializedProperty _chamberColor;
-    private SerializedProperty _chamberSize;
-    private SerializedProperty _chamberIntensity;
+    private SerializedProperty _thrustersPlasmaColor;
+    private SerializedProperty _thrustersPlasmaSize;
+    private SerializedProperty _thrustersPlasmaIntensity;
     private SerializedProperty _sparkColor;
     private SerializedProperty _sparkAmount;
     private SerializedProperty _sparkSize;
@@ -52,7 +71,7 @@ public sealed class PropulsionWakeTuningEditor : Editor
     private SerializedProperty _density;
     private bool _showLayerPlacement;
     private bool _showMoteControls;
-    private bool _showChamberFinePlacement;
+    private bool _showPlasmaSourceFinePlacement;
     private bool _showSparkPlacement = true;
     private bool _showSparkMotion;
     private bool _showSparkTrails;
@@ -64,10 +83,29 @@ public sealed class PropulsionWakeTuningEditor : Editor
     private void OnEnable()
     {
         _overallLength = serializedObject.FindProperty("overallLength");
+        _plasmaTexture = serializedObject.FindProperty("plasmaTexture");
+        _plasmaColor = serializedObject.FindProperty("plasmaColor");
+        _overchargePlasmaColor = serializedObject.FindProperty("overchargePlasmaColor");
+        _plasmaBrightness = serializedObject.FindProperty("plasmaBrightness");
+        _overchargeLength = serializedObject.FindProperty("overchargeLengthMultiplier");
+        _overchargeIntensity = serializedObject.FindProperty("overchargeIntensityMultiplier");
+        _visualResponse = serializedObject.FindProperty("visualResponse");
+        _fullEffectSpeed = serializedObject.FindProperty("fullEffectSpeedKmh");
         _bodyLength = serializedObject.FindProperty("exhaustBodyLength");
         _filamentLength = serializedObject.FindProperty("filamentLength");
         _memoryLength = serializedObject.FindProperty("memoryLength");
         _showMemory = serializedObject.FindProperty("showMemoryRibbons");
+        _memoryColor = serializedObject.FindProperty("memoryColor");
+        _memoryOpacity = serializedObject.FindProperty("memoryOpacity");
+        _memoryOverchargeResponse = serializedObject.FindProperty("memoryOverchargeResponse");
+        _followMemoryPath = serializedObject.FindProperty("followMemoryPath");
+        _plasmaEchoLength = serializedObject.FindProperty("plasmaEchoLength");
+        _throttleTrailLengthResponse = serializedObject.FindProperty("throttleTrailLengthResponse");
+        _boostTrailLengthResponse = serializedObject.FindProperty("boostTrailLengthResponse");
+        _gripBreakTrailLengthResponse = serializedObject.FindProperty("gripBreakTrailLengthResponse");
+        _plasmaEchoWidth = serializedObject.FindProperty("plasmaEchoWidth");
+        _plasmaEchoOpacity = serializedObject.FindProperty("plasmaEchoOpacity");
+        _overchargeEchoIntensity = serializedObject.FindProperty("overchargeEchoIntensity");
         _maximumMemoryLength = serializedObject.FindProperty("maximumMemoryLengthMeters");
         _memorySmoothness = serializedObject.FindProperty("memorySmoothness");
         _preventForwardWrap = serializedObject.FindProperty("preventForwardWrap");
@@ -87,9 +125,9 @@ public sealed class PropulsionWakeTuningEditor : Editor
         _showSparks = serializedObject.FindProperty("showPlasmaSparks");
         _leftExhaustEffectOffset = serializedObject.FindProperty("leftExhaustEffectOffset");
         _rightExhaustEffectOffset = serializedObject.FindProperty("rightExhaustEffectOffset");
-        _chamberColor = serializedObject.FindProperty("plasmaChamberColor");
-        _chamberSize = serializedObject.FindProperty("chamberSize");
-        _chamberIntensity = serializedObject.FindProperty("chamberIntensity");
+        _thrustersPlasmaColor = serializedObject.FindProperty("thrustersPlasmaColor");
+        _thrustersPlasmaSize = serializedObject.FindProperty("thrustersPlasmaSize");
+        _thrustersPlasmaIntensity = serializedObject.FindProperty("thrustersPlasmaIntensity");
         _sparkColor = serializedObject.FindProperty("plasmaSparkColor");
         _sparkAmount = serializedObject.FindProperty("sparkAmount");
         _sparkSize = serializedObject.FindProperty("sparkSize");
@@ -108,20 +146,65 @@ public sealed class PropulsionWakeTuningEditor : Editor
         serializedObject.Update();
 
         EditorGUILayout.HelpBox(
-            "Tune in Play Mode from top to bottom. Start with a preset, then adjust Length and Width. " +
-            "Use alignment only after the silhouette feels right.", MessageType.Info);
+            "This rig is the single control surface for every thruster visual. Tune the live plasma first, movement memory second, then place both nozzles in the Scene view.",
+            MessageType.Info);
 
         DrawPresets();
         EditorGUILayout.Space(8f);
 
-        EditorGUILayout.LabelField("PRIMARY LOOK", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("THRUSTERS PLASMA EFFECT", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(_plasmaTexture, new GUIContent("Plasma Texture"));
+        EditorGUILayout.PropertyField(_plasmaColor, new GUIContent("Cruise Cyan"));
+        EditorGUILayout.PropertyField(_overchargePlasmaColor,
+            new GUIContent("Overcharge Cyan"));
+        EditorGUILayout.PropertyField(_plasmaBrightness, new GUIContent("Brightness"));
         EditorGUILayout.PropertyField(_overallLength, new GUIContent("Length"));
         EditorGUILayout.PropertyField(_width, new GUIContent("Thickness"));
         EditorGUILayout.PropertyField(_density, new GUIContent("Detail Density"));
+        EditorGUILayout.PropertyField(_visualResponse, new GUIContent("Response"));
+        EditorGUILayout.PropertyField(_fullEffectSpeed, new GUIContent("Full Effect Speed"));
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("OVERCHARGE RESPONSE", EditorStyles.miniBoldLabel);
+        EditorGUILayout.PropertyField(_overchargeLength,
+            new GUIContent("Length Multiplier"));
+        EditorGUILayout.PropertyField(_overchargeIntensity,
+            new GUIContent("Intensity Multiplier"));
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("VECTOR PLASMA TRAIL", EditorStyles.miniBoldLabel);
+        EditorGUILayout.PropertyField(_followMemoryPath,
+            new GUIContent("Follow Memory Path"));
+        if (_followMemoryPath.boolValue)
+        {
+            EditorGUILayout.PropertyField(_plasmaEchoLength,
+                new GUIContent("Master Length"));
+            EditorGUILayout.PropertyField(_throttleTrailLengthResponse,
+                new GUIContent("Throttle Length"));
+            EditorGUILayout.PropertyField(_boostTrailLengthResponse,
+                new GUIContent("Overcharge Length"));
+            EditorGUILayout.PropertyField(_gripBreakTrailLengthResponse,
+                new GUIContent("Grip Break Length"));
+            EditorGUILayout.PropertyField(_plasmaEchoWidth,
+                new GUIContent("Trail Width"));
+            EditorGUILayout.PropertyField(_plasmaEchoOpacity,
+                new GUIContent("Trail Presence"));
+            EditorGUILayout.PropertyField(_overchargeEchoIntensity,
+                new GUIContent("Overcharge Punch"));
+        }
+        EditorGUILayout.Space(8f);
+
+        EditorGUILayout.LabelField("PROPULSION MEMORY EFFECT", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(_showMemory, new GUIContent("Movement Ribbons"));
         if (_showMemory.boolValue)
+        {
+            EditorGUILayout.PropertyField(_memoryColor, new GUIContent("Memory Color"));
+            EditorGUILayout.PropertyField(_memoryOpacity, new GUIContent("Memory Opacity"));
+            EditorGUILayout.PropertyField(_ribbonSize, new GUIContent("Memory Width"));
+            EditorGUILayout.PropertyField(_memoryLength, new GUIContent("Memory Duration"));
+            EditorGUILayout.PropertyField(_memoryOverchargeResponse,
+                new GUIContent("Overcharge Influence"));
             EditorGUILayout.PropertyField(_maximumMemoryLength,
                 new GUIContent("Ribbon Max Length (m)"));
+        }
 
         DrawEffectiveLengthReadout();
         EditorGUILayout.Space(8f);
@@ -136,13 +219,12 @@ public sealed class PropulsionWakeTuningEditor : Editor
         DrawProperty("showPlasmaPlume", "Show Plasma Plume");
         EditorGUILayout.PropertyField(_filamentSize, new GUIContent("Ion Filament Width"));
         DrawProperty("showIonFilaments", "Show Ion Filaments");
-        EditorGUILayout.PropertyField(_ribbonSize, new GUIContent("Memory Ribbon Width"));
         EditorGUILayout.PropertyField(_particleStretch, new GUIContent("Particle Streak Length"));
         EditorGUILayout.Space(8f);
 
         EditorGUILayout.LabelField("EXHAUST PIPE PLACEMENT", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "The LEFT/RIGHT exhaust transforms are the placement authority. Move them with the Exhaust Pipe Scene gizmo: trail, core, filaments, chamber, motes, and sparks all follow.",
+            "The LEFT/RIGHT exhaust transforms are the placement authority. Move them with the Exhaust Pipe Scene gizmo: trail, core, filaments, plasma source, motes, and sparks all follow.",
             MessageType.None);
         EditorGUILayout.Space(8f);
 
@@ -173,21 +255,21 @@ public sealed class PropulsionWakeTuningEditor : Editor
             EditorGUILayout.Space(8f);
         }
 
-        EditorGUILayout.LabelField("EXHAUST EFFECT", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("THRUSTERS PLASMA SOURCE + SPARKS", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(_showSparks,
             new GUIContent("Enable Expelled Sparks"));
         EditorGUILayout.LabelField("Sparks / Glow Assembly Placement",
             EditorStyles.miniBoldLabel);
         EditorGUILayout.HelpBox(
-            "A fine adjustment relative to the exhaust pipe. The Exhaust Effect Scene gizmo moves chamber glow, motes, and sparks together.",
+            "A fine adjustment relative to the exhaust pipe. The Thrusters Plasma Effect gizmo moves the plasma source, motes, and sparks together.",
             MessageType.None);
         EditorGUILayout.PropertyField(_leftExhaustEffectOffset,
-            new GUIContent("Left Exhaust Effect Position"));
+            new GUIContent("Left Plasma Assembly Position"));
         EditorGUILayout.PropertyField(_rightExhaustEffectOffset,
-            new GUIContent("Right Exhaust Effect Position"));
-        DrawProperty("leftExhaustEffectRotation", "Left Exhaust Effect Aim");
-        DrawProperty("rightExhaustEffectRotation", "Right Exhaust Effect Aim");
-        if (GUILayout.Button("Reset Exhaust Effect Placement"))
+            new GUIContent("Right Plasma Assembly Position"));
+        DrawProperty("leftExhaustEffectRotation", "Left Plasma Assembly Aim");
+        DrawProperty("rightExhaustEffectRotation", "Right Plasma Assembly Aim");
+        if (GUILayout.Button("Reset Plasma Assembly Placement"))
         {
             _leftExhaustEffectOffset.vector3Value = Vector3.zero;
             _rightExhaustEffectOffset.vector3Value = Vector3.zero;
@@ -195,22 +277,24 @@ public sealed class PropulsionWakeTuningEditor : Editor
         }
 
             EditorGUILayout.Space(3f);
-            EditorGUILayout.LabelField("Pipe Chamber", EditorStyles.miniBoldLabel);
-            DrawProperty("showPlasmaChamber", "Enable Chamber Glow");
-            _showChamberFinePlacement = EditorGUILayout.Foldout(
-                _showChamberFinePlacement, "Fine Chamber Position (Relative)", true);
-            if (_showChamberFinePlacement)
+            EditorGUILayout.LabelField("Thrusters Plasma Effect", EditorStyles.miniBoldLabel);
+            DrawProperty("showThrustersPlasmaEffect", "Enable Plasma Source");
+            _showPlasmaSourceFinePlacement = EditorGUILayout.Foldout(
+                _showPlasmaSourceFinePlacement, "Fine Source Position (Relative)", true);
+            if (_showPlasmaSourceFinePlacement)
             {
                 EditorGUILayout.HelpBox(
-                    "Optional correction relative to Exhaust Effect Position. Leave at zero when moving the complete sparks/glow assembly.",
+                    "Optional correction relative to the master plasma-effect position. Leave at zero when moving the complete assembly.",
                     MessageType.None);
-                DrawProperty("leftChamberOffset", "Left Fine Position");
-                DrawProperty("rightChamberOffset", "Right Fine Position");
+                DrawProperty("leftThrustersPlasmaOffset", "Left Fine Position");
+                DrawProperty("rightThrustersPlasmaOffset", "Right Fine Position");
             }
-            EditorGUILayout.PropertyField(_chamberColor, new GUIContent("Chamber Color"));
-            EditorGUILayout.PropertyField(_chamberSize, new GUIContent("Chamber Size"));
-            EditorGUILayout.PropertyField(_chamberIntensity,
-                new GUIContent("Chamber Intensity"));
+            EditorGUILayout.PropertyField(_thrustersPlasmaColor,
+                new GUIContent("Source Color"));
+            EditorGUILayout.PropertyField(_thrustersPlasmaSize,
+                new GUIContent("Source Size"));
+            EditorGUILayout.PropertyField(_thrustersPlasmaIntensity,
+                new GUIContent("Source Intensity"));
 
             EditorGUILayout.Space(3f);
             _showMoteControls = EditorGUILayout.Foldout(_showMoteControls,
@@ -281,11 +365,20 @@ public sealed class PropulsionWakeTuningEditor : Editor
                     new GUIContent("Overcharge Intensity"));
             }
 
+            EditorGUILayout.Space(3f);
+            EditorGUILayout.LabelField("Surface Contact", EditorStyles.miniBoldLabel);
+            DrawProperty("sparkSurfaceCollision", "Collide With Roads / Walls");
+            DrawProperty("sparkCollisionMask", "Surface Layers");
+            DrawProperty("sparkCollisionBounce", "Bounce");
+            DrawProperty("sparkCollisionDamping", "Damping");
+            DrawProperty("sparkCollisionLifetimeLoss", "Lifetime Loss Per Hit");
+            DrawProperty("highQualitySparkCollision", "High Quality Collision");
+
             if (GUILayout.Button("Reset All Plasma Element Placement"))
             {
                 ResetVectors("leftExhaustEffectOffset", "rightExhaustEffectOffset",
                     "leftExhaustEffectRotation", "rightExhaustEffectRotation",
-                    "leftChamberOffset", "rightChamberOffset", "leftMoteOffset",
+                    "leftThrustersPlasmaOffset", "rightThrustersPlasmaOffset", "leftMoteOffset",
                     "rightMoteOffset", "leftMoteRotation", "rightMoteRotation",
                     "leftSparkOffset", "rightSparkOffset", "leftSparkRotation",
                     "rightSparkRotation");
@@ -294,14 +387,14 @@ public sealed class PropulsionWakeTuningEditor : Editor
 
         EditorGUILayout.LabelField("SCENE PLACEMENT GIZMOS", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Exhaust Pipe moves the real nozzle and every effect. Exhaust Effect moves only sparks/glow relative to that pipe.",
+            "Exhaust Pipe moves the real nozzle and every effect. Thrusters Plasma Effect moves only the plasma/sparks assembly relative to that pipe.",
             MessageType.None);
         EditorGUILayout.Space(3f);
         EditorGUILayout.LabelField("Scene Placement Handle", EditorStyles.miniBoldLabel);
         _handleElement = (HandleElement)EditorGUILayout.EnumPopup("Element", _handleElement);
         _handleSide = (HandleSide)EditorGUILayout.EnumPopup("Side", _handleSide);
         EditorGUILayout.HelpBox(
-            "Select the hovercraft's Propulsion Wake Placement Rig, choose Exhaust Pipe or Exhaust Effect, then place each side directly in the Scene view.",
+            "Select the hovercraft's Propulsion Wake Placement Rig, choose Exhaust Pipe or Thrusters Plasma Effect, then place each side directly in the Scene view.",
             MessageType.None);
         EditorGUILayout.Space(8f);
         _showAdvanced = EditorGUILayout.Foldout(_showAdvanced, "Advanced Layer Controls", true);
@@ -392,7 +485,7 @@ public sealed class PropulsionWakeTuningEditor : Editor
         }
 
         Handles.Label(movedPosition,
-            $"  {_handleSide} Exhaust Effect - SPARKS + GLOW", EditorStyles.boldLabel);
+            $"  {_handleSide} Thrusters Plasma Effect - SOURCE + SPARKS", EditorStyles.boldLabel);
     }
 
     private bool TryResolveHandleTarget(PropulsionWakeTuning tuning,
@@ -501,8 +594,8 @@ public sealed class PropulsionWakeTuningEditor : Editor
         _ribbonSize.floatValue = 1f;
         _particleStretch.floatValue = 1f;
         _showSparks.boolValue = true;
-        _chamberSize.floatValue = 1f;
-        _chamberIntensity.floatValue = 1f;
+        _thrustersPlasmaSize.floatValue = 1f;
+        _thrustersPlasmaIntensity.floatValue = 1f;
         _sparkAmount.floatValue = 1f;
         _sparkSize.floatValue = 1f;
         _sparkSpeed.floatValue = 1f;
@@ -530,14 +623,14 @@ public sealed class PropulsionWakeTuningEditor : Editor
                 "leftRibbonOffset", "rightRibbonOffset", "leftRibbonRotation",
                 "rightRibbonRotation", "leftExhaustEffectOffset", "rightExhaustEffectOffset",
                 "leftExhaustEffectRotation", "rightExhaustEffectRotation",
-                "leftChamberOffset", "rightChamberOffset", "leftMoteOffset",
+                "leftThrustersPlasmaOffset", "rightThrustersPlasmaOffset", "leftMoteOffset",
                 "rightMoteOffset", "leftMoteRotation", "rightMoteRotation",
                 "leftSparkOffset", "rightSparkOffset", "leftSparkRotation",
                 "rightSparkRotation");
             SetBool("showHotCore", true);
             SetBool("showPlasmaPlume", true);
             SetBool("showIonFilaments", true);
-            SetBool("showPlasmaChamber", true);
+            SetBool("showThrustersPlasmaEffect", true);
             SetBool("showPlasmaMotes", true);
             SetFloat("moteAmount", 1f);
             SetFloat("moteSize", 1f);
@@ -577,7 +670,7 @@ public sealed class PropulsionWakeTuningEditor : Editor
     {
         float body = _overallLength.floatValue * _bodyLength.floatValue;
         float filaments = _overallLength.floatValue * _filamentLength.floatValue;
-        float memory = _overallLength.floatValue * _memoryLength.floatValue;
+        float memory = _memoryLength.floatValue;
         EditorGUILayout.HelpBox(
             $"Effective: Body {body:0.00}x | Filaments {filaments:0.00}x | Ribbons {memory:0.00}x",
             body > 4f || filaments > 4f || memory > 4f ? MessageType.Warning : MessageType.None);
@@ -588,7 +681,6 @@ public sealed class PropulsionWakeTuningEditor : Editor
         EditorGUI.indentLevel++;
         EditorGUILayout.PropertyField(_bodyLength, new GUIContent("Body Layer Multiplier"));
         EditorGUILayout.PropertyField(_filamentLength, new GUIContent("Filament Layer Multiplier"));
-        EditorGUILayout.PropertyField(_memoryLength, new GUIContent("Ribbon Lifetime Multiplier"));
         EditorGUILayout.PropertyField(_memorySmoothness);
         EditorGUILayout.PropertyField(_preventForwardWrap);
         if (_preventForwardWrap.boolValue)

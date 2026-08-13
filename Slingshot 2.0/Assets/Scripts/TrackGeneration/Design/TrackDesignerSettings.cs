@@ -657,6 +657,15 @@ namespace TrackGeneration.Design
         [Tooltip("Emission strength of the guide lines.")]
         [Range(0f, 4f)] public float CenterGuideEmission = 1.2f;
 
+        [Tooltip("Where the two split lines sit ACROSS the road, in cross-section units: 1 = the road-side shoulder (outer edge of the flat floor, base of the wall) so they hug the road sides with no gap; 2 = up at the wall tip, flush with the wall markings. Lines ride the real surface at this position.")]
+        [Range(0.4f, 2f)] public float LaneEdgePosition = 1f;
+
+        [Tooltip("Road width (fraction of the DESIGN road width) at/below which the two lines have fully merged into a single centerline. Raise it to merge on wider roads.")]
+        [Range(0.1f, 0.9f)] public float LaneMergeFraction = 0.6f;
+
+        [Tooltip("Road width (fraction of the DESIGN road width) at/above which the lines are fully split to the two edges. Must be above the merge fraction. Lower it to keep two lines on more of the track.")]
+        [Range(0.2f, 1f)] public float LaneSplitFraction = 0.85f;
+
         [Header("Wall Markers")]
         [Tooltip("Transverse marker lines across the walls: speed, curvature and orientation rhythm. Spacing is VISUAL — independent of the physical ring density.")]
         public bool WallMarkersEnabled = true;
@@ -677,6 +686,14 @@ namespace TrackGeneration.Design
         {
             CenterGuideWidth = Mathf.Clamp(CenterGuideWidth, 0.02f, 4f);
             CenterGuideEmission = Mathf.Clamp(CenterGuideEmission, 0f, 8f);
+            // Existing serialized settings created before this control was added may
+            // deserialize it as zero. Preserve the intended no-gap default at the
+            // exact floor/wall shoulder instead of silently clamping inward.
+            if (LaneEdgePosition <= 0f) LaneEdgePosition = 1f;
+            LaneEdgePosition = Mathf.Clamp(LaneEdgePosition, 0.4f, 2f);
+            LaneMergeFraction = Mathf.Clamp(LaneMergeFraction, 0.05f, 0.85f);
+            // Keep a real transition band between merged and split.
+            LaneSplitFraction = Mathf.Clamp(LaneSplitFraction, LaneMergeFraction + 0.05f, 1f);
             WallMarkerWidth = Mathf.Clamp(WallMarkerWidth, 0.05f, 8f);
             WallMarkerSpacingMeters = Mathf.Clamp(WallMarkerSpacingMeters, 4f, 500f);
             MarkerFadeDistance = Mathf.Clamp(MarkerFadeDistance, 20f, 5000f);

@@ -8,6 +8,47 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class PropulsionWakeTuning : MonoBehaviour
 {
+    [Header("Thrusters Plasma Effect")]
+    [Tooltip("Optional soft plasma texture used by every authored propulsion layer.")]
+    public Texture2D plasmaTexture;
+
+    [Tooltip("Main cyan plasma color from idle through normal thrust.")]
+    [ColorUsage(true, true)] public Color plasmaColor =
+        new Color(0.22f, 1.35f, 1.9f, 1f);
+
+    [Tooltip("Plasma color reached while overcharge is being discharged. This is intentionally independent from the movement-memory color.")]
+    [ColorUsage(true, true)] public Color overchargePlasmaColor =
+        new Color(0.40f, 1.8f, 2.5f, 1f);
+
+    [Tooltip("Brightness of the tight plasma body and nozzle source.")]
+    [Range(0.1f, 3f)] public float plasmaBrightness = 1f;
+
+    [Tooltip("How much longer the live plasma becomes at full overcharge.")]
+    [Range(1f, 3f)] public float overchargeLengthMultiplier = 1.55f;
+
+    [Tooltip("How much brighter and denser the live plasma becomes at full overcharge.")]
+    [Range(1f, 3f)] public float overchargeIntensityMultiplier = 1.65f;
+
+    [Tooltip("How quickly the propulsion visuals attack and release when throttle or overcharge changes.")]
+    [Range(1f, 30f)] public float visualResponse = 12f;
+
+    [Tooltip("Speed at which the speed-driven portion of the propulsion effect reaches its full cinematic response.")]
+    [Min(100f)] public float fullEffectSpeedKmh = 1800f;
+
+    [Tooltip("Width of the authored wake at idle.")]
+    [Min(0.005f)] public float idleWakeWidth = 0.055f;
+    [Tooltip("Width of the authored wake at ordinary cruise.")]
+    [Min(0.05f)] public float cruiseWakeWidth = 0.34f;
+    [Tooltip("Width reached by the authored wake during full overcharge.")]
+    [Min(0.1f)] public float overchargeWakeWidth = 1.25f;
+    [Range(0.05f, 1f)] public float cruiseWakeTime = 0.26f;
+    [Range(0.1f, 2f)] public float overchargeWakeTime = 0.72f;
+
+    [Tooltip("Width response used by any authored legacy thruster trails bound to the craft.")]
+    [Range(1f, 5f)] public float authoredTrailOverchargeWidth = 3.4f;
+    [Tooltip("Emission response used by authored thruster materials bound to the craft.")]
+    [Range(1f, 8f)] public float authoredTrailOverchargeEmission = 4.8f;
+
     [Header("Trail Length")]
     [Tooltip("Master multiplier applied to every propulsion trail layer.")]
     [Range(0.1f, 4f)] public float overallLength = 1f;
@@ -24,6 +65,41 @@ public sealed class PropulsionWakeTuning : MonoBehaviour
     [Header("Long Trail Control")]
     [Tooltip("Turns off only the long movement-history ribbons. The detailed nozzle particles remain visible.")]
     public bool showMemoryRibbons = true;
+
+    [Tooltip("Independent color for movement history. It is not recolored by overcharge.")]
+    [ColorUsage(true, true)] public Color memoryColor =
+        new Color(0.34f, 0.82f, 1.35f, 1f);
+
+    [Tooltip("Opacity of the movement-memory ribbons without changing the live plasma.")]
+    [Range(0f, 1f)] public float memoryOpacity = 0.62f;
+
+    [Tooltip("How strongly overcharge widens the memory ribbon. Set to zero for completely independent memory.")]
+    [Range(0f, 2f)] public float memoryOverchargeResponse = 0.25f;
+
+    [Header("Plasma Path Echo")]
+    [Tooltip("Adds a compact vector-plasma signature along the same movement path as the longer propulsion-memory ribbon.")]
+    public bool followMemoryPath = true;
+
+    [Tooltip("Master length of the vector-plasma trail as a fraction of the movement-memory path. The three response controls below scale this live value.")]
+    [Range(0.05f, 1f)] public float plasmaEchoLength = 0.16f;
+
+    [Tooltip("How much throttle extends the vector-plasma trail. Zero removes throttle from the length calculation.")]
+    [Range(0f, 2f)] public float throttleTrailLengthResponse = 0.72f;
+
+    [Tooltip("How much active Overcharge extends the vector-plasma trail. Zero removes boost from the length calculation.")]
+    [Range(0f, 2f)] public float boostTrailLengthResponse = 1.25f;
+
+    [Tooltip("How much Grip Break extends the vector-plasma trail while sliding. Zero removes Grip Break from the length calculation.")]
+    [Range(0f, 2f)] public float gripBreakTrailLengthResponse = 0.82f;
+
+    [Tooltip("Width of the cyan plasma echo. This does not change the longer memory ribbon.")]
+    [Range(0.1f, 2f)] public float plasmaEchoWidth = 0.72f;
+
+    [Tooltip("Visibility of the cyan plasma echo before overcharge response is added.")]
+    [Range(0f, 1f)] public float plasmaEchoOpacity = 0.34f;
+
+    [Tooltip("Extra brightness and width given to the plasma echo during overcharge.")]
+    [Range(0f, 2.5f)] public float overchargeEchoIntensity = 1.55f;
 
     [Tooltip("Hard world-space length cap for each memory ribbon, independent of vehicle speed.")]
     [Range(0.5f, 60f)] public float maximumMemoryLengthMeters = 12f;
@@ -113,26 +189,29 @@ public sealed class PropulsionWakeTuning : MonoBehaviour
     [Tooltip("Adds hot plasma fragments that peel away from each exhaust under load.")]
     public bool showPlasmaSparks = true;
 
-    [Tooltip("Shows the compact plasma glow sitting inside each exhaust pipe.")]
-    public bool showPlasmaChamber = true;
+    [Tooltip("Shows the compact cyan plasma source at each exhaust nozzle.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("showPlasmaChamber")]
+    public bool showThrustersPlasmaEffect = true;
 
-    [Tooltip("Moves the left chamber, motes, and sparks assembly relative to the left exhaust pipe.")]
+    [Tooltip("Moves the complete left plasma source, motes, and sparks assembly relative to the left exhaust pipe.")]
     [UnityEngine.Serialization.FormerlySerializedAs("leftPlasmaOffset")]
     public Vector3 leftExhaustEffectOffset = Vector3.zero;
 
-    [Tooltip("Moves the right chamber, motes, and sparks assembly relative to the right exhaust pipe.")]
+    [Tooltip("Moves the complete right plasma source, motes, and sparks assembly relative to the right exhaust pipe.")]
     [UnityEngine.Serialization.FormerlySerializedAs("rightPlasmaOffset")]
     public Vector3 rightExhaustEffectOffset = Vector3.zero;
 
-    [Tooltip("Aims the complete left chamber, motes, and sparks assembly relative to the exhaust trail.")]
+    [Tooltip("Aims the complete left plasma source, motes, and sparks assembly relative to the exhaust trail.")]
     public Vector3 leftExhaustEffectRotation = Vector3.zero;
 
-    [Tooltip("Aims the complete right chamber, motes, and sparks assembly relative to the exhaust trail.")]
+    [Tooltip("Aims the complete right plasma source, motes, and sparks assembly relative to the exhaust trail.")]
     public Vector3 rightExhaustEffectRotation = Vector3.zero;
 
-    [Tooltip("Additional placement for the compact pipe chamber only, after the master plasma offset.")]
-    public Vector3 leftChamberOffset = Vector3.zero;
-    public Vector3 rightChamberOffset = Vector3.zero;
+    [Tooltip("Additional placement for the compact thrusters plasma source only, after the master exhaust-effect offset.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("leftChamberOffset")]
+    public Vector3 leftThrustersPlasmaOffset = Vector3.zero;
+    [UnityEngine.Serialization.FormerlySerializedAs("rightChamberOffset")]
+    public Vector3 rightThrustersPlasmaOffset = Vector3.zero;
 
     [Tooltip("Additional placement for the loose plasma motes only.")]
     public Vector3 leftMoteOffset = Vector3.zero;
@@ -157,15 +236,18 @@ public sealed class PropulsionWakeTuning : MonoBehaviour
     public Vector3 leftSparkRotation = Vector3.zero;
     public Vector3 rightSparkRotation = Vector3.zero;
 
-    [Tooltip("HDR color of the compact energy visible inside the exhaust pipe.")]
-    [ColorUsage(true, true)] public Color plasmaChamberColor =
+    [Tooltip("HDR color of the compact energy visible at the exhaust source.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("plasmaChamberColor")]
+    [ColorUsage(true, true)] public Color thrustersPlasmaColor =
         new Color(0.42f, 1.35f, 1.8f, 1f);
 
-    [Tooltip("Physical size of the compact plasma chamber inside the pipe.")]
-    [Range(0.2f, 3f)] public float chamberSize = 1f;
+    [Tooltip("Physical size of the compact plasma source at the nozzle.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("chamberSize")]
+    [Range(0.2f, 3f)] public float thrustersPlasmaSize = 1f;
 
-    [Tooltip("Brightness and particle density of the plasma chamber.")]
-    [Range(0f, 3f)] public float chamberIntensity = 1f;
+    [Tooltip("Brightness and particle density of the compact plasma source.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("chamberIntensity")]
+    [Range(0f, 3f)] public float thrustersPlasmaIntensity = 1f;
 
     [Tooltip("HDR head color of the expelled exhaust sparks.")]
     [ColorUsage(true, true)] public Color plasmaSparkColor =
@@ -197,6 +279,18 @@ public sealed class PropulsionWakeTuning : MonoBehaviour
 
     [Tooltip("Extra spark intensity while overcharge is being discharged.")]
     [Range(0f, 3f)] public float overchargeSparkBoost = 1f;
+
+    [Header("Spark Surface Contact")]
+    [Tooltip("Lets expelled sparks collide with static roads and walls. Dynamic craft colliders are ignored to prevent self-collision.")]
+    public bool sparkSurfaceCollision = true;
+
+    [Tooltip("Layers containing road and wall colliders. Keep the hovercraft on a different/dynamic collider layer.")]
+    public LayerMask sparkCollisionMask = ~0;
+
+    [Range(0f, 1f)] public float sparkCollisionBounce = 0.12f;
+    [Range(0f, 1f)] public float sparkCollisionDamping = 0.42f;
+    [Range(0f, 1f)] public float sparkCollisionLifetimeLoss = 0.22f;
+    public bool highQualitySparkCollision = true;
 
     [Tooltip("Radius of the area sparks are born across at the pipe opening.")]
     [Range(0.05f, 3f)] public float sparkSpawnRadius = 1f;
@@ -255,8 +349,26 @@ public sealed class PropulsionWakeTuning : MonoBehaviour
         filamentSize = Mathf.Clamp(filamentSize, 0.2f, 3f);
         ribbonSize = Mathf.Clamp(ribbonSize, 0.2f, 3f);
         particleStretch = Mathf.Clamp(particleStretch, 0.2f, 3f);
-        chamberSize = Mathf.Clamp(chamberSize, 0.2f, 3f);
-        chamberIntensity = Mathf.Clamp(chamberIntensity, 0f, 3f);
+        plasmaBrightness = Mathf.Clamp(plasmaBrightness, 0.1f, 3f);
+        overchargeLengthMultiplier = Mathf.Clamp(overchargeLengthMultiplier, 1f, 3f);
+        overchargeIntensityMultiplier = Mathf.Clamp(overchargeIntensityMultiplier, 1f, 3f);
+        visualResponse = Mathf.Clamp(visualResponse, 1f, 30f);
+        fullEffectSpeedKmh = Mathf.Max(100f, fullEffectSpeedKmh);
+        idleWakeWidth = Mathf.Max(0.005f, idleWakeWidth);
+        cruiseWakeWidth = Mathf.Max(0.05f, cruiseWakeWidth);
+        overchargeWakeWidth = Mathf.Max(0.1f, overchargeWakeWidth);
+        cruiseWakeTime = Mathf.Clamp(cruiseWakeTime, 0.05f, 1f);
+        overchargeWakeTime = Mathf.Clamp(overchargeWakeTime, 0.1f, 2f);
+        authoredTrailOverchargeWidth = Mathf.Clamp(authoredTrailOverchargeWidth, 1f, 5f);
+        authoredTrailOverchargeEmission = Mathf.Clamp(authoredTrailOverchargeEmission, 1f, 8f);
+        memoryOpacity = Mathf.Clamp01(memoryOpacity);
+        memoryOverchargeResponse = Mathf.Clamp(memoryOverchargeResponse, 0f, 2f);
+        plasmaEchoLength = Mathf.Clamp(plasmaEchoLength, 0.05f, 1f);
+        plasmaEchoWidth = Mathf.Clamp(plasmaEchoWidth, 0.1f, 2f);
+        plasmaEchoOpacity = Mathf.Clamp01(plasmaEchoOpacity);
+        overchargeEchoIntensity = Mathf.Clamp(overchargeEchoIntensity, 0f, 2.5f);
+        thrustersPlasmaSize = Mathf.Clamp(thrustersPlasmaSize, 0.2f, 3f);
+        thrustersPlasmaIntensity = Mathf.Clamp(thrustersPlasmaIntensity, 0f, 3f);
         moteAmount = Mathf.Clamp(moteAmount, 0f, 3f);
         moteSize = Mathf.Clamp(moteSize, 0.2f, 3f);
         moteSpeed = Mathf.Clamp(moteSpeed, 0.2f, 3f);
@@ -272,6 +384,9 @@ public sealed class PropulsionWakeTuning : MonoBehaviour
         sparkTrailAmount = Mathf.Clamp01(sparkTrailAmount);
         sparkTurbulence = Mathf.Clamp(sparkTurbulence, 0.2f, 3f);
         overchargeSparkBoost = Mathf.Clamp(overchargeSparkBoost, 0f, 3f);
+        sparkCollisionBounce = Mathf.Clamp01(sparkCollisionBounce);
+        sparkCollisionDamping = Mathf.Clamp01(sparkCollisionDamping);
+        sparkCollisionLifetimeLoss = Mathf.Clamp01(sparkCollisionLifetimeLoss);
         sparkSpawnRadius = Mathf.Clamp(sparkSpawnRadius, 0.05f, 3f);
         sparkSpeedVariation = Mathf.Clamp01(sparkSpeedVariation);
         sparkDrag = Mathf.Clamp(sparkDrag, 0f, 3f);
