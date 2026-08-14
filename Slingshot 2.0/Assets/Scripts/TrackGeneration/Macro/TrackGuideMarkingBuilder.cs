@@ -72,11 +72,12 @@ namespace TrackGeneration.Macro
             int chunkIndex = 0;
             foreach (var chain in chains)
             {
-                var frames = ChainFrames(chain);
+                var frames = ChainFrames(chain, out List<float> rollingWeights);
                 if (frames.Count < 2) continue;
 
                 if (visual.CenterGuideEnabled)
-                    BuildCenterGuides(frames, profile, visual, markingRoot.transform, guideMat, ref chunkIndex, referenceWidth);
+                    BuildCenterGuides(frames, rollingWeights, profile, visual,
+                        markingRoot.transform, guideMat, ref chunkIndex, referenceWidth);
                 if (visual.WallMarkersEnabled)
                     BuildWallMarkers(frames, profile, visual, markingRoot.transform, markerMat, ref chunkIndex);
             }
@@ -114,22 +115,64 @@ namespace TrackGeneration.Macro
             return chains;
         }
 
-        private static List<TrackConnectionFrame> ChainFrames(List<GeneratedTrackSection> chain)
+        private static List<TrackConnectionFrame> ChainFrames(
+            List<GeneratedTrackSection> chain, out List<float> rollingWeights)
         {
             var frames = new List<TrackConnectionFrame>();
+            rollingWeights = new List<float>();
             foreach (var sec in chain)
             {
                 var f = sec.SubdivisionFrames;
                 for (int i = frames.Count == 0 ? 0 : 1; i < f.Length; i++)
+                {
                     frames.Add(f[i]);
+                    rollingWeights.Add(RollingFeatureWeight(sec, f[i]));
+                }
             }
             return frames;
         }
 
+        private static float RollingFeatureWeight(
+            GeneratedTrackSection section, in TrackConnectionFrame frame)
+        {
+            if (section?.Definition == null || !HasRoadRoll(section.Definition))
+                return 0f;
+
+            float start = section.StartFrame.ArcLength;
+            float length = Mathf.Max(0.01f,
+                section.EndFrame.ArcLength - section.StartFrame.ArcLength);
+            float u = Mathf.Clamp01((frame.ArcLength - start) / length);
+
+            // Keep the weld itself unchanged, then merge rapidly through the entry
+            // and hold one center stripe across the actual corkscrew body. The same
+            // easing reverses at the exit, so adjacent wide roads branch cleanly.
+            float edgeDistance01 = Mathf.Min(u, 1f - u) / 0.18f;
+            return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(edgeDistance01));
+        }
+
+        private static bool HasRoadRoll(TrackMacroSectionDefinition definition)
+        {
+            if (definition.SectionType == TrackMacroSectionType.Corkscrew)
+                return true;
+
+            var phases = definition.RotationalPhases;
+            if (phases == null) return false;
+            for (int i = 0; i < phases.Count; i++)
+            {
+                var phase = phases[i];
+                if (phase != null && phase.Axis == RotationalPhaseAxis.RoadRoll &&
+                    phase.RotationUnits > 0)
+                    return true;
+            }
+            return false;
+        }
+
         // ─────────────────────────── Center guide lines ───────────────────────────
 
-        private static void BuildCenterGuides(List<TrackConnectionFrame> frames, TrackRoadProfileSettings profile,
-            TrackVisualSettings visual, Transform root, Material mat, ref int chunkIndex, float referenceWidth)
+        private static void BuildCenterGuides(List<TrackConnectionFrame> frames,
+            List<float> rollingWeights, TrackRoadProfileSettings profile,
+            TrackVisualSettings visual, Transform root, Material mat,
+            ref int chunkIndex, float referenceWidth)
         {
             var verts = new List<Vector3>();
             var tris = new List<int>();
@@ -148,16 +191,21 @@ namespace TrackGeneration.Macro
             float mergeWidth = referenceWidth * mergeFrac;
             float splitWidth = referenceWidth * splitFrac;
 
+            // Width alone is not the usable road width. Dynamic turn rounding can
+            // remove almost the entire flat floor while the frame still reports the
+            // full design width; wallrides and pipes reshape it further. Classify the
+            // actual evaluated shoulder-to-shoulder span at every ring, then spread
+            // narrow detections into their neighbours so topology changes form one
+            // readable Y transition instead of flickering ring by ring.
+            float[] guideSplits = ResolveGuideSplits(frames, rollingWeights, profile,
+                mergeWidth, splitWidth, referenceWidth);
+
             int prevBase = -1;
             for (int r = 0; r < frames.Count; r++)
             {
                 var f = frames[r];
-                float closure = Mathf.Clamp01(f.PipeClosure);
-
                 // 0 = fully merged (single centerline), 1 = fully split to the edges.
-                float split01 = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(mergeWidth, splitWidth, f.Width));
-                // A closing pipe collapses to a single floor line regardless of width.
-                split01 *= 1f - Mathf.SmoothStep(0.1f, 0.6f, closure);
+                float split01 = guideSplits[r];
 
                 TrackCrossSection.Evaluate(profile, f, profilePoints, crossParameters);
 
@@ -172,15 +220,24 @@ namespace TrackGeneration.Macro
                     out Vector2 rightCenter, out Vector2 rightTangent, out Vector2 rightNormal);
 
                 float width = visual.CenterGuideWidth;
-                float halfLineWidth = width * 0.5f;
+
+                // A narrow road must read as ONE center stripe, not two full-width
+                // strips stacked on top of each other. At the merged end each side
+                // owns exactly half of the center stripe. As the road widens those
+                // halves separate and grow into two full-width edge stripes. This
+                // keeps a continuous Y-shaped transition without doubled emission.
+                float mergedHalfOffset = width * 0.25f * (1f - split01);
+                float halfLineWidth = width * Mathf.Lerp(0.25f, 0.5f, split01);
+                Vector2 leftStripCenter = leftCenter - leftTangent * mergedHalfOffset;
+                Vector2 rightStripCenter = rightCenter + rightTangent * mergedHalfOffset;
 
                 int baseIdx = verts.Count;
-                // Always two strips. When guidePosition reaches 0 they coincide and render as one
-                // centerline; no hard swap, so the branch/merge is seamless.
-                verts.Add(ProfileToWorld(f, leftCenter - leftTangent * halfLineWidth + leftNormal * SurfaceOffset) - origin);
-                verts.Add(ProfileToWorld(f, leftCenter + leftTangent * halfLineWidth + leftNormal * SurfaceOffset) - origin);
-                verts.Add(ProfileToWorld(f, rightCenter - rightTangent * halfLineWidth + rightNormal * SurfaceOffset) - origin);
-                verts.Add(ProfileToWorld(f, rightCenter + rightTangent * halfLineWidth + rightNormal * SurfaceOffset) - origin);
+                // The two quads meet edge-to-edge as one center stripe when merged;
+                // they become independent full-width edge lines after branching.
+                verts.Add(ProfileToWorld(f, leftStripCenter - leftTangent * halfLineWidth + leftNormal * SurfaceOffset) - origin);
+                verts.Add(ProfileToWorld(f, leftStripCenter + leftTangent * halfLineWidth + leftNormal * SurfaceOffset) - origin);
+                verts.Add(ProfileToWorld(f, rightStripCenter - rightTangent * halfLineWidth + rightNormal * SurfaceOffset) - origin);
+                verts.Add(ProfileToWorld(f, rightStripCenter + rightTangent * halfLineWidth + rightNormal * SurfaceOffset) - origin);
 
                 if (prevBase >= 0)
                 {
@@ -196,6 +253,109 @@ namespace TrackGeneration.Macro
             }
 
             EmitMesh(verts, tris, origin, $"CenterGuide_{chunkIndex++:D2}", root, mat);
+        }
+
+        private static float[] ResolveGuideSplits(
+            List<TrackConnectionFrame> frames,
+            List<float> rollingWeights,
+            TrackRoadProfileSettings profile,
+            float mergeWidth,
+            float splitWidth,
+            float referenceWidth)
+        {
+            int count = frames.Count;
+            var splits = new float[count];
+            var profilePoints = new Vector2[TrackCrossSection.PointCount(profile)];
+            var crossParameters = new float[profilePoints.Length];
+
+            // Evaluate a neutral design-width ring once. It is the correct baseline
+            // for usable floor width, rather than assuming the entire half-pipe width
+            // is flat/drivable road.
+            TrackConnectionFrame referenceFrame = TrackConnectionFrame.Origin(referenceWidth);
+            TrackCrossSection.Evaluate(profile, referenceFrame, profilePoints, crossParameters);
+            float referenceUsableWidth = MeasureUsableFloorWidth(profilePoints, crossParameters);
+            float usableMergeWidth = referenceUsableWidth * (mergeWidth / referenceWidth);
+            float usableSplitWidth = referenceUsableWidth * (splitWidth / referenceWidth);
+
+            for (int r = 0; r < count; r++)
+            {
+                TrackConnectionFrame frame = frames[r];
+                TrackCrossSection.Evaluate(profile, frame, profilePoints, crossParameters);
+                float usableWidth = MeasureUsableFloorWidth(profilePoints, crossParameters);
+
+                float totalWidthSplit = SmoothWidthSplit(frame.Width, mergeWidth, splitWidth);
+                float usableWidthSplit = SmoothWidthSplit(
+                    usableWidth, usableMergeWidth, usableSplitWidth);
+
+                // The most restrictive real measurement wins. A road cannot support
+                // two readable lanes merely because its outer walls are far apart.
+                float split = Mathf.Min(totalWidthSplit, usableWidthSplit);
+
+                // Closed pipes and wallrides each expose one primary driving surface,
+                // so a single orientation line is unambiguous even if their chord
+                // measurement happens to remain large during the morph.
+                split *= 1f - Mathf.SmoothStep(0.08f, 0.62f,
+                    Mathf.Clamp01(frame.PipeClosure));
+                split *= 1f - Mathf.SmoothStep(0.08f, 0.55f,
+                    Mathf.Clamp01(frame.WallrideMorph));
+
+                // Corkscrews and every authored road-roll phase keep the explicit
+                // semantic override established for legacy-width presets.
+                if (rollingWeights != null && r < rollingWeights.Count)
+                    split *= 1f - Mathf.Clamp01(rollingWeights[r]);
+
+                splits[r] = Mathf.Clamp01(split);
+            }
+
+            // Propagate the need for a center line over a physical distance. Two
+            // passes catch both approach and exit while remaining O(n), important for
+            // generated tracks with tens of thousands of rings.
+            float transitionDistance = Mathf.Max(18f, referenceWidth * 1.5f);
+            PropagateNarrowness(frames, splits, transitionDistance, forward: true);
+            PropagateNarrowness(frames, splits, transitionDistance, forward: false);
+            return splits;
+        }
+
+        private static float SmoothWidthSplit(float width, float mergeWidth, float splitWidth)
+        {
+            return Mathf.SmoothStep(0f, 1f,
+                Mathf.InverseLerp(mergeWidth, splitWidth, width));
+        }
+
+        private static float MeasureUsableFloorWidth(
+            Vector2[] profilePoints, float[] crossParameters)
+        {
+            SampleAtCrossParameter(profilePoints, crossParameters, -1f,
+                out Vector2 leftShoulder, out _);
+            SampleAtCrossParameter(profilePoints, crossParameters, 1f,
+                out Vector2 rightShoulder, out _);
+            return Vector2.Distance(leftShoulder, rightShoulder);
+        }
+
+        private static void PropagateNarrowness(
+            List<TrackConnectionFrame> frames,
+            float[] splits,
+            float transitionDistance,
+            bool forward)
+        {
+            int start = forward ? 1 : frames.Count - 2;
+            int end = forward ? frames.Count : -1;
+            int step = forward ? 1 : -1;
+
+            for (int i = start; i != end; i += step)
+            {
+                int previous = i - step;
+                float distance = Mathf.Abs(frames[i].ArcLength - frames[previous].ArcLength);
+                if (distance <= 0.0001f)
+                    distance = Vector3.Distance(frames[i].Position, frames[previous].Position);
+
+                // Work in merge weight (1 = one center line). Subtracting distance
+                // gives a finite linear envelope which cleanly reaches zero.
+                float previousMerge = 1f - splits[previous];
+                float propagatedMerge = Mathf.Max(0f,
+                    previousMerge - distance / transitionDistance);
+                splits[i] = Mathf.Min(splits[i], 1f - propagatedMerge);
+            }
         }
 
         private static Vector3 ProfileToWorld(TrackConnectionFrame frame, Vector2 point)

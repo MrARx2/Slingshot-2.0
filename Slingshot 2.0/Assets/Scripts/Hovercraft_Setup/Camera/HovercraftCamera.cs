@@ -86,7 +86,7 @@ public class HovercraftCamera : MonoBehaviour
         [Range(0f, 1f)] public float noseInfluence = 1f;
 
         [Header("Dynamic Framing (loops / corkscrews)")]
-        [Tooltip("Blend to a tighter, lower, upward-looking frame while the track is engaged as a loop/corkscrew (rollercoaster feel). Uses the dynamic-orientation detector regardless of this profile's orientation mode.")]
+        [Tooltip("Gently anticipates a loop/corkscrew, then blends to the lower ride composition once the craft is actually inside the feature.")]
         public bool dynamicFraming = false;
 
         [Tooltip("Chase distance while engaged in a loop/corkscrew.")]
@@ -95,8 +95,12 @@ public class HovercraftCamera : MonoBehaviour
         [Tooltip("Camera height while engaged. Lower than normal = looking slightly up at the craft.")]
         public float engagedHeight = 1.3f;
 
-        [Tooltip("Extra aim-point height while engaged — raises the view like lifting your head on a rollercoaster.")]
+        [Tooltip("Extra aim-point height while inside the feature. Keep this restrained: a large value pushes the craft toward the bottom of frame and makes it look miniature.")]
         public float engagedLookUp = 1.6f;
+
+        [Header("Motion Budget")]
+        [Tooltip("How much positional acceleration and drift roll this view receives. Close cameras need a much smaller budget because every movement is magnified on screen.")]
+        [Range(0f, 1f)] public float motionEnergyInfluence = 1f;
     }
 
     public static List<CameraProfile> CreateDefaultProfiles()
@@ -120,20 +124,21 @@ public class HovercraftCamera : MonoBehaviour
                 distanceBase = 5f, distanceMax = 8.5f,
                 heightBase = 1.5f, heightMax = 2f,
                 lookAheadBase = 6f, lookAheadMax = 32f,
-                fovBase = 60f, fovMax = 86f
+                fovBase = 60f, fovMax = 86f,
+                motionEnergyInfluence = 0.18f
             },
             new CameraProfile
             {
                 profileName = "Chase Dynamic",
                 perspective = CameraPerspective.ThirdPerson,
                 groundOrientation = GroundOrientationMode.Dynamic,
-                distanceBase = 9f, distanceMax = 14f,
-                heightBase = 3.2f, heightMax = 4.2f,
-                lookAheadBase = 5f, lookAheadMax = 28f,
-                fovBase = 59f, fovMax = 85f,
+                distanceBase = 7.5f, distanceMax = 12.4f,
+                heightBase = 2.6f, heightMax = 3.6f,
+                lookAheadBase = 7f, lookAheadMax = 40f,
+                fovBase = 62f, fovMax = 100f,
                 noseInfluence = 0f,
                 dynamicFraming = true,
-                engagedDistance = 5.5f, engagedHeight = 1.3f, engagedLookUp = 1.6f
+                engagedDistance = 8.15f, engagedHeight = 1.65f, engagedLookUp = 0.35f
             },
             new CameraProfile
             {
@@ -192,10 +197,20 @@ public class HovercraftCamera : MonoBehaviour
     public float speedForMinEffects = 60f;
 
     [Tooltip("Speed (m/s) at which all speed-driven camera effects reach maximum. Set this at or slightly above the craft's realistic top speed — anything faster looks IDENTICAL, so a low value silently flattens the whole high-speed range. 380 m/s ≈ 1370 km/h.")]
-    public float speedForMaxEffects = 380f;
+    public float speedForMaxEffects = 500f;
 
     [Tooltip("Response curve across the min→max band. 1 = linear. >1 holds the effect back and delivers it at the top end (speed keeps building as you go faster). <1 front-loads it into the low end.")]
-    [Range(0.3f, 2.5f)] public float speedResponseExponent = 1.25f;
+    [Range(0.3f, 2.5f)] public float speedResponseExponent = 0.9f;
+
+    [Header("Cinematic Speed Energy")]
+    [Tooltip("Camera setback caused by real forward acceleration. Gives throttle and hills physical weight without adding steady-state lag.")]
+    [Range(0f, 2f)] public float accelerationCameraSetback = 0.9f;
+
+    [Tooltip("Temporary lens expansion caused by real forward acceleration, in degrees.")]
+    [Range(0f, 8f)] public float accelerationFovKick = 4.5f;
+
+    [Tooltip("Maximum camera roll caused by lateral slip. Automatically fades out in loops and corkscrews.")]
+    [Range(0f, 8f)] public float driftCameraRoll = 2.75f;
 
     // ══════════════════════════════════════════════════════════════
     //  REFERENCE FRAME (shared by both perspectives)
@@ -230,7 +245,7 @@ public class HovercraftCamera : MonoBehaviour
     public float dynamicBankStartAngle = 76f;
 
     [Tooltip("Dynamic mode: surface bank tilt where following is fully engaged. Keep a WIDE gap from the start angle: the craft rolls through a corkscrew fast, so a narrow band is crossed in a fraction of a second and the camera snaps rather than blends.")]
-    public float dynamicBankFullAngle = 96f;
+    public float dynamicBankFullAngle = 104f;
 
     [Tooltip("Dynamic mode: yaw rate (deg/sec) where bank-based engagement starts being suppressed. Turning + banked = a corner, not a corkscrew.")]
     public float dynamicYawSuppressStart = 10f;
@@ -252,10 +267,10 @@ public class HovercraftCamera : MonoBehaviour
     public TrackSectionSensor trackSensor;
 
     [Tooltip("SECONDS of warning before a loop/corkscrew where engagement ramps in. This is the real anticipation control — a fixed metre distance cannot work across the craft's speed range (30 m is 0.6 s when crawling but only 0.08 s at design speed, which is a step, not a blend). The lead distance is derived from this and the current speed.")]
-    public float sectionBlendInSeconds = 0.8f;
+    public float sectionBlendInSeconds = 0.95f;
 
     [Tooltip("SECONDS after a loop/corkscrew where engagement ramps back out.")]
-    public float sectionBlendOutSeconds = 0.5f;
+    public float sectionBlendOutSeconds = 0.75f;
 
     [Tooltip("Minimum metres BEFORE a loop/corkscrew for the ramp in, regardless of speed. Only binds at low speed, where the time-based lead would be shorter than the craft's own length.")]
     public float sectionBlendInDistance = 30f;
@@ -264,22 +279,22 @@ public class HovercraftCamera : MonoBehaviour
     public float sectionBlendOutDistance = 20f;
 
     [Tooltip("How quickly the reference up tracks the surface normal while grounded. Must be fast enough for loops.")]
-    public float groundedUpResponse = 6f;
+    public float groundedUpResponse = 5f;
 
     [Tooltip("How quickly the reference up relaxes back to world up while airborne. Keep low so leaving a wall doesn't snap the view.")]
-    public float airborneUpResponse = 2f;
+    public float airborneUpResponse = 1.6f;
 
     [Tooltip("Hard cap on reference-up rotation (deg/sec). Protects against normal pops on seams.")]
-    public float maxUpDegreesPerSecond = 500f;
+    public float maxUpDegreesPerSecond = 360f;
 
     [Tooltip("Below this flat speed (m/s) the camera follows craft forward instead of velocity.")]
     public float minFlatSpeedForDirection = 1.5f;
 
     [Tooltip("How quickly the follow direction tracks its target while grounded.")]
-    public float groundedDirectionResponse = 5f;
+    public float groundedDirectionResponse = 4.2f;
 
     [Tooltip("How quickly the follow direction tracks its target while airborne. Lower = calmer during flips.")]
-    public float airborneDirectionResponse = 3f;
+    public float airborneDirectionResponse = 2.4f;
 
     [Tooltip("How much the follow direction favors craft forward over velocity at LOW speed while grounded.")]
     [Range(0f, 1f)] public float lowSpeedForwardInfluence = 0.75f;
@@ -313,39 +328,42 @@ public class HovercraftCamera : MonoBehaviour
 
     [Header("Third Person — Position")]
     [Tooltip("Extra distance added while airborne.")]
-    public float tpAirborneExtraDistance = 2f;
+    public float tpAirborneExtraDistance = 1.4f;
 
     [Tooltip("Extra height added while airborne.")]
-    public float tpAirborneExtraHeight = 1f;
+    public float tpAirborneExtraHeight = 0.7f;
 
     [Tooltip("Smoothing time for the camera offset (relative to the craft, so it adds no speed lag).")]
-    public float tpOffsetSmoothTime = 0.12f;
+    public float tpOffsetSmoothTime = 0.18f;
+
+    [Tooltip("Minimum camera height above the craft during downhill driving. Uses world up on ordinary track and the local track up inside loops/corkscrews, so inverted features remain valid.")]
+    [Range(0.25f, 3f)] public float tpMinimumHeightAboveCraft = 1.35f;
 
     [Header("Third Person — Aim")]
     [Tooltip("Look target height above the craft center (along reference up).")]
     public float tpLookHeight = 1.2f;
 
     [Tooltip("Look-ahead multiplier while airborne. Lower keeps focus on the craft/landing.")]
-    public float tpAirborneLookAheadMultiplier = 0.6f;
+    public float tpAirborneLookAheadMultiplier = 0.72f;
 
     [Tooltip("Sideways look offset per m/s of lateral slip. Frames drifts without unsettling normal driving.")]
-    public float tpDriftLookInfluence = 0.05f;
+    public float tpDriftLookInfluence = 0.035f;
 
     [Tooltip("Maximum sideways look offset from drift (meters).")]
-    public float tpMaxDriftLookOffset = 3f;
+    public float tpMaxDriftLookOffset = 2.5f;
 
     [Tooltip("Rotation smoothing response. Higher = tighter.")]
-    public float tpRotationResponse = 14f;
+    public float tpRotationResponse = 10f;
 
     [Header("Surface Look-Ahead (loops / corkscrews)")]
     [Tooltip("How many seconds of track curvature the view leads by. Riding a loop pitches the view up into it; a corkscrew rolls the view ahead. 0 = off.")]
-    public float surfaceLookAheadTime = 0.4f;
+    public float surfaceLookAheadTime = 0.28f;
 
     [Tooltip("Maximum look-ahead angle (degrees).")]
-    public float maxSurfaceLookAhead = 40f;
+    public float maxSurfaceLookAhead = 32f;
 
     [Tooltip("Smoothing response for the measured track curvature. Lower = calmer.")]
-    public float surfaceLookAheadSmoothing = 5f;
+    public float surfaceLookAheadSmoothing = 4.5f;
 
     [Tooltip("How much of the surface look-ahead applies in first person.")]
     [Range(0f, 1f)] public float fpSurfaceLookAheadAmount = 0.6f;
@@ -386,35 +404,35 @@ public class HovercraftCamera : MonoBehaviour
 
     [Header("Boost Kick")]
     [Tooltip("Metres the third-person camera eases back behind the craft at full boost (acceleration setback). Smoothed, so keep it modest.")]
-    public float boostThirdPersonSetback = 1.5f;
+    public float boostThirdPersonSetback = 2.2f;
 
     [Tooltip("Metres the first-person view recoils backward at full boost. Kept restrained so the cockpit never leaves the craft.")]
-    public float boostFirstPersonRecoil = 0.09f;
+    public float boostFirstPersonRecoil = 0.12f;
 
     [Tooltip("How quickly boost presentation attacks after the gameplay signal begins.")]
-    public float boostVisualAttackResponse = 24f;
+    public float boostVisualAttackResponse = 28f;
 
     [Tooltip("How quickly boost presentation relaxes after the burst ends.")]
-    public float boostVisualReleaseResponse = 6f;
+    public float boostVisualReleaseResponse = 5.5f;
 
     [Tooltip("Length of the short visual onset pulse. This affects only camera presentation, never craft forces.")]
-    [Range(0.05f, 0.5f)] public float boostOnsetPulseDuration = 0.22f;
+    [Range(0.05f, 0.5f)] public float boostOnsetPulseDuration = 0.18f;
 
     [Tooltip("Strength of the immediate boost onset pulse relative to the sustained boost envelope.")]
-    [Range(0f, 1f)] public float boostOnsetPulseStrength = 0.72f;
+    [Range(0f, 1f)] public float boostOnsetPulseStrength = 0.95f;
 
     [Tooltip("Extra presentation scale for held Overcharge. Preserves existing camera tuning while giving discharge a stronger sustained read.")]
     [FormerlySerializedAs("nitroPresentationScale")]
-    [Range(1f, 1.75f)] public float overchargePresentationScale = 1.35f;
+    [Range(1f, 1.75f)] public float overchargePresentationScale = 1.4f;
 
     [Tooltip("If true, Grip Breaker from CraftCore / TractionCore adds FOV.")]
     public bool useGripBreakerAsBoostFOV = true;
 
     [Tooltip("Exponential FOV smoothing speed. Higher = faster response.")]
-    public float fovSmoothSpeed = 8f;
+    public float fovSmoothSpeed = 5.5f;
 
     [Tooltip("FOV response while widening. Higher than the release response makes acceleration read immediately without a hard snap.")]
-    public float fovAttackSpeed = 18f;
+    public float fovAttackSpeed = 22f;
 
     // ══════════════════════════════════════════════════════════════
     //  COLLISION AVOIDANCE (third person)
@@ -432,11 +450,11 @@ public class HovercraftCamera : MonoBehaviour
     [Tooltip("Minimum distance from the pivot when blocked (never pushed past the obstacle).")]
     public float minDistance = 2f;
 
-    [Tooltip("How quickly the camera pulls in when blocked (exp response). High enough to avoid clipping walls, but not an instant snap.")]
-    public float collisionPullInSpeed = 14f;
+    [Tooltip("How quickly the camera pulls in when blocked (exp response). Prompt enough to avoid clipping, restrained enough to remain smooth across detailed track geometry.")]
+    public float collisionPullInSpeed = 12f;
 
-    [Tooltip("How quickly the camera extends back out after an obstacle clears (fraction/sec).")]
-    public float collisionRecoverySpeed = 2.5f;
+    [Tooltip("Exponential response used when the camera extends after an obstacle clears.")]
+    public float collisionRecoverySpeed = 1.4f;
 
     // ══════════════════════════════════════════════════════════════
     //  CLIP PLANES / CURSOR / TIMING
@@ -474,6 +492,7 @@ public class HovercraftCamera : MonoBehaviour
     private Vector3 _frameAngularVelocity;   // deg/sec, axis * magnitude
     private float _dynamicEngagement;        // 0 = regular road, 1 = inside loop/corkscrew (smoothed)
     private float _engagementRaw;            // unsmoothed engagement, this frame
+    private float _insideFeatureBlend;        // 0 = anticipation/exit, 1 = physically inside the feature
 
     // Third person
     private Vector3 _smoothedOffset;      // camera offset relative to craft position
@@ -486,6 +505,14 @@ public class HovercraftCamera : MonoBehaviour
     private float _boostVisual;
     private float _boostOnsetPulse;
     private bool _boostSignalWasActive;
+
+    // Cinematic energy is sampled from physics, then eased for presentation.
+    // Measuring in FixedUpdate avoids render-rate-dependent acceleration spikes.
+    private Vector3 _previousPhysicsVelocity;
+    private float _sampledForwardAcceleration;
+    private float _accelerationVisual;
+    private float _smoothedSideSpeed;
+    private bool _hasPhysicsVelocitySample;
 
     private bool _initialized;
 
@@ -527,6 +554,29 @@ public class HovercraftCamera : MonoBehaviour
         }
     }
 
+    void FixedUpdate()
+    {
+        if (targetRigidbody == null)
+            return;
+
+        Vector3 velocity = targetRigidbody.linearVelocity;
+        if (!_hasPhysicsVelocitySample)
+        {
+            _previousPhysicsVelocity = velocity;
+            _hasPhysicsVelocitySample = true;
+            return;
+        }
+
+        float fixedDt = Mathf.Max(0.0001f, Time.fixedDeltaTime);
+        Vector3 acceleration = (velocity - _previousPhysicsVelocity) / fixedDt;
+        Vector3 travelDirection = velocity.sqrMagnitude > 25f
+            ? velocity.normalized
+            : (target != null ? target.forward : Vector3.forward);
+
+        _sampledForwardAcceleration = Vector3.Dot(acceleration, travelDirection);
+        _previousPhysicsVelocity = velocity;
+    }
+
     void LateUpdate()
     {
         if (target == null) return;
@@ -543,18 +593,22 @@ public class HovercraftCamera : MonoBehaviour
 
         UpdateGroundedState(dt);
         UpdateReferenceUp(dt);
+        UpdateInsideFeatureBlend(dt);
 
         float speed = GetSpeed();
         float speedT = GetSpeedT(speed);
 
         UpdateFollowDirection(speedT, dt);
+        UpdateCinematicEnergy(dt);
+        // Resolve FOV before the chase offset so dolly-zoom compensation uses the
+        // same-frame lens value. This prevents a subtle one-frame composition pulse
+        // during acceleration, braking and Overcharge transitions.
+        UpdateFOV(speedT, dt);
 
         if (currentPerspective == CameraPerspective.ThirdPerson)
             UpdateThirdPerson(speedT, dt);
         else
             UpdateFirstPerson(speedT, dt);
-
-        UpdateFOV(speedT, dt);
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -654,6 +708,7 @@ public class HovercraftCamera : MonoBehaviour
         Vector3 surfaceUpNow = GetSurfaceUp();
         _engagementRaw = ComputeEngagement(surfaceUpNow);
         _dynamicEngagement = (1f - _airBlend) * _engagementRaw;
+        _insideFeatureBlend = IsInsideOrientationFeature() ? 1f : _dynamicEngagement;
         _referenceUp = GetTargetReferenceUp(surfaceUpNow);
         _prevReferenceUp = _referenceUp;
         _frameAngularVelocity = Vector3.zero;
@@ -664,13 +719,30 @@ public class HovercraftCamera : MonoBehaviour
         _collisionFraction = 1f;
         _boostVisual = _boostAmount;
         _boostOnsetPulse = 0f;
+        _sampledForwardAcceleration = 0f;
+        _accelerationVisual = 0f;
+        _smoothedSideSpeed = HasTelemetry()
+            ? craftCore.telemetry.CurrentTelemetry.sideSpeed
+            : 0f;
+        if (targetRigidbody != null)
+        {
+            _previousPhysicsVelocity = targetRigidbody.linearVelocity;
+            _hasPhysicsVelocitySample = true;
+        }
+        else
+        {
+            _previousPhysicsVelocity = Vector3.zero;
+            _hasPhysicsVelocitySample = false;
+        }
 
         if (currentPerspective == CameraPerspective.ThirdPerson)
         {
             Vector3 desiredOffset = ComputeThirdPersonOffset(GetSpeedT(GetSpeed()));
             _smoothedOffset = desiredOffset;
 
-            transform.position = target.position + desiredOffset;
+            transform.position = EnforceMinimumCameraHeight(
+                target.position,
+                target.position + desiredOffset);
             transform.rotation = ComputeThirdPersonRotation(GetSpeedT(GetSpeed()), transform.position);
 
             if (_cam != null)
@@ -752,15 +824,22 @@ public class HovercraftCamera : MonoBehaviour
             var t = craftCore.telemetry.CurrentTelemetry;
             _isGrounded = t.isGrounded;
             // Telemetry: 1 = grounded. Camera: 1 = airborne.
-            _airBlend = 1f - t.groundedFactor;
+            float telemetryAirTarget = 1f - t.groundedFactor;
+            // Add a restrained camera envelope on top of the fast physics signal.
+            // This filters brief probe losses and gives take-off/landing a soft knee.
+            float response = telemetryAirTarget > _airBlend ? 5.5f : 8f;
+            _airBlend = Mathf.Lerp(_airBlend, telemetryAirTarget, ExpSmoothing(response, dt));
             return;
         }
 
         if (!useExternalGroundedState)
             UpdateFallbackGroundedRaycast();
 
-        float targetBlend = _isGrounded ? 0f : 1f;
-        _airBlend = Mathf.MoveTowards(_airBlend, targetBlend, dt * fallbackGroundedBlendSpeed);
+        float fallbackAirTarget = _isGrounded ? 0f : 1f;
+        _airBlend = Mathf.Lerp(
+            _airBlend,
+            fallbackAirTarget,
+            ExpSmoothing(fallbackGroundedBlendSpeed, dt));
     }
 
     private void UpdateFallbackGroundedRaycast()
@@ -812,7 +891,7 @@ public class HovercraftCamera : MonoBehaviour
         if (mode == GroundOrientationMode.Dynamic)
             influence *= _engagementRaw;
 
-        float groundedWeight = (1f - _airBlend) * influence;
+        float groundedWeight = (1f - Ease01(_airBlend)) * influence;
         Vector3 up = BlendTowardSurfaceUp(surfaceUp, groundedWeight);
 
         if (up.sqrMagnitude < 0.001f)
@@ -1073,7 +1152,7 @@ public class HovercraftCamera : MonoBehaviour
         // framing, drift-framing fade, and Dynamic-mode orientation following.
         _engagementRaw = ComputeEngagement(surfaceUp);
 
-        float engagementTarget = (1f - _airBlend) * _engagementRaw;
+        float engagementTarget = (1f - Ease01(_airBlend)) * _engagementRaw;
 
         // Asymmetric: engage briskly so the camera arrives WITH the feature, release
         // slowly so a momentary dip below the threshold cannot pop the framing out and
@@ -1097,7 +1176,7 @@ public class HovercraftCamera : MonoBehaviour
 
         Vector3 targetUp = GetTargetReferenceUp(surfaceUp);
 
-        float response = Mathf.Lerp(groundedUpResponse, airborneUpResponse, _airBlend);
+        float response = Mathf.Lerp(groundedUpResponse, airborneUpResponse, Ease01(_airBlend));
         float lerp = ExpSmoothing(response, dt);
 
         Vector3 desired = Vector3.Slerp(_referenceUp, targetUp, lerp);
@@ -1107,6 +1186,53 @@ public class HovercraftCamera : MonoBehaviour
         _referenceUp = Vector3.RotateTowards(_referenceUp, desired, maxRadians, 0f).normalized;
 
         UpdateFrameAngularVelocity(dt);
+    }
+
+    /// <summary>
+    /// Separates feature anticipation from actually riding the feature. The section
+    /// sensor intentionally reports engagement before a loop/corkscrew so orientation
+    /// can prepare in time, but using that same signal at full strength for composition
+    /// made the approach camera invasive. This second envelope only reaches one while
+    /// the craft is physically within an orientation section.
+    /// </summary>
+    private void UpdateInsideFeatureBlend(float dt)
+    {
+        float targetBlend;
+
+        if (useTrackSectionData && trackSensor != null && trackSensor.HasTrack && trackSensor.IsTracking)
+            targetBlend = trackSensor.IsOnOrientationSection ? 1f : 0f;
+        else
+            targetBlend = _dynamicEngagement;
+
+        float response = targetBlend > _insideFeatureBlend ? 7.5f : 3.2f;
+        _insideFeatureBlend = Mathf.Lerp(
+            _insideFeatureBlend,
+            targetBlend,
+            ExpSmoothing(response, dt));
+    }
+
+    private bool IsInsideOrientationFeature()
+    {
+        return useTrackSectionData
+            && trackSensor != null
+            && trackSensor.HasTrack
+            && trackSensor.IsTracking
+            && trackSensor.IsOnOrientationSection;
+    }
+
+    /// <summary>
+    /// Keeps only a subtle establishing-frame hint during anticipation, then hands
+    /// over to the authored low ride composition inside the feature.
+    /// </summary>
+    private float GetFeatureCompositionBlend(CameraProfile profile)
+    {
+        if (profile == null || !profile.dynamicFraming)
+            return 0f;
+
+        float orientationBlend = Ease01(_dynamicEngagement);
+        float insideBlend = Ease01(_insideFeatureBlend);
+        const float anticipationInfluence = 0.18f;
+        return orientationBlend * Mathf.Lerp(anticipationInfluence, 1f, insideBlend);
     }
 
     /// <summary>
@@ -1154,7 +1280,7 @@ public class HovercraftCamera : MonoBehaviour
             return Quaternion.identity;
 
         float leadAngle = Mathf.Min(magnitude * surfaceLookAheadTime, maxSurfaceLookAhead);
-        leadAngle *= 1f - _airBlend;
+        leadAngle *= 1f - Ease01(_airBlend);
 
         if (leadAngle < 0.01f)
             return Quaternion.identity;
@@ -1209,7 +1335,7 @@ public class HovercraftCamera : MonoBehaviour
         float forwardInfluence = Mathf.Lerp(
             Mathf.Lerp(lowSpeedForwardInfluence, highSpeedForwardInfluence, speedT),
             airborneForwardInfluence,
-            _airBlend
+            Ease01(_airBlend)
         );
 
         // Per-profile: 0 = camera follows pure velocity, so deliberate drift angles
@@ -1228,7 +1354,7 @@ public class HovercraftCamera : MonoBehaviour
     {
         Vector3 desired = ComputeDesiredFollowDirection(speedT);
 
-        float response = Mathf.Lerp(groundedDirectionResponse, airborneDirectionResponse, _airBlend);
+        float response = Mathf.Lerp(groundedDirectionResponse, airborneDirectionResponse, Ease01(_airBlend));
         float lerp = ExpSmoothing(response, dt);
 
         Vector3 next = Vector3.Slerp(_followDirection, desired, lerp);
@@ -1245,17 +1371,20 @@ public class HovercraftCamera : MonoBehaviour
 
     private void UpdateThirdPerson(float speedT, float dt)
     {
+        float motionBudget = Mathf.Clamp01(ActiveProfile.motionEnergyInfluence);
+
         // Desired offset relative to the craft. Smoothing this offset (instead of
         // the world position) means steady travel at any speed has zero lag —
         // only changes of direction/distance are eased.
         Vector3 desiredOffset = ComputeThirdPersonOffset(speedT);
 
-        // Boost setback: fold the fall-back into the offset BEFORE smoothing so the
-        // camera eases back and returns instead of snapping (a hard add here read as a
-        // teleport). The envelope already ramps _boostAmount, so this is doubly smooth.
+        // Sustained boost setback belongs inside the normal offset smoothing so held
+        // Overcharge remains stable instead of continuously shaking the composition.
         float boostKick = Mathf.Clamp01(_boostVisual);
         if (boostKick > 0f && boostThirdPersonSetback > 0f)
-            desiredOffset -= target.forward * (boostThirdPersonSetback * overchargePresentationScale * boostKick);
+            desiredOffset -= _followDirection
+                           * (boostThirdPersonSetback * overchargePresentationScale
+                           * boostKick * motionBudget);
 
         _smoothedOffset = Vector3.SmoothDamp(
             _smoothedOffset,
@@ -1268,6 +1397,32 @@ public class HovercraftCamera : MonoBehaviour
 
         Vector3 anchor = target.position;
         Vector3 desiredPosition = anchor + _smoothedOffset;
+
+        // Real acceleration gives the camera mass. Acceleration pulls the view back;
+        // braking nudges it forward at lower strength so it reads without seasickness.
+        float inertialWeight = _accelerationVisual >= 0f
+            ? _accelerationVisual
+            : _accelerationVisual * 0.35f;
+        desiredPosition -= _followDirection
+                         * (accelerationCameraSetback * inertialWeight * motionBudget);
+
+        // The ignition hit intentionally bypasses the general offset smoothing. It is
+        // short and restrained, then hands off to the sustained envelope above. This
+        // keeps every ordinary transition sweet without making Overcharge feel delayed.
+        float ignitionKick = Mathf.Clamp01(_boostOnsetPulse * boostOnsetPulseStrength);
+        if (ignitionKick > 0f && boostThirdPersonSetback > 0f)
+        {
+            const float ignitionSetbackShare = 0.24f;
+            desiredPosition -= _followDirection
+                             * (boostThirdPersonSetback * overchargePresentationScale
+                             * ignitionSetbackShare * ignitionKick * motionBudget);
+        }
+
+        // Descents and curvature lead can rotate the trailing offset underneath the
+        // craft. Keep the chase view above a stable safety plane so the rear silhouette
+        // and propulsion wake retain the intended composition. Orientation features
+        // smoothly replace world up with their local track up, preserving inversions.
+        desiredPosition = EnforceMinimumCameraHeight(anchor, desiredPosition);
 
         if (useCollisionAvoidance)
             desiredPosition = ApplyCollisionAvoidance(anchor, desiredPosition, dt);
@@ -1288,17 +1443,23 @@ public class HovercraftCamera : MonoBehaviour
     {
         CameraProfile profile = ActiveProfile;
 
+        float airBlend = Ease01(_airBlend);
         float distance = Mathf.Lerp(profile.distanceBase, profile.distanceMax, speedT)
-                         + tpAirborneExtraDistance * _airBlend;
+                         + tpAirborneExtraDistance * airBlend;
 
         float height = Mathf.Lerp(profile.heightBase, profile.heightMax, speedT)
-                       + tpAirborneExtraHeight * _airBlend;
+                       + tpAirborneExtraHeight * airBlend;
 
-        // Dynamic framing: pull in close and low while engaged in a loop/corkscrew.
+        float framingBlend = GetFeatureCompositionBlend(profile);
+
+        // The approach only receives a hint of the feature frame. Once the craft is
+        // physically inside, it drops to a low shoulder-level chase view. Separating
+        // these phases avoids both the old invasive approach close-up and the later
+        // high, distant "RC car" view while riding the loop.
         if (profile.dynamicFraming)
         {
-            distance = Mathf.Lerp(distance, profile.engagedDistance, _dynamicEngagement);
-            height = Mathf.Lerp(height, profile.engagedHeight, _dynamicEngagement);
+            distance = Mathf.Lerp(distance, profile.engagedDistance, framingBlend);
+            height = Mathf.Lerp(height, profile.engagedHeight, framingBlend);
         }
 
         Vector3 offset = -_followDirection * distance + _referenceUp * height;
@@ -1311,7 +1472,16 @@ public class HovercraftCamera : MonoBehaviour
             float currentTan = Mathf.Tan(Mathf.Clamp(_cam.fieldOfView, 1f, 179f) * 0.5f * Mathf.Deg2Rad);
 
             if (baseTan > 0.0001f && currentTan > 0.0001f)
-                offset *= Mathf.Lerp(1f, baseTan / currentTan, tpFovZoomCompensation);
+            {
+                // Full dolly compensation is useful on straights, but it used to
+                // stack with feature framing and halve the camera distance. Relax it
+                // during features so the road geometry remains visible around the craft.
+                float effectiveCompensation = Mathf.Lerp(
+                    tpFovZoomCompensation,
+                    tpFovZoomCompensation * 0.45f,
+                    framingBlend);
+                offset *= Mathf.Lerp(1f, baseTan / currentTan, effectiveCompensation);
+            }
         }
 
         // Surface look-ahead swings the POSITION along the curvature too: the camera
@@ -1326,13 +1496,13 @@ public class HovercraftCamera : MonoBehaviour
         CameraProfile profile = ActiveProfile;
 
         float lookAhead = Mathf.Lerp(profile.lookAheadBase, profile.lookAheadMax, speedT);
-        lookAhead *= Mathf.Lerp(1f, tpAirborneLookAheadMultiplier, _airBlend);
+        lookAhead *= Mathf.Lerp(1f, tpAirborneLookAheadMultiplier, Ease01(_airBlend));
 
         // Dynamic framing: raise the aim point while engaged, tilting the view up
         // like lifting your head on a rollercoaster.
         float lookHeight = tpLookHeight;
         if (profile.dynamicFraming)
-            lookHeight += profile.engagedLookUp * _dynamicEngagement;
+            lookHeight += profile.engagedLookUp * GetFeatureCompositionBlend(profile);
 
         Vector3 aimOffset = _followDirection * lookAhead + _referenceUp * lookHeight;
 
@@ -1340,14 +1510,14 @@ public class HovercraftCamera : MonoBehaviour
         // Faded out inside loops/corkscrews — side-slip noise there reads as shake.
         if (tpDriftLookInfluence > 0f && HasTelemetry())
         {
-            float sideSpeed = craftCore.telemetry.CurrentTelemetry.sideSpeed;
+            float sideSpeed = _smoothedSideSpeed;
             float sideOffset = Mathf.Clamp(
                 sideSpeed * tpDriftLookInfluence,
                 -tpMaxDriftLookOffset,
                 tpMaxDriftLookOffset
             );
 
-            sideOffset *= 1f - _dynamicEngagement;
+            sideOffset *= 1f - Ease01(_dynamicEngagement);
 
             Vector3 frameRight = Vector3.Cross(_referenceUp, _followDirection);
             aimOffset += frameRight * sideOffset;
@@ -1362,12 +1532,28 @@ public class HovercraftCamera : MonoBehaviour
         // Camera up: the reference frame (bank-reduced at the source), swept by the lead.
         Vector3 cameraUp = lead * _referenceUp;
 
-        return SafeLookRotation(lookDirection, cameraUp, transform.rotation);
+        Quaternion rotation = SafeLookRotation(lookDirection, cameraUp, transform.rotation);
+
+        // A small body-language roll lets a drift feel loaded without moving the
+        // focal point. Feature engagement fades it out so corkscrews stay legible.
+        if (driftCameraRoll > 0f && HasTelemetry() && lookDirection.sqrMagnitude > 0.001f)
+        {
+            float sideSpeed = _smoothedSideSpeed;
+            float slip = Mathf.Clamp(sideSpeed / 55f, -1f, 1f);
+            float featureSuppression = 1f - Ease01(_dynamicEngagement);
+            float motionBudget = Mathf.Clamp01(ActiveProfile.motionEnergyInfluence);
+            float roll = -slip * driftCameraRoll * featureSuppression * motionBudget;
+            rotation = Quaternion.AngleAxis(roll, lookDirection.normalized) * rotation;
+        }
+
+        return rotation;
     }
 
     private Vector3 ApplyCollisionAvoidance(Vector3 anchor, Vector3 desiredPosition, float dt)
     {
-        Vector3 pivot = anchor + _referenceUp * tpLookHeight;
+        Vector3 safetyUp = GetCameraSafetyUp();
+        float pivotHeight = Mathf.Max(tpLookHeight, tpMinimumHeightAboveCraft);
+        Vector3 pivot = anchor + safetyUp * pivotHeight;
         Vector3 toCamera = desiredPosition - pivot;
         float fullDistance = toCamera.magnitude;
 
@@ -1410,18 +1596,64 @@ public class HovercraftCamera : MonoBehaviour
             }
         }
 
-        // Pull in fast but smoothed (a snap here reads as flicker on ramp exits);
-        // extend back out slowly so clearing an obstacle never pops.
+        // Adjacent triangles can alternate as the closest hit by a few centimetres.
+        // Ignore that sub-visual change so a detailed track collider cannot chatter
+        // the camera even though its actual clearance has not meaningfully changed.
+        if (Mathf.Abs(targetFraction - _collisionFraction) < 0.012f)
+            targetFraction = _collisionFraction;
+
+        // Pull in promptly but smoothly; extend with an exponential ease so clearing
+        // a wall or loop shell never introduces a derivative pop.
         if (targetFraction < _collisionFraction)
             _collisionFraction = Mathf.Lerp(_collisionFraction, targetFraction, ExpSmoothing(collisionPullInSpeed, dt));
         else
-            _collisionFraction = Mathf.MoveTowards(_collisionFraction, targetFraction, collisionRecoverySpeed * dt);
+            _collisionFraction = Mathf.Lerp(_collisionFraction, targetFraction, ExpSmoothing(collisionRecoverySpeed, dt));
 
         // Keep at least minDistance from the pivot, but never past the obstacle.
         float length = fullDistance * _collisionFraction;
         length = Mathf.Max(length, Mathf.Min(minDistance, hitDistance));
 
         return pivot + direction * length;
+    }
+
+    private Vector3 EnforceMinimumCameraHeight(Vector3 anchor, Vector3 position)
+    {
+        Vector3 safetyUp = GetCameraSafetyUp();
+        float currentHeight = Vector3.Dot(position - anchor, safetyUp);
+        float minimumHeight = Mathf.Max(0.05f, tpMinimumHeightAboveCraft);
+
+        // Softplus behaves like a minimum-height clamp without the hard derivative
+        // change of Mathf.Max. The correction begins imperceptibly above the limit,
+        // then smoothly approaches the floor as the authored offset tries to pass it.
+        const float softKnee = 0.28f;
+        float delta = currentHeight - minimumHeight;
+        float targetHeight;
+
+        if (delta >= softKnee * 6f)
+            return position;
+        if (delta <= -softKnee * 6f)
+            targetHeight = minimumHeight;
+        else
+            targetHeight = minimumHeight
+                         + softKnee * Mathf.Log(1f + Mathf.Exp(delta / softKnee));
+
+        if (targetHeight > currentHeight)
+            position += safetyUp * (targetHeight - currentHeight);
+
+        return position;
+    }
+
+    private Vector3 GetCameraSafetyUp()
+    {
+        // World up is the stable downhill rule. Genuine orientation features blend
+        // toward their own smoothed reference up so loops and corkscrews are never
+        // constrained by an arbitrary global ceiling/floor.
+        Vector3 safetyUp = Vector3.Slerp(
+            Vector3.up,
+            _referenceUp,
+            Ease01(_dynamicEngagement));
+
+        return safetyUp.sqrMagnitude > 0.001f ? safetyUp.normalized : Vector3.up;
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -1435,9 +1667,13 @@ public class HovercraftCamera : MonoBehaviour
         // A restrained backward recoil at boost onset sells the acceleration without
         // ever letting the cockpit drift out of the craft.
         Vector3 mountOffset = ActiveProfile.mountOffset;
-        float fpBoost = Mathf.Clamp01(_boostVisual);
+        float motionBudget = Mathf.Clamp01(ActiveProfile.motionEnergyInfluence);
+        float fpIgnition = _boostOnsetPulse * boostOnsetPulseStrength * 0.35f;
+        float fpBoost = Mathf.Clamp01(_boostVisual + fpIgnition);
         if (fpBoost > 0f && boostFirstPersonRecoil > 0f)
-            mountOffset -= Vector3.forward * (boostFirstPersonRecoil * overchargePresentationScale * fpBoost);
+            mountOffset -= Vector3.forward
+                         * (boostFirstPersonRecoil * overchargePresentationScale
+                         * fpBoost * motionBudget);
 
         transform.position = target.TransformPoint(mountOffset);
 
@@ -1457,7 +1693,7 @@ public class HovercraftCamera : MonoBehaviour
         // Horizon softening: damp a fraction of the craft's lean toward the reference
         // up. Grounded this settles carve-lean roll; airborne it stays tiny so the
         // pilot genuinely rotates with flips.
-        float softening = Mathf.Lerp(fpGroundedHorizonSoftening, fpAirborneHorizonSoftening, _airBlend);
+        float softening = Mathf.Lerp(fpGroundedHorizonSoftening, fpAirborneHorizonSoftening, Ease01(_airBlend));
         up = Vector3.Slerp(up, _referenceUp, softening);
 
         // Velocity look: pull slightly toward where the craft is actually going.
@@ -1534,7 +1770,35 @@ public class HovercraftCamera : MonoBehaviour
         float lo = Mathf.Max(0f, speedForMinEffects);
         float hi = Mathf.Max(lo + 1f, speedForMaxEffects);
         float t = Mathf.Clamp01((speed - lo) / (hi - lo));
-        return Mathf.Pow(t, speedResponseExponent);
+        return Ease01(Mathf.Pow(t, speedResponseExponent));
+    }
+
+    private void UpdateCinematicEnergy(float dt)
+    {
+        // Positive and negative acceleration use different practical ranges: the
+        // main thruster hits harder than ordinary braking. Both are normalized here
+        // so the public art controls remain simple and meaningful.
+        float targetEnergy = _sampledForwardAcceleration >= 0f
+            ? Mathf.InverseLerp(2f, 55f, _sampledForwardAcceleration)
+            : -Mathf.InverseLerp(4f, 75f, -_sampledForwardAcceleration);
+
+        // A soft envelope keeps suspension and mesh-contact impulses out of the
+        // presentation while preserving the sustained pull of real acceleration.
+        float response = Mathf.Abs(targetEnergy) > Mathf.Abs(_accelerationVisual) ? 6f : 3.2f;
+        _accelerationVisual = Mathf.Lerp(
+            _accelerationVisual,
+            targetEnergy,
+            ExpSmoothing(response, dt));
+
+        // Drift framing is visual language, not a physics meter. Filtering the raw
+        // telemetry prevents hover-probe corrections from becoming lateral twitches.
+        float targetSideSpeed = HasTelemetry()
+            ? craftCore.telemetry.CurrentTelemetry.sideSpeed
+            : 0f;
+        _smoothedSideSpeed = Mathf.Lerp(
+            _smoothedSideSpeed,
+            targetSideSpeed,
+            ExpSmoothing(5f, dt));
     }
 
     private void UpdateFOV(float speedT, float dt)
@@ -1546,7 +1810,9 @@ public class HovercraftCamera : MonoBehaviour
 
         CameraProfile profile = ActiveProfile;
         float targetFov = Mathf.Lerp(profile.fovBase, profile.fovMax, speedT)
-                        + boostExtraFOV * overchargePresentationScale * boost;
+                        + boostExtraFOV * overchargePresentationScale * boost
+                        + accelerationFovKick * Mathf.Max(0f, _accelerationVisual)
+                        * Mathf.Clamp01(profile.motionEnergyInfluence);
 
         float response = targetFov > _cam.fieldOfView ? fovAttackSpeed : fovSmoothSpeed;
         float fovLerp = ExpSmoothing(response, dt);
@@ -1573,6 +1839,13 @@ public class HovercraftCamera : MonoBehaviour
     {
         if (responseSpeed <= 0f) return 1f;
         return 1f - Mathf.Exp(-responseSpeed * dt);
+    }
+
+    /// <summary>Zero-slope easing used at the ends of presentation transitions.</summary>
+    private static float Ease01(float value)
+    {
+        value = Mathf.Clamp01(value);
+        return value * value * (3f - 2f * value);
     }
 
     /// <summary>LookRotation that survives degenerate forward/up pairs.</summary>

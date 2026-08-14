@@ -588,6 +588,32 @@ namespace TrackGeneration
                 TrackGuideMarkingBuilder.Build(layout.Sections, resolved.RoadProfile, Designer.Visual,
                     tempRootObj.transform, RoadLineMaterial, resolved.RoadWidth);
 
+                // ── KeepAboveStart ground guarantee ──────────────────────────────
+                // The elevation solver only BIASES toward staying above the start; its
+                // closure correction can still drive the realised profile below y=0.
+                // Because a closed lap's elevation is defined only up to a constant
+                // vertical offset, lift the whole track (root transform) so its lowest
+                // rideable point sits at/above the ground plane. Everything — mesh,
+                // collider, markings and craft spawn — world-transforms through this
+                // root, so the lift is uniform and cannot reopen the loop.
+                if (resolved.GroundLevelPolicy == TrackGeneration.Design.TrackGroundLevelPolicy.KeepAboveStart)
+                {
+                    float worldMinY = float.MaxValue;
+                    foreach (var sec in layout.Sections)
+                    {
+                        if (sec == null || sec.SubdivisionFrames == null) continue;
+                        foreach (var fr in sec.SubdivisionFrames)
+                            worldMinY = Mathf.Min(worldMinY, tempRootObj.transform.TransformPoint(fr.Position).y);
+                    }
+                    const float groundClearance = 0.05f; // sit a hair above y=0
+                    if (worldMinY != float.MaxValue && worldMinY < groundClearance)
+                    {
+                        float lift = groundClearance - worldMinY;
+                        tempRootObj.transform.position += Vector3.up * lift;
+                        Debug.Log($"[TrackGenerator] KeepAboveStart: lifted track {lift:F1}m so its lowest point clears the ground plane.");
+                    }
+                }
+
                 // Validate the built objects before committing.
                 int meshCount = 0;
                 foreach (MeshFilter f in tempRootObj.GetComponentsInChildren<MeshFilter>(true))

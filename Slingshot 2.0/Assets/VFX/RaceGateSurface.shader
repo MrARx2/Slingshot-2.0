@@ -22,6 +22,7 @@ Shader "Slingshot/Race Gate Surface"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
+            #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             struct Attributes
@@ -34,6 +35,7 @@ Shader "Slingshot/Race Gate Surface"
             {
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                half fogFactor : TEXCOORD1;
             };
 
             CBUFFER_START(UnityPerMaterial)
@@ -47,8 +49,10 @@ Shader "Slingshot/Race Gate Surface"
             Varyings Vert(Attributes input)
             {
                 Varyings output;
-                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                VertexPositionInputs positions = GetVertexPositionInputs(input.positionOS.xyz);
+                output.positionCS = positions.positionCS;
                 output.uv = input.uv;
+                output.fogFactor = ComputeFogFactor(positions.positionCS.z);
                 return output;
             }
 
@@ -57,7 +61,8 @@ Shader "Slingshot/Race Gate Surface"
                 float2 cell = floor(input.uv * max(_CheckerScale.xy, float2(1.0, 1.0)));
                 half checker = fmod(cell.x + cell.y, 2.0);
                 half3 color = lerp(_BaseColor.rgb, _SecondaryColor.rgb, checker * _CheckerMix);
-                return half4(color * _Brightness, 1.0h);
+                color = MixFog(color * _Brightness, input.fogFactor);
+                return half4(color, 1.0h);
             }
             ENDHLSL
         }

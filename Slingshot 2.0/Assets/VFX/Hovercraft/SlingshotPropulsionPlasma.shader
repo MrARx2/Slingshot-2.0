@@ -37,6 +37,7 @@ Shader "Slingshot/VFX/Propulsion Plasma"
             #pragma vertex Vert
             #pragma fragment Frag
             #pragma multi_compile_instancing
+            #pragma multi_compile_fog
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
@@ -68,6 +69,7 @@ Shader "Slingshot/VFX/Propulsion Plasma"
                 float4 positionHCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
                 half4 color : COLOR;
+                half fogFactor : TEXCOORD1;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -76,9 +78,11 @@ Shader "Slingshot/VFX/Propulsion Plasma"
                 Varyings output;
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
-                output.positionHCS = TransformObjectToHClip(input.positionOS.xyz);
+                VertexPositionInputs positions = GetVertexPositionInputs(input.positionOS.xyz);
+                output.positionHCS = positions.positionCS;
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
                 output.color = input.color;
+                output.fogFactor = ComputeFogFactor(positions.positionCS.z);
                 return output;
             }
 
@@ -105,6 +109,7 @@ Shader "Slingshot/VFX/Propulsion Plasma"
                 half energy = saturate((core + halo * 0.42) * endFade * detail);
                 half3 plasma = _EdgeColor.rgb * halo * 0.42h + _Tint.rgb * core * 1.45h;
                 plasma *= input.color.rgb * _Intensity * energy * input.color.a;
+                plasma *= ComputeFogIntensity(input.fogFactor);
                 return half4(plasma, energy);
             }
             ENDHLSL

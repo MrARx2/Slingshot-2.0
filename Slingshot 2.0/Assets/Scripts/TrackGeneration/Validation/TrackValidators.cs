@@ -1002,6 +1002,11 @@ namespace TrackGeneration.Validation
 
             float requiredLateral = Mathf.Max(cfg.RoadWidth, cfg.DualRoadWidth)
                                   + cfg.RoadProfile.SideHeight * 2f + cfg.WallMaskSafetyMargin;
+            // NOTE: the "two roads inside each other" case needs a proper fix that raises
+            // BOTH this requirement AND the lane-separation resolver together — otherwise
+            // the validator demands more clearance than the resolver places the roads at,
+            // and every dual quarter becomes unbuildable (0 valid candidates). Reverted
+            // the catch-envelope bump here until the resolver is updated to match.
             float requiredVertical = cfg.VerticalClearance * 0.85f;
 
             // Lane separation is resolved to the same envelope value, so allow a tiny

@@ -24,6 +24,7 @@ Shader "Slingshot/Track Guide Emissive"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
+            #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             struct Attributes { float4 positionOS : POSITION; };
@@ -31,6 +32,7 @@ Shader "Slingshot/Track Guide Emissive"
             {
                 float4 positionCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
+                half fogFactor : TEXCOORD1;
             };
             CBUFFER_START(UnityPerMaterial)
                 half4 _BaseColor;
@@ -47,6 +49,7 @@ Shader "Slingshot/Track Guide Emissive"
                 VertexPositionInputs positions = GetVertexPositionInputs(input.positionOS.xyz);
                 output.positionCS = positions.positionCS;
                 output.positionWS = positions.positionWS;
+                output.fogFactor = ComputeFogFactor(positions.positionCS.z);
                 return output;
             }
 
@@ -56,8 +59,11 @@ Shader "Slingshot/Track Guide Emissive"
                     (input.positionWS.x + input.positionWS.y + input.positionWS.z) * _PulseScale
                     - _Time.y * _PulseSpeed);
                 half pulseGain = lerp(1.0h, 0.55h + pulse * 0.9h, _PulseStrength);
-                return half4(_BaseColor.rgb * _Brightness * pulseGain,
-                    _BaseColor.a * _Opacity);
+                // This pass is additive, so it must fade toward black rather than
+                // adding the fog color a second time over the already fogged scene.
+                half3 color = _BaseColor.rgb * _Brightness * pulseGain;
+                color *= ComputeFogIntensity(input.fogFactor);
+                return half4(color, _BaseColor.a * _Opacity);
             }
             ENDHLSL
         }

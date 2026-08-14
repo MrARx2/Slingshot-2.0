@@ -6,6 +6,7 @@ Shader "Slingshot/Skybox HDRI 3D Rotation"
         [HideInInspector] _MainTex_HDR ("HDR Decode", Vector) = (1,1,0,0)
         _Tint ("Tint", Color) = (1,1,1,1)
         _Exposure ("Exposure", Range(0,8)) = 1
+        _ApparentDistance ("Apparent Distance", Range(0.5,6)) = 1
         _RotationXYZ ("Pitch Yaw Roll", Vector) = (0,0,0,0)
     }
 
@@ -25,6 +26,7 @@ Shader "Slingshot/Skybox HDRI 3D Rotation"
             float4 _MainTex_HDR;
             float4 _Tint;
             float _Exposure;
+            float _ApparentDistance;
             float4 _RotationXYZ;
 
             struct Attributes
@@ -59,6 +61,24 @@ Shader "Slingshot/Skybox HDRI 3D Rotation"
                 return float3(c * value.x - s * value.y, s * value.x + c * value.y, value.z);
             }
 
+            // A skybox has no physical radius, so moving or scaling it cannot change its
+            // apparent distance. This remaps the panorama's angular feature scale instead.
+            // The pole-aware fold keeps latitude-longitude sampling continuous when the
+            // distance is greater than one and more than one panorama tile is visible.
+            float2 ApplyApparentDistance(float2 uv, float apparentDistance)
+            {
+                float scale = max(apparentDistance, 0.01);
+                float2 scaled = (uv - 0.5) * scale + 0.5;
+
+                float latitudeBand = floor(scaled.y);
+                float mirroredBand = fmod(abs(latitudeBand), 2.0);
+                float latitude = frac(scaled.y);
+                latitude = lerp(latitude, 1.0 - latitude, mirroredBand);
+
+                float longitude = frac(scaled.x + mirroredBand * 0.5);
+                return float2(longitude, saturate(latitude));
+            }
+
             Varyings vert(Attributes input)
             {
                 Varyings output;
@@ -79,6 +99,7 @@ Shader "Slingshot/Skybox HDRI 3D Rotation"
                 float2 uv;
                 uv.x = atan2(direction.x, direction.z) / (2.0 * PI) + 0.5;
                 uv.y = asin(clamp(direction.y, -1.0, 1.0)) / PI + 0.5;
+                uv = ApplyApparentDistance(uv, _ApparentDistance);
 
                 half4 encoded = tex2D(_MainTex, uv);
                 half3 color = DecodeHDR(encoded, _MainTex_HDR);

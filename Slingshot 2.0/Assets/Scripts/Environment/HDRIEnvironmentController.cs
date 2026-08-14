@@ -17,6 +17,8 @@ public sealed class HDRIEnvironmentController : MonoBehaviour
 
     [Header("Art Direction")]
     [Min(0f)] public float exposure = 1f;
+    [Tooltip("Controls the apparent angular size of the panorama. 1 is the source HDRI. Higher values make stars and nebulae smaller and feel farther away; lower values make them larger and closer. This is an artistic scale control because a skybox is physically infinite.")]
+    [Range(0.5f, 6f)] public float apparentDistance = 1f;
     [Tooltip("Moves the HDRI view up/down around the local X axis.")]
     [Range(-180f, 180f)] public float pitchOffset = 0f;
     [Tooltip("Turns the HDRI left/right around the local Y axis.")]
@@ -44,6 +46,7 @@ public sealed class HDRIEnvironmentController : MonoBehaviour
     private Texture _appliedTexture;
     private Color _appliedTint;
     private float _appliedExposure = float.NaN;
+    private float _appliedApparentDistance = float.NaN;
     private Vector3 _appliedRotation = new Vector3(float.NaN, float.NaN, float.NaN);
     private float _appliedAmbientIntensity = float.NaN;
     private float _appliedReflectionIntensity = float.NaN;
@@ -63,6 +66,7 @@ public sealed class HDRIEnvironmentController : MonoBehaviour
     private void OnValidate()
     {
         exposure = Mathf.Max(0f, exposure);
+        apparentDistance = Mathf.Clamp(apparentDistance, 0.5f, 6f);
         ambientIntensity = Mathf.Max(0f, ambientIntensity);
         reflectionIntensity = Mathf.Max(0f, reflectionIntensity);
         ApplyEnvironment(true);
@@ -130,6 +134,7 @@ public sealed class HDRIEnvironmentController : MonoBehaviour
             _appliedTexture != hdriTexture ||
             _appliedTint != tint ||
             !Mathf.Approximately(_appliedExposure, exposure) ||
+            !Mathf.Approximately(_appliedApparentDistance, apparentDistance) ||
             _appliedRotation != rotation ||
             !Mathf.Approximately(_appliedAmbientIntensity, ambientIntensity) ||
             !Mathf.Approximately(_appliedReflectionIntensity, reflectionIntensity) ||
@@ -141,6 +146,7 @@ public sealed class HDRIEnvironmentController : MonoBehaviour
         _runtimeSkybox.SetTexture("_MainTex", hdriTexture);
         _runtimeSkybox.SetColor("_Tint", tint);
         _runtimeSkybox.SetFloat("_Exposure", exposure);
+        _runtimeSkybox.SetFloat("_ApparentDistance", apparentDistance);
         _runtimeSkybox.SetVector("_RotationXYZ", rotation);
 
         RenderSettings.skybox = _runtimeSkybox;
@@ -156,6 +162,7 @@ public sealed class HDRIEnvironmentController : MonoBehaviour
         _appliedTexture = hdriTexture;
         _appliedTint = tint;
         _appliedExposure = exposure;
+        _appliedApparentDistance = apparentDistance;
         _appliedRotation = rotation;
         _appliedAmbientIntensity = ambientIntensity;
         _appliedReflectionIntensity = reflectionIntensity;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 using TrackGeneration.Macro;
 
 namespace TrackGeneration.Design
@@ -645,7 +646,7 @@ namespace TrackGeneration.Design
     public class TrackVisualSettings
     {
         [Header("Center Guide Lines")]
-        [Tooltip("Two longitudinal guide lines marking the edges of the center-flat region. They move inward and fade as dynamic turn rounding removes the flat zone.")]
+        [Tooltip("Width-aware road guidance: one center line on narrow sections, branching smoothly into two road-edge lines on sufficiently wide sections.")]
         public bool CenterGuideEnabled = true;
 
         [Tooltip("Center guide color (shader-based — never raised collision geometry).")]
@@ -657,14 +658,15 @@ namespace TrackGeneration.Design
         [Tooltip("Emission strength of the guide lines.")]
         [Range(0f, 4f)] public float CenterGuideEmission = 1.2f;
 
-        [Tooltip("Where the two split lines sit ACROSS the road, in cross-section units: 1 = the road-side shoulder (outer edge of the flat floor, base of the wall) so they hug the road sides with no gap; 2 = up at the wall tip, flush with the wall markings. Lines ride the real surface at this position.")]
+        [Tooltip("Where the two split lines sit across the evaluated road surface. 1 = the exact floor/wall shoulder with no gap; values above 1 continue up the wall toward its outer tip.")]
+        [FormerlySerializedAs("LaneEdgeInset")]
         [Range(0.4f, 2f)] public float LaneEdgePosition = 1f;
 
-        [Tooltip("Road width (fraction of the DESIGN road width) at/below which the two lines have fully merged into a single centerline. Raise it to merge on wider roads.")]
-        [Range(0.1f, 0.9f)] public float LaneMergeFraction = 0.6f;
+        [Tooltip("Usable road width (fraction of the neutral DESIGN road) at/below which the two lines fully merge. Detection uses both total width and the real shoulder-to-shoulder floor after turn rounding, pipes and wallrides, so visually narrow bowls are included.")]
+        [Range(0.1f, 0.9f)] public float LaneMergeFraction = 0.78f;
 
-        [Tooltip("Road width (fraction of the DESIGN road width) at/above which the lines are fully split to the two edges. Must be above the merge fraction. Lower it to keep two lines on more of the track.")]
-        [Range(0.2f, 1f)] public float LaneSplitFraction = 0.85f;
+        [Tooltip("Usable road width (fraction of the neutral DESIGN road) at/above which the lines are fully split to both edges. Must be above the merge fraction.")]
+        [Range(0.2f, 1f)] public float LaneSplitFraction = 0.9f;
 
         [Header("Wall Markers")]
         [Tooltip("Transverse marker lines across the walls: speed, curvature and orientation rhythm. Spacing is VISUAL — independent of the physical ring density.")]
