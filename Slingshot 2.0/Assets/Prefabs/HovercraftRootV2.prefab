@@ -597,6 +597,11 @@ MonoBehaviour:
   energy: {fileID: 1480833927898353629}
   feedback: {fileID: 7302965889752632134}
   extraGravity: 75
+  improveHighSpeedCollisions: 1
+  collisionSolverIterations: 12
+  collisionSolverVelocityIterations: 4
+  maxCollisionDepenetrationSpeed: 45
+  craftContactOffset: 0.04
 --- !u!114 &1480833927898353629
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1119,6 +1124,10 @@ MonoBehaviour:
   rechargeDuration: 7
   rechargeBusDemand: 50
   minimumIgnitionReserve01: 0.025
+  fullDriftRechargeMultiplier: 2.25
+  driftRechargeStartAngle: 8
+  driftRechargeFullAngle: 34
+  driftRechargeMinimumSpeedKmh: 120
   sustainedThrottle: 1.35
   ignitionThrottleBonus: 1.15
   ignitionPunchDuration: 0.22
@@ -1134,6 +1143,8 @@ MonoBehaviour:
   ignitionRemaining: 0
   isBurning: 0
   boostSequenceId: 0
+  driftRechargeBonus01: 0
+  driftRechargeMultiplier: 1
 --- !u!114 &4724508117979035402
 MonoBehaviour:
   m_ObjectHideFlags: 0

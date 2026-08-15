@@ -157,7 +157,7 @@ public class EnergyCore : MonoBehaviour
         float controllableGranted = slotDemand[0] * slotScale[0] + slotDemand[1] * slotScale[1]
                                   + slotDemand[2] * slotScale[2] + slotDemand[3] * slotScale[3];
 
-        // Nitro regeneration uses only LEFTOVER budget: it never steals a direction's
+        // Overcharge regeneration uses only LEFTOVER budget: it never steals a direction's
         // slot and stalls while the BUS is fully committed (a rule the player can learn).
         float rechargeRequest = overcharge != null ? Mathf.Max(0f, overcharge.RequestedRechargePower) : 0f;
         float leftover = Mathf.Max(0f, budget - controllableGranted);

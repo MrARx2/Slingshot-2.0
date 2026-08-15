@@ -28,7 +28,9 @@ namespace HovercraftV2.Tests
             if (_go != null) Object.DestroyImmediate(_go);
         }
 
-        private void Tick(bool held, bool pressed = false, float grantPower01 = 1f)
+        private void Tick(bool held, bool pressed = false, float grantPower01 = 1f,
+                          CraftTelemetry telemetry = default, float gripBreakerAmount = 0f,
+                          bool gripBreakerHeld = false)
         {
             EnergyState energy = EnergyState.Full;
             energy.overchargePower01 = grantPower01;
@@ -37,8 +39,9 @@ namespace HovercraftV2.Tests
             _nitro.TickOvercharge(new CraftIntent
             {
                 boostHeld = held,
-                boostPressed = pressed
-            }, default, energy);
+                boostPressed = pressed,
+                wantsGripBreaker = gripBreakerHeld
+            }, telemetry, energy, gripBreakerAmount);
         }
 
         private void TickFor(int count, bool held, float grantPower01 = 1f)
@@ -155,6 +158,63 @@ namespace HovercraftV2.Tests
 
             Tick(false, false, 1f);
             Assert.Greater(_nitro.OverchargeReserve01, reserveWithoutPower);
+        }
+
+        [Test]
+        public void GripBreakSidewaysDrift_RechargesFasterAndRequestsMatchingBusPower()
+        {
+            _nitro.regenerationDelay = 0f;
+            _nitro.fullDriftRechargeMultiplier = 2.25f;
+            _nitro.driftRechargeMinimumSpeedKmh = 50f;
+            _nitro.driftRechargeStartAngle = 5f;
+            _nitro.driftRechargeFullAngle = 30f;
+
+            TickFor(5, true);
+            Tick(false);
+            float normalStart = _nitro.OverchargeReserve01;
+            Tick(false);
+            float normalGain = _nitro.OverchargeReserve01 - normalStart;
+
+            _nitro.ResetBoostState();
+            TickFor(5, true);
+            Tick(false);
+
+            CraftTelemetry driftTelemetry = new CraftTelemetry
+            {
+                forwardSpeed = 35f,
+                sideSpeed = 35f,
+                speed = 49.5f,
+                hasSurfaceContact = true,
+                isGrounded = true
+            };
+            float driftStart = _nitro.OverchargeReserve01;
+            Tick(false, false, 1f, driftTelemetry, 1f, true);
+            float driftGain = _nitro.OverchargeReserve01 - driftStart;
+
+            Assert.Greater(driftGain, normalGain * 2f);
+            Assert.AreEqual(2.25f, _nitro.DriftRechargeMultiplier, 0.001f);
+            Assert.AreEqual(
+                _nitro.rechargeBusDemand * _nitro.DriftRechargeMultiplier,
+                _nitro.RequestedRechargePower,
+                0.001f);
+        }
+
+        [Test]
+        public void GripBreakWithoutSidewaysSlip_GivesNoRechargeBonus()
+        {
+            CraftTelemetry straightTelemetry = new CraftTelemetry
+            {
+                forwardSpeed = 100f,
+                sideSpeed = 0f,
+                speed = 100f,
+                hasSurfaceContact = true,
+                isGrounded = true
+            };
+
+            Tick(false, false, 1f, straightTelemetry, 1f, true);
+
+            Assert.AreEqual(0f, _nitro.DriftRechargeBonus01, 0.001f);
+            Assert.AreEqual(1f, _nitro.DriftRechargeMultiplier, 0.001f);
         }
 
         [Test]

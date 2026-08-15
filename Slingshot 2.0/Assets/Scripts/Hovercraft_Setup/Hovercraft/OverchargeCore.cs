@@ -32,6 +32,19 @@ public class OverchargeCore : MonoBehaviour
     [Tooltip("Minimum reserve needed to ignite. Prevents empty-tank input chatter.")]
     [Range(0f, 0.15f)] public float minimumIgnitionReserve01 = 0.025f;
 
+    [Header("Grip Break Drift Recharge")]
+    [Tooltip("Total Overcharge recharge speed during a fully committed Grip Break drift. The extra recharge still consumes proportional POWER BUS capacity.")]
+    [Range(1f, 4f)] public float fullDriftRechargeMultiplier = 2.25f;
+
+    [Tooltip("Drift angle where the Grip Break recharge bonus begins to build.")]
+    [Range(0f, 45f)] public float driftRechargeStartAngle = 8f;
+
+    [Tooltip("Drift angle that earns the full Grip Break recharge bonus.")]
+    [Range(10f, 80f)] public float driftRechargeFullAngle = 34f;
+
+    [Tooltip("Minimum craft speed required before sideways motion counts as a rewarding drift.")]
+    [Min(0f)] public float driftRechargeMinimumSpeedKmh = 120f;
+
     [Header("Overcharge Force")]
     [Tooltip("Additional main-thruster throttle while Overcharge is held.")]
     [FormerlySerializedAs("boostThrottle")]
@@ -63,6 +76,8 @@ public class OverchargeCore : MonoBehaviour
     [SerializeField] private float ignitionRemaining;
     [SerializeField] private bool isBurning;
     [SerializeField] private int boostSequenceId;
+    [SerializeField, Range(0f, 1f)] private float driftRechargeBonus01;
+    [SerializeField, Min(1f)] private float driftRechargeMultiplier = 1f;
 
     private float _deniedAtTime = -999f;
 
@@ -76,8 +91,12 @@ public class OverchargeCore : MonoBehaviour
     public float OverchargeReserve01 => Mathf.Clamp01(overchargeReserve01);
     public float NitroReserve01 => OverchargeReserve01;
     public float RechargeDelayRemaining => Mathf.Max(0f, regenerationDelayRemaining);
-    public float RequestedRechargePower => IsRecharging ? Mathf.Max(0f, rechargeBusDemand) : 0f;
+    public float RequestedRechargePower => IsRecharging
+        ? Mathf.Max(0f, rechargeBusDemand) * DriftRechargeMultiplier
+        : 0f;
     public float RechargePower01 => Mathf.Clamp01(chargeGrantPower01);
+    public float DriftRechargeBonus01 => Mathf.Clamp01(driftRechargeBonus01);
+    public float DriftRechargeMultiplier => Mathf.Max(1f, driftRechargeMultiplier);
 
     public float CooldownRemaining => RechargeDelayRemaining
         + (1f - OverchargeReserve01) * Mathf.Max(0.1f, rechargeDuration);
@@ -107,11 +126,13 @@ public class OverchargeCore : MonoBehaviour
     public int BoostSequenceId => boostSequenceId;
     public bool BoostDeniedRecently => Time.time - _deniedAtTime <= 0.4f;
 
-    public void TickOvercharge(CraftIntent intent, CraftTelemetry telemetry, EnergyState energy)
+    public void TickOvercharge(CraftIntent intent, CraftTelemetry telemetry, EnergyState energy,
+                               float gripBreakerAmount = 0f)
     {
         float dt = Mathf.Max(0.0001f, Time.fixedDeltaTime);
         grantPower01 = Mathf.Clamp01(energy.overchargeBurstPower01);
         chargeGrantPower01 = Mathf.Clamp01(energy.overchargeChargePower01);
+        UpdateDriftRecharge(intent, telemetry, gripBreakerAmount);
 
         bool wantsBurn = intent.boostHeld;
         bool hasReserve = overchargeReserve01 > 0.0001f;
@@ -174,9 +195,44 @@ public class OverchargeCore : MonoBehaviour
             {
                 overchargeReserve01 = Mathf.Min(1f,
                     overchargeReserve01
-                    + dt / Mathf.Max(0.1f, rechargeDuration) * chargeGrantPower01);
+                    + dt / Mathf.Max(0.1f, rechargeDuration)
+                    * chargeGrantPower01
+                    * DriftRechargeMultiplier);
             }
         }
+    }
+
+    private void UpdateDriftRecharge(CraftIntent intent, CraftTelemetry telemetry,
+                                     float gripBreakerAmount)
+    {
+        driftRechargeBonus01 = 0f;
+        driftRechargeMultiplier = 1f;
+
+        // Reward an actual on-track slide, not merely holding Grip Break while
+        // stationary, travelling straight, airborne, or during grip recovery.
+        if (!intent.wantsGripBreaker || gripBreakerAmount <= 0.001f
+            || (!telemetry.hasSurfaceContact && !telemetry.isGrounded))
+            return;
+
+        float planarSpeed = new Vector2(telemetry.forwardSpeed, telemetry.sideSpeed).magnitude;
+        float speedKmh = planarSpeed * 3.6f;
+        float speed01 = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(
+            Mathf.Max(0f, driftRechargeMinimumSpeedKmh),
+            Mathf.Max(driftRechargeMinimumSpeedKmh + 80f,
+                      driftRechargeMinimumSpeedKmh * 1.5f),
+            speedKmh));
+
+        float driftAngle = Mathf.Abs(Mathf.Atan2(
+            telemetry.sideSpeed,
+            Mathf.Max(0.01f, Mathf.Abs(telemetry.forwardSpeed))) * Mathf.Rad2Deg);
+        float angle01 = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(
+            Mathf.Max(0f, driftRechargeStartAngle),
+            Mathf.Max(driftRechargeStartAngle + 1f, driftRechargeFullAngle),
+            driftAngle));
+
+        driftRechargeBonus01 = Mathf.Clamp01(angle01 * speed01 * Mathf.Clamp01(gripBreakerAmount));
+        driftRechargeMultiplier = Mathf.Lerp(
+            1f, Mathf.Max(1f, fullDriftRechargeMultiplier), driftRechargeBonus01);
     }
 
     private void BeginBurn()
@@ -221,5 +277,7 @@ public class OverchargeCore : MonoBehaviour
         isBurning = false;
         grantPower01 = 1f;
         chargeGrantPower01 = 1f;
+        driftRechargeBonus01 = 0f;
+        driftRechargeMultiplier = 1f;
     }
 }

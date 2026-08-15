@@ -107,6 +107,22 @@ public class CraftCore : MonoBehaviour, TrackGeneration.ITrackRaceCraft
     [Tooltip("Additional downward acceleration applied every FixedUpdate. Keeps the craft planted.")]
     public float extraGravity = 15f;
 
+    [Header("High-Speed Collision Quality")]
+    [Tooltip("Applies craft-only contact-quality settings intended for extreme racing speeds. This does not change propulsion, steering, or hover forces.")]
+    public bool improveHighSpeedCollisions = true;
+
+    [Tooltip("Position solver passes used for this craft. More passes make persistent collision contacts more stable.")]
+    [Min(1)] public int collisionSolverIterations = 12;
+
+    [Tooltip("Velocity solver passes used for this craft. Raising this above Unity's low global default reduces unstable bounce at high-speed contact.")]
+    [Min(1)] public int collisionSolverVelocityIterations = 4;
+
+    [Tooltip("Maximum speed (m/s) Unity may use to push the craft out of an overlapping collider. Capping this prevents small penetrations from becoming violent launch impulses.")]
+    [Min(0f)] public float maxCollisionDepenetrationSpeed = 45f;
+
+    [Tooltip("Contact generation margin on the craft's physical colliders. A modest margin lets PhysX establish contact slightly earlier without changing the visible or physical collider size.")]
+    [Range(0.001f, 0.1f)] public float craftContactOffset = 0.04f;
+
     // ══════════════════════════════════════════════════════════════
     //  PRIVATE CACHED REFERENCES
     // ══════════════════════════════════════════════════════════════
@@ -155,9 +171,41 @@ public class CraftCore : MonoBehaviour, TrackGeneration.ITrackRaceCraft
         _rb.useGravity = true;
         _rb.interpolation = RigidbodyInterpolation.Interpolate;
         _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        ConfigureHighSpeedCollisionQuality();
 
         // ── Wire shared references to subsystems ─────────────────
         WireSubsystemReferences();
+    }
+
+    /// <summary>
+    /// Improves the quality of contacts already detected by continuous collision
+    /// detection. These are deliberately per-craft settings so the generated track
+    /// and every other physics object do not pay the additional solver cost.
+    /// </summary>
+    private void ConfigureHighSpeedCollisionQuality()
+    {
+        if (!improveHighSpeedCollisions || _rb == null) return;
+
+        _rb.solverIterations = Mathf.Max(1, collisionSolverIterations);
+        _rb.solverVelocityIterations = Mathf.Max(1, collisionSolverVelocityIterations);
+        _rb.maxDepenetrationVelocity = Mathf.Max(0f, maxCollisionDepenetrationSpeed);
+
+        float safeContactOffset = Mathf.Clamp(craftContactOffset, 0.001f, 0.1f);
+        Collider[] craftColliders = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < craftColliders.Length; i++)
+        {
+            Collider craftCollider = craftColliders[i];
+            if (craftCollider == null || craftCollider.isTrigger) continue;
+            craftCollider.contactOffset = safeContactOffset;
+        }
+    }
+
+    private void OnValidate()
+    {
+        collisionSolverIterations = Mathf.Max(1, collisionSolverIterations);
+        collisionSolverVelocityIterations = Mathf.Max(1, collisionSolverVelocityIterations);
+        maxCollisionDepenetrationSpeed = Mathf.Max(0f, maxCollisionDepenetrationSpeed);
+        craftContactOffset = Mathf.Clamp(craftContactOffset, 0.001f, 0.1f);
     }
 
     /// <summary>
@@ -275,7 +323,8 @@ public class CraftCore : MonoBehaviour, TrackGeneration.ITrackRaceCraft
         overcharge?.TickOvercharge(
             vectoring.CurrentIntent,
             telemetry.CurrentTelemetry,
-            lastEnergy
+            lastEnergy,
+            activeTraction.gripBreakerAmount
         );
 
         // ── 9b. Drive the synchronized camera boost response ─────

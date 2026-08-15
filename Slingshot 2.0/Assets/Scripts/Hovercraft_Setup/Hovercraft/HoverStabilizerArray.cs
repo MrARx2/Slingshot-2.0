@@ -438,6 +438,16 @@ public class HoverStabilizerArray : MonoBehaviour
     private Vector3 _smoothAlignTarget = Vector3.up;
     private bool _hasSmoothAlignTarget;
 
+    // Landing reacquisition state. Airborne attitude can leave the craft pitched or
+    // rolled far enough that all four narrow hover rays miss a flat landing surface,
+    // even after the hull has physically touched it. Preserve that real collision
+    // normal briefly so surface alignment can rotate the hover rays back onto the
+    // road. This changes sensing only; it does not add force or alter throttle tuning.
+    private bool _landingReacquisitionArmed;
+    private Vector3 _landingCollisionNormal = Vector3.up;
+    private float _landingCollisionSeenAt = float.NegativeInfinity;
+    private const float LandingCollisionMemorySeconds = 0.25f;
+
 
     // Surface alignment debug state (drawn by OnDrawGizmosSelected).
     private Vector3 _alignTargetNormal = Vector3.up;
@@ -520,6 +530,7 @@ public class HoverStabilizerArray : MonoBehaviour
         float dt = Time.fixedDeltaTime;
 
         IsStabilizerArmed = intent.stabilizerArmed;
+        UpdateLandingReacquisitionState(telemetry);
 
         // R disengages only the automatic hover stabilizer.
         // It must NOT disable player air attitude control. Airborne roll/pitch
@@ -1010,6 +1021,21 @@ public class HoverStabilizerArray : MonoBehaviour
             ? telemetry.groundNormal.normalized
             : transform.up;
 
+        // A hull contact immediately after flight is stronger landing evidence than
+        // the local-down hover rays. Those rays may all be pointing beside a flat
+        // road when the craft touches down with residual air attitude. Use the real
+        // contact normal only during the airborne -> grounded handoff; once any hover
+        // probe establishes normal grounded telemetry, the usual controller owns the
+        // surface reference again.
+        if (TryGetLandingCollisionNormal(telemetry, out Vector3 landingNormal))
+        {
+            _hasPredictedSurface = true;
+            _predictedSurfaceNormal = landingNormal;
+            _predictedSurfaceDistance = 0f;
+            predictiveWeight = 1f;
+            return landingNormal;
+        }
+
         float lookAhead = Mathf.Min(
             telemetry.speed * Mathf.Max(0f, surfaceLookAheadTime),
             Mathf.Max(0f, maxSurfaceLookAheadDistance));
@@ -1068,6 +1094,99 @@ public class HoverStabilizerArray : MonoBehaviour
         }
 
         return target;
+    }
+
+    /// <summary>
+    /// Arms contact-backed surface reacquisition only while the craft is genuinely
+    /// away from its hover cushion. A normal grounded frame ends the handoff, so
+    /// ordinary road and wall handling never reads collision normals through this path.
+    /// </summary>
+    private void UpdateLandingReacquisitionState(CraftTelemetry telemetry)
+    {
+        if (telemetry.groundedFactor <= 0.05f)
+        {
+            _landingReacquisitionArmed = true;
+            return;
+        }
+
+        if (telemetry.isGrounded)
+        {
+            _landingReacquisitionArmed = false;
+            _landingCollisionSeenAt = float.NegativeInfinity;
+        }
+    }
+
+    private bool TryGetLandingCollisionNormal(CraftTelemetry telemetry, out Vector3 normal)
+    {
+        normal = Vector3.up;
+
+        if (!_landingReacquisitionArmed || telemetry.isGrounded)
+        {
+            return false;
+        }
+
+        if (Time.fixedTime - _landingCollisionSeenAt > LandingCollisionMemorySeconds
+            || _landingCollisionNormal.sqrMagnitude < 0.001f)
+        {
+            return false;
+        }
+
+        normal = _landingCollisionNormal.normalized;
+        return true;
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        CaptureLandingCollision(collision);
+    }
+
+    private void OnCollisionStay(Collision collision)
+    {
+        CaptureLandingCollision(collision);
+    }
+
+    /// <summary>
+    /// Records the surface normal from an actual hull landing while probe-based
+    /// grounded state is still absent. Contact normals are oriented toward the craft
+    /// before averaging so multi-collider hull contacts cannot cancel each other.
+    /// </summary>
+    private void CaptureLandingCollision(Collision collision)
+    {
+        if (!_landingReacquisitionArmed || collision == null || collision.contactCount <= 0)
+        {
+            return;
+        }
+
+        Vector3 craftCenter = rb != null ? rb.worldCenterOfMass : transform.position;
+        Vector3 normalSum = Vector3.zero;
+        int validContacts = 0;
+
+        for (int i = 0; i < collision.contactCount; i++)
+        {
+            ContactPoint contact = collision.GetContact(i);
+            Vector3 contactNormal = contact.normal;
+
+            if (contactNormal.sqrMagnitude < 0.001f)
+            {
+                continue;
+            }
+
+            if (Vector3.Dot(contactNormal, craftCenter - contact.point) < 0f)
+            {
+                contactNormal = -contactNormal;
+            }
+
+            normalSum += contactNormal.normalized;
+            validContacts++;
+        }
+
+        if (validContacts <= 0 || normalSum.sqrMagnitude < 0.001f)
+        {
+            return;
+        }
+
+        _landingCollisionNormal = normalSum.normalized;
+        _landingCollisionSeenAt = Time.fixedTime;
     }
 
     // ══════════════════════════════════════════════════════════════
