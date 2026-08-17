@@ -570,6 +570,35 @@ namespace TrackGeneration.Planning
 
             frames[0] = entry;
 
+            // Honest vertical geometry. BuildStraight previously wrote VerticalCurvature =
+            // 0 even while the pitch swept 0→peak→0, hiding the harsh grade from every
+            // downstream system. Measure it from the TRUE 3D arc length (ring-to-ring
+            // spatial distance) — never the horizontal parameter — so diagnostics and
+            // validators see the real vertical curvature (rad/m) and its rate (rad/m²).
+            // Sign convention: +curvature = nose pitching up (valley / concave up),
+            // −curvature = crest. Geometry is unchanged; only the metadata is corrected.
+            if (rings >= 3)
+            {
+                float PitchRad(int idx) => frames[idx].PitchAngle * Mathf.Deg2Rad;
+                float Ds3D(int a, int b) => Mathf.Max(1e-4f, (frames[b].Position - frames[a].Position).magnitude);
+
+                var vc = new float[rings];
+                for (int i = 1; i < rings - 1; i++)
+                    vc[i] = (PitchRad(i + 1) - PitchRad(i - 1)) / Ds3D(i - 1, i + 1);
+                vc[0] = entry.VerticalCurvature; // preserve incoming continuity at the weld
+                vc[rings - 1] = (PitchRad(rings - 1) - PitchRad(rings - 2)) / Ds3D(rings - 2, rings - 1);
+
+                for (int i = 0; i < rings; i++)
+                {
+                    var f = frames[i];
+                    f.VerticalCurvature = vc[i];
+                    f.VerticalCurvatureRate = i == 0
+                        ? entry.VerticalCurvatureRate
+                        : (vc[i] - vc[i - 1]) / Ds3D(i - 1, i);
+                    frames[i] = f;
+                }
+            }
+
             return frames;
         }
 
@@ -816,13 +845,20 @@ namespace TrackGeneration.Planning
             return frames;
         }
 
-        /// <summary>Keyframes for a jump launch ramp whose pitch never decreases before the lip.</summary>
+        /// <summary>
+        /// Keyframes for a jump launch ramp whose pitch never decreases before the lip.
+        /// The approach stays low, then loads progressively harder near the open edge:
+        /// this is a launch-ramp silhouette, rather than a long shallow hill.
+        /// </summary>
         public static (float u, float pitch)[] LaunchRampKeys(float intermediatePitchDeg, float launchPitchDeg)
         {
             float lip = Mathf.Max(0f, launchPitchDeg);
             float middle = Mathf.Clamp(intermediatePitchDeg, 0f, lip);
-            float early = Mathf.Min(middle * 0.12f, lip * 0.08f);
-            return new[] { (0f, 0f), (0.22f, early), (0.62f, middle), (1f, lip) };
+            // Keep the first third level, delay most of the rotation until the final
+            // third, and hold the terminal tangent briefly. Piecewise smoothstep gives
+            // every join zero angular rate, including the open edge, so the pronounced
+            // lip remains C1-smooth and cannot become a one-ring kicker.
+            return new[] { (0f, 0f), (0.32f, 0f), (0.68f, middle), (0.9f, lip), (1f, lip) };
         }
 
         /// <summary>Keyframes for a jump landing ramp: shallow arrival pitch → descent pitch → level.</summary>

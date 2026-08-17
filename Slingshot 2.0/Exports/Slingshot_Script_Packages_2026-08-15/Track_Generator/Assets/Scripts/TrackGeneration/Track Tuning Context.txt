@@ -1,0 +1,83 @@
+Here’s the clean V1 track generator piece list:
+
+Track Generator V1 Piece Types
+
+1. Straight
+Basic forward track section.
+Used for connection, speed build-up, and pacing.
+
+2. Wide Straight
+Wider straight section.
+Used for recovery, overtaking, and giving the player room after difficult sections.
+
+3. Boost Straight
+Straight section with boost pads or speed-focused layout.
+Used before big banked turns, jumps, or long speed sections.
+
+4. Banked Curve
+Main corner type for the game.
+Used for fast left/right turns while maintaining high speed.
+
+Variables:
+- Direction: Left / Right
+- Angle: Gentle / Medium / Sharp
+- Banking: Medium / High
+- Radius: Medium / Large
+
+5. Banked Hairpin
+Very strong 120–180 degree banked turn.
+Used as a major direction change and skill check.
+Should be used sparingly.
+
+6. S-Curve
+Flowing left-right or right-left curve sequence.
+Used for rhythm and control without forcing full slowdown.
+
+7. Chicane
+Sharper left-right-left or right-left-right sequence.
+Used to break up long high-speed sections and test reaction/control.
+
+8. Jump Ramp
+Launch ramp that sends the hovercraft into the air.
+Used for air-control gameplay.
+
+9. Air Gap
+The empty space between a jump ramp and landing ramp.
+Can vary in distance and height.
+
+10. Landing Ramp / Recovery Platform
+Reverse-shaped ramp that catches the hovercraft after a jump.
+Like a motocross landing ramp.
+Used to make landings smooth, skill-based, and less physics-janky.
+
+11. Recovery Straight
+Safe straight section after a jump, landing, hairpin, or chaotic section.
+Gives the player time to stabilize.
+
+12. Tunnel / Bridge Variant
+Visual/environmental variant of Straight, Wide Straight, or Banked Curve.
+Not a core gameplay type, just a presentation variant.
+
+And the important generator rule:
+
+Most corners should be banked by default.
+
+The hovercraft is very fast, so flat sharp corners should be avoided in V1 unless they are intentionally used as a slow technical challenge.
+
+Every Jump Ramp should normally be followed by:
+Jump Ramp → Air Gap → Landing Ramp / Recovery Platform → Recovery Straight
+
+For V1, the basic flow should look like:
+
+Straight
+→ Banked Curve
+→ Boost Straight
+→ High Banked Curve
+→ Wide Straight
+→ S-Curve
+→ Jump Ramp
+→ Air Gap
+→ Landing Ramp
+→ Recovery Straight
+→ Banked Hairpin
+→ Wide Straight

@@ -163,6 +163,9 @@ MonoBehaviour:
         OptionalWeight: 1
         MinimumSpacingOverrideSeconds: -1
         AllowInCompoundPatterns: 1
+      TargetJumpApexHeight: 100
+      JumpLipEmphasis: 0.7
+      JumpCaptureSpeedVariation: 0.06
       Loops:
         Enabled: 1
         MinimumCount: 2
@@ -254,7 +257,7 @@ MonoBehaviour:
       MaxAttempts: 192
       SelectionMode: 1
       CandidatesToScore: 4
-      FailurePolicy: 0
+      FailurePolicy: 2
       ClosureReserveFraction: 0.2
       MetersPerRing: 1.5
       MaxFacetAngleDegrees: 0.5

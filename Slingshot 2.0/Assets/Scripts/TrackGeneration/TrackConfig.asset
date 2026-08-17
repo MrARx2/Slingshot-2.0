@@ -129,16 +129,16 @@ MonoBehaviour:
   minJumpApproachSeconds: 1.3
   maxJumpApproachSeconds: 3
   minLaunchTransitionSeconds: 0.35
-  maxLaunchTransitionSeconds: 1.2
-  minJumpLaunchPitchDegrees: 3
-  maxJumpLaunchPitchDegrees: 6
+  maxLaunchTransitionSeconds: 3.5
+  minJumpLaunchPitchDegrees: 6
+  maxJumpLaunchPitchDegrees: 11
   minJumpAirtimeSeconds: 1
-  maxJumpAirtimeSeconds: 4
+  maxJumpAirtimeSeconds: 7
   minLandingTransitionSeconds: 0.5
-  maxLandingTransitionSeconds: 1.8
+  maxLandingTransitionSeconds: 2.2
   minJumpRecoverySeconds: 1
   maxJumpRecoverySeconds: 2.5
-  minJumpHeight: 3
+  minJumpHeight: 25
   maxJumpHeight: 80
   jumpLandingTolerance: 4
   allowDualRoadQuarters: 1

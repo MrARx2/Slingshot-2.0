@@ -404,6 +404,12 @@ namespace TrackGeneration.Design
         [Tooltip("Maximum sustained drop angle for THIS track (degrees), clamped by the rulebook.")]
         [Range(2f, 45f)] public float MaxDropAngle = 32f;
 
+        [Tooltip("Maximum vertical curvature load allowed on ordinary road at design speed. Inversion features use their authored geometry instead.")]
+        [Range(2f, 30f)] public float MaxCurvatureInducedG = 15f;
+
+        [Tooltip("Maximum rate at which ordinary-road vertical curvature may change (radians per square meter). Lower values make grade transitions longer and calmer.")]
+        [Range(0.000001f, 0.0001f)] public float MaxVerticalCurvatureRate = 0.00002f;
+
         [Tooltip("Net-zero crests/dips placed on straights (hill up-and-over or dip down-and-back).")]
         public TrackFeatureRule Crests = new TrackFeatureRule(true, 0, 4, 1f);
 
@@ -423,6 +429,10 @@ namespace TrackGeneration.Design
             MaxMajorElevationSections = Mathf.Max(MinMajorElevationSections, MaxMajorElevationSections);
             MaxClimbAngle = Mathf.Clamp(MaxClimbAngle, 1f, 60f);
             MaxDropAngle = Mathf.Clamp(MaxDropAngle, 1f, 60f);
+            if (MaxCurvatureInducedG <= 0f) MaxCurvatureInducedG = 15f;
+            if (MaxVerticalCurvatureRate <= 0f) MaxVerticalCurvatureRate = 0.00002f;
+            MaxCurvatureInducedG = Mathf.Clamp(MaxCurvatureInducedG, 1f, 50f);
+            MaxVerticalCurvatureRate = Mathf.Clamp(MaxVerticalCurvatureRate, 0.0000001f, 0.001f);
             (Crests ??= new TrackFeatureRule()).Sanitize();
             (Bridges ??= new TrackFeatureRule()).Sanitize();
             (Underpasses ??= new TrackFeatureRule()).Sanitize();
@@ -435,6 +445,16 @@ namespace TrackGeneration.Design
     {
         [Tooltip("Jump groups: approach → launch → air gap → landing → recovery. Air-gap distance is derived from the ballistic trajectory at design speed.")]
         public TrackFeatureRule Jumps = new TrackFeatureRule(true, 0, 2, 1f);
+
+        [Header("Air-gap objectives")]
+        [Tooltip("Readable height of the flight apex above the launch lip. Launch pitch is solved from this objective; it is not a fixed pitch target.")]
+        [Range(5f, 250f)] public float TargetJumpApexHeight = 45f;
+
+        [Tooltip("How strongly the launch uses the legal lip-height range. Higher values create a more pronounced elevation ramp before release.")]
+        [Range(0f, 1f)] public float JumpLipEmphasis = 0.25f;
+
+        [Tooltip("Entry-speed variation that the landing capture surface must tolerate on both sides of design speed.")]
+        [Range(0f, 0.2f)] public float JumpCaptureSpeedVariation = 0.06f;
 
         [Tooltip("Full vertical loops (eased clothoid-style curvature).")]
         public TrackFeatureRule Loops = new TrackFeatureRule(true, 0, 1, 0.8f);
@@ -503,6 +523,10 @@ namespace TrackGeneration.Design
             (Chicanes ??= new TrackFeatureRule()).Sanitize();
             (SCurves ??= new TrackFeatureRule()).Sanitize();
             (Hairpins ??= new TrackFeatureRule()).Sanitize();
+            if (TargetJumpApexHeight <= 0f) TargetJumpApexHeight = 45f;
+            TargetJumpApexHeight = Mathf.Clamp(TargetJumpApexHeight, 1f, 500f);
+            JumpLipEmphasis = Mathf.Clamp01(JumpLipEmphasis);
+            JumpCaptureSpeedVariation = Mathf.Clamp(JumpCaptureSpeedVariation, 0f, 0.25f);
             MinFullPipeSeconds = Mathf.Clamp(MinFullPipeSeconds, 1f, 15f);
             MaxFullPipeSeconds = Mathf.Clamp(MaxFullPipeSeconds, MinFullPipeSeconds, 15f);
             FullPipeRadiusScale = Mathf.Clamp(FullPipeRadiusScale, 0.4f, 1.5f);

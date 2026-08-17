@@ -378,6 +378,21 @@ namespace TrackGeneration.Tests
         }
 
         [Test]
+        public void JumpLaunchUsesLateRiseSilhouetteAndStableLipTangent()
+        {
+            var keys = SectionFrameBuilders.LaunchRampKeys(3.5f, 10f);
+
+            Assert.AreEqual(0f, SectionFrameBuilders.KeyframedPitchAt(0.3f, keys), 0.0001f,
+                "The air-gap approach should remain level through roughly its first third.");
+            Assert.Less(SectionFrameBuilders.KeyframedPitchAt(0.5f, keys), 2.5f,
+                "The launch started loading too early and regressed toward a long shallow hill.");
+            Assert.Greater(SectionFrameBuilders.KeyframedPitchAt(0.8f, keys), 5f,
+                "The final third must contain the pronounced upward launch curvature.");
+            Assert.AreEqual(10f, SectionFrameBuilders.KeyframedPitchAt(0.95f, keys), 0.0001f,
+                "The terminal lip must hold a stable ballistic tangent before the open edge.");
+        }
+
+        [Test]
         public void MonotonicJumpSolverStillProducesReachableDescendingLandings()
         {
             var config = TrackGenerationTestUtil.CreateConfig();

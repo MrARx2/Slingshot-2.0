@@ -304,25 +304,25 @@ namespace TrackGeneration.Core
 
         [Tooltip("Launch transition duration window (seconds) — the pitch-up ramp itself.")]
         [SerializeField] private float minLaunchTransitionSeconds = 0.35f;
-        [SerializeField] private float maxLaunchTransitionSeconds = 1.2f;
+        [SerializeField] private float maxLaunchTransitionSeconds = 3.5f;
 
         [Tooltip("Launch-lip pitch window (degrees). Every air gap receives a progressive elevation ramp that reaches at least this pitch before the open edge.")]
-        [SerializeField] private float minJumpLaunchPitchDegrees = 3f;
-        [SerializeField] private float maxJumpLaunchPitchDegrees = 6f;
+        [SerializeField] private float minJumpLaunchPitchDegrees = 6f;
+        [SerializeField] private float maxJumpLaunchPitchDegrees = 11f;
 
         [Tooltip("Target airtime window (seconds). Air-gap distance is derived from the ballistic trajectory at design speed, never chosen randomly.")]
         [SerializeField] private float minJumpAirtimeSeconds = 0.25f;
-        [SerializeField] private float maxJumpAirtimeSeconds = 4f;
+        [SerializeField] private float maxJumpAirtimeSeconds = 7f;
 
         [Tooltip("Landing transition duration window (seconds).")]
         [SerializeField] private float minLandingTransitionSeconds = 0.50f;
-        [SerializeField] private float maxLandingTransitionSeconds = 1.8f;
+        [SerializeField] private float maxLandingTransitionSeconds = 2.2f;
 
         [SerializeField] private float minJumpRecoverySeconds = 1.0f;
         [SerializeField] private float maxJumpRecoverySeconds = 2.5f;
 
         [Tooltip("Launch lip height window (meters).")]
-        [SerializeField] private float minJumpHeight = 3f;
+        [SerializeField] private float minJumpHeight = 25f;
         [SerializeField] private float maxJumpHeight = 80f;
 
         [Tooltip("Tolerance between the predicted ballistic arrival and the landing surface (meters).")]

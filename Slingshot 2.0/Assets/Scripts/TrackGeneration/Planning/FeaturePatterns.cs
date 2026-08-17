@@ -91,6 +91,12 @@ namespace TrackGeneration.Planning
             public float LandingDescentPitchDeg;
             public float LandingHeight;      // landing mouth height above grade
             public float LandingHorizontal;
+
+            public float ApexHeight;
+            public float TimeToApex;
+            public bool CapturesMinimumSpeed;
+            public bool CapturesNominalSpeed;
+            public bool CapturesMaximumSpeed;
         }
 
         public static bool TrySolve(ResolvedTrackGenerationConfig cfg, ref Unity.Mathematics.Random rng, out Solution s,
@@ -100,71 +106,64 @@ namespace TrackGeneration.Planning
             float v = cfg.DesignSpeedMps;
             float g = Mathf.Max(0.1f, cfg.Gravity);
 
-            // Callers with a hard airtime need (mid-air lane aim) raise the draw floor
-            // instead of gambling on a high roll.
+            // Callers with a hard airtime need (mid-air lane aim) raise the floor.
+            // Geometry is then solved from apex + capture objectives, not from a
+            // randomly selected launch angle.
             float tFloor = Mathf.Max(cfg.MinJumpAirtimeSeconds, minAirtimeSeconds);
-            const float minArrivalDescentFraction = 0.18f;
-            const float maxArrivalDescentFraction = 0.45f;
             float minPitchRad = cfg.MinJumpLaunchPitchDegrees * Mathf.Deg2Rad;
-            float pitchAirtimeFloor = v * Mathf.Sin(minPitchRad) /
-                                      (g * (1f - minArrivalDescentFraction));
-            tFloor = Mathf.Max(tFloor, pitchAirtimeFloor);
             float maxPitchRad = cfg.MaxJumpLaunchPitchDegrees * Mathf.Deg2Rad;
-            float pitchAirtimeCeiling = v * Mathf.Sin(maxPitchRad) /
-                                        (g * (1f - maxArrivalDescentFraction));
-            float tCeiling = Mathf.Min(cfg.MaxJumpAirtimeSeconds, pitchAirtimeCeiling);
-            if (tFloor > tCeiling) return false;
+            float captureVariation = Mathf.Clamp(cfg.JumpCaptureSpeedVariation, 0f, 0.25f);
+            float minimumSpeed = v * (1f - captureVariation);
 
-            for (int attempt = 0; attempt < 12; attempt++)
+            // Pronounced high-speed launches have a narrower overlap between the
+            // desired apex, the three-speed capture envelope and the legal landing
+            // length. These trials are cheap scalar math; search deeply enough that a
+            // required jump does not become a seed lottery after raising its lip.
+            for (int attempt = 0; attempt < 64; attempt++)
             {
-                float t = Mathf.Lerp(tFloor, tCeiling, Mathf.Sqrt(rng.NextFloat()));
+                float apexTarget = cfg.TargetJumpApexHeight * rng.NextFloat(0.9f, 1.1f);
+                float targetVyAtMinimumSpeed = Mathf.Sqrt(2f * g * Mathf.Max(0.1f, apexTarget));
+                float minVy = minimumSpeed * Mathf.Sin(minPitchRad);
+                float maxVy = minimumSpeed * Mathf.Sin(maxPitchRad);
 
-                // Descent fraction k: arrival vertical speed = -g·t·k, and the flight's
-                // net rise is g·t²·(0.5-k). The monotonic launch removed the old
-                // mid-ramp height hump. Keep k below 0.5 so the catch can sit above the
-                // lip and retain enough elevation for its long transition; k > 0 still
-                // guarantees that the craft arrives while descending.
-                float minPitchSin = Mathf.Sin(cfg.MinJumpLaunchPitchDegrees * Mathf.Deg2Rad);
-                float maxPitchSin = Mathf.Sin(cfg.MaxJumpLaunchPitchDegrees * Mathf.Deg2Rad);
-                float kForMinPitch = 1f - v * minPitchSin / (g * t);
-                float kForMaxPitch = 1f - v * maxPitchSin / (g * t);
-                float kMin = Mathf.Max(minArrivalDescentFraction, kForMaxPitch);
-                float kMax = Mathf.Min(maxArrivalDescentFraction, kForMinPitch);
-                if (kMax < kMin) continue;
-                float k = Mathf.Lerp(kMin, kMax, rng.NextFloat());
-
-                float vy0 = g * t * (1f - k);
-                float sinLaunch = vy0 / v;
-                if (sinLaunch > Mathf.Sin(cfg.MaxJumpLaunchPitchDegrees * Mathf.Deg2Rad) + 0.0001f)
-                    continue;
-
+                // A required long airtime may need a higher apex to remain above the
+                // landing mouth while already descending. Raise the objective only as
+                // much as needed, then reject if the hard pitch guard cannot contain it.
+                targetVyAtMinimumSpeed = Mathf.Max(targetVyAtMinimumSpeed, g * tFloor / 1.8f);
+                targetVyAtMinimumSpeed = Mathf.Clamp(targetVyAtMinimumSpeed, minVy, maxVy);
+                float sinLaunch = targetVyAtMinimumSpeed / minimumSpeed;
+                if (sinLaunch > Mathf.Sin(maxPitchRad) + 0.0001f) continue;
                 float launchPitch = Mathf.Asin(sinLaunch) * Mathf.Rad2Deg;
-                // The old ramp climbed at 5..9 degrees and then pitched DOWN to the
-                // ballistic launch angle at the open lip. That encoded the visible
-                // pre-jump flattening. Keep the intermediate key below the launch
-                // pitch so the surface continues pitching upward all the way out.
-                float climbPitch = launchPitch * rng.NextFloat(0.5f, 0.72f);
-                float launchLength = Mathf.Lerp(cfg.MinLaunchTransitionLength, cfg.MaxLaunchTransitionLength, rng.NextFloat());
+                float timeToApex = targetVyAtMinimumSpeed / g;
+                float tCeiling = Mathf.Min(cfg.MaxJumpAirtimeSeconds, timeToApex * 1.8f);
+                float effectiveFloor = Mathf.Max(tFloor, timeToApex * 1.1f);
+                if (effectiveFloor > tCeiling) continue;
+                float t = Mathf.Lerp(effectiveFloor, tCeiling, rng.NextFloat(0.2f, 0.85f));
+
+                // The launch must read as a real ramp, not a long hill. Keep the
+                // intermediate pitch low so most of the tangent rotation is reserved
+                // for the final third of LaunchRampKeys.
+                float climbPitch = launchPitch * rng.NextFloat(0.3f, 0.42f);
 
                 var launchKeys = SectionFrameBuilders.LaunchRampKeys(climbPitch, launchPitch);
-                SectionFrameBuilders.KeyframedPitchSpan(launchKeys, launchLength, out float launchHoriz, out float lipHeight);
+                SectionFrameBuilders.KeyframedPitchSpan(launchKeys, 1f, out _, out float unitLipRise);
+                if (unitLipRise <= 0.0001f) continue;
+                float desiredLip = Mathf.Lerp(cfg.MinJumpHeight, cfg.MaxJumpHeight,
+                    cfg.JumpLipEmphasis * rng.NextFloat(0.9f, 1.1f));
+                float launchLength = Mathf.Clamp(desiredLip / unitLipRise,
+                    cfg.MinLaunchTransitionLength, cfg.MaxLaunchTransitionLength);
+                SectionFrameBuilders.KeyframedPitchSpan(launchKeys, launchLength,
+                    out float launchHoriz, out float lipHeight);
+                if (lipHeight < cfg.MinJumpHeight - 0.01f || lipHeight > cfg.MaxJumpHeight + 0.01f)
+                    continue;
 
-                // Scale the launch length so the lip height lands inside the legal window.
-                if (lipHeight < cfg.MinJumpHeight || lipHeight > cfg.MaxJumpHeight)
-                {
-                    float target = Mathf.Clamp(lipHeight, cfg.MinJumpHeight, cfg.MaxJumpHeight);
-                    launchLength *= target / Mathf.Max(0.01f, lipHeight);
-                    if (launchLength < cfg.MinLaunchTransitionLength || launchLength > cfg.MaxLaunchTransitionLength)
-                        continue;
-                    SectionFrameBuilders.KeyframedPitchSpan(launchKeys, launchLength, out launchHoriz, out lipHeight);
-                }
-
+                float vy0 = minimumSpeed * Mathf.Sin(launchPitch * Mathf.Deg2Rad);
                 float gapRise = vy0 * t - 0.5f * g * t * t;
                 float landingHeight = lipHeight + gapRise;
                 if (landingHeight < 1.5f) continue;
 
-                float vx = v * Mathf.Cos(launchPitch * Mathf.Deg2Rad);
-                float vyArr = -g * t * k;
+                float vx = minimumSpeed * Mathf.Cos(launchPitch * Mathf.Deg2Rad);
+                float vyArr = vy0 - g * t;
                 float arrivalPitch = Mathf.Atan2(vyArr, vx) * Mathf.Rad2Deg;
                 float gapHoriz = vx * t;
 
@@ -188,6 +187,14 @@ namespace TrackGeneration.Planning
 
                     SectionFrameBuilders.KeyframedPitchSpan(landingKeys, landingLength, out float landHoriz, out _);
 
+                    bool captureMin = CapturesLanding(minimumSpeed, g, launchPitch,
+                        gapHoriz, gapRise, landingKeys, landingLength, cfg.JumpLandingTolerance);
+                    bool captureNominal = CapturesLanding(v, g, launchPitch,
+                        gapHoriz, gapRise, landingKeys, landingLength, cfg.JumpLandingTolerance);
+                    bool captureMax = CapturesLanding(v * (1f + captureVariation), g, launchPitch,
+                        gapHoriz, gapRise, landingKeys, landingLength, cfg.JumpLandingTolerance);
+                    if (!captureMin || !captureNominal || !captureMax) continue;
+
                     s = new Solution
                     {
                         LaunchLength = launchLength,
@@ -203,7 +210,12 @@ namespace TrackGeneration.Planning
                         LandingLength = landingLength,
                         LandingDescentPitchDeg = descent,
                         LandingHeight = landingHeight,
-                        LandingHorizontal = landHoriz
+                        LandingHorizontal = landHoriz,
+                        ApexHeight = vy0 * vy0 / (2f * g),
+                        TimeToApex = timeToApex,
+                        CapturesMinimumSpeed = captureMin,
+                        CapturesNominalSpeed = captureNominal,
+                        CapturesMaximumSpeed = captureMax
                     };
                     landed = true;
                     break;
@@ -213,6 +225,46 @@ namespace TrackGeneration.Planning
             }
 
             return false;
+        }
+
+        private static bool CapturesLanding(float speed, float gravity, float launchPitchDeg,
+            float gapHorizontal, float gapRise, (float u, float pitch)[] landingKeys,
+            float landingLength, float tolerance)
+        {
+            const int samples = 384;
+            float launchRad = launchPitchDeg * Mathf.Deg2Rad;
+            float vx = Mathf.Max(0.1f, speed * Mathf.Cos(launchRad));
+            float vy = speed * Mathf.Sin(launchRad);
+            float x = gapHorizontal;
+            float y = gapRise;
+            float previousDifference = ProjectileHeight(x, vx, vy, gravity) - y;
+            if (Mathf.Abs(previousDifference) <= tolerance) return true;
+            if (previousDifference < -tolerance) return false;
+
+            float ds = landingLength / samples;
+            for (int i = 1; i <= samples; i++)
+            {
+                float uMid = (i - 0.5f) / samples;
+                float pitch = SectionFrameBuilders.KeyframedPitchAt(uMid, landingKeys) * Mathf.Deg2Rad;
+                x += Mathf.Cos(pitch) * ds;
+                y += Mathf.Sin(pitch) * ds;
+                float difference = ProjectileHeight(x, vx, vy, gravity) - y;
+                if (difference <= tolerance && previousDifference >= -tolerance)
+                {
+                    float time = x / vx;
+                    float projectilePitch = Mathf.Atan2(vy - gravity * time, vx) * Mathf.Rad2Deg;
+                    float surfacePitch = SectionFrameBuilders.KeyframedPitchAt((float)i / samples, landingKeys);
+                    return Mathf.Abs(Mathf.DeltaAngle(projectilePitch, surfacePitch)) <= 18f;
+                }
+                previousDifference = difference;
+            }
+            return false;
+        }
+
+        private static float ProjectileHeight(float x, float vx, float vy, float gravity)
+        {
+            float time = x / Mathf.Max(0.1f, vx);
+            return vy * time - 0.5f * gravity * time * time;
         }
     }
 
@@ -300,11 +352,16 @@ namespace TrackGeneration.Planning
                 ElevationChange = s.GapRise,
                 PitchChange = s.ArrivalPitchDeg,
                 AirtimeSeconds = s.AirtimeSeconds,
+                JumpApexHeight = s.ApexHeight,
+                JumpTimeToApex = s.TimeToApex,
+                JumpCapturesMinimumSpeed = s.CapturesMinimumSpeed,
+                JumpCapturesNominalSpeed = s.CapturesNominalSpeed,
+                JumpCapturesMaximumSpeed = s.CapturesMaximumSpeed,
                 PlanHorizontalLength = s.GapHorizontal,
                 RiskLevel = SectionRiskLevel.Extreme,
                 LockLength = true,
                 PatternId = patternId,
-                DebugName = $"{namePrefix}AirGap_{s.GapHorizontal:F0}m_{s.AirtimeSeconds:F2}s",
+                DebugName = $"{namePrefix}AirGap_{s.GapHorizontal:F0}m_Apex{s.ApexHeight:F0}m",
                 Contract = new SectionConnectionContract
                 {
                     RequiredEntryOrientation = TrackOrientationTag.VerticalAscending,

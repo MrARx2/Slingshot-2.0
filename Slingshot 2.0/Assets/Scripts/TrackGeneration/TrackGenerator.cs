@@ -156,7 +156,7 @@ namespace TrackGeneration
             // editor scene for preview and play, but never embed them in the .unity file.
             if (!Application.isPlaying && trackRoot != null)
             {
-                DisableDebugVisualization(trackRoot.gameObject);
+                RestoreDebugAnnotations(trackRoot.gameObject);
                 RepairGeneratedTrackState(trackRoot.gameObject);
                 MarkGeneratedHierarchyTransient(trackRoot.gameObject);
             }
@@ -173,7 +173,7 @@ namespace TrackGeneration
             List<GameObject> roots = FindGeneratedTrackRoots();
             foreach (GameObject root in roots)
             {
-                DisableDebugVisualization(root);
+                RestoreDebugAnnotations(root);
                 RepairGeneratedTrackState(root);
                 MarkGeneratedHierarchyTransient(root);
             }
@@ -429,6 +429,9 @@ namespace TrackGeneration
                 {
                     TrackDesignerSettings relaxed = Designer.Clone();
                     var records = RelaxOptionalSettings(relaxed);
+                    // The relaxed pass exists to recover one playable result quickly,
+                    // not to score four more candidates after the full pass failed.
+                    relaxed.Generation.SelectionMode = CandidateSelectionMode.FirstValid;
                     var relaxedResolved = ResolvedTrackGenerationConfig.Resolve(Config, relaxed);
                     TrackGenerationResult retry = pipeline.Run(relaxedResolved, seed, seedStreams);
 
@@ -477,8 +480,44 @@ namespace TrackGeneration
             }
 
             Relax("Features.CompoundFeatureChance", ref s.Features.CompoundFeatureChance, 0f);
-            Relax("Layout.CornerSequenceChance", ref s.Layout.CornerSequenceChance, s.Layout.CornerSequenceChance * 0.5f);
-            Relax("Scale.PacingVariation", ref s.Scale.PacingVariation, Mathf.Min(s.Scale.PacingVariation, 0.4f));
+            Relax("Layout.CornerSequenceChance", ref s.Layout.CornerSequenceChance, 0f);
+            Relax("Scale.PacingVariation", ref s.Scale.PacingVariation, Mathf.Min(s.Scale.PacingVariation, 0.2f));
+
+            void RelaxInt(string name, ref int value, int relaxedValue)
+            {
+                if (value == relaxedValue) return;
+                records.Add(new RelaxedSettingRecord
+                {
+                    SettingName = name,
+                    OriginalValue = value,
+                    RelaxedValue = relaxedValue
+                });
+                value = relaxedValue;
+            }
+
+            // Required minima remain intact. The fallback removes only optional
+            // geometry so it does not repeat the same oversized search a second time.
+            RelaxInt("Features.MaxFeatureGroups", ref s.Features.MaxFeatureGroups,
+                s.Features.MinFeatureGroups);
+            RelaxInt("Layout.MaxTurnCount", ref s.Layout.MaxTurnCount,
+                Mathf.Min(s.Layout.MaxTurnCount, s.Layout.MinTurnCount + 1));
+            if (s.Layout.DirectionPattern != TurnDirectionPattern.Circuit)
+            {
+                records.Add(new RelaxedSettingRecord
+                {
+                    SettingName = "Layout.DirectionPattern",
+                    OriginalValue = (float)s.Layout.DirectionPattern,
+                    RelaxedValue = (float)TurnDirectionPattern.Circuit
+                });
+                // A mostly one-direction circuit has a positive-length closure
+                // solution far more often than a deeply folded mixed-sign walk. This
+                // applies only after the authored first pass has already failed.
+                s.Layout.DirectionPattern = TurnDirectionPattern.Circuit;
+            }
+            RelaxInt("Elevation.MaxMajorElevationSections", ref s.Elevation.MaxMajorElevationSections,
+                s.Elevation.MinMajorElevationSections);
+            Relax("Elevation.TargetElevationAmplitude", ref s.Elevation.TargetElevationAmplitude,
+                Mathf.Min(s.Elevation.TargetElevationAmplitude, 300f));
 
             void RelaxRule(string name, TrackFeatureRule rule)
             {
@@ -489,9 +528,9 @@ namespace TrackGeneration
                     {
                         SettingName = $"{name}.MaximumCount",
                         OriginalValue = rule.MaximumCount,
-                        RelaxedValue = Mathf.Max(rule.MinimumCount, rule.MinimumCount)
+                        RelaxedValue = rule.MinimumCount
                     });
-                    rule.MaximumCount = Mathf.Max(rule.MinimumCount, rule.MinimumCount);
+                    rule.MaximumCount = rule.MinimumCount;
                 }
                 if (rule.MinimumCount == 0 && rule.OptionalWeight > 0f)
                 {
@@ -510,8 +549,14 @@ namespace TrackGeneration
             RelaxRule("Features.Spirals", s.Features.Spirals);
             RelaxRule("Features.Jumps", s.Features.Jumps);
             RelaxRule("Features.HalfLoops", s.Features.HalfLoops);
+            RelaxRule("Features.FullPipes", s.Features.FullPipes);
+            RelaxRule("Features.Wallrides", s.Features.Wallrides);
             RelaxRule("Features.Chicanes", s.Features.Chicanes);
             RelaxRule("Features.SCurves", s.Features.SCurves);
+            RelaxRule("Features.Hairpins", s.Features.Hairpins);
+            RelaxRule("Elevation.Crests", s.Elevation.Crests);
+            RelaxRule("Elevation.Bridges", s.Elevation.Bridges);
+            RelaxRule("Elevation.Underpasses", s.Elevation.Underpasses);
 
             if (s.Quarters.MaximumDualQuarterCount > s.Quarters.MinimumDualQuarterCount)
             {
@@ -631,7 +676,12 @@ namespace TrackGeneration
                 var visualizer = tempRootObj.AddComponent<MacroTrackDebugVisualizer>();
                 visualizer.Initialize(seed.BaseSeed, layout.Sections, resolved.RoadProfile);
                 visualizer.SetLayout(layout);
-                visualizer.Level = TrackDebugVisualizationLevel.Off;
+                // Early-development default: annotate every turn/feature in the Scene view
+                // ([NN] DebugName per section + ◆ pattern-group labels). Camera-distance
+                // gated (LabelDrawDistance) so it never floods the editor. Turn it Off, or
+                // lower it, on the MacroTrackDebugVisualizer on the track root (or via the
+                // Toggle Debug View button) when the labels get in the way.
+                visualizer.Level = TrackDebugVisualizationLevel.Normal;
 
                 CreateStartAnchor(tempRootObj.transform, layout.Sections[0].StartFrame);
 
@@ -958,7 +1008,7 @@ namespace TrackGeneration
             foreach (GameObject root in roots)
             {
                 if (root == null) continue;
-                DisableDebugVisualization(root);
+                RestoreDebugAnnotations(root);
 
                 if (IsPendingTrack(root) || (removeDuplicates && root != selected))
                     DestroyObject(root);
@@ -1053,12 +1103,18 @@ namespace TrackGeneration
             }
         }
 
-        private static void DisableDebugVisualization(GameObject root)
+        // Early-development default: keep the track's turn/feature annotations ON.
+        // OnValidate and the editor-save guard run constantly (any inspector tweak, every
+        // domain reload), so forcing the level Off here was silently killing the labels a
+        // moment after generation set them to Normal. Restore the Normal annotation tier
+        // instead. Only lifts from Off, so a manually raised Detailed/Full tier is kept,
+        // and disabling the MacroTrackDebugVisualizer component still hides everything.
+        private static void RestoreDebugAnnotations(GameObject root)
         {
             if (root == null) return;
             MacroTrackDebugVisualizer visualizer = root.GetComponent<MacroTrackDebugVisualizer>();
-            if (visualizer != null)
-                visualizer.Level = TrackDebugVisualizationLevel.Off;
+            if (visualizer != null && visualizer.Level == TrackDebugVisualizationLevel.Off)
+                visualizer.Level = TrackDebugVisualizationLevel.Normal;
         }
 
 #if UNITY_EDITOR

@@ -526,6 +526,22 @@ namespace TrackGeneration.Validation
 
             foreach (var sec in layout.Sections)
             {
+                if (sec.Definition.SectionType == TrackMacroSectionType.AirGap &&
+                    (!sec.Definition.JumpCapturesMinimumSpeed ||
+                     !sec.Definition.JumpCapturesNominalSpeed ||
+                     !sec.Definition.JumpCapturesMaximumSpeed))
+                {
+                    issues.Add(new ValidationIssue
+                    {
+                        Reason = GenerationFailureReason.TransitionRateExceeded,
+                        IsError = true,
+                        Validator = "JumpCapture",
+                        Subject = sec.Definition.DebugName,
+                        Position = sec.StartFrame.Position,
+                        Message = "Air-gap landing did not validate capture at minimum, nominal and maximum entry speed."
+                    });
+                }
+
                 var frames = sec.SubdivisionFrames;
                 if (frames == null || frames.Length < 3) continue;
 
@@ -537,10 +553,55 @@ namespace TrackGeneration.Validation
                 // rate is the governing limit and IS checked below.
                 bool skipSlope = isPitchFeature || sec.Definition.SectionType == TrackMacroSectionType.Corkscrew ||
                                  sec.Definition.SectionType == TrackMacroSectionType.RotationalEvent;
+                bool ordinaryVertical = IsOrdinaryVerticalSection(sec.Definition.SectionType) &&
+                                        Mathf.Abs(sec.Definition.HillHeight) < 0.001f;
+                float maxVerticalCurvature = cfg.MaxCurvatureInducedG * Mathf.Max(0.1f, cfg.Gravity) /
+                                             Mathf.Max(1f, cfg.DesignSpeedMps * cfg.DesignSpeedMps);
 
                 for (int i = 1; i < frames.Length; i++)
                 {
                     float ds = Mathf.Max(0.05f, frames[i].ArcLength - frames[i - 1].ArcLength);
+                    float trueDs = Mathf.Max(0.05f,
+                        Vector3.Distance(frames[i - 1].Position, frames[i].Position));
+
+                    if (ordinaryVertical &&
+                        (Mathf.Abs(frames[i].VerticalCurvature) > maxVerticalCurvature * 1.05f ||
+                         Mathf.Abs(frames[i].VerticalCurvatureRate) > cfg.MaxVerticalCurvatureRate * 1.05f))
+                    {
+                        issues.Add(new ValidationIssue
+                        {
+                            Reason = GenerationFailureReason.TransitionRateExceeded,
+                            IsError = true,
+                            Validator = "VerticalProfile",
+                            Subject = sec.Definition.DebugName,
+                            Position = frames[i].Position,
+                            RequestedValue = maxVerticalCurvature,
+                            AchievedValue = Mathf.Abs(frames[i].VerticalCurvature),
+                            Message = $"Ordinary-road vertical profile exceeds its curvature envelope at ring {i}."
+                        });
+                        break;
+                    }
+
+                    if (ordinaryVertical)
+                    {
+                        float widthRate = Mathf.Abs(frames[i].Width - frames[i - 1].Width) / trueDs;
+                        float wallHeightRate = Mathf.Abs(frames[i].SideHeight - frames[i - 1].SideHeight) / trueDs;
+                        if (widthRate > 0.126f || wallHeightRate > 0.084f)
+                        {
+                            issues.Add(new ValidationIssue
+                            {
+                                Reason = GenerationFailureReason.TransitionRateExceeded,
+                                IsError = true,
+                                Validator = "CrossSectionField",
+                                Subject = sec.Definition.DebugName,
+                                Position = frames[i].Position,
+                                AchievedValue = Mathf.Max(widthRate, wallHeightRate),
+                                Message = $"Canonical cross-section changes too quickly at ring {i} " +
+                                          $"(width {widthRate:F3}m/m, wall height {wallHeightRate:F3}m/m)."
+                            });
+                            break;
+                        }
+                    }
 
                     // Roll rate = TWIST about the travel axis. Comparing raw Up vectors
                     // would count pitch changes (crests, ramps) as roll — transport the
@@ -606,6 +667,23 @@ namespace TrackGeneration.Validation
                         break;
                     }
                 }
+            }
+        }
+
+        private static bool IsOrdinaryVerticalSection(TrackMacroSectionType type)
+        {
+            switch (type)
+            {
+                case TrackMacroSectionType.Straight:
+                case TrackMacroSectionType.WideStraight:
+                case TrackMacroSectionType.BoostStraight:
+                case TrackMacroSectionType.BankedCurve:
+                case TrackMacroSectionType.BankedHairpin:
+                case TrackMacroSectionType.SCurve:
+                case TrackMacroSectionType.Chicane:
+                    return true;
+                default:
+                    return false;
             }
         }
 

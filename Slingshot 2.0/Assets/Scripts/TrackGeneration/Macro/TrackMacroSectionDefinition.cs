@@ -273,6 +273,17 @@ namespace TrackGeneration.Macro
         [Tooltip("Jump chain only: ballistic airtime of the gap in seconds (AirGap) — the gap distance is derived from the trajectory, never random.")]
         public float AirtimeSeconds;
 
+        [Tooltip("AirGap diagnostic: solved apex height above the launch lip.")]
+        public float JumpApexHeight;
+
+        [Tooltip("AirGap diagnostic: solved time from release to the apex.")]
+        public float JumpTimeToApex;
+
+        [Tooltip("AirGap diagnostic: landing capture validation at minimum/design/maximum entry speed.")]
+        public bool JumpCapturesMinimumSpeed;
+        public bool JumpCapturesNominalSpeed;
+        public bool JumpCapturesMaximumSpeed;
+
         [Tooltip("Jump ramps only: the intermediate launch/landing shaping pitch (degrees). Launch ramps keep this between level and PitchChange so pitch never falls before the lip.")]
         public float SecondaryPitchDeg;
 

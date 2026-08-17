@@ -366,10 +366,18 @@ namespace TrackGeneration.Design
             s.Elevation.MinMajorElevationSections = 5; s.Elevation.MaxMajorElevationSections = 10;
             s.Elevation.MaxClimbAngle = 34f; s.Elevation.MaxDropAngle = 36f;
 
-            s.Generation.MaxAttempts = 192; // feature-heavy plans reject often on length budget
+            s.Generation.MaxAttempts = 192; // the time watchdog, not attempt count, bounds editor generation
+            // Preserve every required minimum, but if the ornamental first pass cannot
+            // close, retry with optional counts/weights reduced before giving up.
+            s.Generation.FailurePolicy = GenerationFailurePolicy.RelaxOptionalSettings;
             s.Scale.MaxTrackLengthMeters = 60000f; // monumental feature footprints need the full rulebook cap
 
             s.Features.MinFeatureGroups = 4; s.Features.MaxFeatureGroups = 8;
+            // Air gaps must read as deliberate launches at hovercraft speed: a taller
+            // progressive ramp, then a clearly upward terminal lip rather than a long
+            // road that happens to end only a few degrees above level.
+            s.Features.TargetJumpApexHeight = 100f;
+            s.Features.JumpLipEmphasis = 0.7f;
             s.Features.Loops = new TrackFeatureRule(true, 1, 3, 1.5f);
             s.Features.Corkscrews = new TrackFeatureRule(true, 1, 3, 1.5f);
             s.Features.Spirals = new TrackFeatureRule(true, 1, 2, 1f);

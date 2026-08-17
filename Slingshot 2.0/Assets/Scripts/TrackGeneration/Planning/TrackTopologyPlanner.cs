@@ -17,6 +17,12 @@ namespace TrackGeneration.Planning
         public List<ConnectorDecisionRecord> ConnectorDecisions = new List<ConnectorDecisionRecord>();
         public int TurnCount;
 
+        /// <summary>
+        /// Corkscrew slots consumed by optional corner realizations before ordinary
+        /// gap features are selected. It becomes a placed count only after emission.
+        /// </summary>
+        public int ReservedCornerCorkscrews;
+
         /// <summary>Non-fatal planning notes (dual-quarter demotions, infeasible selections).</summary>
         public List<string> Warnings = new List<string>();
 
@@ -67,6 +73,7 @@ namespace TrackGeneration.Planning
     public class TrackTopologyPlanner
     {
         private const float MinAdjustableStraight = 40f;
+        private const int MaxAlternateDualPlacementsPerCandidate = 1;
 
         // ─────────────────────────── Corner slot model ───────────────────────────
 
@@ -91,54 +98,96 @@ namespace TrackGeneration.Planning
         /// Every subsystem draws ONLY from its own stream, so re-randomizing one
         /// stream (features, elevation, quarter content) never perturbs the others.
         ///
-        /// Dual-quarter demotion loop: the deterministic planning core runs from a COPY
-        /// of the random streams; when the alternate road of one dual quarter cannot be
-        /// fitted (or fails balance under the DemoteToSingleRoad policy), that quarter is
-        /// demoted in the mask and the whole core re-runs from the same stream state —
-        /// fully deterministic, never surgical def removal.
+        /// The deterministic planning core first uses the requested random selection.
+        /// If that selection cannot close or its alternate road cannot fit, the planner
+        /// tries the other legal quarter placements from the same random-stream state.
+        /// This relocates a REQUIRED dual quarter instead of silently deleting it.
         /// </summary>
         public TopologyPlan Plan(ResolvedTrackGenerationConfig cfg, PlanRandomStreams rngs)
         {
-            bool[] dualMask = null;
-            var demotionNotes = new List<string>();
-            TopologyPlan plan = null;
+            TopologyPlan initial = PlanCore(cfg, rngs.Copy(), null, out _);
+            if (MeetsDualRequirement(initial, cfg)) return initial;
 
-            for (int attempt = 0; attempt <= 4; attempt++)
+            // Re-running a whole candidate is expensive: it includes closure,
+            // elevation and Road B fitting. Only retry when the candidate reached the
+            // dual-road stage and that requirement itself failed. Closure, transition,
+            // intersection and budget failures need a new candidate, not another copy
+            // of the same one with up to sixteen quarter masks.
+            bool dualSpecificFailure = !initial.Failed
+                ? initial.DualQuarterCount < cfg.MinDualQuarters
+                : initial.Failure == GenerationFailureReason.DualRoadFitFailure ||
+                  (initial.Failure == GenerationFailureReason.DualRoadBalanceFailure &&
+                   cfg.BalancePolicy == DualQuarterBalancePolicy.DemoteToSingleRoad);
+
+            if (dualSpecificFailure && initial.Quarters.Count == 4)
             {
-                plan = PlanCore(cfg, rngs.Copy(), dualMask, out int failedQuarter);
-
-                bool demotable = plan.Failed && failedQuarter >= 0 &&
-                                 (plan.Failure == GenerationFailureReason.DualRoadFitFailure ||
-                                  (plan.Failure == GenerationFailureReason.DualRoadBalanceFailure &&
-                                   cfg.BalancePolicy == DualQuarterBalancePolicy.DemoteToSingleRoad));
-                if (!demotable) break;
-
-                if (dualMask == null)
+                int forcedMask = 0;
+                int forbiddenMask = 0;
+                int initialMask = 0;
+                for (int q = 0; q < 4; q++)
                 {
-                    dualMask = new bool[4];
-                    foreach (var q in plan.Quarters) dualMask[q.Index] = q.Dual;
+                    if (initial.Quarters[q].Dual) initialMask |= 1 << q;
+                    if (cfg.QuarterTypeOverrides[q] == QuarterTypeOverride.DualRoad)
+                        forcedMask |= 1 << q;
+                    else if (cfg.QuarterTypeOverrides[q] == QuarterTypeOverride.SingleRoad)
+                        forbiddenMask |= 1 << q;
                 }
-                dualMask[failedQuarter] = false;
-                demotionNotes.Add($"Quarter {failedQuarter} demoted to SingleRoad: {plan.FailureMessage}");
+                if (!cfg.AllowQ1Dual) forbiddenMask |= 1;
+                if (!cfg.AllowQ4Dual) forbiddenMask |= 1 << 3;
+
+                int minimumMaskCount = Mathf.Max(cfg.MinDualQuarters, CountMaskBits(forcedMask));
+                int alternatesTried = 0;
+                for (int mask = 0; mask < 16; mask++)
+                {
+                    if (CountMaskBits(mask) != minimumMaskCount) continue;
+                    if (mask == initialMask) continue;
+                    if ((mask & forcedMask) != forcedMask || (mask & forbiddenMask) != 0) continue;
+
+                    var explicitMask = new bool[4];
+                    for (int q = 0; q < 4; q++) explicitMask[q] = (mask & (1 << q)) != 0;
+                    TopologyPlan alternate = PlanCore(cfg, rngs.Copy(), explicitMask, out _);
+                    alternatesTried++;
+                    if (MeetsDualRequirement(alternate, cfg))
+                    {
+                        alternate.Warnings.Insert(0,
+                            $"Required Dual Road Quarter fallback selected mask {MaskLabel(mask)} after the initial placement failed.");
+                        return alternate;
+                    }
+                    if (alternatesTried >= MaxAlternateDualPlacementsPerCandidate) break;
+                }
             }
 
-            if (demotionNotes.Count > 0)
-                plan.Warnings.InsertRange(0, demotionNotes);
-
-            // The demoted plan must still satisfy the resolved minimum.
-            if (!plan.Failed && plan.DualQuarterCount < cfg.MinDualQuarters)
+            if (!initial.Failed && initial.DualQuarterCount < cfg.MinDualQuarters)
             {
-                string detail = demotionNotes.Count > 0 ? demotionNotes[demotionNotes.Count - 1] : null;
-                for (int w = plan.Warnings.Count - 1; w >= 0 && detail == null; w--)
-                    if (plan.Warnings[w].StartsWith("Dual selection") ||
-                        plan.Warnings[w].Contains("demoted to SingleRoad"))
-                        detail = plan.Warnings[w];
-                plan.Fail(GenerationFailureReason.RequiredFeatureMissing,
-                    $"Only {plan.DualQuarterCount} of the required {cfg.MinDualQuarters} Dual Road Quarters could be built " +
-                    $"({detail ?? "no eligible quarters"}).");
+                string detail = null;
+                for (int w = initial.Warnings.Count - 1; w >= 0 && detail == null; w--)
+                    if (initial.Warnings[w].StartsWith("Dual selection") ||
+                        initial.Warnings[w].Contains("demoted to SingleRoad"))
+                        detail = initial.Warnings[w];
+                initial.Fail(GenerationFailureReason.RequiredFeatureMissing,
+                    $"Only {initial.DualQuarterCount} of the required {cfg.MinDualQuarters} Dual Road Quarters could be built " +
+                    $"after the bounded alternate-placement retry ({detail ?? "no eligible quarters"}).");
             }
 
-            return plan;
+            return initial;
+        }
+
+        private static bool MeetsDualRequirement(TopologyPlan plan, ResolvedTrackGenerationConfig cfg)
+            => !plan.Failed && plan.DualQuarterCount >= cfg.MinDualQuarters;
+
+        private static int CountMaskBits(int mask)
+        {
+            int count = 0;
+            for (; mask != 0; mask >>= 1) count += mask & 1;
+            return count;
+        }
+
+        private static string MaskLabel(int mask)
+        {
+            var quarters = new List<string>(4);
+            for (int q = 0; q < 4; q++)
+                if ((mask & (1 << q)) != 0) quarters.Add($"Q{q + 1}");
+            return quarters.Count == 0 ? "SingleRoad-only" : string.Join("+", quarters);
         }
 
         /// <summary>
@@ -171,6 +220,7 @@ namespace TrackGeneration.Planning
             // straights and the dual-quarter gate overhead. Optional content stops when
             // the budget runs out instead of blowing the cap and failing later.
             float cornerArcEstimate = 0f;
+            float cornerRealizationExtra = 0f;
             foreach (var c in corners)
             {
                 float radius = Mathf.Max(Mathf.Lerp(cfg.MaxCurveRadius, cfg.MinCurveRadius, c.Magnitude / 180f), cfg.MinCurveRadius);
@@ -180,14 +230,38 @@ namespace TrackGeneration.Planning
                 // toward the minimum (it counts 80% of that slack as usable) — charge
                 // features only 35% of the drawn surplus, or feature-heavy presets fail
                 // the budget check for length the solver would happily have found.
-                cornerArcEstimate += Mathf.Lerp(drawnArc, minArc, 0.65f);
+                float chargedArc = Mathf.Lerp(drawnArc, minArc, 0.65f);
+                cornerArcEstimate += chargedArc;
+
+                // Long, locked corner realizations replace an ordinary arc. Charge
+                // their positive difference here so they cannot bypass the feature
+                // budget while still avoiding double-counting the base corner.
+                float realized = 0f;
+                if (c.IsHalfLoop)
+                    realized = cfg.EstimateFeatureFootprint(c.HalfLoopType);
+                else if (c.IsSpecial && c.Realization == TrackPatternType.Corkscrew)
+                    realized = cfg.EstimateFeatureFootprint(TrackPatternType.Corkscrew) +
+                               cfg.DefaultRecoveryLength;
+                else if (c.IsSpecial && c.Realization == TrackPatternType.WallrideTurn)
+                    realized = drawnArc + cfg.DefaultRecoveryLength;
+                else if (c.IsSpecial && (c.Realization == TrackPatternType.Hairpin ||
+                                         c.Realization == TrackPatternType.SweeperIntoHairpin))
+                    realized = cfg.EstimateFeatureFootprint(c.Realization);
+                cornerRealizationExtra += Mathf.Max(0f, realized - chargedArc);
             }
-            // The gate overhead uses MAX launch/airtime/landing — solved jumps come in
-            // well under it, and the post-solve cap check now catches real overruns.
-            float gateOverhead = QuarterGateOverhead(cfg) * 0.8f;
+            // Gate overhead reserves the complete launch/airtime/landing capture
+            // envelope. This is deliberately the same allowance the builder may use,
+            // so a plan cannot become over-length merely by solving its landings.
+            float gateOverhead = QuarterGateOverhead(cfg);
             float quarterEstimate = plan.DualQuarterCount * gateOverhead;
             float straightsEstimate = gapCount * Mathf.Max(MinAdjustableStraight, cfg.MinStraightLength * 0.6f);
-            float featureBudget = cfg.MaxTrackLength * 0.85f - cornerArcEstimate - quarterEstimate - straightsEstimate;
+            // Closure is not optional content. Protect its configured share before
+            // admitting optional features so a visually rich open path does not arrive
+            // at the final solve with no remaining distance in which to return home.
+            float closureLengthReserve = cfg.MaxTrackLength * Mathf.Max(0.15f, cfg.ClosureReserveFraction);
+            float featureBudget = cfg.MaxTrackLength - closureLengthReserve -
+                                  cornerArcEstimate - cornerRealizationExtra -
+                                  quarterEstimate - straightsEstimate;
 
             // Road A inside a dual quarter may carry ordinary feature patterns. Road B
             // is fitted independently and the completed pair still has to pass timing,
@@ -324,7 +398,7 @@ namespace TrackGeneration.Planning
 
         /// <summary>Planned length of one dual quarter's gate suites (entry choice jump + exit convergence jump).</summary>
         internal static float QuarterGateOverhead(ResolvedTrackGenerationConfig cfg)
-            => 2f * (cfg.MaxLaunchTransitionLength + cfg.DesignSpeedMps * cfg.MaxJumpAirtimeSeconds + cfg.MaxLandingTransitionLength)
+            => 2f * (cfg.MaxLaunchTransitionLength + cfg.DesignSpeedMps * cfg.MaxJumpAirtimeSeconds + cfg.JumpLandingPlanningLength)
                + cfg.JumpRecoveryLength + cfg.DefaultApproachLength;
 
         // ═══════════════════════════ 1. Corner plan ═══════════════════════════
@@ -547,7 +621,12 @@ namespace TrackGeneration.Planning
             // → InsufficientLengthBudget) and packed too much curvature into the ring budget
             // (max facet 3.1° vs 0.5° target). The gentle ±45 barrel stays smooth and
             // affordable. Widen this window only after the 90° geometry is stretched/eased.
-            if (cfg.DirectionalCorkscrews)
+            // Directional corkscrews are optional corner content. Reserve one only
+            // when the rule has headroom above its required minimum. Previously a
+            // min=1/max=1 preset emitted the required gap corkscrew and then added a
+            // second corner barrel, making every completed candidate invalid.
+            if (cfg.DirectionalCorkscrews && cfg.Corkscrews.Enabled &&
+                cfg.Corkscrews.MaximumCount > cfg.Corkscrews.MinimumCount)
             {
                 var dcoEligible = new List<CornerSlot>();
                 foreach (var c in corners)
@@ -558,6 +637,7 @@ namespace TrackGeneration.Planning
                     var pick = dcoEligible[rngs.Feature.NextInt(dcoEligible.Count)];
                     pick.IsSpecial = true;
                     pick.Realization = TrackPatternType.Corkscrew;
+                    plan.ReservedCornerCorkscrews++;
                 }
             }
 
@@ -796,7 +876,9 @@ namespace TrackGeneration.Planning
 
             // Feature-count budget per underlying element, respecting maxima across
             // both single and compound placements.
-            int loopsUsed = 0, corksUsed = 0, spiralsUsed = 0, jumpsUsed = 0, chicanesUsed = 0, sCurvesUsed = 0, pipesUsed = 0;
+            int loopsUsed = 0, corksUsed = plan.ReservedCornerCorkscrews,
+                spiralsUsed = 0, jumpsUsed = 0, chicanesUsed = 0,
+                sCurvesUsed = 0, pipesUsed = 0;
 
             bool TryConsume(TrackPatternType t)
             {
@@ -1639,6 +1721,7 @@ namespace TrackGeneration.Planning
                     defs.Add(dco);
                     defs.Add(SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight, cfg.DefaultRecoveryLength, width,
                         "RecoveryStraight", locked: true, pid));
+                    plan.CountPattern(TrackPatternType.Corkscrew);
                     break;
                 }
                 default:
@@ -1948,8 +2031,13 @@ namespace TrackGeneration.Planning
             // solved-over-cap) — measured 90%→82% on Balanced when this was relaxed.
             if (excess > straightShrinkable + cornerShrinkable)
             {
+                float lockedLength = total - adjustableTotal - cornerShrinkable;
+                float minimumLegalLength = lockedLength + floorTotal;
                 plan.Fail(GenerationFailureReason.InsufficientLengthBudget,
-                    $"Locked content alone needs {(total - adjustableTotal - cornerShrinkable) / 1000f:F1}km — the {cfg.MaxTrackLength / 1000f:F1}km cap cannot fit this plan.");
+                    $"Minimum legal lap is {minimumLegalLength / 1000f:F1}km " +
+                    $"(locked content {lockedLength / 1000f:F1}km + adjustable-road floors {floorTotal / 1000f:F1}km), " +
+                    $"but the closure planning ceiling is {budgetCeiling / 1000f:F1}km " +
+                    $"inside the {cfg.MaxTrackLength / 1000f:F1}km hard cap.");
                 return false;
             }
 
@@ -2684,7 +2772,35 @@ namespace TrackGeneration.Planning
 
             if (cfg.TargetElevationAmplitude < 6f && !needCompensation) return;
 
-            // Carriers: plain (non-safety) straights.
+            bool AuthoredVerticalBoundary(TrackMacroSectionType type) =>
+                type == TrackMacroSectionType.JumpRamp ||
+                type == TrackMacroSectionType.AirGap ||
+                type == TrackMacroSectionType.LandingRamp ||
+                type == TrackMacroSectionType.Loop ||
+                type == TrackMacroSectionType.Corkscrew ||
+                type == TrackMacroSectionType.Spiral ||
+                type == TrackMacroSectionType.HalfLoopTwist ||
+                type == TrackMacroSectionType.FullPipe ||
+                type == TrackMacroSectionType.RotationalEvent;
+
+            bool NearAuthoredVerticalBoundary(int index)
+            {
+                // Feature approaches/recoveries are usually one definition long. A
+                // two-section guard prevents a major climb from terminating directly
+                // at a loop/corkscrew/spiral/jump mouth, which created both harsh
+                // transitions and plan-vs-built feature-footprint drift.
+                for (int offset = -2; offset <= 2; offset++)
+                {
+                    if (offset == 0) continue;
+                    int neighbor = index + offset;
+                    if (neighbor < 0 || neighbor >= defs.Count) continue;
+                    if (AuthoredVerticalBoundary(defs[neighbor].SectionType)) return true;
+                }
+                return false;
+            }
+
+            // Carriers: plain (non-safety) straights, with protected feature mouths
+            // kept level. Ordinary elevation still has the remaining gaps to use.
             var eligible = new List<int>();
             for (int i = 0; i < defs.Count; i++)
             {
@@ -2693,6 +2809,7 @@ namespace TrackGeneration.Planning
                                 d.SectionType == TrackMacroSectionType.WideStraight ||
                                 d.SectionType == TrackMacroSectionType.BoostStraight)
                                && !d.LockLength && d.Length >= 100f;
+                carrier &= !NearAuthoredVerticalBoundary(i);
                 if (carrier) eligible.Add(i);
             }
 
@@ -2730,8 +2847,13 @@ namespace TrackGeneration.Planning
                     majorSet.Add(idx);
                 }
 
+                // The chain-level vertical solver must ease into and out of the grade
+                // while respecting curvature at design speed. The old /1.5 estimate
+                // described a sustained slope, not a drivable eased profile, and was
+                // allowing 300-450 m rises in ~800 m. Reserve four lengths of shaping
+                // room so planned elevation reaches the builder legally and gradually.
                 float Capacity(int idx, bool up) =>
-                    defs[idx].Length * Mathf.Tan((up ? cfg.MaxClimbAngle : cfg.MaxDropAngle) * Mathf.Deg2Rad) / 1.5f;
+                    defs[idx].Length * Mathf.Tan((up ? cfg.MaxClimbAngle : cfg.MaxDropAngle) * Mathf.Deg2Rad) / 4f;
 
                 var order = new List<int>();
                 foreach (int idx in eligible) if (majorSet.Contains(idx)) order.Add(idx);

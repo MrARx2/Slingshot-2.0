@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using UnityEngine;
 using TrackGeneration.Core;
 using TrackGeneration.Design;
@@ -22,6 +23,9 @@ namespace TrackGeneration.Planning
         /// vertically separates the folded legs.
         /// </summary>
         private const int ElevationRerollsPerAttempt = 6;
+        // One primary pass plus one optional relaxed pass is capped near the project's
+        // established 1:20-2:00 generation window, instead of ever hanging for 12 min.
+        private const double SynchronousTimeBudgetSeconds = 60.0;
 
         private class Candidate
         {
@@ -73,8 +77,18 @@ namespace TrackGeneration.Planning
             TrackTopologyPlanner.AngleReliefClosures = 0;
 
             int attempts = 0;
+            var generationTimer = Stopwatch.StartNew();
             for (; attempts < cfg.MaxAttempts; attempts++)
             {
+                if (attempts > 0 && generationTimer.Elapsed.TotalSeconds >= SynchronousTimeBudgetSeconds)
+                {
+                    result.Report.AddFailure(attempts,
+                        GenerationFailureReason.GenerationTimeBudgetExceeded,
+                        "GenerationWatchdog",
+                        $"Stopped this generation pass after {generationTimer.Elapsed.TotalSeconds:F1}s and {attempts} attempts so the Unity editor remains responsive.");
+                    break;
+                }
+
                 uint attemptSeed = attemptSeedRng.NextUInt();
                 if (attemptSeed == 0) attemptSeed = 1;
                 var attemptRng = new Unity.Mathematics.Random(attemptSeed);
@@ -100,6 +114,7 @@ namespace TrackGeneration.Planning
                 // discovering a fresh layout.
                 for (int reroll = 1;
                      plan.Failed && plan.Failure == GenerationFailureReason.SelfIntersection &&
+                     generationTimer.Elapsed.TotalSeconds < SynchronousTimeBudgetSeconds &&
                      reroll <= ElevationRerollsPerAttempt;
                      reroll++)
                 {

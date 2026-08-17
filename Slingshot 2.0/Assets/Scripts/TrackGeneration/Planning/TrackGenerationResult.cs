@@ -28,6 +28,7 @@ namespace TrackGeneration.Planning
         RollRateViolation,
         PitchRateViolation,
         RingBudgetExceeded,
+        GenerationTimeBudgetExceeded,
         FeatureEnvelopeCollision,
         RaceCourseBuildFailure,
         MeshBuildFailure

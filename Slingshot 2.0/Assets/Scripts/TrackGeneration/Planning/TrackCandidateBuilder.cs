@@ -163,6 +163,16 @@ namespace TrackGeneration.Planning
                 return null;
             }
 
+            // Ordinary elevation is authored as section-level intent, but it is solved
+            // here as one continuous field over each physical chain. This stage keeps
+            // every horizontal centreline sample fixed and runs before banking,
+            // cross-section planning, retopology, mesh and collider construction.
+            if (!VerticalProfilePlanner.TryApply(layout.Sections, cfg, out string verticalFailure))
+            {
+                Fail(GenerationFailureReason.TransitionRateExceeded, verticalFailure);
+                return null;
+            }
+
             // ── Closure validation (rulebook tolerances) — never a global warp ──
             var closing = layout.Sections[layout.Sections.Count - 1];
             var endF = closing.EndFrame;
@@ -1130,88 +1140,7 @@ namespace TrackGeneration.Planning
         /// </summary>
         private static void ApplyCrossSectionBlend(List<GeneratedTrackSection> sections, ResolvedTrackGenerationConfig cfg)
         {
-            int n = sections.Count;
-            if (n == 0 || cfg.RoadProfile == null) return;
-
-            float baseH = cfg.RoadProfile.SideHeight;
-            float blendLen = Mathf.Max(1f, cfg.CrossSectionTransitionLength);
-
-            float SectionLen(GeneratedTrackSection s) => Mathf.Max(0.01f, s.EndFrame.ArcLength - s.StartFrame.ArcLength);
-
-            int Neighbor(int i, int step)
-            {
-                int j = (i + step + n) % n;
-                // Never blend across a physical break: list adjacency is not physical
-                // adjacency around a dual quarter's alternate road (road A's lip is
-                // followed in the LIST by road B's mouth, one lane away) — and open
-                // air-gap boundaries blend to themselves.
-                var a = sections[i];
-                var b = sections[j];
-                Vector3 aEdge = step > 0 ? a.EndFrame.Position : a.StartFrame.Position;
-                Vector3 bEdge = step > 0 ? b.StartFrame.Position : b.EndFrame.Position;
-                bool open = step > 0 ? (a.OpenEnd || b.OpenStart) : (a.OpenStart || b.OpenEnd);
-                bool airGap = a.IsEmptySpace || b.IsEmptySpace;
-                if (!airGap && (open || (aEdge - bEdge).sqrMagnitude > 0.25f)) return i;
-                return j;
-            }
-
-            // Bridge/transfer connectors CARRY their turn complex's depth through,
-            // GRADED by BridgeCarry: short links hold fully, longer ones relax
-            // proportionally — a dip to plain-straight depth between two banked turns
-            // is a visible wall-height wave on every borderline link.
-            float MultiplierOf(int i)
-            {
-                var s = sections[i];
-                float own = DepthMultiplier(s.Definition.SectionType);
-                float carry = Mathf.Clamp01(s.Definition.BridgeCarry);
-                if (carry < 0.001f) return own;
-
-                float held = Mathf.Min(
-                    DepthMultiplier(sections[Neighbor(i, -1)].Definition.SectionType),
-                    DepthMultiplier(sections[Neighbor(i, +1)].Definition.SectionType));
-                return Mathf.Lerp(own, held, carry);
-            }
-
-            for (int i = 0; i < n; i++)
-            {
-                var sec = sections[i];
-                if (sec.SubdivisionFrames == null || sec.SubdivisionFrames.Length == 0) continue;
-
-                float m = MultiplierOf(i);
-                int pi = Neighbor(i, -1);
-                int ni = Neighbor(i, +1);
-                float mPrev = MultiplierOf(pi);
-                float mNext = MultiplierOf(ni);
-
-                float len = SectionLen(sec);
-                float w0 = Mathf.Max(0.01f, Mathf.Min(blendLen, Mathf.Min(len, SectionLen(sections[pi]))));
-                float w1 = Mathf.Max(0.01f, Mathf.Min(blendLen, Mathf.Min(len, SectionLen(sections[ni]))));
-                float s0 = sec.StartFrame.ArcLength;
-                float s1 = sec.EndFrame.ArcLength;
-
-                for (int f = 0; f < sec.SubdivisionFrames.Length; f++)
-                {
-                    var fr = sec.SubdivisionFrames[f];
-                    float s = fr.ArcLength;
-
-                    float mult = m;
-                    if (s < s0 + w0 * 0.5f)
-                        mult = Mathf.Lerp(mPrev, m, TrackBlend.Evaluate(cfg.BlendCurve, (s - (s0 - w0 * 0.5f)) / w0));
-                    else if (s > s1 - w1 * 0.5f)
-                        mult = Mathf.Lerp(m, mNext, TrackBlend.Evaluate(cfg.BlendCurve, (s - (s1 - w1 * 0.5f)) / w1));
-
-                    fr.SideHeight = baseH * mult;
-                    sec.SubdivisionFrames[f] = fr;
-                }
-
-                var sf = sec.StartFrame;
-                sf.SideHeight = sec.SubdivisionFrames[0].SideHeight;
-                sec.StartFrame = sf;
-
-                var ef = sec.EndFrame;
-                ef.SideHeight = sec.SubdivisionFrames[sec.SubdivisionFrames.Length - 1].SideHeight;
-                sec.EndFrame = ef;
-            }
+            CrossSectionPlanner.Apply(sections, cfg);
         }
 
         /// <summary>

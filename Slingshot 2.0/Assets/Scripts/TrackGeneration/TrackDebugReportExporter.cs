@@ -91,6 +91,7 @@ namespace TrackGeneration
             ChainMap(sb, sections);
             ConnectorAudit(sb, sections, resolved);
             WallWaveHotspots(sb, sections, resolved);
+            TrackGeometryDiagnostics.AppendBaseline(sb, sections, resolved);
             DiscontinuityScan(sb, sections);
             TrackMeshIntegrityDiagnostics.Append(sb, sections, resolved); // read-only surface measurement
             QuarterDissection(sb, generator, sections);
@@ -172,7 +173,7 @@ namespace TrackGeneration
             sb.AppendLine($"bankBlend {r.BankTransitionLength:F0}m | minConnector {r.MinimumConnectorLength:F0}m | BRIDGE {r.SameDirectionBridgeLength:F0}m | bankReversal {r.MinimumBankReversalLength:F0}m | inherit {r.ConnectorInheritanceStrength:F2}");
             sb.AppendLine($"field blur radius (bank) = max(60, {r.BankTransitionLength * 0.5f:F0}, {r.MinimumBankReversalLength * 0.5f:F0}) = {Mathf.Max(60f, Mathf.Max(r.BankTransitionLength * 0.5f, r.MinimumBankReversalLength * 0.5f)):F0}m");
             sb.AppendLine($"quarters: dual {r.MinDualQuarters}-{r.MaxDualQuarters} {r.QuarterChoiceType} | laneSep {r.LaneSeparation:F0}m | catch {r.QuarterCatchWidth:F0}m | roadB width {r.DualRoadWidth:F0}m | lenTol {r.RoadLengthTolerance:P0} | balanceTol {r.NeutralTimeTolerance:P1}");
-            sb.AppendLine($"jumps: approach {r.JumpApproachLength:F0}m launch {r.MinLaunchTransitionLength:F0}-{r.MaxLaunchTransitionLength:F0}m airtime {r.MinJumpAirtimeSeconds:F2}-{r.MaxJumpAirtimeSeconds:F2}s landing {r.MinLandingTransitionLength:F0}-{r.MaxLandingTransitionLength:F0}m lip {r.MinJumpHeight:F0}-{r.MaxJumpHeight:F0}m");
+            sb.AppendLine($"jumps: approach {r.JumpApproachLength:F0}m launch {r.MinLaunchTransitionLength:F0}-{r.MaxLaunchTransitionLength:F0}m at {r.MinJumpLaunchPitchDegrees:F1}-{r.MaxJumpLaunchPitchDegrees:F1}deg | airtime {r.MinJumpAirtimeSeconds:F2}-{r.MaxJumpAirtimeSeconds:F2}s landing {r.MinLandingTransitionLength:F0}-{r.JumpLandingPlanningLength:F0}m planned, {r.MaxLandingTransitionLength:F0}m solver cap | lip {r.MinJumpHeight:F0}-{r.MaxJumpHeight:F0}m");
             sb.AppendLine($"spirals: {r.MinSpiralRevolutions}-{r.MaxSpiralRevolutions} rev | quantized climb {r.MinSpiralClimbPerRevolution:F0}-{r.MaxSpiralClimbPerRevolution:F0}m/rev | built-layer clearance {r.SpiralClearance:F0}m");
             sb.AppendLine($"pipes: len {r.MinFullPipeLength:F0}-{r.MaxFullPipeLength:F0}m transition {r.PipeTransitionLength:F0}m radiusScale {r.FullPipeRadiusScale:F2} | rounding {(r.DynamicTurnRoundingEnabled ? r.TurnRoundingStrength.ToString("F2") : "off")} catchWall {(r.CatchWallEnabled ? r.CatchWallStrength.ToString("F2") : "off")}");
             foreach (var issue in r.Issues)

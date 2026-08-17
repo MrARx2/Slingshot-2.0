@@ -124,6 +124,8 @@ namespace TrackGeneration.Macro
         public int MaxMajorElevationSections;
         public float MaxClimbAngle;
         public float MaxDropAngle;
+        public float MaxCurvatureInducedG;
+        public float MaxVerticalCurvatureRate;
         public ResolvedFeatureRule Crests;
         public ResolvedFeatureRule Bridges;
         public ResolvedFeatureRule Underpasses;
@@ -215,11 +217,20 @@ namespace TrackGeneration.Macro
         public float MinJumpAirtimeSeconds;
         public float MaxJumpAirtimeSeconds;
         public float MinLandingTransitionLength;
+        /// <summary>
+        /// Authoritative landing allowance used by topology length budgeting. It
+        /// matches the solver's complete capture envelope so planning never admits
+        /// content that the built landing later pushes beyond the lap-length cap.
+        /// </summary>
+        public float JumpLandingPlanningLength;
         public float MaxLandingTransitionLength;
         public float JumpRecoveryLength;
         public float MinJumpHeight;
         public float MaxJumpHeight;
         public float JumpLandingTolerance;
+        public float TargetJumpApexHeight;
+        public float JumpLipEmphasis;
+        public float JumpCaptureSpeedVariation;
 
         // ── Clearance safety margin (dual-quarter road pairing) ──
         public float WallMaskSafetyMargin;
@@ -450,6 +461,8 @@ namespace TrackGeneration.Macro
             r.MaxMajorElevationSections = settings.Elevation.MaxMajorElevationSections;
             r.MaxClimbAngle = r.ClampReport(settings.Elevation.MaxClimbAngle, 1f, limits.MaxClimbAngle, "Elevation.MaxClimbAngle");
             r.MaxDropAngle = r.ClampReport(settings.Elevation.MaxDropAngle, 1f, limits.MaxDropAngle, "Elevation.MaxDropAngle");
+            r.MaxCurvatureInducedG = Mathf.Clamp(settings.Elevation.MaxCurvatureInducedG, 1f, 50f);
+            r.MaxVerticalCurvatureRate = Mathf.Clamp(settings.Elevation.MaxVerticalCurvatureRate, 0.0000001f, 0.001f);
             r.GroundLevelPolicy = settings.Elevation.GroundLevelPolicy;
 
             bool allowUnder = limits.AllowUnderpasses && settings.Elevation.GroundLevelPolicy == TrackGroundLevelPolicy.FreeFloating;
@@ -581,11 +594,22 @@ namespace TrackGeneration.Macro
             r.MinJumpAirtimeSeconds = limits.MinJumpAirtimeSeconds;
             r.MaxJumpAirtimeSeconds = limits.MaxJumpAirtimeSeconds;
             r.MinLandingTransitionLength = S(limits.MinLandingTransitionSeconds);
-            r.MaxLandingTransitionLength = S(limits.MaxLandingTransitionSeconds);
+            r.JumpCaptureSpeedVariation = Mathf.Clamp(settings.Features.JumpCaptureSpeedVariation, 0f, 0.25f);
+            // Keep two names because reports distinguish planning from solver limits,
+            // but charge the complete legal landing envelope to the topology budget.
+            // At Rollercoaster speeds the capture solver consistently needs the far
+            // end of this envelope. Charging a shorter "typical" landing admitted
+            // optional content that later became 55-70 km of locked geometry.
+            float baseMaxLandingLength = S(limits.MaxLandingTransitionSeconds);
+            r.MaxLandingTransitionLength = baseMaxLandingLength *
+                                           (1f + 32f * r.JumpCaptureSpeedVariation);
+            r.JumpLandingPlanningLength = r.MaxLandingTransitionLength;
             r.JumpRecoveryLength = Mathf.Max(r.DefaultRecoveryLength, S(limits.MinJumpRecoverySeconds));
             r.MinJumpHeight = limits.MinJumpHeight;
             r.MaxJumpHeight = limits.MaxJumpHeight;
             r.JumpLandingTolerance = limits.JumpLandingTolerance;
+            r.TargetJumpApexHeight = Mathf.Max(1f, settings.Features.TargetJumpApexHeight);
+            r.JumpLipEmphasis = Mathf.Clamp01(settings.Features.JumpLipEmphasis);
 
             r.WallMaskSafetyMargin = 3f;
 
@@ -734,7 +758,7 @@ namespace TrackGeneration.Macro
                 }
                 case TrackPatternType.JumpGap:
                 case TrackPatternType.JumpToBankedLanding:
-                    return JumpApproachLength + MaxLaunchTransitionLength + DesignSpeedMps * MaxJumpAirtimeSeconds + MaxLandingTransitionLength + JumpRecoveryLength;
+                    return JumpApproachLength + MaxLaunchTransitionLength + DesignSpeedMps * MaxJumpAirtimeSeconds + JumpLandingPlanningLength + JumpRecoveryLength;
                 case TrackPatternType.FullPipe:
                     return DefaultApproachLength + (MinFullPipeLength + MaxFullPipeLength) * 0.5f + DefaultRecoveryLength;
                 case TrackPatternType.HalfLoopToCorkscrew:
@@ -856,7 +880,7 @@ namespace TrackGeneration.Macro
             {
                 float gateOverheadSeconds = 2f * (MaxLaunchTransitionLength / Mathf.Max(1f, DesignSpeedMps)
                                                   + MaxJumpAirtimeSeconds
-                                                  + MaxLandingTransitionLength / Mathf.Max(1f, DesignSpeedMps))
+                                                  + JumpLandingPlanningLength / Mathf.Max(1f, DesignSpeedMps))
                                           + (JumpRecoveryLength + DefaultApproachLength) / Mathf.Max(1f, DesignSpeedMps);
                 float gateTime = MinDualQuarters * gateOverheadSeconds;
                 if (gateTime > TargetLapTimeSeconds * 0.5f)
