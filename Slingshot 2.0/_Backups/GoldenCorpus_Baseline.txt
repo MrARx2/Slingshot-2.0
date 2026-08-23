@@ -1,0 +1,20 @@
+# Slingshot Track Generator — V1 Golden Corpus Baseline
+# Captured before V2 changes. Do not edit by hand.
+# id | seed | metrics | canonicalHash
+
+normal_racing | seed=1000 | lap=31737m rings=24615 turns=15 elev=[0..668] range=668 loops=1 corks=1 spirals=0 halfloops=0 jumps=0 pipes=0 wallrides=2 dual=0 compound=0 maxFacet=0.41 score=51.3 | canon=31892e5cc8f91732
+flowing | seed=2000 | lap=29829m rings=12320 turns=12 elev=[0..67] range=67 loops=0 corks=0 spirals=0 halfloops=0 jumps=0 pipes=0 wallrides=1 dual=0 compound=0 maxFacet=0.20 score=61.2 | canon=edadb5418bd0dd29
+technical_curves | seed=3002 | lap=20764m rings=12330 turns=16 elev=[0..94] range=94 loops=0 corks=0 spirals=0 halfloops=0 jumps=0 pipes=0 wallrides=1 dual=0 compound=0 maxFacet=0.44 score=54.0 | canon=399f5bb9bb1c9003
+velocity | seed=4000 | lap=22149m rings=16400 turns=7 elev=[-11..88] range=99 loops=0 corks=1 spirals=0 halfloops=0 jumps=0 pipes=0 wallrides=1 dual=0 compound=0 maxFacet=0.17 score=82.1 | canon=30f55590e1a699de
+switchback_banking | seed=5006 | lap=28569m rings=16431 turns=16 elev=[0..275] range=275 loops=0 corks=0 spirals=0 halfloops=0 jumps=0 pipes=1 wallrides=2 dual=0 compound=0 maxFacet=0.40 score=55.9 | canon=c2d960487fd39a13
+rollercoaster | seed=6000 | lap=46199m rings=25643 turns=13 elev=[0..958] range=958 loops=1 corks=1 spirals=1 halfloops=0 jumps=1 pipes=0 wallrides=2 dual=0 compound=0 maxFacet=0.40 score=51.3 | canon=238832c42ae25fe2
+major_elevation | seed=7019 | lap=52872m rings=24632 turns=13 elev=[0..426] range=426 loops=0 corks=0 spirals=0 halfloops=0 jumps=0 pipes=0 wallrides=0 dual=1 compound=0 maxFacet=0.30 score=62.2 | canon=120d139c69ca52be
+wallride | seed=10000 | lap=16455m rings=8218 turns=11 elev=[0..141] range=141 loops=0 corks=0 spirals=0 halfloops=0 jumps=0 pipes=0 wallrides=2 dual=0 compound=0 maxFacet=0.29 score=77.7 | canon=e63f4020bae3bfae
+compound | seed=15061 | lap=56519m rings=24613 turns=9 elev=[-158..388] range=546 loops=1 corks=1 spirals=1 halfloops=0 jumps=2 pipes=0 wallrides=2 dual=0 compound=1 maxFacet=0.64 score=65.4 | canon=aff750125419cc83
+loop | NOT_FOUND (widen ScanWindow/BaseSeed and re-run)
+corkscrew | NOT_FOUND (widen ScanWindow/BaseSeed and re-run)
+jump | NOT_FOUND (widen ScanWindow/BaseSeed and re-run)
+full_pipe | NOT_FOUND (widen ScanWindow/BaseSeed and re-run)
+spiral | NOT_FOUND (widen ScanWindow/BaseSeed and re-run)
+
+# resolved=9 missing=5

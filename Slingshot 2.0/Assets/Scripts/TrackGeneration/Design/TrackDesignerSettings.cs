@@ -632,12 +632,12 @@ namespace TrackGeneration.Design
         [Tooltip("Road width of the alternate road relative to the main road width.")]
         [Range(0.7f, 1.3f)] public float DualRoadWidthScale = 1f;
 
-        [Tooltip("Accepted relative length difference between the two roads (fraction of road A's length). The alternate road is fitted to a similar length so ride times stay comparable.")]
-        [Range(0.05f, 0.5f)] public float RoadLengthTolerance = 0.2f;
+        [Tooltip("Accepted relative length difference between the two roads (fraction of road A's length). The alternate road is fitted to a similar length so ride times stay comparable. Raise toward 1.0 to ACCEPT a much longer detour route B (needed for guaranteed duals — road B must bulge around road A) at the cost of a lopsided choice.")]
+        [Range(0.05f, 1f)] public float RoadLengthTolerance = 0.2f;
 
         [Header("Balance (validation only — never iterative geometry repair)")]
-        [Tooltip("Maximum allowed NEUTRAL-craft time difference between the two roads, percent of the faster road (doc target 3–5%).")]
-        [Range(1f, 10f)] public float NeutralTimeTolerancePercent = 4f;
+        [Tooltip("Maximum allowed NEUTRAL-craft time difference between the two roads, percent of the faster road (doc target 3–5%). This is the BINDING gate for dual-road yield: road B detours around road A and is naturally slower, so low values reject nearly every dual. Raise toward 40–60 (and turn OFF Require Archetype Differentiation) to allow intentionally imbalanced duals so they generate.")]
+        [Range(1f, 60f)] public float NeutralTimeTolerancePercent = 4f;
 
         [Tooltip("Require that at least one craft archetype prefers each road (neither road dominates every archetype).")]
         public bool RequireArchetypeDifferentiation = true;
@@ -660,8 +660,8 @@ namespace TrackGeneration.Design
             LaneSeparationMeters = Mathf.Clamp(LaneSeparationMeters, 8f, 120f);
             CatchWidthScale = Mathf.Clamp(CatchWidthScale, 1f, 2.5f);
             DualRoadWidthScale = Mathf.Clamp(DualRoadWidthScale, 0.5f, 1.5f);
-            RoadLengthTolerance = Mathf.Clamp(RoadLengthTolerance, 0.02f, 0.6f);
-            NeutralTimeTolerancePercent = Mathf.Clamp(NeutralTimeTolerancePercent, 0.5f, 20f);
+            RoadLengthTolerance = Mathf.Clamp(RoadLengthTolerance, 0.02f, 1f);
+            NeutralTimeTolerancePercent = Mathf.Clamp(NeutralTimeTolerancePercent, 0.5f, 60f);
         }
     }
 

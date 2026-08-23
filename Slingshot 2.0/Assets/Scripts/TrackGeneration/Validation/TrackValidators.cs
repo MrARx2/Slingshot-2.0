@@ -1078,13 +1078,12 @@ namespace TrackGeneration.Validation
             }
             if (framesA.Count < 8 || framesB.Count < 8) return;
 
+            // Physical minimum: the two full road envelopes must not overlap laterally
+            // UNLESS they are vertically separated (requiredVertical). The lateral demand
+            // is inherent to 100 m-wide roads; the durable fix for dual yield is to give
+            // road B real vertical separation so this lateral check stops being binding.
             float requiredLateral = Mathf.Max(cfg.RoadWidth, cfg.DualRoadWidth)
                                   + cfg.RoadProfile.SideHeight * 2f + cfg.WallMaskSafetyMargin;
-            // NOTE: the "two roads inside each other" case needs a proper fix that raises
-            // BOTH this requirement AND the lane-separation resolver together — otherwise
-            // the validator demands more clearance than the resolver places the roads at,
-            // and every dual quarter becomes unbuildable (0 valid candidates). Reverted
-            // the catch-envelope bump here until the resolver is updated to match.
             float requiredVertical = cfg.VerticalClearance * 0.85f;
 
             // Lane separation is resolved to the same envelope value, so allow a tiny

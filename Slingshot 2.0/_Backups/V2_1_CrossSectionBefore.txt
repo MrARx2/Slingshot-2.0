@@ -1,0 +1,347 @@
+# V2.1 — Cross-section transition quality BASELINE (before any geometry change)
+# Read-only measurement over the FROZEN golden corpus.
+# reversals = derivative sign changes across an anchor→anchor span (clean morph = 0)
+# excursion = metres the span left the [A,B] band with no authored reason
+
+════ normal_racing (seed 1000) ════
+── V2.1 CROSS-SECTION TRANSITION QUALITY (read-only; influences nothing) ──
+Composed TopL/TopR are measured from the REAL evaluated cross-section (width, side height,
+wall multipliers, overhang, rounding, pipe closure, wallride morph), in the frame's local basis.
+sections: anchor 4 | design-target 14 | pass-through 21 | spans 15
+composed wall-top worst RATES (m/m): lateral 0.163 at [037] Wallride_70deg_Right R arc 31223m
+                                     vertical 0.327 at [025] Wallride_110deg_Left R arc 24217m
+                                     combined 0.327 at [025] Wallride_110deg_Left R arc 24217m
+
+  CHANNEL ATTRIBUTION (how much of the wave each channel contributes)
+  channel      | reversals | worst excursion | at
+  Width        |         0 |      0.00 m   | 
+  SideHeight   |         2 |      0.81 m   | [035] BankedCurve_30deg_Left → [037] Wallride_70deg_Right
+  BoostL       |         5 |      0.34 x   | [017] BankedCurve_120deg_Right → [020] BankedCurve_25deg_Left
+  BoostR       |         7 |      0.36 x   | [017] BankedCurve_120deg_Right → [020] BankedCurve_25deg_Left
+  Bank         |         4 |     30.21 deg | [017] BankedCurve_120deg_Right → [020] BankedCurve_25deg_Left
+  TopL(vert)   |         9 |      5.52 m   | [017] BankedCurve_120deg_Right → [020] BankedCurve_25deg_Left
+  TopL(lat)    |         0 |      0.04 m   | [017] BankedCurve_120deg_Right → [020] BankedCurve_25deg_Left
+  TopR(vert)   |        12 |      4.29 m   | [017] BankedCurve_120deg_Right → [020] BankedCurve_25deg_Left
+  TopR(lat)    |         0 |      0.04 m   | [017] BankedCurve_120deg_Right → [020] BankedCurve_25deg_Left
+
+  ══ V2.1 STAGE-2 METRICS (what the SideHeight fix is judged against) ══
+  neutral SideHeight 14.0m (from cfg.RoadProfile.SideHeight) | transition Lt 289m | neutral run needs >= 3xLt = 867m
+  span classification: SHORT(no neutral justified) 8 | LONG(neutral run allowed) 3 | straddles-neutral 4
+  >> UnnecessarySideHeightReversals = 2
+  >> UnnecessarySideHeightExcursion  = 0.81m at [035] BankedCurve_30deg_Left → [037] Wallride_70deg_Right (SHORT (no neutral justified))
+
+  SPANS RANKED BY UNNECESSARY SIDEHEIGHT EXCURSION (the actual defect list)
+  class | span | len (need) | SideH A→B [min..max] | raw rev/exc | UNNECESSARY rev/exc | pass-through
+  SHORT | [035] BankedCurve_30deg_Left → [037] Wallride_70deg_Right | 41m (need 867m) | 15.1→15.4 [14.3..15.4] | 1/0.81m | **1/0.81m** | Straight_14
+  SHORT | [022] BankedCurve_95deg_Right → [024] Loop_4u_H1R225_H2R340 | 40m (need 867m) | 15.1→14.6 [14.0..15.1] | 1/0.56m | **1/0.56m** | Straight_09
+  strad | [030] BankedCurve_35deg_Left → [033] BankedCurve_55deg_Right | 985m (need 867m) | 15.1→14.0 [14.0..15.1] | 0/0.03m | **0/0.03m** | Straight_12 → ClosureSBend_56deg
+  strad | [025] Wallride_110deg_Left → [028] BankedCurve_80deg_Right | 1659m (need 867m) | 15.4→14.0 [14.0..15.4] | 0/0.02m | **0/0.02m** | RecoveryStraight → Straight_10_Drop158m
+  strad | [017] BankedCurve_120deg_Right → [020] BankedCurve_25deg_Left | 2064m (need 867m) | 15.1→14.0 [14.0..15.1] | 0/0.02m | **0/0.02m** | Straight_07_Drop77m → SCurve_36deg_LeftFirst
+  strad | [002] BankedCurve_55deg_Right → [005] BankedCurve_25deg_Left | 5567m (need 867m) | 15.1→14.0 [14.0..15.1] | 0/0.02m | **0/0.02m** | Straight_01 → ClosureSBend_57deg
+
+  WORST SPANS (ranked by FINAL COMPOSED wall-top excursion — diagnostic only)
+  span | len | SideH A→B [min..max] rev/exc | BoostL A→B rev/exc | BoostR A→B rev/exc | TopL A→B rev/exc | TopR A→B rev/exc | pass-through
+  [017] BankedCurve_120deg_Right → [020] BankedCurve_25deg_Left | 2064m | SideH 15.1→14.0 [14.0..15.1] 0/0.0 | BoostL 1.17→1.23 [0.84..1.51] 3/0.34 | BoostR 1.17→0.96 [0.78..1.54] 2/0.36 | TopL 17.9→17.4 [11.9..21.7] 4/5.5 | TopR 17.9→13.6 [11.0..22.2] 3/4.3 | Straight_07_Drop77m → SCurve_36deg_LeftFirst
+  [030] BankedCurve_35deg_Left → [033] BankedCurve_55deg_Right | 985m | SideH 15.1→14.0 [14.0..15.1] 0/0.0 | BoostL 0.92→1.56 [0.77..1.64] 2/0.16 | BoostR 1.59→0.74 [0.70..1.66] 2/0.06 | TopL 14.2→22.7 [10.9..23.9] 2/3.3 | TopR 24.7→10.5 [9.9..24.7] 3/0.5 | Straight_12 → ClosureSBend_56deg
+  [020] BankedCurve_25deg_Left → [022] BankedCurve_95deg_Right | 1280m | SideH 15.1→15.1 [15.1..15.1] 0/0.0 | BoostL 1.09→1.43 [1.09..1.43] 0/0.00 | BoostR 1.13→1.17 [1.13..1.31] 1/0.14 | TopL 16.6→22.0 [16.6..22.0] 0/0.0 | TopR 17.3→18.0 [17.3..20.0] 1/2.1 | Straight_08_Climb136m
+  [025] Wallride_110deg_Left → [028] BankedCurve_80deg_Right | 1659m | SideH 15.4→14.0 [14.0..15.4] 0/0.0 | BoostL 1.00→1.25 [1.00..1.25] 0/0.00 | BoostR 1.00→0.88 [0.88..1.00] 0/0.00 | TopL 15.6→17.7 [14.2..17.7] 1/1.4 | TopR 15.6→12.6 [12.6..15.6] 0/0.0 | RecoveryStraight → Straight_10_Drop158m
+  [035] BankedCurve_30deg_Left → [037] Wallride_70deg_Right | 41m | SideH 15.1→15.4 [14.3..15.4] 1/0.8 | BoostL 0.99→1.00 [0.99..1.00] 0/0.00 | BoostR 1.02→1.00 [1.00..1.02] 0/0.00 | TopL 15.2→15.5 [14.4..15.5] 1/0.7 | TopR 15.6→15.5 [14.6..15.6] 1/1.0 | Straight_14
+  [009] BankedCurve_80deg_Right → [011] BankedCurve_50deg_Left | 1299m | SideH 15.1→15.1 [15.1..15.1] 0/0.0 | BoostL 1.43→1.14 [1.14..1.43] 0/0.00 | BoostR 1.16→1.26 [1.16..1.32] 2/0.06 | TopL 22.0→17.5 [17.5..22.0] 0/0.0 | TopR 17.8→19.3 [17.8..20.2] 2/0.8 | Straight_04_Climb112m
+  [002] BankedCurve_55deg_Right → [005] BankedCurve_25deg_Left | 5567m | SideH 15.1→14.0 [14.0..15.1] 0/0.0 | BoostL 1.28→0.85 [0.85..1.28] 0/0.00 | BoostR 0.87→1.33 [0.87..1.33] 0/0.00 | TopL 19.6→12.0 [12.0..19.6] 0/0.0 | TopR 13.3→19.0 [12.6..19.0] 1/0.7 | Straight_01 → ClosureSBend_57deg
+  [022] BankedCurve_95deg_Right → [024] Loop_4u_H1R225_H2R340 | 40m | SideH 15.1→14.6 [14.0..15.1] 1/0.6 | BoostL 1.16→1.12 [1.12..1.16] 0/0.00 | BoostR 0.92→0.94 [0.92..0.94] 0/0.00 | TopL 17.7→16.5 [16.1..17.7] 1/0.5 | TopR 14.1→13.9 [13.3..14.1] 1/0.6 | Straight_09
+
+════ flowing (seed 2000) ════
+── V2.1 CROSS-SECTION TRANSITION QUALITY (read-only; influences nothing) ──
+Composed TopL/TopR are measured from the REAL evaluated cross-section (width, side height,
+wall multipliers, overhang, rounding, pipe closure, wallride morph), in the frame's local basis.
+sections: anchor 1 | design-target 14 | pass-through 17 | spans 12
+composed wall-top worst RATES (m/m): lateral 0.129 at [030] Wallride_90deg_Right R arc 27958m
+                                     vertical 0.147 at [030] Wallride_90deg_Right L arc 27992m
+                                     combined 0.147 at [030] Wallride_90deg_Right L arc 27992m
+
+  CHANNEL ATTRIBUTION (how much of the wave each channel contributes)
+  channel      | reversals | worst excursion | at
+  Width        |         0 |      0.00 m   | 
+  SideHeight   |         1 |      0.70 m   | [028] BankedCurve_70deg_Left → [030] Wallride_90deg_Right
+  BoostL       |         4 |      0.40 x   | [001] BankedCurve_80deg_Left → [004] OpenIn_43deg_Left
+  BoostR       |         3 |      0.57 x   | [001] BankedCurve_80deg_Left → [004] OpenIn_43deg_Left
+  Bank         |         4 |     53.08 deg | [001] BankedCurve_80deg_Left → [004] OpenIn_43deg_Left
+  TopL(vert)   |         8 |      6.57 m   | [005] OpenOut_52deg_Left → [008] OpenIn_52deg_Right
+  TopL(lat)    |         0 |      0.07 m   | [001] BankedCurve_80deg_Left → [004] OpenIn_43deg_Left
+  TopR(vert)   |         6 |      8.03 m   | [001] BankedCurve_80deg_Left → [004] OpenIn_43deg_Left
+  TopR(lat)    |         0 |      0.05 m   | [005] OpenOut_52deg_Left → [008] OpenIn_52deg_Right
+
+  ══ V2.1 STAGE-2 METRICS (what the SideHeight fix is judged against) ══
+  neutral SideHeight 14.0m (from cfg.RoadProfile.SideHeight) | transition Lt 361m | neutral run needs >= 3xLt = 1083m
+  span classification: SHORT(no neutral justified) 7 | LONG(neutral run allowed) 2 | straddles-neutral 3
+  >> UnnecessarySideHeightReversals = 1
+  >> UnnecessarySideHeightExcursion  = 0.70m at [028] BankedCurve_70deg_Left → [030] Wallride_90deg_Right (SHORT (no neutral justified))
+
+  SPANS RANKED BY UNNECESSARY SIDEHEIGHT EXCURSION (the actual defect list)
+  class | span | len (need) | SideH A→B [min..max] | raw rev/exc | UNNECESSARY rev/exc | pass-through
+  SHORT | [028] BankedCurve_70deg_Left → [030] Wallride_90deg_Right | 46m (need 1083m) | 15.1→15.4 [14.4..15.4] | 1/0.70m | **1/0.70m** | Straight_11
+  strad | [023] BankedCurve_20deg_Right → [026] BankedCurve_50deg_Left | 6338m (need 1083m) | 15.1→14.0 [14.0..15.1] | 0/0.04m | **0/0.04m** | Straight_09 → ClosureSBend_57deg
+
+  WORST SPANS (ranked by FINAL COMPOSED wall-top excursion — diagnostic only)
+  span | len | SideH A→B [min..max] rev/exc | BoostL A→B rev/exc | BoostR A→B rev/exc | TopL A→B rev/exc | TopR A→B rev/exc | pass-through
+  [001] BankedCurve_80deg_Left → [004] OpenIn_43deg_Left | 1461m | SideH 15.1→14.0 [14.0..15.1] 0/0.0 | BoostL 0.65→1.26 [0.65..1.66] 1/0.40 | BoostR 1.75→1.26 [0.69..1.75] 1/0.57 | TopL 10.0→17.8 [9.2..24.2] 2/6.4 | TopR 27.6→17.9 [9.8..27.6] 1/8.0 | Straight_01 → SCurve_44deg_LeftFirst
+  [005] OpenOut_52deg_Left → [008] OpenIn_52deg_Right | 1818m | SideH 15.1→14.0 [14.0..15.1] 0/0.0 | BoostL 1.22→1.54 [0.84..1.59] 3/0.37 | BoostR 1.27→0.75 [0.72..1.59] 2/0.33 | TopL 18.6→22.3 [12.0..23.1] 4/6.6 | TopR 19.4→10.6 [10.3..23.1] 3/3.7 | Straight_02_Climb67m → ClosureSBend_36deg
+  [028] BankedCurve_70deg_Left → [030] Wallride_90deg_Right | 46m | SideH 15.1→15.4 [14.4..15.4] 1/0.7 | BoostL 0.99→1.00 [0.99..1.00] 0/0.00 | BoostR 1.01→1.00 [1.00..1.01] 0/0.00 | TopL 15.2→15.6 [14.5..15.6] 1/0.6 | TopR 15.4→15.6 [14.6..15.6] 1/0.8 | Straight_11
+  [023] BankedCurve_20deg_Right → [026] BankedCurve_50deg_Left | 6338m | SideH 15.1→14.0 [14.0..15.1] 0/0.0 | BoostL 1.33→0.88 [0.88..1.33] 0/0.00 | BoostR 0.85→1.26 [0.85..1.26] 0/0.00 | TopL 20.4→12.5 [12.5..20.4] 0/0.0 | TopR 13.0→17.9 [12.3..17.9] 1/0.6 | Straight_09 → ClosureSBend_57deg
+  [015] DoubleApexOut_48deg_Left → [017] BankedCurve_80deg_Left | 1731m | SideH 15.1→15.0 [15.0..15.1] 0/0.0 | BoostL 0.73→0.80 [0.73..0.80] 0/0.00 | BoostR 1.57→1.42 [1.42..1.57] 0/0.00 | TopL 11.2→12.2 [11.1..12.2] 1/0.1 | TopR 24.5→21.8 [21.8..24.5] 0/0.0 | Straight_05_Drop25m
+
+════ technical_curves (seed 3002) ════
+── V2.1 CROSS-SECTION TRANSITION QUALITY (read-only; influences nothing) ──
+Composed TopL/TopR are measured from the REAL evaluated cross-section (width, side height,
+wall multipliers, overhang, rounding, pipe closure, wallride morph), in the frame's local basis.
+sections: anchor 1 | design-target 16 | pass-through 25 | spans 16
+composed wall-top worst RATES (m/m): lateral 0.253 at [009] Wallride_120deg_Right R arc 4405m
+                                     vertical 0.320 at [009] Wallride_120deg_Right L arc 4419m
+                                     combined 0.320 at [009] Wallride_120deg_Right L arc 4419m
+
+  CHANNEL ATTRIBUTION (how much of the wave each channel contributes)
+  channel      | reversals | worst excursion | at
+  Width        |         0 |      0.00 m   | 
+  SideHeight   |         1 |      1.36 m   | [005] Hairpin_175deg_Left → [009] Wallride_120deg_Right
+  BoostL       |        13 |      0.32 x   | [020] BankedCurve_45deg_Right → [023] BankedCurve_135deg_Right
+  BoostR       |         6 |      0.19 x   | [020] BankedCurve_45deg_Right → [023] BankedCurve_135deg_Right
+  Bank         |         8 |     32.42 deg | [020] BankedCurve_45deg_Right → [023] BankedCurve_135deg_Right
+  TopL(vert)   |        19 |      4.58 m   | [020] BankedCurve_45deg_Right → [023] BankedCurve_135deg_Right
+  TopL(lat)    |         0 |      0.01 m   | [020] BankedCurve_45deg_Right → [023] BankedCurve_135deg_Right
+  TopR(vert)   |         9 |      2.65 m   | [020] BankedCurve_45deg_Right → [023] BankedCurve_135deg_Right
+  TopR(lat)    |         0 |      0.01 m   | [023] BankedCurve_135deg_Right → [025] BankedCurve_40deg_Left
+
+  ══ V2.1 STAGE-2 METRICS (what the SideHeight fix is judged against) ══
+  neutral SideHeight 14.0m (from cfg.RoadProfile.SideHeight) | transition Lt 217m | neutral run needs >= 3xLt = 650m
+  span classification: SHORT(no neutral justified) 8 | LONG(neutral run allowed) 4 | straddles-neutral 4
+  >> UnnecessarySideHeightReversals = 0
+  >> UnnecessarySideHeightExcursion  = 0.04m at [009] Wallride_120deg_Right → [012] BankedCurve_20deg_Left (straddles-neutral)
+
+  SPANS RANKED BY UNNECESSARY SIDEHEIGHT EXCURSION (the actual defect list)
+  class | span | len (need) | SideH A→B [min..max] | raw rev/exc | UNNECESSARY rev/exc | pass-through
+  strad | [009] Wallride_120deg_Right → [012] BankedCurve_20deg_Left | 556m (need 650m) | 15.4→14.0 [14.0..15.4] | 0/0.04m | **0/0.04m** | RecoveryStraight → Straight_04
+
+  WORST SPANS (ranked by FINAL COMPOSED wall-top excursion — diagnostic only)
+  span | len | SideH A→B [min..max] rev/exc | BoostL A→B rev/exc | BoostR A→B rev/exc | TopL A→B rev/exc | TopR A→B rev/exc | pass-through
+  [020] BankedCurve_45deg_Right → [023] BankedCurve_135deg_Right | 916m | SideH 15.1→14.0 [14.0..15.1] 0/0.0 | BoostL 1.40→1.29 [0.97..1.42] 2/0.32 | BoostR 0.81→1.09 [0.81..1.27] 1/0.19 | TopL 21.5→18.4 [13.8..21.5] 3/4.6 | TopR 12.5→15.5 [11.4..18.1] 2/2.6 | Straight_08 → SCurve_51deg_RightFirst
+  [005] Hairpin_175deg_Left → [009] Wallride_120deg_Right | 1213m | SideH 15.4→15.4 [14.0..15.4] 1/1.4 | BoostL 0.87→1.00 [0.87..1.22] 3/0.22 | BoostR 1.29→1.00 [0.93..1.29] 3/0.07 | TopL 13.4→15.6 [12.5..17.3] 5/1.7 | TopR 20.0→15.6 [13.2..20.0] 3/2.3 | RecoveryStraight → Straight_03 → SCurve_47deg_LeftFirst
+  [009] Wallride_120deg_Right → [012] BankedCurve_20deg_Left | 556m | SideH 15.4→14.0 [14.0..15.4] 0/0.0 | BoostL 1.00→1.06 [0.99..1.06] 1/0.01 | BoostR 1.00→1.09 [1.00..1.09] 0/0.00 | TopL 15.6→15.1 [14.0..15.6] 1/1.1 | TopR 15.6→15.5 [14.2..15.6] 1/1.3 | RecoveryStraight → Straight_04
+  [012] BankedCurve_20deg_Left → [016] BankedCurve_80deg_Left | 835m | SideH 15.1→14.0 [14.0..15.1] 0/0.0 | BoostL 1.22→1.17 [1.17..1.38] 3/0.15 | BoostR 1.24→1.45 [1.24..1.45] 2/0.00 | TopL 18.7→16.7 [16.7..19.5] 4/0.8 | TopR 19.0→20.6 [17.7..20.6] 3/1.2 | Straight_05 → Chicane_RightFirst → RecoveryStraight
+  [035] Hairpin_160deg_Left → [038] BankedCurve_40deg_Left | 1615m | SideH 15.4→14.0 [14.0..15.4] 0/0.0 | BoostL 0.87→1.00 [0.87..1.00] 0/0.00 | BoostR 1.28→1.00 [1.00..1.28] 0/0.00 | TopL 13.5→14.2 [12.5..14.2] 1/1.0 | TopR 19.9→14.2 [14.2..19.9] 0/0.0 | RecoveryStraight → Straight_14_Drop40m
+  [003] BankedCurve_95deg_Right → [005] Hairpin_175deg_Left | 705m | SideH 15.1→15.2 [15.1..15.2] 0/0.0 | BoostL 1.23→1.11 [1.11..1.29] 1/0.06 | BoostR 1.16→1.46 [1.16..1.46] 0/0.00 | TopL 18.8→17.1 [17.1..19.7] 1/0.9 | TopR 17.7→22.5 [17.7..22.5] 0/0.0 | Straight_02_Climb94m
+  [018] BankedCurve_90deg_Left → [020] BankedCurve_45deg_Right | 520m | SideH 15.1→15.1 [15.1..15.1] 0/0.0 | BoostL 1.09→1.24 [1.09..1.26] 1/0.02 | BoostR 1.43→1.10 [1.10..1.43] 0/0.00 | TopL 16.8→19.0 [16.8..19.2] 2/0.2 | TopR 22.1→16.8 [16.8..22.1] 0/0.0 | Straight_07_Drop75m
+
+════ velocity (seed 4000) ════
+── V2.1 CROSS-SECTION TRANSITION QUALITY (read-only; influences nothing) ──
+Composed TopL/TopR are measured from the REAL evaluated cross-section (width, side height,
+wall multipliers, overhang, rounding, pipe closure, wallride morph), in the frame's local basis.
+sections: anchor 2 | design-target 6 | pass-through 8 | spans 6
+composed wall-top worst RATES (m/m): lateral 0.103 at [014] Wallride_70deg_Right R arc 21219m
+                                     vertical 0.098 at [014] Wallride_70deg_Right L arc 20057m
+                                     combined 0.111 at [014] Wallride_70deg_Right R arc 19961m
+
+  CHANNEL ATTRIBUTION (how much of the wave each channel contributes)
+  channel      | reversals | worst excursion | at
+  Width        |         0 |      0.00 m   | 
+  SideHeight   |         2 |      1.12 m   | [012] BankedCurve_65deg_Right → [014] Wallride_70deg_Right
+  BoostL       |         3 |      0.15 x   | [008] BankedCurve_30deg_Right → [010] BankedCurve_80deg_Right
+  BoostR       |         3 |      0.07 x   | [008] BankedCurve_30deg_Right → [010] BankedCurve_80deg_Right
+  Bank         |         3 |     15.09 deg | [008] BankedCurve_30deg_Right → [010] BankedCurve_80deg_Right
+  TopL(vert)   |         5 |      3.04 m   | [004] BankedCurve_70deg_Right → [006] BankedCurve_20deg_Right
+  TopL(lat)    |         0 |      0.02 m   | [006] BankedCurve_20deg_Right → [008] BankedCurve_30deg_Right
+  TopR(vert)   |         9 |      1.10 m   | [012] BankedCurve_65deg_Right → [014] Wallride_70deg_Right
+  TopR(lat)    |         0 |      0.00 m   | [008] BankedCurve_30deg_Right → [010] BankedCurve_80deg_Right
+
+  ══ V2.1 STAGE-2 METRICS (what the SideHeight fix is judged against) ══
+  neutral SideHeight 14.0m (from cfg.RoadProfile.SideHeight) | transition Lt 469m | neutral run needs >= 3xLt = 1408m
+  span classification: SHORT(no neutral justified) 3 | LONG(neutral run allowed) 3 | straddles-neutral 0
+  >> UnnecessarySideHeightReversals = 1
+  >> UnnecessarySideHeightExcursion  = 0.54m at [001] BankedCurve_25deg_Right → [003] Corkscrew_4u_R_H1R173_H2R206_Orbit18 (SHORT (no neutral justified))
+
+  SPANS RANKED BY UNNECESSARY SIDEHEIGHT EXCURSION (the actual defect list)
+  class | span | len (need) | SideH A→B [min..max] | raw rev/exc | UNNECESSARY rev/exc | pass-through
+  SHORT | [001] BankedCurve_25deg_Right → [003] Corkscrew_4u_R_H1R173_H2R206_Orbit18 | 885m (need 1408m) | 15.1→14.5 [14.0..15.1] | 1/0.54m | **1/0.54m** | Straight_01
+
+  WORST SPANS (ranked by FINAL COMPOSED wall-top excursion — diagnostic only)
+  span | len | SideH A→B [min..max] rev/exc | BoostL A→B rev/exc | BoostR A→B rev/exc | TopL A→B rev/exc | TopR A→B rev/exc | pass-through
+  [004] BankedCurve_70deg_Right → [006] BankedCurve_20deg_Right | 1042m | SideH 15.1→14.3 [14.3..15.1] 0/0.0 | BoostL 1.35→1.43 [1.22..1.43] 1/0.13 | BoostR 0.84→0.80 [0.80..0.90] 1/0.06 | TopL 20.8→21.0 [17.7..21.0] 1/3.0 | TopR 12.8→11.6 [11.6..13.0] 2/0.2 | Straight_02
+  [008] BankedCurve_30deg_Right → [010] BankedCurve_80deg_Right | 1929m | SideH 15.1→14.1 [14.1..15.1] 0/0.0 | BoostL 1.32→1.21 [1.06..1.32] 1/0.15 | BoostR 0.85→0.90 [0.85..0.97] 1/0.07 | TopL 20.2→17.2 [15.1..20.2] 1/2.1 | TopR 13.0→12.9 [12.3..13.9] 2/0.9 | Straight_04_Climb94m
+  [006] BankedCurve_20deg_Right → [008] BankedCurve_30deg_Right | 1049m | SideH 15.1→14.7 [14.7..15.1] 0/0.0 | BoostL 1.54→1.56 [1.44..1.56] 1/0.10 | BoostR 0.75→0.74 [0.74..0.79] 1/0.05 | TopL 24.1→23.6 [21.7..24.1] 1/1.9 | TopR 11.4→11.0 [11.0..11.8] 2/0.4 | Straight_03
+  [012] BankedCurve_65deg_Right → [014] Wallride_70deg_Right | 1618m | SideH 15.1→15.4 [14.0..15.4] 1/1.1 | BoostL 1.01→1.00 [1.00..1.01] 0/0.00 | BoostR 1.00→1.00 [1.00..1.00] 0/0.00 | TopL 15.4→15.6 [14.2..15.6] 1/1.2 | TopR 15.2→15.6 [14.1..15.6] 1/1.1 | Straight_06_Drop21m
+  [001] BankedCurve_25deg_Right → [003] Corkscrew_4u_R_H1R173_H2R206_Orbit18 | 885m | SideH 15.1→14.5 [14.0..15.1] 1/0.5 | BoostL 1.29→1.00 [1.00..1.29] 0/0.00 | BoostR 0.86→1.01 [0.86..1.01] 0/0.00 | TopL 19.8→14.7 [14.1..19.8] 1/0.5 | TopR 13.2→14.8 [12.5..14.8] 1/0.7 | Straight_01
+  [010] BankedCurve_80deg_Right → [012] BankedCurve_65deg_Right | 2362m | SideH 15.1→14.3 [14.3..15.1] 0/0.0 | BoostL 1.29→1.06 [1.06..1.29] 0/0.00 | BoostR 0.86→0.97 [0.86..0.97] 0/0.00 | TopL 19.8→15.4 [15.4..19.8] 0/0.0 | TopR 13.2→14.1 [12.6..14.1] 1/0.6 | Straight_05_Drop61m
+
+════ switchback_banking (seed 5006) ════
+── V2.1 CROSS-SECTION TRANSITION QUALITY (read-only; influences nothing) ──
+Composed TopL/TopR are measured from the REAL evaluated cross-section (width, side height,
+wall multipliers, overhang, rounding, pipe closure, wallride morph), in the frame's local basis.
+sections: anchor 3 | design-target 16 | pass-through 28 | spans 18
+composed wall-top worst RATES (m/m): lateral 0.210 at [024] Wallride_105deg_Left L arc 14876m
+                                     vertical 0.252 at [024] Wallride_105deg_Left R arc 15629m
+                                     combined 0.252 at [024] Wallride_105deg_Left R arc 15629m
+
+  CHANNEL ATTRIBUTION (how much of the wave each channel contributes)
+  channel      | reversals | worst excursion | at
+  Width        |         0 |      0.00 m   | 
+  SideHeight   |         2 |      1.12 m   | [022] DoubleApexOut_65deg_Left → [024] Wallride_105deg_Left
+  BoostL       |         1 |      0.11 x   | [009] Hairpin_160deg_Left → [012] Hairpin_160deg_Left
+  BoostR       |         1 |      0.24 x   | [009] Hairpin_160deg_Left → [012] Hairpin_160deg_Left
+  Bank         |         1 |     19.18 deg | [009] Hairpin_160deg_Left → [012] Hairpin_160deg_Left
+  TopL(vert)   |         7 |      1.40 m   | [036] Wallride_90deg_Right → [039] BankedCurve_60deg_Right
+  TopL(lat)    |         0 |      0.00 m   | [009] Hairpin_160deg_Left → [012] Hairpin_160deg_Left
+  TopR(vert)   |         5 |      3.36 m   | [009] Hairpin_160deg_Left → [012] Hairpin_160deg_Left
+  TopR(lat)    |         0 |      0.00 m   | [007] BankedCurve_55deg_Right → [009] Hairpin_160deg_Left
+
+  ══ V2.1 STAGE-2 METRICS (what the SideHeight fix is judged against) ══
+  neutral SideHeight 14.0m (from cfg.RoadProfile.SideHeight) | transition Lt 253m | neutral run needs >= 3xLt = 758m
+  span classification: SHORT(no neutral justified) 9 | LONG(neutral run allowed) 2 | straddles-neutral 7
+  >> UnnecessarySideHeightReversals = 0
+  >> UnnecessarySideHeightExcursion  = 0.00m at 
+
+  SPANS RANKED BY UNNECESSARY SIDEHEIGHT EXCURSION (the actual defect list)
+  class | span | len (need) | SideH A→B [min..max] | raw rev/exc | UNNECESSARY rev/exc | pass-through
+
+  WORST SPANS (ranked by FINAL COMPOSED wall-top excursion — diagnostic only)
+  span | len | SideH A→B [min..max] rev/exc | BoostL A→B rev/exc | BoostR A→B rev/exc | TopL A→B rev/exc | TopR A→B rev/exc | pass-through
+  [009] Hairpin_160deg_Left → [012] Hairpin_160deg_Left | 1336m | SideH 15.4→14.0 [14.0..15.4] 0/0.0 | BoostL 0.89→0.89 [0.89..1.00] 1/0.11 | BoostR 1.24→1.24 [1.00..1.24] 1/0.24 | TopL 13.8→12.6 [12.6..14.2] 2/0.3 | TopR 19.3→17.5 [14.2..19.3] 1/3.4 | RecoveryStraight → Straight_04_Climb123m
+  [036] Wallride_90deg_Right → [039] BankedCurve_60deg_Right | 1583m | SideH 15.4→14.0 [14.0..15.4] 0/0.0 | BoostL 1.00→1.24 [1.00..1.24] 0/0.00 | BoostR 1.00→0.89 [0.89..1.00] 0/0.00 | TopL 15.6→17.5 [14.2..17.5] 1/1.4 | TopR 15.6→12.6 [12.6..15.6] 0/0.0 | RecoveryStraight → Straight_13_Drop15m
+  [034] BankedCurve_135deg_Right → [036] Wallride_90deg_Right | 2476m | SideH 15.1→15.4 [14.0..15.4] 1/1.1 | BoostL 1.26→1.00 [1.00..1.26] 0/0.00 | BoostR 0.88→1.00 [0.88..1.00] 0/0.00 | TopL 19.3→15.6 [14.2..19.3] 1/1.4 | TopR 13.4→15.6 [12.6..15.6] 1/0.8 | Straight_12_Drop185m
+  [024] Wallride_105deg_Left → [027] Hairpin_155deg_Left | 1336m | SideH 15.4→14.0 [14.0..15.4] 0/0.0 | BoostL 1.00→0.89 [0.89..1.00] 0/0.00 | BoostR 1.00→1.23 [1.00..1.23] 0/0.00 | TopL 15.6→12.7 [12.7..15.6] 0/0.0 | TopR 15.6→17.3 [14.2..17.3] 1/1.4 | RecoveryStraight → Straight_08_Climb89m
+  [022] DoubleApexOut_65deg_Left → [024] Wallride_105deg_Left | 975m | SideH 15.1→15.4 [14.0..15.4] 1/1.1 | BoostL 0.92→1.00 [0.92..1.00] 0/0.00 | BoostR 1.17→1.00 [1.00..1.17] 0/0.00 | TopL 14.1→15.6 [13.2..15.6] 1/0.9 | TopR 17.9→15.6 [14.2..17.9] 1/1.4 | Straight_07_Drop164m
+  [027] Hairpin_155deg_Left → [030] BankedCurve_125deg_Right | 401m | SideH 15.4→14.0 [14.0..15.4] 0/0.0 | BoostL 0.89→1.28 [0.89..1.28] 0/0.00 | BoostR 1.23→0.87 [0.87..1.23] 0/0.00 | TopL 13.9→18.1 [12.9..18.1] 1/1.0 | TopR 19.1→12.3 [12.3..19.1] 0/0.0 | RecoveryStraight → Straight_09
+  [012] Hairpin_160deg_Left → [016] FullPipe_2740m_R21m | 870m | SideH 15.4→14.0 [14.0..15.4] 0/0.0 | BoostL 0.89→1.00 [0.89..1.00] 0/0.00 | BoostR 1.24→1.00 [1.00..1.24] 0/0.00 | TopL 13.8→14.2 [12.8..14.2] 1/1.0 | TopR 19.3→14.2 [14.2..19.3] 0/0.0 | RecoveryStraight → Straight_05 → FullPipeApproach
+  [002] Hairpin_175deg_Right → [005] BankedCurve_110deg_Left | 401m | SideH 15.4→14.0 [14.0..15.4] 0/0.0 | BoostL 1.25→0.88 [0.88..1.25] 0/0.00 | BoostR 0.88→1.26 [0.88..1.26] 0/0.00 | TopL 19.5→12.5 [12.5..19.5] 0/0.0 | TopR 13.7→17.8 [12.7..17.8] 1/1.0 | RecoveryStraight → Straight_01
+
+════ rollercoaster (seed 6000) ════
+── V2.1 CROSS-SECTION TRANSITION QUALITY (read-only; influences nothing) ──
+Composed TopL/TopR are measured from the REAL evaluated cross-section (width, side height,
+wall multipliers, overhang, rounding, pipe closure, wallride morph), in the frame's local basis.
+sections: anchor 7 | design-target 14 | pass-through 22 | spans 16
+composed wall-top worst RATES (m/m): lateral 0.121 at [042] Wallride_140deg_Left L arc 44020m
+                                     vertical 0.126 at [038] Wallride_85deg_Left R arc 38079m
+                                     combined 0.134 at [038] Wallride_85deg_Left L arc 38158m
+
+  CHANNEL ATTRIBUTION (how much of the wave each channel contributes)
+  channel      | reversals | worst excursion | at
+  Width        |         0 |      0.00 m   | 
+  SideHeight   |         5 |      1.38 m   | [038] Wallride_85deg_Left → [042] Wallride_140deg_Left
+  BoostL       |         2 |      0.19 x   | [038] Wallride_85deg_Left → [042] Wallride_140deg_Left
+  BoostR       |         3 |      0.19 x   | [038] Wallride_85deg_Left → [042] Wallride_140deg_Left
+  Bank         |         3 |     19.13 deg | [038] Wallride_85deg_Left → [042] Wallride_140deg_Left
+  TopL(vert)   |        11 |      2.64 m   | [038] Wallride_85deg_Left → [042] Wallride_140deg_Left
+  TopL(lat)    |         0 |      0.00 m   | [038] Wallride_85deg_Left → [042] Wallride_140deg_Left
+  TopR(vert)   |         8 |      2.64 m   | [038] Wallride_85deg_Left → [042] Wallride_140deg_Left
+  TopR(lat)    |         0 |      0.00 m   | [038] Wallride_85deg_Left → [042] Wallride_140deg_Left
+
+  ══ V2.1 STAGE-2 METRICS (what the SideHeight fix is judged against) ══
+  neutral SideHeight 14.0m (from cfg.RoadProfile.SideHeight) | transition Lt 361m | neutral run needs >= 3xLt = 1083m
+  span classification: SHORT(no neutral justified) 10 | LONG(neutral run allowed) 4 | straddles-neutral 2
+  >> UnnecessarySideHeightReversals = 2
+  >> UnnecessarySideHeightExcursion  = 0.46m at [031] DoubleApexOut_45deg_Left → [033] Loop_4u_H1R382_H2R413 (SHORT (no neutral justified))
+
+  SPANS RANKED BY UNNECESSARY SIDEHEIGHT EXCURSION (the actual defect list)
+  class | span | len (need) | SideH A→B [min..max] | raw rev/exc | UNNECESSARY rev/exc | pass-through
+  SHORT | [031] DoubleApexOut_45deg_Left → [033] Loop_4u_H1R382_H2R413 | 39m (need 1083m) | 15.1→14.6 [14.1..15.1] | 1/0.46m | **1/0.46m** | Straight_09
+  SHORT | [008] DoubleApexOut_45deg_Left → [010] Corkscrew_8u_R_H1R221_H2R149_Orbit27 | 41m (need 1083m) | 15.1→14.6 [14.1..15.1] | 1/0.46m | **1/0.46m** | Straight_01
+
+  WORST SPANS (ranked by FINAL COMPOSED wall-top excursion — diagnostic only)
+  span | len | SideH A→B [min..max] rev/exc | BoostL A→B rev/exc | BoostR A→B rev/exc | TopL A→B rev/exc | TopR A→B rev/exc | pass-through
+  [038] Wallride_85deg_Left → [042] Wallride_140deg_Left | 5448m | SideH 15.4→15.4 [14.0..15.4] 1/1.4 | BoostL 1.00→1.00 [0.91..1.19] 2/0.19 | BoostR 1.00→1.00 [0.91..1.19] 2/0.19 | TopL 15.6→15.6 [12.9..16.9] 3/2.6 | TopR 15.6→15.6 [12.9..16.9] 3/2.6 | RecoveryStraight → Straight_12_Drop40m → ClosureSBend_57deg
+  [036] BankedCurve_55deg_Left → [038] Wallride_85deg_Left | 2818m | SideH 15.1→15.4 [14.0..15.4] 1/1.1 | BoostL 0.96→1.00 [0.96..1.00] 0/0.00 | BoostR 1.09→1.00 [1.00..1.09] 0/0.00 | TopL 14.6→15.6 [13.7..15.6] 1/1.0 | TopR 16.7→15.6 [14.2..16.7] 1/1.4 | Straight_11_Drop241m
+  [019] BankedCurve_60deg_Right → [022] Spiral_1rev_Up_Left | 2347m | SideH 15.1→14.8 [14.0..15.1] 1/0.8 | BoostL 1.05→0.78 [0.78..1.05] 0/0.00 | BoostR 0.98→1.48 [0.98..1.48] 0/0.00 | TopL 16.0→11.6 [11.2..16.0] 1/0.4 | TopR 15.0→22.5 [13.9..22.5] 1/1.0 | Straight_06 → SpiralApproach
+  [004] LandingRamp_H131m → [006] DoubleApexIn_45deg_Left | 541m | SideH 13.3→14.0 [13.3..14.0] 0/0.0 | BoostL 1.00→0.93 [0.93..1.00] 0/0.00 | BoostR 1.00→1.16 [1.00..1.16] 0/0.00 | TopL 13.5→13.1 [13.1..14.2] 1/0.7 | TopR 13.5→16.3 [13.5..16.3] 0/0.0 | RecoveryStraight
+  [008] DoubleApexOut_45deg_Left → [010] Corkscrew_8u_R_H1R221_H2R149_Orbit27 | 41m | SideH 15.1→14.6 [14.1..15.1] 1/0.5 | BoostL 0.96→0.97 [0.96..0.97] 0/0.00 | BoostR 1.09→1.07 [1.07..1.09] 0/0.00 | TopL 14.6→14.3 [13.8..14.6] 1/0.5 | TopR 16.7→15.7 [15.3..16.7] 1/0.4 | Straight_01
+  [031] DoubleApexOut_45deg_Left → [033] Loop_4u_H1R382_H2R413 | 39m | SideH 15.1→14.6 [14.1..15.1] 1/0.5 | BoostL 0.95→0.96 [0.95..0.96] 0/0.00 | BoostR 1.11→1.08 [1.08..1.11] 0/0.00 | TopL 14.5→14.1 [13.7..14.5] 1/0.5 | TopR 16.9→16.0 [15.6..16.9] 1/0.4 | Straight_09
+  [022] Spiral_1rev_Up_Left → [024] TightenIn_47deg_Left | 541m | SideH 14.8→14.0 [14.0..14.8] 0/0.0 | BoostL 0.77→0.97 [0.77..0.98] 0/0.01 | BoostR 1.48→1.07 [1.05..1.48] 1/0.02 | TopL 11.6→13.7 [11.2..13.9] 2/0.4 | TopR 22.6→15.2 [14.8..22.6] 1/0.3 | RecoveryStraight
+  [027] BankedCurve_25deg_Left → [029] DoubleApexIn_45deg_Left | 39m | SideH 15.1→15.0 [15.0..15.1] 0/0.0 | BoostL 0.72→0.72 [0.72..0.72] 0/0.00 | BoostR 1.60→1.59 [1.59..1.60] 0/0.00 | TopL 11.0→11.0 [10.9..11.0] 1/0.1 | TopR 25.1→24.6 [24.6..25.1] 0/0.0 | Straight_08
+
+════ wallride (seed 10000) ════
+── V2.1 CROSS-SECTION TRANSITION QUALITY (read-only; influences nothing) ──
+Composed TopL/TopR are measured from the REAL evaluated cross-section (width, side height,
+wall multipliers, overhang, rounding, pipe closure, wallride morph), in the frame's local basis.
+sections: anchor 2 | design-target 10 | pass-through 14 | spans 11
+composed wall-top worst RATES (m/m): lateral 0.163 at [024] Wallride_90deg_Left L arc 14866m
+                                     vertical 0.196 at [017] Wallride_60deg_Left R arc 9294m
+                                     combined 0.196 at [017] Wallride_60deg_Left R arc 9294m
+
+  CHANNEL ATTRIBUTION (how much of the wave each channel contributes)
+  channel      | reversals | worst excursion | at
+  Width        |         0 |      0.00 m   | 
+  SideHeight   |         2 |      1.07 m   | [015] BankedCurve_65deg_Left → [017] Wallride_60deg_Left
+  BoostL       |         1 |      0.07 x   | [011] DoubleApexOut_73deg_Left → [013] BankedCurve_20deg_Right
+  BoostR       |         0 |      0.00 x   | [022] BankedCurve_65deg_Right → [024] Wallride_90deg_Left
+  Bank         |         0 |      0.00 deg | [015] BankedCurve_65deg_Left → [017] Wallride_60deg_Left
+  TopL(vert)   |         3 |      1.14 m   | [022] BankedCurve_65deg_Right → [024] Wallride_90deg_Left
+  TopL(lat)    |         0 |      0.00 m   | [001] BankedCurve_65deg_Right → [003] BankedCurve_60deg_Left
+  TopR(vert)   |         3 |      1.18 m   | [015] BankedCurve_65deg_Left → [017] Wallride_60deg_Left
+  TopR(lat)    |         0 |      0.00 m   | [001] BankedCurve_65deg_Right → [003] BankedCurve_60deg_Left
+
+  ══ V2.1 STAGE-2 METRICS (what the SideHeight fix is judged against) ══
+  neutral SideHeight 14.0m (from cfg.RoadProfile.SideHeight) | transition Lt 289m | neutral run needs >= 3xLt = 867m
+  span classification: SHORT(no neutral justified) 9 | LONG(neutral run allowed) 1 | straddles-neutral 1
+  >> UnnecessarySideHeightReversals = 1
+  >> UnnecessarySideHeightExcursion  = 0.94m at [022] BankedCurve_65deg_Right → [024] Wallride_90deg_Left (SHORT (no neutral justified))
+
+  SPANS RANKED BY UNNECESSARY SIDEHEIGHT EXCURSION (the actual defect list)
+  class | span | len (need) | SideH A→B [min..max] | raw rev/exc | UNNECESSARY rev/exc | pass-through
+  SHORT | [022] BankedCurve_65deg_Right → [024] Wallride_90deg_Left | 48m (need 867m) | 15.1→15.4 [14.2..15.4] | 1/0.94m | **1/0.94m** | Straight_10
+
+  WORST SPANS (ranked by FINAL COMPOSED wall-top excursion — diagnostic only)
+  span | len | SideH A→B [min..max] rev/exc | BoostL A→B rev/exc | BoostR A→B rev/exc | TopL A→B rev/exc | TopR A→B rev/exc | pass-through
+  [015] BankedCurve_65deg_Left → [017] Wallride_60deg_Left | 1300m | SideH 15.1→15.4 [14.0..15.4] 1/1.1 | BoostL 1.00→1.00 [1.00..1.00] 0/0.00 | BoostR 1.01→1.00 [1.00..1.01] 0/0.00 | TopL 15.2→15.6 [14.1..15.6] 1/1.1 | TopR 15.4→15.6 [14.2..15.6] 1/1.2 | Straight_07_Climb57m
+  [022] BankedCurve_65deg_Right → [024] Wallride_90deg_Left | 48m | SideH 15.1→15.4 [14.2..15.4] 1/0.9 | BoostL 1.03→1.00 [1.00..1.03] 0/0.00 | BoostR 0.99→1.00 [0.99..1.00] 0/0.00 | TopL 15.7→15.6 [14.4..15.7] 1/1.1 | TopR 15.1→15.6 [14.3..15.6] 1/0.8 | Straight_10
+  [017] Wallride_60deg_Left → [020] BankedCurve_145deg_Left | 2959m | SideH 15.4→14.0 [14.0..15.4] 0/0.0 | BoostL 1.00→0.96 [0.96..1.00] 0/0.00 | BoostR 1.00→1.08 [1.00..1.08] 0/0.00 | TopL 15.6→13.6 [13.6..15.6] 0/0.0 | TopR 15.6→15.3 [14.2..15.6] 1/1.1 | RecoveryStraight → Straight_08_Drop141m
+  [011] DoubleApexOut_73deg_Left → [013] BankedCurve_20deg_Right | 578m | SideH 15.1→15.1 [15.1..15.1] 0/0.0 | BoostL 1.15→1.15 [1.15..1.22] 1/0.07 | BoostR 1.33→1.07 [1.07..1.33] 0/0.00 | TopL 17.6→17.6 [17.6..18.6] 1/1.0 | TopR 20.3→16.4 [16.4..20.3] 0/0.0 | Straight_05_Climb83m
+
+════ compound (seed 15061) ════
+── V2.1 CROSS-SECTION TRANSITION QUALITY (read-only; influences nothing) ──
+Composed TopL/TopR are measured from the REAL evaluated cross-section (width, side height,
+wall multipliers, overhang, rounding, pipe closure, wallride morph), in the frame's local basis.
+sections: anchor 9 | design-target 7 | pass-through 21 | spans 11
+composed wall-top worst RATES (m/m): lateral 0.121 at [037] Wallride_135deg_Left L arc 54361m
+                                     vertical 0.421 at [025] Loop_4u_H1R314_H2R270 L arc 39366m
+                                     combined 0.421 at [025] Loop_4u_H1R314_H2R270 L arc 39366m
+
+  CHANNEL ATTRIBUTION (how much of the wave each channel contributes)
+  channel      | reversals | worst excursion | at
+  Width        |         0 |      0.00 m   | 
+  SideHeight   |         4 |      0.84 m   | [026] Wallride_120deg_Left → [030] Spiral_2rev_Up_Right
+  BoostL       |         5 |      0.69 x   | [032] BankedCurve_60deg_Right → [035] BankedCurve_20deg_Right
+  BoostR       |         5 |      0.37 x   | [032] BankedCurve_60deg_Right → [035] BankedCurve_20deg_Right
+  Bank         |         5 |     75.27 deg | [032] BankedCurve_60deg_Right → [035] BankedCurve_20deg_Right
+  TopL(vert)   |        10 |      9.99 m   | [032] BankedCurve_60deg_Right → [035] BankedCurve_20deg_Right
+  TopL(lat)    |         0 |      0.05 m   | [032] BankedCurve_60deg_Right → [035] BankedCurve_20deg_Right
+  TopR(vert)   |        14 |      4.49 m   | [032] BankedCurve_60deg_Right → [035] BankedCurve_20deg_Right
+  TopR(lat)    |         1 |      0.07 m   | [032] BankedCurve_60deg_Right → [035] BankedCurve_20deg_Right
+
+  ══ V2.1 STAGE-2 METRICS (what the SideHeight fix is judged against) ══
+  neutral SideHeight 14.0m (from cfg.RoadProfile.SideHeight) | transition Lt 361m | neutral run needs >= 3xLt = 1083m
+  span classification: SHORT(no neutral justified) 4 | LONG(neutral run allowed) 1 | straddles-neutral 6
+  >> UnnecessarySideHeightReversals = 3
+  >> UnnecessarySideHeightExcursion  = 0.63m at [035] BankedCurve_20deg_Right → [037] Wallride_135deg_Left (SHORT (no neutral justified))
+
+  SPANS RANKED BY UNNECESSARY SIDEHEIGHT EXCURSION (the actual defect list)
+  class | span | len (need) | SideH A→B [min..max] | raw rev/exc | UNNECESSARY rev/exc | pass-through
+  SHORT | [035] BankedCurve_20deg_Right → [037] Wallride_135deg_Left | 42m (need 1083m) | 15.1→15.4 [14.5..15.4] | 1/0.63m | **1/0.63m** | Straight_08
+  SHORT | [010] BankedCurve_95deg_Left → [012] Corkscrew_4u_L_H1R157_H2R87_Orbit26 | 40m (need 1083m) | 15.1→14.6 [14.1..15.1] | 1/0.47m | **1/0.47m** | Straight_02
+  SHORT | [023] BankedCurve_55deg_Left → [025] Loop_4u_H1R314_H2R270 | 40m (need 1083m) | 15.1→14.5 [14.1..15.1] | 1/0.45m | **1/0.45m** | Straight_05
+  strad | [032] BankedCurve_60deg_Right → [035] BankedCurve_20deg_Right | 1798m (need 1083m) | 15.1→14.0 [14.0..15.1] | 0/0.04m | **0/0.04m** | Straight_07 → ClosureSBend_75deg
+
+  WORST SPANS (ranked by FINAL COMPOSED wall-top excursion — diagnostic only)
+  span | len | SideH A→B [min..max] rev/exc | BoostL A→B rev/exc | BoostR A→B rev/exc | TopL A→B rev/exc | TopR A→B rev/exc | pass-through
+  [032] BankedCurve_60deg_Right → [035] BankedCurve_20deg_Right | 1798m | SideH 15.1→14.0 [14.0..15.1] 0/0.0 | BoostL 1.39→1.39 [0.70..1.69] 2/0.69 | BoostR 1.32→0.82 [0.68..1.69] 2/0.37 | TopL 21.3→19.9 [9.9..24.7] 2/10.0 | TopR 20.2→11.6 [9.6..24.7] 3/4.5 | Straight_07 → ClosureSBend_75deg
+  [018] LandingRamp_H135m → [021] BankedCurve_25deg_Right | 1845m | SideH 13.3→14.0 [13.3..14.0] 0/0.0 | BoostL 1.00→1.44 [0.91..1.44] 2/0.09 | BoostR 1.00→1.18 [0.84..1.45] 2/0.27 | TopL 13.5→20.6 [12.9..20.6] 2/0.6 | TopR 13.5→16.8 [11.9..20.8] 3/4.0 | BankedLandingSweep → RecoveryStraight_Drop98m
+  [030] Spiral_2rev_Up_Right → [032] BankedCurve_60deg_Right | 541m | SideH 14.8→14.0 [14.0..14.8] 0/0.0 | BoostL 1.48→1.28 [1.14..1.48] 1/0.14 | BoostR 0.78→0.87 [0.78..0.93] 1/0.06 | TopL 22.6→18.2 [16.2..22.6] 1/2.0 | TopR 11.6→12.3 [11.2..13.2] 2/0.9 | RecoveryStraight_Drop91m
+  [026] Wallride_120deg_Left → [030] Spiral_2rev_Up_Right | 1305m | SideH 15.4→14.8 [14.0..15.4] 1/0.8 | BoostL 1.00→1.48 [1.00..1.48] 0/0.00 | BoostR 1.00→0.77 [0.77..1.00] 0/0.00 | TopL 15.6→22.6 [14.2..22.6] 1/1.4 | TopR 15.6→11.6 [11.2..15.6] 1/0.4 | RecoveryStraight_Climb12m → Straight_06 → SpiralApproach
+  [035] BankedCurve_20deg_Right → [037] Wallride_135deg_Left | 42m | SideH 15.1→15.4 [14.5..15.4] 1/0.6 | BoostL 1.01→1.00 [1.00..1.01] 0/0.00 | BoostR 1.00→1.00 [1.00..1.00] 0/0.00 | TopL 15.4→15.6 [14.7..15.6] 1/0.7 | TopR 15.2→15.6 [14.6..15.6] 1/0.6 | Straight_08
+  [013] BankedCurve_60deg_Right → [016] JumpRamp_H49m_7.3deg | 763m | SideH 15.1→13.3 [13.3..15.1] 0/0.0 | BoostL 1.28→1.00 [1.00..1.28] 0/0.00 | BoostR 0.87→1.00 [0.87..1.00] 0/0.00 | TopL 19.6→13.5 [13.5..19.6] 0/0.0 | TopR 13.3→13.5 [12.6..14.2] 2/0.7 | Straight_03 → JumpApproach
+  [008] LandingRamp_H121m → [010] BankedCurve_95deg_Left | 542m | SideH 13.3→14.0 [13.3..14.0] 0/0.0 | BoostL 1.00→0.89 [0.89..1.00] 0/0.00 | BoostR 1.00→1.24 [1.00..1.24] 0/0.00 | TopL 13.5→12.6 [12.6..14.2] 1/0.7 | TopR 13.5→17.5 [13.5..17.5] 0/0.0 | RecoveryStraight_Climb91m
+  [010] BankedCurve_95deg_Left → [012] Corkscrew_4u_L_H1R157_H2R87_Orbit26 | 40m | SideH 15.1→14.6 [14.1..15.1] 1/0.5 | BoostL 1.01→1.02 [1.01..1.02] 0/0.00 | BoostR 1.27→1.25 [1.25..1.27] 0/0.00 | TopL 15.5→15.1 [14.6..15.5] 1/0.5 | TopR 19.5→18.5 [18.0..19.5] 1/0.5 | Straight_02
+  [023] BankedCurve_55deg_Left → [025] Loop_4u_H1R314_H2R270 | 40m | SideH 15.1→14.5 [14.1..15.1] 1/0.4 | BoostL 0.97→0.99 [0.97..0.99] 0/0.00 | BoostR 1.15→1.11 [1.11..1.15] 0/0.00 | TopL 14.8→14.6 [14.1..14.8] 1/0.5 | TopR 17.5→16.3 [16.0..17.5] 1/0.3 | Straight_05
+
+════════ STAGE-2 TARGET METRICS (before) ════════
+UnnecessarySideHeightReversals=10 UnnecessarySideHeightExcursion=0.94m [spans SHORT=58 LONG=20 straddle=27] at [022] BankedCurve_65deg_Right → [024] Wallride_90deg_Left (SHORT (no neutral justified))
+
+════════ AGGREGATE (the V2.1 before-numbers, per channel) ════════
+tracks=8 spans=105 | EXCURSION SideHeight=1.38m BoostL=0.69x BoostR=0.57x TopL=9.99m TopR=8.03m Width=0.00m Bank=75.3deg | REVERSALS SideHeight=19 BoostL=34 BoostR=28 TopL=72 TopR=66 Width=0 | RATES lat=0.253 vert=0.421 comb=0.421 m/m
+(measured 8 tracks, skipped 0)

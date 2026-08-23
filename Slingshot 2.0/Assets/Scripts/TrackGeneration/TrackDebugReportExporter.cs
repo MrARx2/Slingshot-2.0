@@ -91,6 +91,7 @@ namespace TrackGeneration
             ChainMap(sb, sections);
             ConnectorAudit(sb, sections, resolved);
             WallWaveHotspots(sb, sections, resolved);
+            CrossSectionTransitionDiagnostics.AppendReport(sb, sections, resolved); // V2.1 read-only
             TrackGeometryDiagnostics.AppendBaseline(sb, sections, resolved);
             DiscontinuityScan(sb, sections);
             TrackMeshIntegrityDiagnostics.Append(sb, sections, resolved); // read-only surface measurement

@@ -29,6 +29,14 @@ namespace TrackGeneration.Planning
             public float DesiredSideHeight;
             public bool WidthLocked;
             public bool SideHeightLocked;
+
+            /// <summary>
+            /// V2.1: this node's wall height is a real design destination — an authored feature
+            /// (locked) or ordinary road that intentionally asks for a distinct height (banked
+            /// curve 1.08, hairpin 1.10). Pass-through nodes are NOT destinations and are blended
+            /// between the anchors around them.
+            /// </summary>
+            public bool HeightAnchor;
         }
 
         public static void Apply(List<GeneratedTrackSection> sections,
@@ -40,6 +48,14 @@ namespace TrackGeneration.Planning
             {
                 List<Node> nodes = BuildNodes(chain, cfg);
                 if (nodes.Count < 2) continue;
+
+                float transitionLength = Mathf.Max(1f,
+                    Mathf.Max(cfg.WidthTransitionLength, cfg.CrossSectionTransitionLength));
+
+                // V2.1: resolve pass-through wall-height targets from the anchors around them
+                // BEFORE rate limiting — a rate limiter faithfully tracks whatever targets it is
+                // given, so an incidental neutral target survives it as a visible valley.
+                BlendPassThroughHeights(nodes, transitionLength);
 
                 var widths = new float[nodes.Count];
                 var heights = new float[nodes.Count];
@@ -53,8 +69,7 @@ namespace TrackGeneration.Planning
                     heightLocks[i] = nodes[i].SideHeightLocked;
                 }
 
-                float transition = Mathf.Max(1f,
-                    Mathf.Max(cfg.WidthTransitionLength, cfg.CrossSectionTransitionLength));
+                float transition = transitionLength;
                 float maxWidthRate = Mathf.Min(0.12f,
                     Mathf.Max(0.025f, cfg.RoadWidth / transition));
                 float maxHeightRate = Mathf.Min(0.08f,
@@ -128,6 +143,11 @@ namespace TrackGeneration.Planning
                 float multiplier = TargetMultiplier(chain, s);
                 float targetHeight = cfg.RoadProfile.SideHeight * multiplier;
 
+                // V2.1: an authored shape, or ordinary road asking for a distinct wall height,
+                // is a real destination. Everything else is pass-through (blended, not asserted).
+                bool heightAnchor = protectedShape ||
+                    Mathf.Abs(TrackCandidateBuilder.DepthMultiplier(section.Definition.SectionType) - 1f) > 0.001f;
+
                 for (int r = 0; r < section.SubdivisionFrames.Length; r++)
                 {
                     TrackConnectionFrame frame = section.SubdivisionFrames[r];
@@ -149,13 +169,16 @@ namespace TrackGeneration.Planning
                             DesiredWidth = frame.Width,
                             DesiredSideHeight = targetHeight,
                             WidthLocked = protectedShape,
-                            SideHeightLocked = protectedShape
+                            SideHeightLocked = protectedShape,
+                            HeightAnchor = heightAnchor
                         };
                         nodes.Add(node);
                         previous = node;
                     }
 
                     node.Locations.Add(new Location { Section = section, Ring = r });
+                    // A welded boundary node shared with an anchor section stays an anchor.
+                    if (heightAnchor) node.HeightAnchor = true;
                     if (protectedShape)
                     {
                         node.DesiredWidth = frame.Width;
@@ -166,6 +189,90 @@ namespace TrackGeneration.Planning
                 }
             }
             return nodes;
+        }
+
+        /// <summary>
+        /// V2.1 — removes INCIDENTAL wall-height destinations without removing intentional ones.
+        ///
+        /// A pass-through section (plain straight, connector, approach, recovery) has no design
+        /// reason to reach the neutral wall height; asserting it turns
+        ///   tall anchor → neutral → tall anchor
+        /// into a visible valley, which is what made section boundaries readable as "waves".
+        /// Between two height anchors a pass-through node therefore follows an eased A→B morph,
+        /// and only relaxes toward its own (neutral) target where it is more than one transition
+        /// length from BOTH anchors — i.e. exactly where a genuine neutral plateau fits:
+        ///     transition out (Lt) → neutral plateau → transition in (Lt).
+        ///
+        /// The weight is distance-based and eased, so behaviour is continuous in run length:
+        /// a 1082 m run and a 1084 m run produce almost identical geometry (no threshold cliff).
+        ///
+        /// Anchors are never modified — authored features keep their exact authored profile, and
+        /// intentional variation (banked curve 1.08, hairpin 1.10) is preserved, so
+        /// `Normal → BankedCurve → Normal` still visibly rises.
+        /// </summary>
+        private static void BlendPassThroughHeights(List<Node> nodes, float transitionLength)
+        {
+            float lt = Mathf.Max(1f, transitionLength);
+            int n = nodes.Count;
+
+            int i = 0;
+            while (i < n)
+            {
+                if (nodes[i].HeightAnchor) { i++; continue; }
+
+                int start = i;
+                int end = i;
+                while (end + 1 < n && !nodes[end + 1].HeightAnchor) end++;
+
+                int aIdx = start - 1;
+                int bIdx = end + 1;
+                bool hasA = aIdx >= 0;
+                bool hasB = bIdx < n;
+
+                // No anchor anywhere on this chain — nothing to blend toward, keep own targets.
+                if (!hasA && !hasB) { i = end + 1; continue; }
+
+                float aVal = hasA ? nodes[aIdx].DesiredSideHeight : nodes[bIdx].DesiredSideHeight;
+                float bVal = hasB ? nodes[bIdx].DesiredSideHeight : aVal;
+                float aDist = hasA ? nodes[aIdx].Distance : nodes[start].Distance;
+                float bDist = hasB ? nodes[bIdx].Distance : nodes[end].Distance;
+                float runLength = Mathf.Max(0.001f, bDist - aDist);
+
+                // Does a real neutral PLATEAU fit at all?  The run must pay for a transition out
+                // and a transition in (2 x Lt) before any distance is left to hold neutral; a full
+                // Lt of hold earns the neutral target completely. Without this the local distance
+                // test alone lets a 510 m run reach ~79% of the way to neutral, which is precisely
+                // the incidental valley V2.1 exists to remove. Eased, so behaviour stays continuous
+                // in run length (no cliff at the 3 x Lt mark).
+                float plateau = (hasA && hasB) ? runLength - 2f * lt : float.MaxValue;
+                float spanEarnsNeutral = SectionFrameBuilders.Smooth01(Mathf.Clamp01(plateau / lt));
+
+                for (int k = start; k <= end; k++)
+                {
+                    Node node = nodes[k];
+
+                    // Distance to each bounding anchor (an open end constrains nothing).
+                    float fromA = hasA ? node.Distance - aDist : float.MaxValue;
+                    float fromB = hasB ? bDist - node.Distance : float.MaxValue;
+
+                    // The single A→B morph this span should read as.
+                    float anchorValue = hasA && hasB
+                        ? Mathf.Lerp(aVal, bVal, SectionFrameBuilders.Smooth01(
+                            Mathf.Clamp01((node.Distance - aDist) / runLength)))
+                        : (hasA ? aVal : bVal);
+
+                    // How much this node may relax to its own neutral target: 0 at an anchor,
+                    // 1 only once a full transition length from BOTH sides — AND only if the run
+                    // is long enough to hold a real neutral plateau at all.
+                    float neutralWeight = SectionFrameBuilders.Smooth01(
+                        Mathf.Clamp01(Mathf.Min(fromA, fromB) / lt)) * spanEarnsNeutral;
+
+                    node.DesiredSideHeight =
+                        Mathf.Lerp(anchorValue, node.DesiredSideHeight, neutralWeight);
+                }
+
+                i = end + 1;
+            }
         }
 
         private static float TargetMultiplier(List<GeneratedTrackSection> chain, int index)

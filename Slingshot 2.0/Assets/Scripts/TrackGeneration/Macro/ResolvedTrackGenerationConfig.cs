@@ -658,6 +658,13 @@ namespace TrackGeneration.Macro
             // parallel lanes placed exactly at the floor were failing those checks by
             // centimeters. +4 m clears the fitter's plan-time demand (validator + 3 m
             // drift margin) with room to spare for build drift at the throats.
+            //
+            // NOTE: raising this margin further trades a clearance failure for a WORSE
+            // length/balance failure — a wider lateral offset forces road B to bulge out
+            // more, so it comes out much longer than road A and fails the ~20% balance
+            // gate. The real fix for guaranteed duals is vertical-separated lanes (road B
+            // rides above/below road A, staying laterally close and short), not a wider
+            // lateral gap. Kept at +4.
             float laneFloor = Mathf.Max(r.RoadWidth, r.DualRoadWidth)  // wider road's full envelope
                             + r.RoadProfile.SideHeight * 2f            // rising walls
                             + r.WallMaskSafetyMargin + 4f;
@@ -674,8 +681,8 @@ namespace TrackGeneration.Macro
             r.QuarterCatchWidth = Mathf.Max(
                 r.RoadWidth * Mathf.Clamp(settings.Quarters.CatchWidthScale, 1f, 2.5f),
                 r.LaneSeparation + 24f);
-            r.RoadLengthTolerance = Mathf.Clamp(settings.Quarters.RoadLengthTolerance, 0.02f, 0.6f);
-            r.NeutralTimeTolerance = Mathf.Clamp(settings.Quarters.NeutralTimeTolerancePercent, 0.5f, 20f) / 100f;
+            r.RoadLengthTolerance = Mathf.Clamp(settings.Quarters.RoadLengthTolerance, 0.02f, 1f);
+            r.NeutralTimeTolerance = Mathf.Clamp(settings.Quarters.NeutralTimeTolerancePercent, 0.5f, 60f) / 100f;
             r.RequireArchetypeDifferentiation = settings.Quarters.RequireArchetypeDifferentiation;
             r.BalancePolicy = settings.Quarters.BalancePolicy;
 
