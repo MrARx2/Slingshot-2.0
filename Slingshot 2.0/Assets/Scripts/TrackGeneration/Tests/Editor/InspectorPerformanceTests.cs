@@ -86,6 +86,25 @@ namespace TrackGeneration.Tests
         }
 
         [Test]
+        public void ReportRetainsRareFailureDetailAfterChronologicalTailEvictsIt()
+        {
+            var report = new TrackGenerationReport();
+            report.AddFailure(0, GenerationFailureReason.ClosureElevationFailure,
+                "closure", "rare elevation detail");
+            for (int i = 1; i <= TrackGenerationReport.MaxStoredFailures + 20; i++)
+                report.AddFailure(i, GenerationFailureReason.RecipeCompatibilityFailure,
+                    "override", $"compatibility {i}");
+
+            Assert.IsFalse(report.Failures.Exists(failure =>
+                    failure.Reason == GenerationFailureReason.ClosureElevationFailure),
+                "The fixture must prove the chronological tail actually evicted the rare row.");
+            GenerationAttemptFailure representative = report.RepresentativeFailure(
+                GenerationFailureReason.ClosureElevationFailure);
+            Assert.IsNotNull(representative);
+            StringAssert.Contains("rare elevation detail", representative.Message);
+        }
+
+        [Test]
         public void FallbackFailureMergeCannotBypassSerializedDetailCap()
         {
             var earlier = new TrackGenerationReport();

@@ -75,10 +75,11 @@ namespace TrackGeneration.Editor
             sb.AppendLine($"Straights: {r.MinStraightLength:F0}–{r.MaxStraightLength:F0} m | curve radius {r.MinCurveRadius:F0}–{r.MaxCurveRadius:F0} m | turns {r.MinTurnCount}–{r.MaxTurnCount} ({r.DirectionPattern})");
             sb.AppendLine($"Connectors: min {r.MinimumConnectorLength:F0} m | inheritance {r.ConnectorInheritanceStrength:P0} | bank reversal ≥ {r.MinimumBankReversalLength:F0} m");
             sb.AppendLine($"Bank blend {r.BankTransitionLength:F0} m | pitch {r.PitchTransitionLength:F0} m | roll {r.RollTransitionLength:F0} m | max bank {r.MaxBankAngle:F0}°");
+            sb.AppendLine($"Feature fitting: {r.FeatureFitScale:P0} | compact entry {r.DefaultApproachLength:F0} m | compact recovery {r.DefaultRecoveryLength:F0} m | expands only when solving requires it");
             sb.AppendLine($"Turn rounding: {(r.DynamicTurnRoundingEnabled ? $"on ({r.TurnRoundingStrength:P0}, min flat {r.RoadProfile.MinTurnCenterFlatRatio:F2})" : "off")} | catch wall: {(r.CatchWallEnabled ? $"on ({r.RoadProfile.MaxOverhangAngleDeg:F0}° past vertical)" : "off")}");
             sb.AppendLine($"Feature groups: {r.MinFeatureGroups}–{r.MaxFeatureGroups} | full pipes {r.FullPipes.MinimumCount}–{r.FullPipes.MaximumCount} | wallrides {r.Wallrides.MinimumCount}–{r.Wallrides.MaximumCount}");
             sb.AppendLine($"Quarters: {r.MinDualQuarters}–{r.MaxDualQuarters} dual ({r.QuarterChoiceType}) | lane sep {r.LaneSeparation:F0} m | catch {r.QuarterCatchWidth:F0} m | road B width {r.DualRoadWidth:F0} m");
-            sb.AppendLine($"Elevation: amplitude {r.TargetElevationAmplitude:F0} m | majors {r.MinMajorElevationSections}–{r.MaxMajorElevationSections} | climb ≤ {r.MaxClimbAngle:F0}°");
+            sb.AppendLine($"Elevation: {r.VerticalProfile} | amplitude {r.TargetElevationAmplitude:F0} m | majors {r.MinMajorElevationSections}–{r.MaxMajorElevationSections} | climb ≤ {r.MaxClimbAngle:F0}°");
             sb.Append($"Subdivision ladder: {r.SubdivisionLadder.Count} tiers ({r.SubdivisionLadder[0]}…{r.SubdivisionLadder[r.SubdivisionLadder.Count - 1]}) | facet target {r.MaxRingFacetAngle:F2}°");
             ResolvedSummary = sb.ToString();
             ResolvedIssues.AddRange(r.Issues);
@@ -122,7 +123,8 @@ namespace TrackGeneration.Editor
                     sb.AppendLine($"Full pipes <b>{metrics.FullPipeCount}</b>   Wallrides <b>{metrics.WallrideCount}</b>   Dual quarters <b>{metrics.DualRoadQuarterCount}</b>   Compounds {metrics.CompoundPatternCount}");
                     sb.AppendLine($"Rings {metrics.TotalRings}   Max facet {metrics.MaxFacetAngleObserved:F2}°   Elevation {metrics.MinElevation:F0}..{metrics.MaxElevation:F0} m");
                 }
-                sb.Append($"Attempts {report.AttemptsEvaluated}   Candidates {report.ValidCandidateCount}   Score {report.SelectedCandidateScore:F1}   Warnings {report.Warnings.Count}");
+                sb.AppendLine($"Rating <b>{report.TrackRating}/100</b>   Attempts {report.AttemptsEvaluated}   Candidates {report.ValidCandidateCount}   Internal score {report.SelectedCandidateScore:F1}   Warnings {report.Warnings.Count}");
+                sb.Append($"Time {report.GenerationDurationSeconds:F2}s   Passes {Mathf.Max(1, report.PipelinePassCount)}   Accepted {report.AcceptedPass}");
                 PrimaryFailure = "";
             }
             else
@@ -131,7 +133,7 @@ namespace TrackGeneration.Editor
                 PrimaryFailure = report.Failures.Count > 0
                     ? report.Failures[report.Failures.Count - 1].Message
                     : "Unknown failure.";
-                sb.Append($"Primary reason:\n<b>{PrimaryFailure}</b>\n\nAttempts: {report.AttemptsEvaluated}. Previous valid track preserved.");
+                sb.Append($"Primary reason:\n<b>{PrimaryFailure}</b>\n\nAttempts: {report.AttemptsEvaluated}. Time: {report.GenerationDurationSeconds:F2}s across {Mathf.Max(1, report.PipelinePassCount)} pass(es). Previous valid track preserved.");
             }
             ReportBody = sb.ToString();
 

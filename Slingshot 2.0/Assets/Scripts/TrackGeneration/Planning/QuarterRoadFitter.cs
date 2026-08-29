@@ -208,6 +208,7 @@ namespace TrackGeneration.Planning
                     float radius = Mathf.Clamp(
                         Mathf.Max(Mathf.Lerp(cfg.MaxCurveRadius, cfg.MinCurveRadius, mag / 180f), cfg.MinCurveRadius) * radiusScale,
                         cfg.MinCurveRadius, cfg.MaxCurveRadius);
+                    radius = SectionFrameBuilders.ClampOrdinaryCurveRadius(mag, radius);
                     var c = new TrackMacroSectionDefinition
                     {
                         SectionType = TrackMacroSectionType.BankedCurve,
@@ -235,7 +236,10 @@ namespace TrackGeneration.Planning
                     cornerArcTotal = 0f;
                     foreach (var c in cornerDefs)
                     {
-                        c.Radius = Mathf.Max(cfg.MinCurveRadius, c.Radius * arcScale);
+                        c.Radius = Mathf.Max(cfg.LegalCurveRadiusFloor,
+                            c.Radius * arcScale);
+                        c.Radius = SectionFrameBuilders.ClampOrdinaryCurveRadius(
+                            c.TurnAngle, c.Radius);
                         c.Length = SectionFrameBuilders.EasedArcLength(c.TurnAngle, c.Radius);
                         c.BankingAngle = SectionDefs.RecommendedBank(cfg, c.Radius);
                         cornerArcTotal += c.Length;
@@ -249,7 +253,10 @@ namespace TrackGeneration.Planning
                     continue;
                 }
 
-                float straightInit = Mathf.Max(MinFitStraight, (targetLength - cornerArcTotal) / (k + 1));
+                float straightInit = Mathf.Min(
+                    SectionFrameBuilders.MaxStraightSectionLength,
+                    Mathf.Max(MinFitStraight,
+                        (targetLength - cornerArcTotal) / (k + 1)));
                 for (int s = 0; s <= k; s++)
                 {
                     // RoadId is set at CREATION: the active-set solver grants alternate-
@@ -907,7 +914,13 @@ namespace TrackGeneration.Planning
                 {
                     case TrackMacroSectionType.BankedCurve:
                     case TrackMacroSectionType.BankedHairpin:
-                        frames = SectionFrameBuilders.BuildArc(frame, def.TurnAngle * def.TurnSign, def.Radius, def.BankingAngle, ctx);
+                        frames = Mathf.Abs(def.HillHeight) > 0.001f
+                            ? SectionFrameBuilders.BuildElevatedArc(frame,
+                                def.TurnAngle * def.TurnSign, def.Radius,
+                                def.BankingAngle, def.HillHeight, ctx)
+                            : SectionFrameBuilders.BuildArc(frame,
+                                def.TurnAngle * def.TurnSign, def.Radius,
+                                def.BankingAngle, ctx);
                         break;
                     case TrackMacroSectionType.SCurve:
                         frames = SectionFrameBuilders.BuildComposedArcs(frame,

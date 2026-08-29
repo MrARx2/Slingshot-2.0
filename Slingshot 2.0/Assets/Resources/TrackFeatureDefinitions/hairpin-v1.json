@@ -1,0 +1,23 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.hairpin",
+  "DefinitionVersion": 1,
+  "DisplayName": "Hairpin",
+  "Family": "Turnaround",
+  "Enabled": true,
+  "SemanticElement": 2,
+  "HasPatternType": true,
+  "PatternType": 16,
+  "TopologyRole": 1,
+  "Solver": 0,
+  "SpeedIntent": 0,
+  "RiskLevel": 2,
+  "RequiresRecoveryAfter": true,
+  "Length": { "Minimum": 250.0, "Preferred": 750.0, "Maximum": 1600.0, "Resolution": 1, "MayAutoExpand": true, "ScaleWithDesignSpeed": false, "ReferenceSpeedMps": 361.1111 },
+  "EntryLength": { "Minimum": 90.0, "Preferred": 180.0, "Maximum": 500.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "RecoveryLength": { "Minimum": 180.0, "Preferred": 360.0, "Maximum": 900.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryContract": { "Orientation": 0, "RequiresUprightEntry": false, "MaximumBankDegrees": 35.0, "MaximumPitchDegrees": 25.0, "MaximumHorizontalCurvature": 0.0025, "MaximumRollRateDegreesPerMeter": 0.1, "AcceptsCurvedEntry": true },
+  "ExitContract": { "Orientation": 0, "HeadingChangeDegrees": 180.0 },
+  "Primitives": [ { "PrimitiveId": "compact-reversal", "DisplayName": "Compact Reversal", "PrimitiveType": 2, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 1.0, "RadiusSource": 3, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false } ],
+  "MinimumClearanceMeters": 45.0
+}

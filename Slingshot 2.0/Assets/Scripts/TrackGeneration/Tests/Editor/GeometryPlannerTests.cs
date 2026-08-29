@@ -72,6 +72,29 @@ namespace TrackGeneration.Tests
         }
 
         [Test]
+        public void CanonicalCrossSectionSharesClosedLapSeamContract()
+        {
+            var sections = new List<GeneratedTrackSection>
+            {
+                MakePlanSection(0, new Vector3(0f, 0f, 0f), new Vector3(300f, 0f, 0f),
+                    TrackMacroSectionType.BankedCurve),
+                MakePlanSection(1, new Vector3(300f, 0f, 0f), new Vector3(300f, 0f, 300f),
+                    TrackMacroSectionType.Straight),
+                MakePlanSection(2, new Vector3(300f, 0f, 300f), new Vector3(0f, 0f, 300f),
+                    TrackMacroSectionType.Straight),
+                MakePlanSection(3, new Vector3(0f, 0f, 300f), new Vector3(0f, 0f, 0f),
+                    TrackMacroSectionType.Straight)
+            };
+
+            CrossSectionPlanner.Apply(sections, PlannerConfig());
+
+            Assert.AreEqual(sections[3].EndFrame.Width, sections[0].StartFrame.Width, 0.0001f);
+            Assert.AreEqual(sections[3].EndFrame.SideHeight,
+                sections[0].StartFrame.SideHeight, 0.0001f,
+                "The closed lap seam must be one shared wall-height boundary.");
+        }
+
+        [Test]
         public void ObjectiveJumpReportsThreeSpeedCapture()
         {
             TrackConfig limits = TrackGenerationTestUtil.CreateConfig();
@@ -148,6 +171,36 @@ namespace TrackGeneration.Tests
                 Width = width,
                 ElevationChange = y1 - y0,
                 DebugName = $"PlannerTest_{index}",
+                Contract = SectionConnectionContract.Level()
+            };
+            return new GeneratedTrackSection
+            {
+                Definition = definition,
+                SectionIndex = index,
+                SubdivisionFrames = frames,
+                StartFrame = frames[0],
+                EndFrame = frames[frames.Length - 1]
+            };
+        }
+
+        private static GeneratedTrackSection MakePlanSection(int index, Vector3 start,
+            Vector3 end, TrackMacroSectionType type, float width = 92f)
+        {
+            const int intervals = 20;
+            var frames = new TrackConnectionFrame[intervals + 1];
+            for (int i = 0; i <= intervals; i++)
+            {
+                float t = (float)i / intervals;
+                frames[i] = TrackConnectionFrame.Origin(width);
+                frames[i].Position = Vector3.Lerp(start, end, t);
+                frames[i].ArcLength = Vector3.Distance(start, end) * t;
+            }
+            var definition = new TrackMacroSectionDefinition
+            {
+                SectionType = type,
+                Length = Vector3.Distance(start, end),
+                Width = width,
+                DebugName = $"ClosedPlannerTest_{index}",
                 Contract = SectionConnectionContract.Level()
             };
             return new GeneratedTrackSection

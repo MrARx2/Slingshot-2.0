@@ -55,6 +55,15 @@ namespace TrackGeneration.Macro
         [Tooltip("Road within the quarter: 0 = canonical road (route A), 1 = alternate road (route B) of a Dual Road Quarter.")]
         public int RoadId;
 
+        [Tooltip("Stable V2 topology-demand identity copied from the plan. Empty on connectors/structural sections.")]
+        public string TopologySlotId;
+
+        [Tooltip("Canonical V2 topology-slot order. -1 outside a gameplay-demand slot.")]
+        public int TopologySlotOrder = -1;
+
+        [Tooltip("Topology-slot order within this quarter/road route.")]
+        public int TopologySlotRouteOrder = -1;
+
         /// <summary>The GameObject built for this section (set by the mesh builder).</summary>
         [NonSerialized]
         public GameObject SectionObject;

@@ -1,0 +1,85 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.horseshoe",
+  "DefinitionVersion": 1,
+  "DisplayName": "Horseshoe",
+  "Family": "Turnaround",
+  "Enabled": true,
+  "SemanticElement": 9,
+  "HasPatternType": true,
+  "PatternType": 21,
+  "TopologyRole": 1,
+  "Solver": 3,
+  "SpeedIntent": 1,
+  "RiskLevel": 2,
+  "RequiresRecoveryAfter": true,
+  "EmitsOwnApproach": false,
+  "EmitsOwnRecovery": true,
+  "Length": {
+    "Minimum": 1200.0,
+    "Preferred": 3000.0,
+    "Maximum": 9000.0,
+    "Resolution": 1,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": false,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "EntryLength": {
+    "Minimum": 361.12,
+    "Preferred": 541.68,
+    "Maximum": 1083.34,
+    "Resolution": 0,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "RecoveryLength": {
+    "Minimum": 361.12,
+    "Preferred": 541.68,
+    "Maximum": 1263.90,
+    "Resolution": 0,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "EntryContract": {
+    "Orientation": 0,
+    "RequiresUprightEntry": false,
+    "MaximumBankDegrees": 25.0,
+    "MaximumPitchDegrees": 15.0,
+    "MaximumHorizontalCurvature": 0.0016666667,
+    "MaximumRollRateDegreesPerMeter": 0.08,
+    "AcceptsCurvedEntry": true
+  },
+  "ExitContract": {
+    "Orientation": 0,
+    "HeadingChangeDegrees": 180.0,
+    "PitchChangeDegrees": 0.0,
+    "RollChangeDegrees": 0.0,
+    "ElevationChangeMeters": 0.0
+  },
+  "Turn": {
+    "HeadingDegrees": { "Minimum": 150.0, "Preferred": 180.0, "Maximum": 180.0 },
+    "RadiusMultiplier": { "Minimum": 1.80, "Preferred": 2.00, "Maximum": 2.20 },
+    "AbsoluteRadiusMeters": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 },
+    "CrestHeightMeters": { "Minimum": 60.0, "Preferred": 80.0, "Maximum": 120.0 },
+    "BankMultiplier": { "Minimum": 1.10, "Preferred": 1.25, "Maximum": 1.35 },
+    "CoreSectionType": 4,
+    "UseRecommendedBank": true
+  },
+  "Primitives": [
+    {
+      "PrimitiveId": "elevated-banked-reversal",
+      "DisplayName": "Elevated Banked Reversal",
+      "PrimitiveType": 12,
+      "EntryOrientation": 0,
+      "ExitOrientation": 0,
+      "LengthFraction": 1.0,
+      "RadiusSource": 3,
+      "ContinueCurvature": false,
+      "ContinueRollRate": false,
+      "AllowGenericConnectorBefore": false
+    }
+  ],
+  "MinimumClearanceMeters": 80.0
+}

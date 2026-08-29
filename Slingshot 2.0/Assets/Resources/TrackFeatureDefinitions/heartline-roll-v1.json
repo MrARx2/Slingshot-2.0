@@ -1,0 +1,41 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.heartline-roll",
+  "DefinitionVersion": 3,
+  "DisplayName": "Heartline Roll",
+  "Family": "Transported Roll",
+  "Enabled": true,
+  "SemanticElement": 53,
+  "HasPatternType": true,
+  "PatternType": 26,
+  "TopologyRole": 0,
+  "Solver": 6,
+  "SpeedIntent": 2,
+  "RiskLevel": 2,
+  "RequiresRecoveryAfter": false,
+  "EmitsOwnApproach": false,
+  "EmitsOwnRecovery": false,
+  "Length": { "Minimum": 900.0, "Preferred": 1250.0, "Maximum": 1800.0, "Resolution": 2, "MayAutoExpand": false, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryLength": { "Minimum": 100.0, "Preferred": 180.0, "Maximum": 320.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "RecoveryLength": { "Minimum": 100.0, "Preferred": 180.0, "Maximum": 320.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryContract": { "Orientation": 0, "RequiresUprightEntry": true, "MaximumBankDegrees": 10.0, "MaximumPitchDegrees": 10.0, "MaximumHorizontalCurvature": 0.0008333333, "MaximumRollRateDegreesPerMeter": 0.05, "AcceptsCurvedEntry": true },
+  "ExitContract": { "Orientation": 0, "HeadingChangeDegrees": 0.0, "PitchChangeDegrees": 0.0, "RollChangeDegrees": 360.0, "ElevationChangeMeters": 0.0 },
+  "Rotational": {
+    "RoadRollUnits": 4,
+    "VerticalRotationUnits": 0,
+    "MaximumCoreRollRateDegreesPerSecond": 150.0,
+    "DescendingVerticalPhase": false,
+    "AutomaticHandedness": true,
+    "FirstHalfRadius": { "Minimum": 150.0, "Preferred": 185.0, "Maximum": 230.0 },
+    "SecondHalfRadius": { "Minimum": 150.0, "Preferred": 185.0, "Maximum": 230.0 },
+    "PhaseSplit": { "Minimum": 0.45, "Preferred": 0.50, "Maximum": 0.55 },
+    "CenterlineOrbitDegrees": { "Minimum": 7.0, "Preferred": 10.0, "Maximum": 13.0 },
+    "FirstHalfPitchBiasDegrees": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 },
+    "SecondHalfPitchBiasDegrees": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 },
+    "LimbYawBiasDegrees": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 }
+  },
+  "Primitives": [
+    { "PrimitiveId": "heartline-roll", "DisplayName": "Transported Heartline Roll", "PrimitiveType": 6, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 1.0, "RadiusSource": 1, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false }
+  ],
+  "MinimumClearanceMeters": 45.0
+}

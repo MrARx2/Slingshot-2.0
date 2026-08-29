@@ -5,9 +5,9 @@ namespace TrackGeneration.Macro
     /// <summary>
     /// THE unified parametric road cross-section: one ordered 2D point chain (in the
     /// frame's Right/Up plane) that continuously expresses every road shape the game
-    /// uses — flat-centered half-pipe, dynamically rounded turn bowl, outside catch
-    /// wall curling past vertical, wallride support, three-quarter pipe and fully
-    /// closed pipe. The mesh builder, the collider builder and the debug visualizer
+    /// uses — circular flat-centered half-pipe, dynamically deeper circular turn bowl,
+    /// explicitly-authored wallride support, three-quarter pipe and fully closed pipe.
+    /// The mesh builder, the collider builder and the debug visualizer
     /// all evaluate THIS chain, so render and collision can never disagree.
     ///
     /// Chain order (fixed topology — the point count never changes per track):
@@ -47,22 +47,23 @@ namespace TrackGeneration.Macro
             int total = bowl + 2 * ext;
 
             float halfW = Mathf.Max(0.01f, f.Width * 0.5f);
-            float rounding = Mathf.Clamp01(f.TurnRounding);
-            float flat = Mathf.Lerp(Mathf.Clamp01(p.CenterFlatWidthRatio),
-                Mathf.Clamp01(p.MinTurnCenterFlatRatio), rounding);
-            // Turn rounding pulls the wall bend toward a full quarter circle.
-            float curve = Mathf.Lerp(Mathf.Clamp01(p.WallCurve01), 1f, rounding);
             float sideH = f.SideHeight > 0.001f ? f.SideHeight : p.SideHeight;
-            float baseH = p.ClampedSideHeight(halfW, sideH, flat, curve);
+            p.ResolveCircularBowl(halfW, sideH, f.TurnRounding,
+                out float flat, out float curve, out float evaluatedSideH);
+            float baseH = p.ClampedSideHeight(halfW, evaluatedSideH, flat, curve);
             float closure = Mathf.Clamp01(f.PipeClosure);
             float closureW = closure * closure * (3f - 2f * closure); // smoothstep
 
-            // ── Bowl (left → right), the classic warped distribution ──
+            // ── Bowl (left → right), one authored warped distribution ──
+            // Vertex columns stay at fixed lateral coordinates for the entire track.
+            // Turn rounding changes the evaluated HEIGHT profile, never the topology's
+            // x parameterization; otherwise a longitudinal texture column slides
+            // sideways between rings and produces diagonal UV shear.
             for (int i = 0; i < bowl; i++)
             {
-                float xNorm = p.ProfileXAt(i, bowl, flat);
+                float xNorm = p.ProfileXAt(i, bowl);
                 float mult = xNorm < 0f ? f.LeftWallMultiplier : f.RightWallMultiplier;
-                float h = p.HeightAt(xNorm, halfW, sideH, flat, curve) * mult;
+                float h = p.HeightAt(xNorm, halfW, evaluatedSideH, flat, curve) * mult;
                 points[ext + i] = new Vector2(xNorm * halfW, h);
                 if (crossParams != null)
                     crossParams[ext + i] = Mathf.Sign(xNorm) * Mathf.Min(2f, Mathf.Abs(xNorm) / Mathf.Max(flat, 0.02f));
@@ -71,9 +72,9 @@ namespace TrackGeneration.Macro
             // ── Wall extensions: safety-lip curl → catch wall → wallride support ──
             if (ext > 0)
             {
-                EvaluateExtension(p, ext, halfW, flat, curve, sideH, baseH,
+                EvaluateExtension(p, ext, halfW, flat, curve, evaluatedSideH, baseH,
                     f.LeftWallMultiplier, Mathf.Clamp01(f.LeftOverhang), closureW, left: true, points, crossParams);
-                EvaluateExtension(p, ext, halfW, flat, curve, sideH, baseH,
+                EvaluateExtension(p, ext, halfW, flat, curve, evaluatedSideH, baseH,
                     f.RightWallMultiplier, Mathf.Clamp01(f.RightOverhang), closureW, left: false, points, crossParams);
             }
 

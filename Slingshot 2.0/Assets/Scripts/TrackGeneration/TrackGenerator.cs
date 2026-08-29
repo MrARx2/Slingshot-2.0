@@ -38,6 +38,8 @@ namespace TrackGeneration
         public TrackConfig Config;
 
         [Header("Materials")]
+        [Tooltip("Authoritative persistent materials for generated roads, markings and gameplay surfaces. Legacy fields below remain as migration fallbacks.")]
+        public TrackMaterialSet MaterialSet;
         public Material MainRoadMaterial;
         public Material WallMaterial;
         [UnityEngine.Serialization.FormerlySerializedAs("GuideLineMaterial")]
@@ -89,6 +91,18 @@ namespace TrackGeneration
         [Tooltip("Bumped whenever a generation result is stored — editor caches key off it.")]
         [SerializeField, HideInInspector] private int generationRevision;
 
+        [SerializeField, HideInInspector] private GenerationRecipeV1 lastAcceptedRecipe;
+        [SerializeField, HideInInspector] private TrackResultManifest lastResultManifest;
+        [SerializeField, HideInInspector] private GenerationRecipeV1 pendingImportedRecipe;
+        [SerializeField, HideInInspector] private bool pendingRecipeAwaitingReplay;
+        [System.NonSerialized] private TrackRecipeRating inspectorRatingFallback;
+
+        // The latest report may describe a rejected generation attempt. Keep the
+        // editor's topology index tied to the last transactionally accepted track so
+        // a failed replacement cannot make the still-visible track uneditable.
+        [SerializeField, HideInInspector]
+        private List<TopologySlotRecord> lastAcceptedTopologySlots = new List<TopologySlotRecord>();
+
         [SerializeField, HideInInspector] private int generatedMeshCount;
         [SerializeField, HideInInspector] private int generatedVertexCount;
         [SerializeField, HideInInspector] private int generatedTriangleCount;
@@ -109,6 +123,9 @@ namespace TrackGeneration
 
         /// <summary>Root transform the generated track is local to.</summary>
         public Transform TrackRoot => trackRoot;
+
+        /// <summary>Whether accepted tracks include start/finish and checkpoint geometry.</summary>
+        public bool BuildsRaceCourse => buildRaceCourse;
 
         public TrackGenerationReport LastReport => lastReport;
         public TrackGenerationMetrics LastMetrics => lastMetrics;
@@ -133,12 +150,97 @@ namespace TrackGeneration
         /// <summary>Monotonic counter of stored generation results — inspector caches rebuild only when this changes.</summary>
         public int GenerationRevision => generationRevision;
 
+        /// <summary>Complete recipe that produced the last transactionally accepted track.</summary>
+        public GenerationRecipeV1 LastAcceptedRecipe => lastAcceptedRecipe;
+
+        /// <summary>The imported recipe awaiting replay, or the accepted recipe currently on screen.</summary>
+        public GenerationRecipeV1 DisplayedRecipe =>
+            pendingRecipeAwaitingReplay && pendingImportedRecipe != null
+                ? pendingImportedRecipe
+                : lastAcceptedRecipe;
+
+        /// <summary>
+        /// Rating associated with the recipe shown by the Inspector. This getter is kept
+        /// repaint-cheap: the accepted recipe normally owns the complete rating, while a
+        /// one-time report fallback covers an older serialized snapshot without hashing
+        /// or mutating recipe data during GUI repaint.
+        /// </summary>
+        public TrackRecipeRating DisplayedRecipeRating
+        {
+            get
+            {
+                // A deliberately imported recipe owns the card until it is replayed,
+                // including the honest "Unrated" state of an older recipe. A stale
+                // serialized pending object is ignored unless the explicit replay flag
+                // says the user actually loaded it.
+                if (pendingRecipeAwaitingReplay && pendingImportedRecipe != null)
+                    return pendingImportedRecipe.Rating;
+
+                TrackRecipeRating accepted = lastAcceptedRecipe?.Rating;
+                if (accepted != null && accepted.IsRated)
+                    return accepted;
+
+                if (lastReport != null && lastReport.Success && lastMetrics != null)
+                {
+                    string layoutHash = lastResultManifest?.CanonicalLayoutHash ?? "";
+                    if (inspectorRatingFallback == null ||
+                        inspectorRatingFallback.Overall != lastReport.TrackRating ||
+                        !string.Equals(inspectorRatingFallback.RatedLayoutHash, layoutHash,
+                            System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        TrackDesignerSettings settings =
+                            lastAcceptedRecipe?.DeserializeDesignerSettings() ?? Designer;
+                        inspectorRatingFallback = TrackRecipeRatingCalculator.Calculate(
+                            lastMetrics, lastReport, settings, layoutHash);
+                        if (lastReport.TrackRating > 0)
+                            inspectorRatingFallback.Overall = lastReport.TrackRating;
+                    }
+                    if (inspectorRatingFallback != null && inspectorRatingFallback.IsRated)
+                        return inspectorRatingFallback;
+                }
+
+                return accepted;
+            }
+        }
+
+        /// <summary>
+        /// Stable topology index for the scene track that is actually accepted and
+        /// visible. Unlike <see cref="LastReport"/>, this does not switch to a failed
+        /// attempt merely because that attempt is useful for diagnostics.
+        /// </summary>
+        public List<TopologySlotRecord> EditableTopologySlots
+        {
+            get
+            {
+                if (lastAcceptedTopologySlots != null && lastAcceptedTopologySlots.Count > 0)
+                    return lastAcceptedTopologySlots;
+
+                // Migration path for scenes saved before the accepted index had its
+                // own serialized field.
+                if (lastReport != null && lastReport.Success &&
+                    lastReport.TopologySlots != null && lastReport.TopologySlots.Count > 0)
+                    return lastReport.TopologySlots;
+
+                return null;
+            }
+        }
+
+        /// <summary>Verified identity and canonical hashes of the last accepted track.</summary>
+        public TrackResultManifest LastResultManifest => lastResultManifest;
+
         private TrackSeedManager _seedManager;
         private ITrackRaceCraft _craft;
         private bool _isGenerating;
         private bool _pendingStartPlacement;
         private float _startPlacementRetryDeadline;
         private bool _startPlacementFailureLogged;
+
+        private sealed class AuthoringRunContext
+        {
+            public int BaselineAttemptIndex = -1;
+            public float BaselineLapLength;
+            public IReadOnlyList<AuthoringElevationBaselineEntry> ElevationBaseline;
+        }
 
         private const string GeneratedTrackRootPrefix = "GeneratedTrack_";
         private const string PendingTrackSuffix = "_pending";
@@ -151,13 +253,15 @@ namespace TrackGeneration
 #if UNITY_EDITOR
         private void OnValidate()
         {
+            EnsureAcceptedRecipeRating();
+
             // Procedural track meshes can contain several gigabytes of vertex/index data.
             // They are reproducible from the saved seed and settings, so keep them in the
             // editor scene for preview and play, but never embed them in the .unity file.
             if (!Application.isPlaying && trackRoot != null)
             {
                 RestoreDebugAnnotations(trackRoot.gameObject);
-                RepairGeneratedTrackState(trackRoot.gameObject);
+                RestoreGeneratedTrackState(trackRoot.gameObject);
                 MarkGeneratedHierarchyTransient(trackRoot.gameObject);
             }
         }
@@ -174,7 +278,7 @@ namespace TrackGeneration
             foreach (GameObject root in roots)
             {
                 RestoreDebugAnnotations(root);
-                RepairGeneratedTrackState(root);
+                RestoreGeneratedTrackState(root);
                 MarkGeneratedHierarchyTransient(root);
             }
 
@@ -244,6 +348,8 @@ namespace TrackGeneration
         [ContextMenu("Generate Track")]
         public void GenerateTrack()
         {
+            pendingImportedRecipe = null;
+            pendingRecipeAwaitingReplay = false;
             GenerateInternal("Generate", deriveStreamsFromMaster: true, changedStreams: null);
         }
 
@@ -252,6 +358,8 @@ namespace TrackGeneration
         public void GenerateNewEverything()
         {
             if (_seedManager == null) _seedManager = GetComponent<TrackSeedManager>();
+            pendingImportedRecipe = null;
+            pendingRecipeAwaitingReplay = false;
             _seedManager.UseRandomSeed = true;
             GenerateInternal("Generate New Everything", deriveStreamsFromMaster: true, changedStreams: null);
         }
@@ -261,8 +369,525 @@ namespace TrackGeneration
         public void RegenerateSameSettings()
         {
             if (_seedManager == null) _seedManager = GetComponent<TrackSeedManager>();
+            pendingImportedRecipe = null;
+            pendingRecipeAwaitingReplay = false;
             _seedManager.UseRandomSeed = false;
             GenerateInternal("Regenerate Same Settings", deriveStreamsFromMaster: true, changedStreams: null);
+        }
+
+        /// <summary>
+        /// Captures every current generation input as a versioned recipe. This is safe
+        /// before generation; ExpectedLayoutHash remains empty until a track is accepted.
+        /// </summary>
+        public GenerationRecipeV1 CaptureGenerationRecipe()
+        {
+            if (_seedManager == null) _seedManager = GetComponent<TrackSeedManager>();
+            EnsureStreamsInitialized();
+            TrackSeed seed = _seedManager.GetActiveSeed() ??
+                             _seedManager.ActivateSeed(_seedManager.CurrentSeedInput);
+            Designer ??= TrackStylePresetLibrary.Create(TrackStylePresetLibrary.Balanced);
+            return GenerationRecipeV1.Capture(seed, seedStreams, Designer, Config,
+                settingsLocks, layoutLockMode, transform);
+        }
+
+        /// <summary>Exports the last accepted exact recipe, or the current request when no accepted recipe exists.</summary>
+        public string ExportGenerationRecipe(bool preferLastAccepted = true)
+        {
+            GenerationRecipeV1 recipe = preferLastAccepted && lastAcceptedRecipe != null
+                ? lastAcceptedRecipe.Clone()
+                : CaptureGenerationRecipe();
+            EnsureRecipeRating(recipe, lastReport, lastMetrics,
+                recipe?.ExpectedLayoutHash);
+
+            // Upgrade an accepted authored recipe created by an older editor build at
+            // the moment it becomes an Undo snapshot. The visible accepted layout is
+            // authoritative and supplies the compact state missing from that recipe.
+            // This makes the next successfully applied edit undoable even when the
+            // starting track itself predates complete history serialization.
+            if (preferLastAccepted && recipe != null && recipe.DesignerAuthoredVariant &&
+                (recipe.AuthoringElevationBaseline == null ||
+                 recipe.AuthoringElevationBaseline.Count == 0))
+            {
+                GeneratedTrackLayout acceptedLayout = CurrentLayout;
+#if UNITY_EDITOR
+                if (acceptedLayout?.Sections == null || acceptedLayout.Sections.Count == 0)
+                    TryGetEditorPreviewCacheSnapshot(out _, out acceptedLayout);
+#endif
+                IReadOnlyList<AuthoringElevationBaselineEntry> baseline =
+                    TrackTopologyPlanner.CaptureAuthoringElevationBaseline(
+                        acceptedLayout?.Sections);
+                if (baseline.Count > 0)
+                {
+                    recipe.AuthoringElevationBaseline =
+                        CloneAuthoringElevationBaseline(baseline);
+                    recipe.RefreshHashes();
+                }
+            }
+            return GenerationRecipeV1.Serialize(recipe, true);
+        }
+
+        /// <summary>
+        /// Validates and applies a recipe's deterministic inputs without generating.
+        /// Call <see cref="RegenerateExactRecipe"/> after a successful import.
+        /// </summary>
+        public bool TryImportGenerationRecipe(string json, RecipeReplayMode replayMode, out string error)
+        {
+            GenerationRecipeV1 recipe = GenerationRecipeV1.Deserialize(json, out error);
+            if (recipe == null) return false;
+            if (!recipe.ValidateFor(Config, replayMode, out error)) return false;
+
+            TrackDesignerSettings importedSettings = recipe.DeserializeDesignerSettings();
+            if (importedSettings == null)
+            {
+                error = "The recipe's designer settings could not be restored.";
+                return false;
+            }
+
+            if (_seedManager == null) _seedManager = GetComponent<TrackSeedManager>();
+            _seedManager.ActivateSeed(recipe.BaseSeed, recipe.SeedDisplayName);
+            Designer = importedSettings;
+            seedStreams = recipe.SeedStreams?.Clone() ?? new TrackSeedStreams();
+            settingsLocks = CloneSettingsLocks(recipe.SettingsLocks);
+            layoutLockMode = recipe.LayoutLockMode;
+            transform.SetPositionAndRotation(recipe.Origin?.Position ?? transform.position,
+                recipe.Origin?.Rotation ?? transform.rotation);
+            if (recipe.Origin != null) transform.localScale = recipe.Origin.Scale;
+            pendingImportedRecipe = recipe.Clone();
+            pendingRecipeAwaitingReplay = true;
+            error = "";
+            return true;
+        }
+
+        /// <summary>Generates from the exact imported recipe, or replays the last accepted recipe.</summary>
+        public bool RegenerateExactRecipe(out string error)
+        {
+            GenerationRecipeV1 recipe = (pendingImportedRecipe ?? lastAcceptedRecipe)?.Clone();
+            if (recipe == null)
+            {
+                error = "No imported or previously accepted Generation Recipe is available.";
+                return false;
+            }
+
+            GenerationRecipeV1 currentAccepted = lastAcceptedRecipe?.Clone();
+            List<TopologySlotRecord> currentSlots = CloneTopologySlots(EditableTopologySlots);
+            string json = GenerationRecipeV1.Serialize(recipe, false);
+            if (!TryImportGenerationRecipe(json, RecipeReplayMode.Strict, out error)) return false;
+
+            // Loading the recipe that already owns the visible accepted layout is a
+            // successful exact restore, not a reason to throw that layout back through
+            // the authoring solver. This also upgrades older edited recipes whose saved
+            // elevation snapshot described the accepted output rather than the original
+            // authoring input: the canonical hash proves that the requested exact track
+            // is already present and no geometry needs to be guessed or rebuilt.
+            string acceptedLayoutHash = CurrentLayout?.Sections != null &&
+                                        CurrentLayout.Sections.Count > 0
+                ? TrackCanonicalHasher.ComputeLayoutHash(CurrentLayout)
+                : lastResultManifest?.CanonicalLayoutHash;
+            if (!string.IsNullOrWhiteSpace(recipe.ExpectedLayoutHash) &&
+                string.Equals(recipe.ExpectedLayoutHash, acceptedLayoutHash,
+                    System.StringComparison.OrdinalIgnoreCase))
+            {
+                EnsureRecipeRating(recipe, lastReport, lastMetrics, acceptedLayoutHash);
+                lastAcceptedRecipe = recipe;
+                pendingImportedRecipe = null;
+                pendingRecipeAwaitingReplay = false;
+                if (lastResultManifest != null)
+                    lastResultManifest.RecipeHash = recipe.RecipeHash;
+                lastReport ??= new TrackGenerationReport();
+                lastReport.Success = true;
+                lastReport.TrackRating = recipe.Rating?.Overall ?? 0;
+                lastReport.RegenerationCommand = "Regenerate Exact Recipe";
+                lastReport.AcceptedPass = "Exact layout already accepted";
+                lastReport.Failures?.Clear();
+                unchecked { generationRevision++; }
+                Debug.Log($"[TrackGenerator] Exact recipe already matches the accepted track " +
+                          $"({acceptedLayoutHash}). No rebuild was necessary.");
+                error = "";
+                return true;
+            }
+
+            GenerateInternal("Regenerate Exact Recipe", deriveStreamsFromMaster: false, changedStreams: null);
+            if (lastReport != null && lastReport.Success) return true;
+
+            if (lastReport?.Failures != null && lastReport.Failures.Count > 0)
+                error = lastReport.Failures[lastReport.Failures.Count - 1].Message;
+            else
+                error = "Exact recipe generation failed before an accepted track could be built.";
+
+            // Exact replay is transactional just like Track Editor authoring. A failed
+            // imported recipe must not leave its seed, settings, locks or pending state
+            // attached to the still-visible previous track. Keep a detached copy of the
+            // requested recipe available for inspection/retry; the next replay reapplies
+            // its inputs transactionally, while the live controls continue to describe
+            // the accepted visible track.
+            RestoreAcceptedRecipeInputs(currentAccepted);
+            lastAcceptedTopologySlots = currentSlots;
+            pendingImportedRecipe = recipe;
+            pendingRecipeAwaitingReplay = true;
+            return false;
+        }
+
+        /// <summary>
+        /// Rebuilds an exact previously accepted recipe for the Track Editor's explicit
+        /// Undo action. This is transactional just like an authored replacement: if the
+        /// historical recipe no longer validates, the current accepted track and its
+        /// generation inputs remain active.
+        /// </summary>
+        public bool RestoreAcceptedRecipeSnapshot(string recipeJson, out string error)
+        {
+            if (string.IsNullOrWhiteSpace(recipeJson))
+            {
+                error = "No previous accepted Track Editor design is available to undo.";
+                return false;
+            }
+
+            // Recipes accepted before authored elevation snapshots were introduced
+            // do not contain enough information to reproduce their exact geometry.
+            // Keep the currently accepted track instead of attempting a misleading
+            // best-effort undo that will inevitably fail the canonical layout hash.
+            GenerationRecipeV1 historicalRecipe = GenerationRecipeV1.Deserialize(
+                recipeJson, out string historyReadError);
+            if (historicalRecipe == null)
+            {
+                error = historyReadError;
+                return false;
+            }
+            if (historicalRecipe.DesignerAuthoredVariant &&
+                (historicalRecipe.AuthoringElevationBaseline == null ||
+                 historicalRecipe.AuthoringElevationBaseline.Count == 0))
+            {
+                error = "This Undo entry was created before complete Track Editor history was available, " +
+                        "so its exact prior geometry cannot be reconstructed. Your current track was kept. " +
+                        "Apply another edit; new Undo entries include the complete accepted design.";
+                return false;
+            }
+
+            GenerationRecipeV1 currentAccepted = lastAcceptedRecipe?.Clone();
+            List<TopologySlotRecord> currentSlots = CloneTopologySlots(EditableTopologySlots);
+            if (!TryImportGenerationRecipe(recipeJson, RecipeReplayMode.Strict, out error))
+                return false;
+
+            GenerateInternal("Undo Last Track Editor Change",
+                deriveStreamsFromMaster: false, changedStreams: null);
+            if (lastReport != null && lastReport.Success) return true;
+
+            if (lastReport?.Failures != null && lastReport.Failures.Count > 0)
+                error = DescribeTopologyEditFailure(lastReport);
+            else
+                error = "The previous accepted design could not be rebuilt. The current track was kept.";
+
+            RestoreAcceptedRecipeInputs(currentAccepted);
+            lastAcceptedTopologySlots = currentSlots;
+            return false;
+        }
+
+        /// <summary>
+        /// Rebuilds an accepted route with hand-authored topology choices. The normal
+        /// whole-track planner owns connectors, closure, clearance and validation; the
+        /// currently accepted scene track is swapped only after the edited route passes.
+        /// </summary>
+        public bool ApplyTopologyOverrides(
+            IReadOnlyList<TopologySlotOverride> requestedOverrides,
+            out string error)
+        {
+            if (requestedOverrides == null || requestedOverrides.Count == 0)
+            {
+                error = "Choose at least one replacement before applying changes.";
+                return false;
+            }
+
+            GenerationRecipeV1 previousAcceptedRecipe = lastAcceptedRecipe?.Clone();
+            List<TopologySlotRecord> previousAcceptedTopologySlots =
+                CloneTopologySlots(EditableTopologySlots);
+            GenerationRecipeV1 recipe = previousAcceptedRecipe?.Clone();
+            if (recipe == null)
+            {
+                error = "Generate a valid track before editing its sections.";
+                return false;
+            }
+
+            GeneratedTrackLayout acceptedBaselineLayout = CurrentLayout;
+#if UNITY_EDITOR
+            // A domain/script reload clears the runtime property, while the accepted
+            // DontSaveInEditor hierarchy and its lightweight visualizer survive. Use
+            // that authoritative cache so the first edit after recompilation still
+            // preserves the visible track's elevation design.
+            if (acceptedBaselineLayout?.Sections == null ||
+                acceptedBaselineLayout.Sections.Count == 0)
+                TryGetEditorPreviewCacheSnapshot(out _, out acceptedBaselineLayout);
+#endif
+
+            recipe.TopologySlotOverrides ??= new List<TopologySlotOverride>();
+            bool changedRecipe = false;
+            bool restoredOriginalChoice = false;
+            for (int i = 0; i < requestedOverrides.Count; i++)
+            {
+                TopologySlotOverride requested = CloneTopologyOverride(requestedOverrides[i]);
+                if (!MergeTopologyOverrideForAuthoring(recipe.TopologySlotOverrides, requested,
+                        out bool restoredOriginal))
+                    continue;
+                changedRecipe = true;
+                restoredOriginalChoice |= restoredOriginal;
+            }
+
+            if (!changedRecipe)
+            {
+                error = "The selected replacements did not contain a valid editable section.";
+                return false;
+            }
+
+            // This is a new authored variant. Its accepted layout hash is established
+            // only after the rebuilt route passes and is transactionally swapped in.
+            recipe.ExpectedLayoutHash = "";
+            bool restoredBaseRecipe = restoredOriginalChoice &&
+                                      recipe.TopologySlotOverrides.Count == 0;
+            if (restoredBaseRecipe)
+            {
+                // Returning the last authored choice to its procedural original is a
+                // true revert, not another authored realization. Run the original
+                // deterministic recipe so its sampled feature parameters, recovery,
+                // closure and accepted candidate all return together.
+                recipe.RecipeRevision = 0;
+                recipe.DesignerAuthoredVariant = false;
+                recipe.AuthoringBaselineAttemptIndex = -1;
+                recipe.AuthoringBaselineLapLengthMeters = 0f;
+            }
+            else
+            {
+                recipe.RecipeRevision = Mathf.Max(0, recipe.RecipeRevision) + 1;
+                recipe.DesignerAuthoredVariant = true;
+                recipe.AuthoringBaselineAttemptIndex = lastResultManifest?.SelectedAttemptIndex ?? -1;
+                recipe.AuthoringBaselineLapLengthMeters = acceptedBaselineLayout?.LapLength ??
+                    lastResultManifest?.Metrics?.LapLengthMeters ??
+                    lastMetrics?.LapLengthMeters ?? 0f;
+            }
+
+            IReadOnlyList<AuthoringElevationBaselineEntry> elevationBaseline =
+                restoredBaseRecipe
+                    ? null
+                    : TrackTopologyPlanner.CaptureAuthoringElevationBaseline(
+                        acceptedBaselineLayout?.Sections);
+            recipe.AuthoringElevationBaseline = restoredBaseRecipe
+                ? new List<AuthoringElevationBaselineEntry>()
+                : CloneAuthoringElevationBaseline(elevationBaseline);
+            recipe.RefreshHashes();
+
+            string json = GenerationRecipeV1.Serialize(recipe, false);
+            if (!TryImportGenerationRecipe(json, RecipeReplayMode.Strict, out error)) return false;
+
+            AuthoringRunContext authoring = restoredBaseRecipe
+                ? null
+                : new AuthoringRunContext
+                  {
+                      BaselineAttemptIndex = recipe.AuthoringBaselineAttemptIndex,
+                      BaselineLapLength = recipe.AuthoringBaselineLapLengthMeters,
+                      ElevationBaseline = elevationBaseline
+                  };
+            GenerateInternal(restoredBaseRecipe
+                    ? "Restore Original Track Editor Feature"
+                    : "Apply Track Editor Changes",
+                deriveStreamsFromMaster: false, changedStreams: null,
+                authoring: authoring);
+            if (lastReport != null && lastReport.Success) return true;
+
+            if (lastReport?.Failures != null && lastReport.Failures.Count > 0)
+                error = DescribeTopologyEditFailure(lastReport);
+            else
+                error = "The replacement could not produce a valid complete route. The previous track was kept.";
+
+            // TryImportGenerationRecipe intentionally loads all deterministic inputs
+            // before generation. If the edited route is rejected, put the Inspector,
+            // active seed, origin, locks and pending-recipe state back on the last
+            // accepted route as well. The scene geometry was already preserved by the
+            // transactional generator; this completes the rollback of authoring state.
+            RestoreAcceptedRecipeInputs(previousAcceptedRecipe);
+            lastAcceptedTopologySlots = previousAcceptedTopologySlots;
+            return false;
+        }
+
+        /// <summary>
+        /// Applies one inspector request to recipe data. Choosing the procedural
+        /// original after an ordinary replacement removes the override completely;
+        /// this restores the sampled original geometry instead of compiling a new
+        /// generic realization with the same feature name.
+        /// </summary>
+        public static bool MergeTopologyOverrideForAuthoring(
+            List<TopologySlotOverride> recipeOverrides,
+            TopologySlotOverride requested,
+            out bool restoredOriginal)
+        {
+            restoredOriginal = false;
+            if (recipeOverrides == null || requested == null ||
+                string.IsNullOrWhiteSpace(requested.TopologySlotId))
+                return false;
+
+            // Confirming an Area of Impact explicitly supersedes any earlier authored
+            // choice inside that window. Leaving both in the recipe would create
+            // overlapping ownership and an ambiguous replay.
+            if (requested.AllowFeatureOverrides && requested.ImpactMembers != null)
+            {
+                for (int memberIndex = 0; memberIndex < requested.ImpactMembers.Count;
+                     memberIndex++)
+                {
+                    TopologyImpactMember member = requested.ImpactMembers[memberIndex];
+                    if (member == null) continue;
+                    recipeOverrides.RemoveAll(existingOverride =>
+                        existingOverride != null && ImpactMemberMatchesOverride(
+                            member, existingOverride));
+                }
+            }
+
+            int existingIndex = recipeOverrides.FindIndex(existing => existing != null &&
+                string.Equals(existing.TopologySlotId, requested.TopologySlotId,
+                    System.StringComparison.Ordinal));
+            if (existingIndex < 0)
+            {
+                recipeOverrides.Add(requested);
+                return true;
+            }
+
+            TopologySlotOverride accepted = recipeOverrides[existingIndex];
+            bool acceptedHasImpact = accepted.ImpactMembers != null &&
+                                     accepted.ImpactMembers.Count > 0;
+            bool requestedHasImpact = requested.ImpactMembers != null &&
+                                      requested.ImpactMembers.Count > 0;
+            if (!acceptedHasImpact && !requestedHasImpact &&
+                requested.RequestedRealization == accepted.OriginalRealization)
+            {
+                recipeOverrides.RemoveAt(existingIndex);
+                restoredOriginal = true;
+                return true;
+            }
+
+            // A later edit of the surviving feature must not silently restore
+            // neighbors that an earlier accepted Area of Impact removed.
+            MergeAcceptedImpact(accepted, requested);
+            recipeOverrides[existingIndex] = requested;
+            return true;
+        }
+
+        private static bool ImpactMemberMatchesOverride(
+            TopologyImpactMember member, TopologySlotOverride existing)
+        {
+            if (member == null || existing == null) return false;
+            if (!string.IsNullOrWhiteSpace(member.TopologySlotId) && string.Equals(
+                    member.TopologySlotId, existing.TopologySlotId,
+                    System.StringComparison.Ordinal))
+                return true;
+            return !string.IsNullOrWhiteSpace(member.StructuralAnchor) &&
+                   string.Equals(member.StructuralAnchor, existing.StructuralAnchor,
+                       System.StringComparison.Ordinal);
+        }
+
+        private static void MergeAcceptedImpact(
+            TopologySlotOverride accepted, TopologySlotOverride requested)
+        {
+            if (accepted?.ImpactMembers == null || accepted.ImpactMembers.Count == 0 ||
+                requested == null)
+                return;
+            // The structural anchor identifies the original procedural demand. The
+            // accepted visible slot may shift when a backward feature is consumed;
+            // retaining the source anchor keeps Exact Replay tied to the same demand.
+            requested.StructuralAnchor = accepted.StructuralAnchor;
+            requested.OriginalRealization = accepted.OriginalRealization;
+            requested.ImpactMembers ??= new List<TopologyImpactMember>();
+            for (int i = 0; i < accepted.ImpactMembers.Count; i++)
+            {
+                TopologyImpactMember prior = accepted.ImpactMembers[i];
+                if (prior == null) continue;
+                bool alreadyPresent = false;
+                for (int j = 0; j < requested.ImpactMembers.Count; j++)
+                {
+                    TopologyImpactMember current = requested.ImpactMembers[j];
+                    if (current != null &&
+                        ((!string.IsNullOrWhiteSpace(prior.StructuralAnchor) &&
+                          string.Equals(prior.StructuralAnchor, current.StructuralAnchor,
+                              System.StringComparison.Ordinal)) ||
+                         string.Equals(prior.TopologySlotId, current.TopologySlotId,
+                             System.StringComparison.Ordinal)))
+                    {
+                        alreadyPresent = true;
+                        break;
+                    }
+                }
+                if (!alreadyPresent)
+                    requested.ImpactMembers.Add(JsonUtility.FromJson<TopologyImpactMember>(
+                        JsonUtility.ToJson(prior)));
+            }
+            requested.AllowFeatureOverrides = requested.ImpactMembers.Count > 0;
+            requested.ImpactBackwardFeatures = Mathf.Max(requested.ImpactBackwardFeatures,
+                accepted.ImpactBackwardFeatures);
+            requested.ImpactForwardFeatures = Mathf.Max(requested.ImpactForwardFeatures,
+                accepted.ImpactForwardFeatures);
+            requested.MaximumReplanScope = (LocalReplanScope)Mathf.Max(
+                (int)requested.MaximumReplanScope, (int)accepted.MaximumReplanScope);
+        }
+
+        private static string DescribeTopologyEditFailure(TrackGenerationReport report)
+        {
+            if (report?.Failures == null || report.Failures.Count == 0)
+                return "The replacement failed without a detailed generation reason.";
+
+            // A candidate that reached closure/validation contains more useful fitting
+            // evidence than unrelated random attempts that lacked the authored demand.
+            List<(GenerationFailureReason reason, int count)> counts =
+                report.FailureCountsByReason();
+            GenerationAttemptFailure selected = null;
+            for (int i = 0; i < counts.Count; i++)
+            {
+                if (counts[i].reason == GenerationFailureReason.RecipeCompatibilityFailure)
+                    continue;
+                selected = report.RepresentativeFailure(counts[i].reason);
+                if (selected == null)
+                {
+                    selected = new GenerationAttemptFailure
+                    {
+                        Reason = counts[i].reason,
+                        Message = $"A compatible edited candidate reached {counts[i].reason}."
+                    };
+                }
+                break;
+            }
+            selected ??= report.Failures[report.Failures.Count - 1];
+
+            var summary = new System.Text.StringBuilder();
+            int shown = Mathf.Min(3, counts.Count);
+            for (int i = 0; i < shown; i++)
+            {
+                if (i > 0) summary.Append(", ");
+                summary.Append(counts[i].reason).Append(" x").Append(counts[i].count);
+            }
+
+            return summary.Length == 0
+                ? selected.Message
+                : $"{selected.Message} Failure breakdown: {summary}.";
+        }
+
+        private void RestoreAcceptedRecipeInputs(GenerationRecipeV1 acceptedRecipe)
+        {
+            if (acceptedRecipe == null)
+            {
+                pendingImportedRecipe = null;
+                pendingRecipeAwaitingReplay = false;
+                return;
+            }
+
+            string acceptedJson = GenerationRecipeV1.Serialize(acceptedRecipe, false);
+            if (!TryImportGenerationRecipe(acceptedJson, RecipeReplayMode.Strict,
+                    out string restoreError))
+            {
+                pendingImportedRecipe = null;
+                pendingRecipeAwaitingReplay = false;
+                Debug.LogError(
+                    $"[TrackGenerator] The edited route was rejected, but its previous authoring inputs could not be restored: {restoreError}");
+                return;
+            }
+
+            // The accepted recipe is the live state, not a newly imported recipe waiting
+            // for replay. Clearing this prevents Exact Replay from accidentally targeting
+            // a failed edit on the next click.
+            pendingImportedRecipe = null;
+            pendingRecipeAwaitingReplay = false;
         }
 
         /// <summary>Keeps the layout skeleton (Layout + Quarter streams); rolls features, elevation, surface, visuals.</summary>
@@ -316,6 +941,8 @@ namespace TrackGeneration
 
         private void PartialRegenerate(string command, params SeedStream[] randomize)
         {
+            pendingImportedRecipe = null;
+            pendingRecipeAwaitingReplay = false;
             EnsureStreamsInitialized();
             seedStreams.Randomize(randomize);
             GenerateInternal(command, deriveStreamsFromMaster: false, changedStreams: randomize);
@@ -334,7 +961,8 @@ namespace TrackGeneration
             seedStreams.DeriveAllFrom(master);
         }
 
-        private void GenerateInternal(string command, bool deriveStreamsFromMaster, SeedStream[] changedStreams)
+        private void GenerateInternal(string command, bool deriveStreamsFromMaster,
+            SeedStream[] changedStreams, AuthoringRunContext authoring = null)
         {
             if (_isGenerating)
             {
@@ -348,7 +976,7 @@ namespace TrackGeneration
                 // Repair state left by a domain reload, interrupted generation, or an
                 // older generator version before allocating another full track.
                 ReconcileGeneratedTrackRoots(removeDuplicates: true);
-                GenerateInternalCore(command, deriveStreamsFromMaster, changedStreams);
+                GenerateInternalCore(command, deriveStreamsFromMaster, changedStreams, authoring);
             }
             finally
             {
@@ -356,7 +984,8 @@ namespace TrackGeneration
             }
         }
 
-        private void GenerateInternalCore(string command, bool deriveStreamsFromMaster, SeedStream[] changedStreams)
+        private void GenerateInternalCore(string command, bool deriveStreamsFromMaster,
+            SeedStream[] changedStreams, AuthoringRunContext authoring)
         {
             if (Config == null)
             {
@@ -380,7 +1009,22 @@ namespace TrackGeneration
             Designer ??= TrackStylePresetLibrary.Create(TrackStylePresetLibrary.Balanced);
             Designer.Sanitize();
 
-            TrackGenerationResult result = RunPipelineWithPolicy(seed);
+            GenerationRecipeV1 requestedRecipe = pendingImportedRecipe?.Clone() ?? CaptureGenerationRecipe();
+
+            // Exact replay of an accepted edited variant restores the same focused
+            // authoring policy even after scene reload or recipe import.
+            if (authoring == null && requestedRecipe.DesignerAuthoredVariant)
+            {
+                authoring = new AuthoringRunContext
+                {
+                    BaselineAttemptIndex = requestedRecipe.AuthoringBaselineAttemptIndex,
+                    BaselineLapLength = requestedRecipe.AuthoringBaselineLapLengthMeters,
+                    ElevationBaseline = requestedRecipe.AuthoringElevationBaseline
+                };
+            }
+
+            TrackGenerationResult result = RunPipelineWithPolicy(seed,
+                requestedRecipe.TopologySlotOverrides, authoring);
 
             // Provenance: what this run preserved/changed and under which locks.
             result.Report.RegenerationCommand = command;
@@ -405,23 +1049,255 @@ namespace TrackGeneration
                 return; // previous valid track stays untouched
             }
 
+            // A recovery pass may have accepted a relaxed/template configuration. The
+            // exact recipe must describe the settings that built the accepted layout,
+            // not the failed settings that merely initiated the request.
+            if (result.EffectiveDesignerSettings != null)
+            {
+                string expectedLayoutHash = requestedRecipe.ExpectedLayoutHash;
+                int recipeRevision = requestedRecipe.RecipeRevision;
+                bool designerAuthoredVariant = requestedRecipe.DesignerAuthoredVariant;
+                int authoringBaselineAttemptIndex = requestedRecipe.AuthoringBaselineAttemptIndex;
+                float authoringBaselineLapLength = requestedRecipe.AuthoringBaselineLapLengthMeters;
+                List<AuthoringElevationBaselineEntry> authoringElevationBaseline =
+                    CloneAuthoringElevationBaseline(
+                        requestedRecipe.AuthoringElevationBaseline);
+                List<TopologySlotOverride> topologyOverrides =
+                    CloneTopologyOverrides(requestedRecipe.TopologySlotOverrides);
+                requestedRecipe = GenerationRecipeV1.Capture(seed, seedStreams,
+                    result.EffectiveDesignerSettings, Config, settingsLocks,
+                    layoutLockMode, transform);
+                requestedRecipe.ExpectedLayoutHash = expectedLayoutHash;
+                requestedRecipe.RecipeRevision = recipeRevision;
+                requestedRecipe.DesignerAuthoredVariant = designerAuthoredVariant;
+                requestedRecipe.AuthoringBaselineAttemptIndex = authoringBaselineAttemptIndex;
+                requestedRecipe.AuthoringBaselineLapLengthMeters = authoringBaselineLapLength;
+                requestedRecipe.AuthoringElevationBaseline = authoringElevationBaseline;
+                requestedRecipe.TopologySlotOverrides = topologyOverrides;
+                requestedRecipe.RefreshHashes();
+            }
+
+            // AuthoringElevationBaseline is a deterministic INPUT: it is the accepted
+            // route immediately before this edit. Do not replace it with the edited
+            // output here. Replaying against that output snapshot changes which
+            // sections the authoring solver treats as protected and can produce a
+            // different canonical layout from the same saved recipe.
+            requestedRecipe.AuthoringElevationBaseline ??=
+                new List<AuthoringElevationBaselineEntry>();
+
+            string generatedLayoutHash = TrackCanonicalHasher.ComputeLayoutHash(result.Layout);
+            if (!string.IsNullOrEmpty(requestedRecipe.ExpectedLayoutHash) &&
+                !string.Equals(requestedRecipe.ExpectedLayoutHash, generatedLayoutHash,
+                    System.StringComparison.OrdinalIgnoreCase))
+            {
+                result.Success = false;
+                result.Report.Success = false;
+                result.Report.AddFailure(result.SelectedAttemptIndex,
+                    GenerationFailureReason.RecipeCompatibilityFailure,
+                    "GenerationRecipe",
+                    $"Exact recipe replay produced layout hash {generatedLayoutHash}, expected {requestedRecipe.ExpectedLayoutHash}. Previous valid track kept.");
+                lastReport = result.Report;
+                LogFailure(result);
+                return;
+            }
+
+            if (!NormalizeAcceptedTopologyOverrides(requestedRecipe.TopologySlotOverrides,
+                    result.Report?.TopologySlots, out string normalizationError))
+            {
+                result.Success = false;
+                result.Report.Success = false;
+                result.Report.AddFailure(result.SelectedAttemptIndex,
+                    GenerationFailureReason.RecipeCompatibilityFailure,
+                    "TrackEditor",
+                    normalizationError + " Previous valid track kept.");
+                lastReport = result.Report;
+                LogFailure(result);
+                return;
+            }
+
             if (!TryBuildTransactional(seed, result))
             {
                 LogFailure(result);
                 return;
             }
 
+            requestedRecipe.ExpectedLayoutHash = generatedLayoutHash;
+            requestedRecipe.Rating = TrackRecipeRatingCalculator.Calculate(
+                result.Layout.Metrics, result.Report,
+                result.EffectiveDesignerSettings ?? Designer,
+                generatedLayoutHash);
+            result.Report.TrackRating = requestedRecipe.Rating.Overall;
+            requestedRecipe.RefreshHashes();
+            lastAcceptedRecipe = requestedRecipe;
+            lastResultManifest = TrackResultManifest.Capture(lastAcceptedRecipe, result);
+            lastAcceptedTopologySlots = CloneTopologySlots(result.Report?.TopologySlots);
+            pendingImportedRecipe = null;
+            pendingRecipeAwaitingReplay = false;
+            inspectorRatingFallback = requestedRecipe.Rating;
+
             LogSuccess(result);
         }
 
+        private void EnsureAcceptedRecipeRating()
+        {
+            if (lastAcceptedRecipe == null || lastReport == null || !lastReport.Success)
+                return;
+            EnsureRecipeRating(lastAcceptedRecipe, lastReport, lastMetrics,
+                lastAcceptedRecipe.ExpectedLayoutHash);
+            lastReport.TrackRating = lastAcceptedRecipe.Rating?.Overall ?? 0;
+        }
+
+        private static void EnsureRecipeRating(GenerationRecipeV1 recipe,
+            TrackGenerationReport report, TrackGenerationMetrics metrics,
+            string layoutHash)
+        {
+            if (recipe == null || report == null || metrics == null || !report.Success)
+                return;
+            if (recipe.Rating != null && recipe.Rating.Version == TrackRecipeRating.CurrentVersion &&
+                string.Equals(recipe.Rating.RatedLayoutHash, layoutHash ?? "",
+                    System.StringComparison.OrdinalIgnoreCase))
+                return;
+
+            TrackDesignerSettings settings = recipe.DeserializeDesignerSettings();
+            if (settings == null) return;
+            recipe.Rating = TrackRecipeRatingCalculator.Calculate(
+                metrics, report, settings, layoutHash);
+        }
+
+        private static SettingsLockState CloneSettingsLocks(SettingsLockState source)
+        {
+            if (source == null) return new SettingsLockState();
+            return JsonUtility.FromJson<SettingsLockState>(JsonUtility.ToJson(source)) ?? new SettingsLockState();
+        }
+
+        private static TopologySlotOverride CloneTopologyOverride(TopologySlotOverride source)
+        {
+            if (source == null) return null;
+            return JsonUtility.FromJson<TopologySlotOverride>(JsonUtility.ToJson(source));
+        }
+
+        private static List<TopologySlotOverride> CloneTopologyOverrides(
+            IReadOnlyList<TopologySlotOverride> source)
+        {
+            var result = new List<TopologySlotOverride>();
+            if (source == null) return result;
+            for (int i = 0; i < source.Count; i++)
+            {
+                TopologySlotOverride clone = CloneTopologyOverride(source[i]);
+                if (clone != null) result.Add(clone);
+            }
+            return result;
+        }
+
+        private static List<AuthoringElevationBaselineEntry> CloneAuthoringElevationBaseline(
+            IReadOnlyList<AuthoringElevationBaselineEntry> source)
+        {
+            var result = new List<AuthoringElevationBaselineEntry>();
+            if (source == null) return result;
+            for (int i = 0; i < source.Count; i++)
+            {
+                AuthoringElevationBaselineEntry entry = source[i];
+                if (entry == null || string.IsNullOrWhiteSpace(entry.MatchKey)) continue;
+                result.Add(new AuthoringElevationBaselineEntry
+                {
+                    MatchKey = entry.MatchKey,
+                    ElevationChange = entry.ElevationChange,
+                    HillHeight = entry.HillHeight,
+                    StartElevation = entry.StartElevation,
+                    EndElevation = entry.EndElevation,
+                    RoadId = entry.RoadId,
+                    CanonicalLapEnd = entry.CanonicalLapEnd
+                });
+            }
+            return result;
+        }
+
+        private static List<TopologySlotRecord> CloneTopologySlots(
+            IReadOnlyList<TopologySlotRecord> source)
+        {
+            var result = new List<TopologySlotRecord>();
+            if (source == null) return result;
+            for (int i = 0; i < source.Count; i++)
+            {
+                TopologySlotRecord item = source[i];
+                if (item == null) continue;
+                TopologySlotRecord clone = JsonUtility.FromJson<TopologySlotRecord>(
+                    JsonUtility.ToJson(item));
+                if (clone != null) result.Add(clone);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Rebinds an accepted Track Editor request to the finished route identity.
+        /// Area of Impact may legitimately remove a later demand and renumber or
+        /// re-quarter the replacement, so the exact marker stamped on the accepted
+        /// geometry is authoritative here just as it is inside the planner.
+        /// </summary>
+        public static bool NormalizeAcceptedTopologyOverrides(
+            IReadOnlyList<TopologySlotOverride> overrides,
+            IReadOnlyList<TopologySlotRecord> acceptedSlots,
+            out string error)
+        {
+            error = "";
+            if (overrides == null || overrides.Count == 0) return true;
+            for (int i = 0; i < overrides.Count; i++)
+            {
+                TopologySlotOverride request = overrides[i];
+                if (request == null) continue;
+                if (!TrackTopologyPlanner.TryResolveAppliedReplacementSlot(
+                        acceptedSlots, request, out TopologySlotRecord slot))
+                {
+                    TopologySlotCatalog.TryResolveOverride(acceptedSlots, request,
+                        out _, out string reason, appliedRealization: true);
+                    error = reason;
+                    return false;
+                }
+
+                request.TopologySlotId = slot.TopologySlotId;
+                request.CanonicalOrder = slot.CanonicalOrder;
+                if (request.ImpactMembers == null || request.ImpactMembers.Count == 0)
+                    request.StructuralAnchor = TopologySlotCatalog.BuildStructuralAnchor(slot);
+            }
+            return true;
+        }
+
         /// <summary>Runs the pipeline, applying the configured failure policy when no valid candidate exists.</summary>
-        private TrackGenerationResult RunPipelineWithPolicy(TrackSeed seed)
+        private TrackGenerationResult RunPipelineWithPolicy(
+            TrackSeed seed,
+            IReadOnlyList<TopologySlotOverride> topologyOverrides,
+            AuthoringRunContext authoring = null)
         {
             var pipeline = new TrackGenerationPipeline();
 
             ResolvedTrackGenerationConfig resolved = ResolvedTrackGenerationConfig.Resolve(Config, Designer);
-            TrackGenerationResult result = pipeline.Run(resolved, seed, seedStreams);
-            if (result.Success) return result;
+            if (authoring != null)
+                TrackEditorAuthoringPolicy.Apply(resolved, authoring.BaselineLapLength);
+            var pipelineOptions = authoring != null && authoring.BaselineAttemptIndex >= 0
+                ? new TrackGenerationPipelineOptions
+                {
+                    OnlyAttemptIndex = authoring.BaselineAttemptIndex,
+                    AuthoringElevationBaseline = authoring.ElevationBaseline
+                }
+                : authoring?.ElevationBaseline != null
+                    ? new TrackGenerationPipelineOptions
+                    {
+                        AuthoringElevationBaseline = authoring.ElevationBaseline
+                    }
+                    : null;
+            TrackGenerationResult result = pipeline.Run(resolved, seed, seedStreams,
+                topologyOverrides, pipelineOptions);
+            if (result.Success)
+            {
+                result.Report.AcceptedPass = "Strict";
+                result.EffectiveDesignerSettings = Designer.Clone();
+                return result;
+            }
+
+            // A Track Editor change is a focused rebuild of the accepted design, not a
+            // request to simplify/reroll it. Never enter the random-generation fallback
+            // pass, which can remove the authored structural demand entirely.
+            if (authoring != null) return result;
 
             switch (Designer.Generation.FailurePolicy)
             {
@@ -433,12 +1309,16 @@ namespace TrackGeneration
                     // not to score four more candidates after the full pass failed.
                     relaxed.Generation.SelectionMode = CandidateSelectionMode.FirstValid;
                     var relaxedResolved = ResolvedTrackGenerationConfig.Resolve(Config, relaxed);
-                    TrackGenerationResult retry = pipeline.Run(relaxedResolved, seed, seedStreams);
+                    TrackGenerationResult retry = pipeline.Run(relaxedResolved, seed, seedStreams,
+                        topologyOverrides);
 
                     // Merge failure history so the report shows the whole story.
                     retry.Report.PrependFailuresFrom(result.Report);
                     retry.Report.RelaxedSettings.AddRange(records);
                     retry.Report.AttemptsEvaluated += result.Report.AttemptsEvaluated;
+                    MergePipelinePassDiagnostics(result.Report, retry.Report,
+                        retry.Success ? "Relaxed optional settings" : "No accepted pass");
+                    if (retry.Success) retry.EffectiveDesignerSettings = relaxed.Clone();
                     return retry;
                 }
 
@@ -446,12 +1326,16 @@ namespace TrackGeneration
                 {
                     TrackDesignerSettings template = BuildTemplateSettings();
                     var templateResolved = ResolvedTrackGenerationConfig.Resolve(Config, template);
-                    TrackGenerationResult retry = pipeline.Run(templateResolved, seed, seedStreams);
+                    TrackGenerationResult retry = pipeline.Run(templateResolved, seed, seedStreams,
+                        topologyOverrides);
 
                     retry.Report.PrependFailuresFrom(result.Report);
                     retry.Report.AttemptsEvaluated += result.Report.AttemptsEvaluated;
+                    MergePipelinePassDiagnostics(result.Report, retry.Report,
+                        retry.Success ? "Simple template fallback" : "No accepted pass");
                     if (retry.Success)
                     {
+                        retry.EffectiveDesignerSettings = template.Clone();
                         retry.UsedFallback = true;
                         retry.Report.UsedFallback = true;
                         retry.Report.FallbackDescription =
@@ -550,10 +1434,18 @@ namespace TrackGeneration
             RelaxRule("Features.Jumps", s.Features.Jumps);
             RelaxRule("Features.HalfLoops", s.Features.HalfLoops);
             RelaxRule("Features.FullPipes", s.Features.FullPipes);
+            RelaxRule("Features.Camelbacks", s.Features.Camelbacks);
+            RelaxRule("Features.HeartlineRolls", s.Features.HeartlineRolls);
+            RelaxRule("Features.ZeroGRolls", s.Features.ZeroGRolls);
+            RelaxRule("Features.DiveLoops", s.Features.DiveLoops);
+            RelaxRule("Features.Sidewinders", s.Features.Sidewinders);
             RelaxRule("Features.Wallrides", s.Features.Wallrides);
             RelaxRule("Features.Chicanes", s.Features.Chicanes);
             RelaxRule("Features.SCurves", s.Features.SCurves);
             RelaxRule("Features.Hairpins", s.Features.Hairpins);
+            RelaxRule("Features.WideTurnarounds", s.Features.WideTurnarounds);
+            RelaxRule("Features.Horseshoes", s.Features.Horseshoes);
+            RelaxRule("Features.Cutbacks", s.Features.Cutbacks);
             RelaxRule("Elevation.Crests", s.Elevation.Crests);
             RelaxRule("Elevation.Bridges", s.Elevation.Bridges);
             RelaxRule("Elevation.Underpasses", s.Elevation.Underpasses);
@@ -586,9 +1478,19 @@ namespace TrackGeneration
             t.Features.Spirals = new TrackFeatureRule(false, 0, 0, 0f);
             t.Features.Jumps = new TrackFeatureRule(false, 0, 0, 0f);
             t.Features.HalfLoops = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.FullPipes = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.Wallrides = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.Camelbacks = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.HeartlineRolls = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.ZeroGRolls = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.DiveLoops = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.Sidewinders = new TrackFeatureRule(false, 0, 0, 0f);
             t.Features.Chicanes = new TrackFeatureRule(false, 0, 0, 0f);
             t.Features.SCurves = new TrackFeatureRule(false, 0, 0, 0f);
             t.Features.Hairpins = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.WideTurnarounds = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.Horseshoes = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.Cutbacks = new TrackFeatureRule(false, 0, 0, 0f);
             t.Features.MinFeatureGroups = 0;
             t.Features.MaxFeatureGroups = 0;
             t.Features.RequiredPatterns.Clear();
@@ -624,14 +1526,25 @@ namespace TrackGeneration
             try
             {
                 ResolvedTrackGenerationConfig resolved = ResolvedTrackGenerationConfig.Resolve(Config, Designer);
+                ResolvedTrackMaterials materials = ResolveMaterials();
+                List<string> missingMaterials = materials.GetMissingRequiredRoles(buildRaceCourse);
+                if (missingMaterials.Count > 0)
+                {
+                    result.Report.AddFailure(-1, GenerationFailureReason.MeshBuildFailure, "Materials",
+                        $"Persistent material assignment is incomplete: {string.Join(", ", missingMaterials)}.");
+                    result.Success = false;
+                    DestroyObject(tempRootObj);
+                    return false;
+                }
 
                 var prismBuilder = new BoxPrismTrackMeshBuilder(resolved.RoadProfile);
-                prismBuilder.Build(layout.Sections, MainRoadMaterial, WallMaterial, tempRootObj.transform);
+                prismBuilder.Build(layout.Sections, materials.RoadSurface, materials.InnerWallSurface,
+                    materials.WallSide, tempRootObj.transform);
 
                 // Guidance visuals: center-flat guide lines + wall marker bands
                 // (non-colliding overlay meshes; break only at air gaps/open edges).
                 TrackGuideMarkingBuilder.Build(layout.Sections, resolved.RoadProfile, Designer.Visual,
-                    tempRootObj.transform, RoadLineMaterial, resolved.RoadWidth);
+                    tempRootObj.transform, materials.GuideMarking, resolved.RoadWidth, materials.WallMarker);
 
                 // ── KeepAboveStart ground guarantee ──────────────────────────────
                 // The elevation solver only BIASES toward staying above the start; its
@@ -643,19 +1556,19 @@ namespace TrackGeneration
                 // root, so the lift is uniform and cannot reopen the loop.
                 if (resolved.GroundLevelPolicy == TrackGeneration.Design.TrackGroundLevelPolicy.KeepAboveStart)
                 {
-                    float worldMinY = float.MaxValue;
-                    foreach (var sec in layout.Sections)
-                    {
-                        if (sec == null || sec.SubdivisionFrames == null) continue;
-                        foreach (var fr in sec.SubdivisionFrames)
-                            worldMinY = Mathf.Min(worldMinY, tempRootObj.transform.TransformPoint(fr.Position).y);
-                    }
+                    // Measure the completed road mesh, including its wall profile. The
+                    // old centerline-only check could pass while a deep outer wall still
+                    // extended below the requested ground plane.
+                    float worldMinY;
+                    if (!TryGetGeneratedRoadWorldMinY(tempRootObj, out worldMinY))
+                        worldMinY = GetSubdivisionWorldMinY(layout, tempRootObj.transform);
+
                     const float groundClearance = 0.05f; // sit a hair above y=0
-                    if (worldMinY != float.MaxValue && worldMinY < groundClearance)
+                    float lift = CalculateGroundLift(worldMinY, groundClearance);
+                    if (lift > 0f)
                     {
-                        float lift = groundClearance - worldMinY;
                         tempRootObj.transform.position += Vector3.up * lift;
-                        Debug.Log($"[TrackGenerator] KeepAboveStart: lifted track {lift:F1}m so its lowest point clears the ground plane.");
+                        Debug.Log($"[TrackGenerator] KeepAboveStart: lifted track {lift:F1}m so the completed road and walls clear the ground plane.");
                     }
                 }
 
@@ -688,8 +1601,8 @@ namespace TrackGeneration
                 if (buildRaceCourse)
                 {
                     RaceCourse course = RaceCourseBuilder.Build(tempRootObj.transform, layout, resolved.RoadProfile,
-                        checkpointCount, startLineArcOffset, StartFinishMaterial,
-                        StartGatePillarMaterial, CheckpointMaterial);
+                        checkpointCount, startLineArcOffset, materials.StartFinish,
+                        materials.StartGatePillar, materials.Checkpoint);
                     if (course == null)
                     {
                         result.Report.AddFailure(-1, GenerationFailureReason.RaceCourseBuildFailure, "RaceCourse",
@@ -716,7 +1629,7 @@ namespace TrackGeneration
                 CurrentMacroSections = layout.Sections;
                 CurrentLayout = layout;
                 CacheStartFrame(tempRootObj.transform, layout.Sections[0].StartFrame);
-                RepairGeneratedTrackState(tempRootObj);
+                RestoreGeneratedTrackState(tempRootObj);
                 UpdateGeneratedMeshStats();
 #if UNITY_EDITOR
                 if (!Application.isPlaying)
@@ -1019,29 +1932,35 @@ namespace TrackGeneration
 #if UNITY_EDITOR
             if (!Application.isPlaying && selected != null)
             {
-                RepairGeneratedTrackState(selected);
+                RestoreGeneratedTrackState(selected);
                 MarkGeneratedHierarchyTransient(selected);
             }
             else if (selected != null)
-                RepairGeneratedTrackState(selected);
+                RestoreGeneratedTrackState(selected);
 #else
             if (selected != null)
-                RepairGeneratedTrackState(selected);
+                RestoreGeneratedTrackState(selected);
 #endif
         }
 
-        private void RepairGeneratedTrackState(GameObject root)
+        /// <summary>
+        /// Restores persistent asset references and runtime components after an editor
+        /// cache/domain reload. This never synthesizes fallback materials.
+        /// </summary>
+        private void RestoreGeneratedTrackState(GameObject root)
         {
             if (root == null) return;
-            RepairRoadMaterials(root);
-            RepairGuideLineMaterial(root);
-            RepairRaceCourse(root);
+            ReapplyPersistentRoadMaterials(root);
+            ReapplyPersistentGuideMaterials(root);
+            RestoreRaceCourseStateAndMaterials(root);
             EnsureStartAnchor(root.transform);
         }
 
-        private void RepairRoadMaterials(GameObject root)
+        private void ReapplyPersistentRoadMaterials(GameObject root)
         {
-            if (root == null || (MainRoadMaterial == null && WallMaterial == null)) return;
+            ResolvedTrackMaterials resolved = ResolveMaterials();
+            if (root == null || (resolved.RoadSurface == null && resolved.InnerWallSurface == null &&
+                                 resolved.WallSide == null)) return;
 
             foreach (MeshRenderer renderer in root.GetComponentsInChildren<MeshRenderer>(true))
             {
@@ -1050,26 +1969,46 @@ namespace TrackGeneration
                     !renderer.name.StartsWith("LOD", System.StringComparison.Ordinal)) continue;
 
                 Material[] materials = renderer.sharedMaterials;
-                if (materials == null || materials.Length < 2) materials = new Material[2];
-                if (MainRoadMaterial != null) materials[0] = MainRoadMaterial;
-                if (WallMaterial != null) materials[1] = WallMaterial;
+                MeshFilter filter = renderer.GetComponent<MeshFilter>();
+                int expectedSlots = filter != null && filter.sharedMesh != null
+                    ? Mathf.Max(2, filter.sharedMesh.subMeshCount)
+                    : Mathf.Max(2, materials?.Length ?? 0);
+                if (materials == null || materials.Length < expectedSlots)
+                    System.Array.Resize(ref materials, expectedSlots);
+                if (resolved.RoadSurface != null) materials[0] = resolved.RoadSurface;
+                if (materials.Length >= 3)
+                {
+                    if (resolved.InnerWallSurface != null) materials[1] = resolved.InnerWallSurface;
+                    if (resolved.WallSide != null) materials[2] = resolved.WallSide;
+                }
+                else if (resolved.WallSide != null)
+                {
+                    // Cached meshes made before the three-surface contract used slot 1
+                    // for the outer shell. Preserve that interpretation during migration.
+                    materials[1] = resolved.WallSide;
+                }
                 renderer.sharedMaterials = materials;
             }
         }
 
-        private void RepairGuideLineMaterial(GameObject root)
+        private void ReapplyPersistentGuideMaterials(GameObject root)
         {
-            if (root == null || RoadLineMaterial == null) return;
+            ResolvedTrackMaterials resolved = ResolveMaterials();
+            if (root == null || (resolved.GuideMarking == null && resolved.WallMarker == null)) return;
             Transform markingRoot = root.transform.Find("TrackGuideMarkings");
             if (markingRoot == null) return;
 
             foreach (MeshRenderer renderer in markingRoot.GetComponentsInChildren<MeshRenderer>(true))
-                renderer.sharedMaterial = RoadLineMaterial;
+            {
+                bool isWallMarker = renderer.name.IndexOf("Wall", System.StringComparison.OrdinalIgnoreCase) >= 0;
+                renderer.sharedMaterial = isWallMarker ? resolved.WallMarker : resolved.GuideMarking;
+            }
         }
 
-        private void RepairRaceCourse(GameObject root)
+        private void RestoreRaceCourseStateAndMaterials(GameObject root)
         {
             if (root == null) return;
+            ResolvedTrackMaterials resolved = ResolveMaterials();
             RaceCourse course = root.GetComponentInChildren<RaceCourse>(true);
             if (course != null)
                 course.RepairGeneratedReferences();
@@ -1081,16 +2020,80 @@ namespace TrackGeneration
                 {
                     Material material;
                     if (!gate.IsStartFinish)
-                        material = CheckpointMaterial;
+                        material = resolved.Checkpoint;
                     else if (renderer.name.StartsWith("Pillar_", System.StringComparison.Ordinal))
-                        material = StartGatePillarMaterial;
+                        material = resolved.StartGatePillar;
                     else
-                        material = StartFinishMaterial;
+                        material = resolved.StartFinish;
 
                     if (material != null)
                         renderer.sharedMaterial = material;
                 }
             }
+        }
+
+        private static void MergePipelinePassDiagnostics(
+            TrackGenerationReport earlier,
+            TrackGenerationReport latest,
+            string acceptedPass)
+        {
+            if (latest == null) return;
+            latest.GenerationDurationSeconds += earlier?.GenerationDurationSeconds ?? 0f;
+            latest.PipelinePassCount += earlier?.PipelinePassCount ?? 0;
+            latest.AcceptedPass = acceptedPass;
+        }
+
+        public ResolvedTrackMaterials ResolveMaterials()
+        {
+            return ResolvedTrackMaterials.Resolve(MaterialSet, MainRoadMaterial, WallMaterial,
+                RoadLineMaterial, StartFinishMaterial, StartGatePillarMaterial, CheckpointMaterial);
+        }
+
+        /// <summary>Returns the upward translation needed to satisfy a ground plane.</summary>
+        public static float CalculateGroundLift(float worldMinY, float groundClearance = 0.05f)
+        {
+            if (float.IsNaN(worldMinY) || float.IsInfinity(worldMinY)) return 0f;
+            return Mathf.Max(0f, groundClearance - worldMinY);
+        }
+
+        private static bool TryGetGeneratedRoadWorldMinY(GameObject root, out float worldMinY)
+        {
+            worldMinY = float.MaxValue;
+            if (root == null) return false;
+
+            foreach (MeshRenderer renderer in root.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (renderer == null || !renderer.TryGetComponent(out MeshFilter filter) ||
+                    filter.sharedMesh == null || filter.sharedMesh.vertexCount == 0)
+                    continue;
+
+                Transform parent = renderer.transform.parent;
+                if (parent == null ||
+                    !parent.name.StartsWith("Track_", System.StringComparison.Ordinal) ||
+                    !renderer.name.StartsWith("LOD", System.StringComparison.Ordinal))
+                    continue;
+
+                float minY = renderer.bounds.min.y;
+                if (float.IsNaN(minY) || float.IsInfinity(minY)) continue;
+                worldMinY = Mathf.Min(worldMinY, minY);
+            }
+
+            return worldMinY != float.MaxValue;
+        }
+
+        private static float GetSubdivisionWorldMinY(GeneratedTrackLayout layout, Transform root)
+        {
+            float worldMinY = float.MaxValue;
+            if (layout?.Sections == null || root == null) return worldMinY;
+
+            foreach (GeneratedTrackSection section in layout.Sections)
+            {
+                if (section?.SubdivisionFrames == null) continue;
+                foreach (TrackConnectionFrame frame in section.SubdivisionFrames)
+                    worldMinY = Mathf.Min(worldMinY, root.TransformPoint(frame.Position).y);
+            }
+
+            return worldMinY;
         }
 
         private void DestroyGeneratedTrackRootsExcept(GameObject keep)
@@ -1185,7 +2188,7 @@ namespace TrackGeneration
                     MarkGeneratedHierarchyTransient(trackRoot.gameObject);
 #endif
                 CurrentMacroSections = visualizer.Sections;
-                RepairGeneratedTrackState(trackRoot.gameObject);
+                RestoreGeneratedTrackState(trackRoot.gameObject);
                 UpdateGeneratedMeshStats();
                 Debug.Log($"[TrackGenerator] Keeping editor-generated track (seed {visualizer.Seed}, {visualizer.Sections.Count} sections).");
                 return true;
@@ -1198,7 +2201,7 @@ namespace TrackGeneration
             // than throwing it away and generating an unrelated road.
             CurrentMacroSections = visualizer != null ? visualizer.Sections : null;
             CurrentLayout = null;
-            RepairGeneratedTrackState(trackRoot.gameObject);
+            RestoreGeneratedTrackState(trackRoot.gameObject);
             UpdateGeneratedMeshStats();
             Debug.LogWarning("[TrackGenerator] Keeping the existing editor-generated track. Its optional section diagnostics were unavailable, but the playable mesh cache is complete.");
             return true;
@@ -1464,7 +2467,7 @@ namespace TrackGeneration
             string fallback = result.UsedFallback ? " [TEMPLATE FALLBACK — request NOT satisfied]" : "";
             Debug.Log(
                 $"[TrackGenerator] Generated track{fallback}. Seed {result.RequestedSeed}, " +
-                $"attempts {result.AttemptsEvaluated}, candidates {result.ValidCandidateCount}, score {result.Report.SelectedCandidateScore:F1}.\n" +
+                $"attempts {result.AttemptsEvaluated}, candidates {result.ValidCandidateCount}, score {result.Report.SelectedCandidateScore:F1}, rating {result.Report.TrackRating}/100.\n" +
                 $"  Lap {m.LapLengthMeters / 1000f:F2}km, est. {m.EstimatedNeutralLapTimeSeconds:F1}s | turns {m.TurnCount} | " +
                 $"loops {m.LoopCount}, corkscrews {m.CorkscrewCount}, spirals {m.SpiralCount}, half-loops {m.HalfLoopCount}, jumps {m.JumpCount} | " +
                 $"dual quarters {m.DualRoadQuarterCount} | elevation {m.MinElevation:F0}..{m.MaxElevation:F0}m | rings {m.TotalRings}.");

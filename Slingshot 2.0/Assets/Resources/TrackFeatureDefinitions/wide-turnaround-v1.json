@@ -1,0 +1,85 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.wide-turnaround",
+  "DefinitionVersion": 1,
+  "DisplayName": "Wide Turnaround",
+  "Family": "Turnaround",
+  "Enabled": true,
+  "SemanticElement": 8,
+  "HasPatternType": true,
+  "PatternType": 20,
+  "TopologyRole": 1,
+  "Solver": 3,
+  "SpeedIntent": 1,
+  "RiskLevel": 1,
+  "RequiresRecoveryAfter": true,
+  "EmitsOwnApproach": false,
+  "EmitsOwnRecovery": true,
+  "Length": {
+    "Minimum": 1000.0,
+    "Preferred": 2500.0,
+    "Maximum": 8000.0,
+    "Resolution": 1,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": false,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "EntryLength": {
+    "Minimum": 252.78,
+    "Preferred": 505.56,
+    "Maximum": 1083.34,
+    "Resolution": 0,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "RecoveryLength": {
+    "Minimum": 252.78,
+    "Preferred": 361.12,
+    "Maximum": 1083.34,
+    "Resolution": 0,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "EntryContract": {
+    "Orientation": 0,
+    "RequiresUprightEntry": false,
+    "MaximumBankDegrees": 35.0,
+    "MaximumPitchDegrees": 25.0,
+    "MaximumHorizontalCurvature": 0.0025,
+    "MaximumRollRateDegreesPerMeter": 0.1,
+    "AcceptsCurvedEntry": true
+  },
+  "ExitContract": {
+    "Orientation": 0,
+    "HeadingChangeDegrees": 180.0,
+    "PitchChangeDegrees": 0.0,
+    "RollChangeDegrees": 0.0,
+    "ElevationChangeMeters": 0.0
+  },
+  "Turn": {
+    "HeadingDegrees": { "Minimum": 150.0, "Preferred": 180.0, "Maximum": 180.0 },
+    "RadiusMultiplier": { "Minimum": 1.35, "Preferred": 1.35, "Maximum": 1.35 },
+    "AbsoluteRadiusMeters": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 },
+    "CrestHeightMeters": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 },
+    "BankMultiplier": { "Minimum": 1.0, "Preferred": 1.0, "Maximum": 1.0 },
+    "CoreSectionType": 4,
+    "UseRecommendedBank": true
+  },
+  "Primitives": [
+    {
+      "PrimitiveId": "broad-eased-reversal",
+      "DisplayName": "Broad Eased Reversal",
+      "PrimitiveType": 2,
+      "EntryOrientation": 0,
+      "ExitOrientation": 0,
+      "LengthFraction": 1.0,
+      "RadiusSource": 3,
+      "ContinueCurvature": false,
+      "ContinueRollRate": false,
+      "AllowGenericConnectorBefore": false
+    }
+  ],
+  "MinimumClearanceMeters": 60.0
+}

@@ -10,14 +10,17 @@ Detail for the wall work: `TRACK_GENERATOR_V2_1_PLAN.md`. Audit: `TRACK_GENERATO
 ```
 V2.0 Baseline            ██████████ DONE      frozen 8-track corpus, determinism green
 V2.1 Wall stability      █████████░ 90%       fix verified; needs rebaseline + visual sign-off
-V2.1b Curvature flow     ██░░░░░░░░ INVESTIGATED  connector zero-curvature interruption — see §1b
-V2.3b Generation Recipe  ░░░░░░░░░░           reproducible design, not just a seed
-V2.2 Vertical profiles   ░░░░░░░░░░           Subtle / Balanced / Extreme
-V2.3 Inspector V2        ░░░░░░░░░░
-V2.4 Feature Min/Max     ░░░░░░░░░░
-V2.5 Materials           ░░░░░░░░░░
-V2.6 Stability pass      ░░░░░░░░░░
-V2.7 Advanced features   ░░░░░░░░░░
+V2.1b Curvature flow     ████░░░░░░ AUDITED   semantic shadow audit live; legacy geometry still authoritative
+V2.3b Generation Recipe  ██████████ DONE      exact replay + hashes + save/load manually verified
+V2.2 Vertical profiles   █████████░ 90%       Subtle / Balanced / Extreme implemented; Unity calibration/sign-off remains
+V2.2b Spatial intent     ░░░░░░░░░░ IDEATION  ratio-based layout/elevation volume; deliberately not implemented yet
+V2.3 Inspector V2        █████████░ 90%       primary workflow redesigned; retained advanced groups remain reachable
+V2.3c Topology editing   █████████░ INTEGRATED preview + automatic route rebuild + transactional apply + exact-recipe overrides; Unity sign-off remains
+V2.4 Feature Min/Max     ██████████ DONE      controls, planner/validator enforcement and focused acceptance matrix complete
+V2.5 Materials           █████████░ 90%       persistent role contract integrated; Unity visual/domain-reload sign-off remains
+V2.6 Stability pass      ██████░░░░ 60%       ground clearance + timing + bounded seed audit integrated; hard-gate/corpus work remains
+V2.7 Definition system   ██████████ DONE      28/28 pattern assets + 2 selectable semantic assets; typed editor and coverage gate
+V2.7 Advanced features   ███████░░░ OPT-IN    Camelback, Cutback, 2 transported rolls and 2 moderate inversions integrated; drive sweeps remain
 V2.8 Polish              ░░░░░░░░░░
 V2.9 Performance         ░░░░░░░░░░           includes the Apply-Presets crash
 V2.10 Stable validation  ░░░░░░░░░░
@@ -88,6 +91,81 @@ The second half of the "intentional-looking tracks" goal. Entry point is already
 **Risk:** Extreme requesting infeasible amplitude → rejects. Mitigate by allocating distance, not by
 raising limits. Watch yield.
 
+**Implemented checkpoint (2026-08-24):** the Track Profile card now exposes an **Elevation** choice
+with Subtle, Balanced and Extreme. Balanced is serialized as the compatibility default and feeds the
+historical planner constants exactly. The two other profiles change only vertical design intent:
+target amplitude, major carrier count, preferred sustained-grade length and level-recovery rhythm.
+They do not own or raise climb angle, drop angle, curvature, clearance or closure limits.
+
+The resolved profile is part of the designer settings captured by Exact Recipe, so Save, Load and
+Exact Replay preserve it. Exported debug reports now include both the requested/effective vertical
+intent and a measured **Vertical Silhouette** block: actual elevation range, planned major carrier
+count and longest continuous grade. Continuous-grade measurement stops at air gaps, road changes,
+open/non-welded boundaries, flat spans and grade reversals.
+
+Runtime and editor assemblies compile with zero C# errors. Focused policy, fallback, clamping,
+recipe round-trip and silhouette-measurement tests are present. Remaining acceptance is deliberately
+empirical: refresh Unity, run `V2FastGate`, then compare reports and generation yield for the same
+profile/size/feature settings across Subtle, Balanced and Extreme. Balanced must remain the visual
+and deterministic compatibility baseline.
+
+---
+
+## 1c. V2.2b — Spatial Intent Volume (future investigation stage)
+
+**Status:** concept accepted for investigation only. Do not begin geometry implementation until the
+designer contract, scale-resolution rule and visual workflow have been reviewed together.
+
+**Product goal:** give the designer a tunable Scene-view volume that expresses the intended spatial
+character of a generated track — its footprint, orientation and elevation usage — without becoming
+a manual spline editor. The volume guides the planner; the generator remains responsible for legal,
+connected and driveable geometry.
+
+### Designer contract
+
+| Setting | Contract |
+|---|---|
+| **Minimum Track Length (km)** | Hard lower bound for an accepted track |
+| **Maximum Track Length (km)** | Hard upper bound for an accepted track |
+| **Volume Ratio X:Y:Z** | Proportional layout shape only; never exposed as absolute world size |
+| **Height Influence** | Soft 0–100% control over how strongly the planner uses the available vertical character |
+| **Volume Orientation** | Designer-controlled world orientation, persisted in the recipe |
+
+Track length is **not suggestive**. A candidate outside the authored minimum/maximum kilometer range
+must fail validation. Setting Min equal to Max remains available when near-exact length is desired,
+subject only to a documented mesh-sampling tolerance.
+
+The volume is ratio-based rather than measured in kilometers or Unity units. Because ratios plus a
+length range do not define one unique physical scale, V2 must first specify a deterministic
+**automatic comfortable-scale solver**. It should resolve the smallest comfortably usable world
+envelope that can satisfy road clearance, feature footprints, curve radii, transitions, connectors
+and closure, with a controlled breathing-space margin. An optional dimensionless Compact ↔ Expansive
+control may be considered later only if automatic scale resolution is not artistically sufficient.
+
+Height Ratio and Height Influence are separate concepts: Height Ratio defines the proportional
+vertical capacity of the resolved envelope; Height Influence controls how strongly the route plan
+tries to explore that capacity. Height Influence may affect elevation-event count, high/low region
+separation, crossing strategy and feature-level placement, but it must never raise slope, curvature,
+transition or driveability limits.
+
+### Investigation and implementation gates
+
+| # | Task |
+|---|---|
+| 1c.1 | Freeze the terminology and hard/soft contract: length range is hard; spatial/elevation intent is soft inside a hard resolved envelope |
+| 1c.2 | Design the deterministic comfortable-scale rule and prove that identical recipe inputs resolve identical world dimensions |
+| 1c.3 | Prototype an editor-only normalized cage: ratio handles, orientation, elevation bands, Height Influence and read-only resolved dimensions; no generation changes |
+| 1c.4 | Define a coarse intent-route representation for broad heading, elevation rhythm, quarter allocation, closure direction and feature opportunities |
+| 1c.5 | Add range-aware length budgeting so every planning stage reserves and reports distance while the final track remains within Min/Max km |
+| 1c.6 | Feed the coarse route into topology/elevation planning without replacing the authoritative feature, connector, geometry or validation builders |
+| 1c.7 | Add containment, clearance, closure, length-range and vertical-intent diagnostics before making the system designer-facing |
+| 1c.8 | Extend Exact Recipe with ratios, orientation, Height Influence, Min/Max km, resolved scale and coarse intent plan so replay survives future solver changes |
+| 1c.9 | Acceptance: determinism, generation yield, volume containment, length-range compliance, smooth elevation, closure and representative visual review |
+
+**Recommended sequencing:** investigate and visually prototype 1c.1–1c.4 after the current V2
+stability work is trustworthy. Do not replace the existing vertical profiles first. The intent volume
+must become a precise planning language before elevation generation is adapted to follow it.
+
 ---
 
 ## 2. V2.3 — Inspector V2
@@ -103,6 +181,52 @@ No geometry risk; pure presentation over existing serialized data. High daily va
 | 2.5 | Move partial-regeneration commands into **Advanced Regeneration** (keep all of them) |
 | 2.6 | Materials + Debug/Diagnostics foldouts |
 | 2.7 | Verify every V1 command is still reachable; no serialized field renamed (use `[FormerlySerializedAs]` if forced) |
+
+**Implemented checkpoint (2026-08-23):** the primary Inspector now separates Track Profile,
+Feature Amounts, Generation, Exact Recipe and Track Editor into bounded cards. Feature Amounts
+edits the existing serialized `TrackFeatureRule` values directly (no duplicate settings), keeps
+advanced weights in the retained settings tree, and explains the explicit-failure behavior.
+
+**Topology editing checkpoint (2026-08-24):** Track Editor is now a three-step designer workflow:
+choose a section, preview another design, then **Build & Apply**. Selecting a section frames it in the
+Scene view automatically. Previewing creates a non-destructive ghost at the real route location.
+Build & Apply sends every queued choice through the authoritative whole-route generation pipeline,
+including connector analysis, closure, elevation, geometry and final validation. Connector mismatch
+is therefore rebuild work, not a dead-end manual task.
+
+The live track swaps only after the complete edited route succeeds. A failed edit keeps the accepted
+track and restores the complete previously accepted recipe/Inspector state. Successful choices are
+stored as normalized topology overrides in the Exact Recipe: they change the exact edited recipe
+identity while preserving the original base-seed identity. Save, Load and Exact Replay therefore
+carry hand-authored choices forward deterministically. Multiple queued edits are shown explicitly and
+are applied together by one clearly labelled action.
+
+**Designer-first authoring checkpoint (2026-08-26):** Build & Apply now targets the exact deterministic
+attempt that produced the visible accepted track, instead of searching unrelated candidate routes.
+The procedural lap-length cap is advisory during this focused rebuild; safe closure straights and
+large-radius curves receive additional fitting authority while physical validators remain strict.
+Exact Recipe persists the authoring baseline. **Area of Impact is now implemented** with independent
+Backward/Before and Forward/After feature reach on the selected quarter route. Zero protects that
+side; non-zero reach highlights and names the exact neighboring features that may be consumed. Build
+requires an explicit override confirmation, offers direct navigation to edit an affected feature and
+shows compatible replacement suggestions. The stable impact identities and accepted removals are
+part of Exact Recipe.
+
+The local preview foundation remains deterministic and uses each topology family's authoritative
+builder: turn realizations use the corner emitter, while heading-neutral and direction-neutral
+features use the feature-pattern registry. The focused V2 gate now also covers exact-recipe override
+serialization, normalization and stable identities. Runtime and editor assemblies compile cleanly;
+the original focused authoring path has passed its in-Unity gate and manual Build & Apply → Save →
+Load → Exact Replay confirmation. Area of Impact and original-feature restoration now require the corresponding 66-case gate and one
+manual directional-window application.
+
+Topology slots describe route opportunities, not permanent feature families. A heading-neutral slot
+that currently contains an inline corkscrew may legitimately become a jump gap, loop, pipe or other
+heading-neutral realization when its surrounding route provides a safe fit. The owned-connector
+solver must therefore measure and, when permitted, consume eligible adjacent straight/connector
+capacity while preserving the unchanged outer entry and exit boundaries. A candidate is rejected
+for insufficient runway only after that local route window is measured; the size of the current
+feature mesh alone is not a compatibility verdict.
 
 ---
 
@@ -131,17 +255,37 @@ risk; pairs with the V2.3 seed workflow.
 | 3.3 | Confirm maximums respected by placement |
 | 3.4 | Tests: `Min=Max=2` → exactly 2 or explicit failure; `0/0` → none; impossible min → clear reason |
 
+**Completed implementation:** placement and final validation enforce minimums and maximums;
+impossible requirements report `RequiredFeatureMissing`, and the designer-facing Min/Max table is
+hoisted into the primary Inspector. Focused acceptance covers exact `2/2`, disabled `0/0`, authored
+range preservation while disabled, and an impossible minimum with its explicit structured failure
+reason. The broader generation regression continues to guard maximum-count enforcement.
+
 ---
 
 ## 4. V2.5 — Material simplification
 
 | # | Task |
 |---|---|
-| 4.1 | `TrackMaterialSet`: RoadSurface, WallSide, GuideMarking, WallMarker, BoostSurface, RaceGate |
+| 4.1 | `TrackMaterialSet`: RoadSurface, WallSide, GuideMarking, WallMarker, BoostSurface, RaceGate, StartFinish, StartGatePillar, Checkpoint |
 | 4.2 | Assign from the set in mesh/marking/boost/gate builders |
 | 4.3 | Remove runtime `new Material` from the normal path (`TrackGuideMarkingBuilder:581`, `RaceCourseBuilder:341-366`, `BoostPadActor:108`) |
 | 4.4 | Retire generator-side material **repair** (`TrackGenerator:1042/1060`) → editor-only warning if a ref is missing |
 | 4.5 | Test: materials survive a domain reload / scene rebuild |
+
+**Implemented checkpoint (2026-08-24):** `TrackMaterialSet` is now the persistent source of truth
+for all normal track, marking, boost and race-course roles. Builders consume one resolved material
+contract, while the legacy serialized references remain as a migration fallback for existing scenes.
+Cached previews and Exact Replay reapply the resolved roles instead of trusting transient renderer
+state. Missing required roles are shown in the Inspector and exported debug report.
+
+The editor command/Inspector action creates or repairs persistent assets under
+`Assets/Materials/TrackGeneration`. Repair reconnects the palette and creates only missing assets;
+it deliberately preserves the shader, textures, colors and emission of every existing authored
+material. The normal generation path no longer creates ad-hoc materials. Focused tests cover role
+precedence, migration fallback, designer-facing missing-role diagnostics and AssetDatabase reload
+persistence. Remaining acceptance is a Unity domain reload plus visual review of road, wall, guide,
+wall-marker, boost, start/finish, pillars and checkpoints.
 
 ---
 
@@ -154,6 +298,18 @@ risk; pairs with the V2.3 seed workflow.
 | 5.3 | Selective sequence-contract enforcement (`TransitionResolver` advisory → gate) — corpus-gated, WARNING→ERROR |
 | 5.4 | Instrumentation: failure rate, dominant rejection reasons, generation time, strict vs relaxed pass usage |
 | 5.5 | 100-seed sweep harness with the automated quality checks from the spec |
+
+**Implemented checkpoint (2026-08-24):** the below-ground placement defect is protected by a
+renderer-bounds measurement with a centreline fallback and a focused regression test. Generation
+reports now record wall-clock duration, pipeline-pass count and the accepted pass. The bounded V2
+stability window runs deterministic planning-only seed sequences without touching the scene, obeys
+a scheduling time limit, can stop on the first failure, and writes a reproducible report containing
+per-seed timing, strict/non-strict acceptance, dominant rejection reasons and failing seed IDs.
+
+The bounded audit intentionally defaults to a small overnight-safe sample rather than invoking the
+historically runaway full corpus. Remaining work is to promote only evidence-backed cross-section
+and sequence checks into hard gates, then expand the accepted corpus/sweep toward 100 seeds after
+yield and timing remain healthy.
 
 ---
 
@@ -210,7 +366,9 @@ immediately without doing closure surgery before we can test it comfortably.
 | 6 | **V2.4 Feature Min/Max** | low | Completes the designer control surface |
 | 7 | **V2.2 Vertical profiles** | med (geometry, self-contained) | Headline product feature; feeds intent to an existing planner |
 | 8 | **V2.1b Stage 2** — connector merge | med (**topology/closure**) | Now measurable (step 4), testable (step 5), on a verified baseline |
-| 9 | V2.5 materials → V2.6 stability (+#6) → V2.7 advanced (+#36 dual roads) → V2.8/9/10 | | Riskiest subsystem work last, with the strongest nets |
+| 9 | V2.5 materials → V2.6 stability (+#6) | | Establish a trustworthy generation baseline before adding another global planning layer |
+| 10 | **V2.2b Spatial Intent Volume investigation** | med/high (layout + elevation planning) | First freeze the ratio, scale and Min/Max-length contracts; prototype the visualizer before changing generation |
+| 11 | V2.7 advanced (+#36 dual roads) → V2.8/9/10 | | Riskiest subsystem work last, with the strongest nets |
 
 **Changes from the first draft, and why:** V2.1b was missing entirely (a core V2 goal) — now
 explicit and split; the crash moved from last to third; Inspector/Recipe moved ahead of vertical

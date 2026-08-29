@@ -66,10 +66,18 @@ namespace TrackGeneration.Design
             ScaleRule(s.Features.Spirals, features);
             ScaleRule(s.Features.HalfLoops, features);
             ScaleRule(s.Features.FullPipes, features);
+            ScaleRule(s.Features.Camelbacks, features);
+            ScaleRule(s.Features.HeartlineRolls, features);
+            ScaleRule(s.Features.ZeroGRolls, features);
+            ScaleRule(s.Features.DiveLoops, features);
+            ScaleRule(s.Features.Sidewinders, features);
             ScaleRule(s.Features.Wallrides, features);
             ScaleRule(s.Features.Chicanes, features);
             ScaleRule(s.Features.SCurves, features);
             ScaleRule(s.Features.Hairpins, features);
+            ScaleRule(s.Features.WideTurnarounds, features);
+            ScaleRule(s.Features.Horseshoes, features);
+            ScaleRule(s.Features.Cutbacks, features);
             // Explicit RequiredPatterns are deliberate designer demands — never scaled.
 
             s.Quarters.MinimumDualQuarterCount = Mathf.Clamp(Mathf.RoundToInt(s.Quarters.MinimumDualQuarterCount * branches), 0, 4);
@@ -116,6 +124,11 @@ namespace TrackGeneration.Design
             ScaleRule(s.Features.Spirals, 0.5f);
             ScaleRule(s.Features.HalfLoops, 0.5f);
             ScaleRule(s.Features.FullPipes, 0.5f);
+            ScaleRule(s.Features.Camelbacks, 0.5f);
+            ScaleRule(s.Features.HeartlineRolls, 0.5f);
+            ScaleRule(s.Features.ZeroGRolls, 0.5f);
+            ScaleRule(s.Features.DiveLoops, 0.4f);
+            ScaleRule(s.Features.Sidewinders, 0.4f);
             ScaleRule(s.Features.Wallrides, 0.6f);
             ScaleRule(s.Features.Chicanes, 0.5f);
             ScaleRule(s.Features.SCurves, 0.5f);
@@ -123,6 +136,9 @@ namespace TrackGeneration.Design
             // design speed, and a hairpin-heavy style (Switchback) blows the 45–60s
             // window on ESTIMATED time long before it blows it on distance.
             ScaleRule(s.Features.Hairpins, 0.35f);
+            ScaleRule(s.Features.WideTurnarounds, 0.35f);
+            ScaleRule(s.Features.Horseshoes, 0.35f);
+            ScaleRule(s.Features.Cutbacks, 0.35f);
             s.Features.Hairpins.MaximumCount = Mathf.Min(s.Features.Hairpins.MaximumCount, 2);
 
             s.Quarters.MinimumDualQuarterCount = 0;

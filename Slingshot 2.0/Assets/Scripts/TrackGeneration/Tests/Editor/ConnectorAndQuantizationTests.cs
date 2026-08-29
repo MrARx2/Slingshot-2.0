@@ -591,7 +591,11 @@ namespace TrackGeneration.Tests
         {
             TrackGenerationResult result = null;
             for (int s = seed; s < seed + 10 && (result == null || !result.Success); s++)
-                result = TrackGenerationTestUtil.Generate(TrackGenerationTestUtil.FastSettings(preset), s);
+            {
+                TrackDesignerSettings settings = TrackGenerationTestUtil.FastSettings(preset);
+                settings.Generation.ConsistentTextureTopology = false;
+                result = TrackGenerationTestUtil.Generate(settings, s);
+            }
             Assert.IsTrue(result is { Success: true }, "No valid track generated.");
 
             var config = TrackGenerationTestUtil.CreateConfig();
@@ -621,7 +625,11 @@ namespace TrackGeneration.Tests
         {
             TrackGenerationResult result = null;
             for (int s = seed; s < seed + 10 && (result == null || !result.Success); s++)
-                result = TrackGenerationTestUtil.Generate(TrackGenerationTestUtil.FastSettings(preset), s);
+            {
+                TrackDesignerSettings settings = TrackGenerationTestUtil.FastSettings(preset);
+                settings.Generation.ConsistentTextureTopology = false;
+                result = TrackGenerationTestUtil.Generate(settings, s);
+            }
             Assert.IsTrue(result is { Success: true }, "No valid track generated.");
 
             // Rebuild region interval counts from the actual frames: contiguous meshed
@@ -663,6 +671,33 @@ namespace TrackGeneration.Tests
                     $"{result.Report.SubdivisionRegions[i].RegionName} reports tier " +
                     $"{result.Report.SubdivisionRegions[i].SelectedTier} but carries {actual[i]} intervals.");
             }
+        }
+
+        [Test]
+        public void ConsistentTextureTopologyUsesExactGlobalMeterCadence()
+        {
+            TrackGenerationResult result = null;
+            const float spacing = 1.25f;
+            for (int seed = 7520; seed < 7530 && (result == null || !result.Success); seed++)
+            {
+                TrackDesignerSettings settings = TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Balanced);
+                settings.Generation.ConsistentTextureTopology = true;
+                settings.Generation.TextureTopologyMetersPerRing = spacing;
+                result = TrackGenerationTestUtil.Generate(settings, seed);
+            }
+            Assert.IsTrue(result is { Success: true }, "No valid fixed-topology track generated.");
+
+            int fixedRegions = 0;
+            foreach (SubdivisionRegionRecord region in result.Report.SubdivisionRegions)
+            {
+                Assert.LessOrEqual(region.SpacingMeters, spacing + 1e-3f,
+                    $"{region.RegionName} exceeded the authored texture-grid spacing.");
+                if (region.LimitingFactor != "fixed texture topology") continue;
+                fixedRegions++;
+                Assert.AreEqual(region.RawRequirement, region.SelectedTier,
+                    $"{region.RegionName} was quantized onto an adaptive ladder tier.");
+            }
+            Assert.Greater(fixedRegions, 0, "No region reported the fixed texture-topology contract.");
         }
 
         private static RotationalPhaseDefinition RotationPhase(RotationalPhaseAxis axis, int units,

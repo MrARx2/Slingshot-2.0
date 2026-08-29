@@ -131,7 +131,13 @@ namespace TrackGeneration.Planning
         {
             if (section?.Definition == null || section.SubdivisionFrames == null ||
                 section.SubdivisionFrames.Length < 2 || section.RoadId != 0 ||
-                section.OpenStart || section.OpenEnd || section.IsEmptySpace) return false;
+                section.IsEmptySpace) return false;
+
+            // OpenStart/OpenEnd describe whether the mesh boundary beside an air gap
+            // receives a cap; they do not make the drivable road on the other side of
+            // that boundary exempt from vertical-profile quality. BuildChains already
+            // splits at an open weld, so this section is solved as its own anchored
+            // chain without ever drawing geometry across the gap.
 
             TrackMacroSectionDefinition d = section.Definition;
             // Pattern membership alone does not make an ordinary road protected. A
@@ -355,11 +361,18 @@ namespace TrackGeneration.Planning
             float maxCurvature = Mathf.Max(0.0000001f,
                 cfg.MaxCurvatureInducedG * Mathf.Max(0.1f, cfg.Gravity) /
                 Mathf.Max(1f, cfg.DesignSpeedMps * cfg.DesignSpeedMps));
+            // Focused authoring is retopologized and sampled again before validation.
+            // Solving exactly on the analytic boundary left long composed curves such
+            // as Chicane_RightFirst one downstream sample outside the same envelope.
+            // Reserve deterministic sampling headroom without changing the rulebook.
+            float samplingHeadroom = cfg.DesignerAuthoringMode ? 0.9f : 1f;
+            maxCurvature *= samplingHeadroom;
+            float maxCurvatureRate = cfg.MaxVerticalCurvatureRate * samplingHeadroom;
 
             // Lengthen both curvature pulses until the exact true-arc limits pass.
             for (int attempt = 0; attempt < 16; attempt++)
             {
-                if (Validate(candidate, maxCurvature, cfg.MaxVerticalCurvatureRate,
+                if (Validate(candidate, maxCurvature, maxCurvatureRate,
                         out float worstK, out float worstRate))
                 {
                     candidate.HeightTable = BuildHeightTable(candidate, ValidationSamples);

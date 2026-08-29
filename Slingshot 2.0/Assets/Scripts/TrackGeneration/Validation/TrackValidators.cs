@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using TrackGeneration.Definitions;
 using TrackGeneration.Macro;
 using TrackGeneration.Planning;
 
@@ -55,9 +56,55 @@ namespace TrackGeneration.Validation
         {
             // Count what was ACTUALLY built (never trust the plan's bookkeeping alone).
             int loops = 0, corks = 0, spirals = 0, halfLoops = 0, jumps = 0, hairpins = 0, chicanes = 0, sCurves = 0;
-            int fullPipes = 0, wallrides = 0;
+            int fullPipes = 0, wallrides = 0, wideTurnarounds = 0, horseshoes = 0;
+            int camelbacks = 0;
+            int cutbacks = 0;
+            int heartlineRolls = 0, zeroGRolls = 0, diveLoops = 0, sidewinders = 0;
             foreach (var sec in layout.Sections)
             {
+                // Definition-native turnarounds can use the same low-level section
+                // types as ordinary curves/hairpins. Count their stamped semantic
+                // identity first so they do not consume the legacy Hairpin rule too.
+                if (sec.Definition.SemanticElement == SemanticElementId.WideTurnaround)
+                {
+                    wideTurnarounds++;
+                    continue;
+                }
+                if (sec.Definition.SemanticElement == SemanticElementId.Horseshoe)
+                {
+                    horseshoes++;
+                    continue;
+                }
+                if (sec.Definition.SemanticElement == SemanticElementId.Camelback)
+                {
+                    camelbacks++;
+                    continue;
+                }
+                if (sec.Definition.SemanticElement == SemanticElementId.Cutback)
+                {
+                    cutbacks++;
+                    continue;
+                }
+                if (sec.Definition.SemanticElement == SemanticElementId.HeartlineRoll)
+                {
+                    heartlineRolls++;
+                    continue;
+                }
+                if (sec.Definition.SemanticElement == SemanticElementId.ZeroGRoll)
+                {
+                    zeroGRolls++;
+                    continue;
+                }
+                if (sec.Definition.SemanticElement == SemanticElementId.DiveLoop)
+                {
+                    diveLoops++;
+                    continue;
+                }
+                if (sec.Definition.SemanticElement == SemanticElementId.Sidewinder)
+                {
+                    sidewinders++;
+                    continue;
+                }
                 switch (sec.Definition.SectionType)
                 {
                     case TrackMacroSectionType.Loop: loops++; break;
@@ -66,8 +113,18 @@ namespace TrackGeneration.Validation
                     case TrackMacroSectionType.HalfLoopTwist: halfLoops++; break;
                     case TrackMacroSectionType.RotationalEvent:
                     {
-                        bool halfLoopPattern = !string.IsNullOrEmpty(sec.PatternId) &&
-                            (sec.PatternId.StartsWith("HalfLoopRollout") ||
+                        // PatternId is an instance identity and Track Editor deliberately
+                        // replaces it with a stable authoring marker. Maneuver semantics
+                        // must therefore come from the stamped definition identity first.
+                        bool halfLoopPattern =
+                            sec.Definition.SemanticElement == SemanticElementId.Immelmann ||
+                            sec.Definition.SemanticElement == SemanticElementId.HalfLoopToCorkscrew ||
+                            (!string.IsNullOrEmpty(sec.PatternId) &&
+                             (sec.PatternId.StartsWith("HalfLoopRollout") ||
+                              sec.PatternId.StartsWith("HalfLoopToCorkscrew")));
+                        bool halfLoopIncludesCorkscrew =
+                            sec.Definition.SemanticElement == SemanticElementId.HalfLoopToCorkscrew ||
+                            (!string.IsNullOrEmpty(sec.PatternId) &&
                              sec.PatternId.StartsWith("HalfLoopToCorkscrew"));
                         int verticalUnits = 0, rollUnits = 0;
                         if (sec.Definition.RotationalPhases != null)
@@ -82,7 +139,10 @@ namespace TrackGeneration.Validation
                         // planner or a valid double/triple event rejects itself afterward.
                         if (halfLoopPattern) halfLoops++;
                         else if (verticalUnits > 0) loops++;
-                        if (rollUnits > 0)
+                        // A plain Immelmann's 180-degree rollout only restores the car
+                        // upright; it is not an authored corkscrew feature. The 540-degree
+                        // HalfLoopToCorkscrew compound does own a corkscrew count.
+                        if (rollUnits > 0 && (!halfLoopPattern || halfLoopIncludesCorkscrew))
                             corks += !string.IsNullOrEmpty(sec.PatternId) &&
                                      sec.PatternId.StartsWith("DoubleCorkscrew") ? 2 : 1;
                         break;
@@ -105,7 +165,10 @@ namespace TrackGeneration.Validation
 
             void Check(ResolvedFeatureRule rule, int actual, string name)
             {
-                if (!rule.Enabled) return;
+                // Runtime-resolved configurations initialize every rule, while focused
+                // editor tools/tests may construct only the rule they are exercising.
+                // An absent rule means no placement contract, the same as Disabled.
+                if (rule == null || !rule.Enabled) return;
                 if (actual < rule.MinimumCount)
                     issues.Add(new ValidationIssue
                     {
@@ -138,7 +201,15 @@ namespace TrackGeneration.Validation
             Check(cfg.Chicanes, chicanes, "chicanes");
             Check(cfg.SCurves, sCurves, "S-curves");
             Check(cfg.FullPipes, fullPipes, "full pipes");
+            Check(cfg.Camelbacks, camelbacks, "camelbacks");
             Check(cfg.Wallrides, wallrides, "wallride turns");
+            Check(cfg.WideTurnarounds, wideTurnarounds, "wide turnarounds");
+            Check(cfg.Horseshoes, horseshoes, "horseshoes");
+            Check(cfg.Cutbacks, cutbacks, "cutbacks");
+            Check(cfg.HeartlineRolls, heartlineRolls, "heartline rolls");
+            Check(cfg.ZeroGRolls, zeroGRolls, "zero-g rolls");
+            Check(cfg.DiveLoops, diveLoops, "dive loops");
+            Check(cfg.Sidewinders, sidewinders, "sidewinders");
 
             foreach (var p in cfg.RequiredPatterns)
             {
@@ -401,8 +472,19 @@ namespace TrackGeneration.Validation
                             Message = $"Phase {p} uses a restricted {phase.RotationUnits * cfg.RotationUnitDegrees:F0}° transition without a compatible adjacent phase."
                         });
 
+                    bool halfLoopEvent =
+                        def.SemanticElement == SemanticElementId.Immelmann ||
+                        def.SemanticElement == SemanticElementId.HalfLoopToCorkscrew ||
+                        def.SemanticElement == SemanticElementId.DiveLoop ||
+                        def.SemanticElement == SemanticElementId.Sidewinder ||
+                        (!string.IsNullOrEmpty(sec.PatternId) &&
+                         (sec.PatternId.StartsWith("HalfLoopRollout") ||
+                          sec.PatternId.StartsWith("HalfLoopToCorkscrew")));
+                    float verticalMinimum = halfLoopEvent
+                        ? cfg.MinHalfLoopRadius
+                        : cfg.MinLoopRadius;
                     float minRadius = phase.Axis == RotationalPhaseAxis.VerticalCenterline
-                        ? Mathf.Max(cfg.MinLoopRadius, def.Width * 0.6f)
+                        ? Mathf.Max(verticalMinimum, def.Width * 0.6f)
                         : Mathf.Max(cfg.MinCorkscrewRadius, def.Width * 0.6f);
                     float actualRadius = Mathf.Min(phase.FirstHalfRadius, phase.SecondHalfRadius);
                     if (actualRadius + 0.01f < minRadius)
@@ -457,7 +539,17 @@ namespace TrackGeneration.Validation
                         Message = "Global retopology budget reduced the event below its preferred samples-per-unit density."
                     });
 
-                float maxAcceleration = cfg.MaxRollRateDegPerMeter /
+                float allowedRollRate = cfg.MaxRollRateDegPerMeter;
+                if (def.SemanticElement != SemanticElementId.None &&
+                    TrackFeatureDefinitionCatalog.TryGet(def.SemanticElement,
+                        out TrackFeatureDefinition rotationalDefinition) &&
+                    rotationalDefinition.Solver == FeatureDefinitionSolver.RotationalSequenceV1)
+                {
+                    allowedRollRate = Mathf.Max(allowedRollRate,
+                        rotationalDefinition.Rotational.MaximumCoreRollRateDegreesPerSecond /
+                        Mathf.Max(1f, cfg.DesignSpeedMps));
+                }
+                float maxAcceleration = allowedRollRate /
                                         Mathf.Max(1f, cfg.MinDistancePerRotationUnit * 0.25f);
                 for (int i = 1; i < frames.Length; i++)
                 {
@@ -545,6 +637,21 @@ namespace TrackGeneration.Validation
                 var frames = sec.SubdivisionFrames;
                 if (frames == null || frames.Length < 3) continue;
 
+                float sectionMaxRollRate = maxRollRate;
+                if (sec.Definition.SectionType == TrackMacroSectionType.RotationalEvent &&
+                    sec.Definition.SemanticElement != SemanticElementId.None &&
+                    TrackFeatureDefinitionCatalog.TryGet(sec.Definition.SemanticElement,
+                        out TrackFeatureDefinition rotationalDefinition) &&
+                    rotationalDefinition.Solver == FeatureDefinitionSolver.RotationalSequenceV1)
+                {
+                    // These assets explicitly own intentional inversion roll speed.
+                    // Their boundary rates still return to the ordinary connector
+                    // envelope; only the authored core receives this allowance.
+                    sectionMaxRollRate = Mathf.Max(sectionMaxRollRate,
+                        rotationalDefinition.Rotational.MaximumCoreRollRateDegreesPerSecond /
+                        Mathf.Max(1f, cfg.DesignSpeedMps) * 1.02f);
+                }
+
                 bool isPitchFeature = sec.Definition.SectionType == TrackMacroSectionType.Loop ||
                                       sec.Definition.SectionType == TrackMacroSectionType.HalfLoopTwist ||
                                       (sec.Definition.SectionType == TrackMacroSectionType.RotationalEvent &&
@@ -553,8 +660,11 @@ namespace TrackGeneration.Validation
                 // rate is the governing limit and IS checked below.
                 bool skipSlope = isPitchFeature || sec.Definition.SectionType == TrackMacroSectionType.Corkscrew ||
                                  sec.Definition.SectionType == TrackMacroSectionType.RotationalEvent;
+                bool definitionOwnedElevatedTurn =
+                    sec.Definition.SemanticElement == SemanticElementId.Horseshoe;
                 bool ordinaryVertical = IsOrdinaryVerticalSection(sec.Definition.SectionType) &&
-                                        Mathf.Abs(sec.Definition.HillHeight) < 0.001f;
+                                        (Mathf.Abs(sec.Definition.HillHeight) < 0.001f ||
+                                         definitionOwnedElevatedTurn);
                 float maxVerticalCurvature = cfg.MaxCurvatureInducedG * Mathf.Max(0.1f, cfg.Gravity) /
                                              Mathf.Max(1f, cfg.DesignSpeedMps * cfg.DesignSpeedMps);
 
@@ -577,7 +687,12 @@ namespace TrackGeneration.Validation
                             Position = frames[i].Position,
                             RequestedValue = maxVerticalCurvature,
                             AchievedValue = Mathf.Abs(frames[i].VerticalCurvature),
-                            Message = $"Ordinary-road vertical profile exceeds its curvature envelope at ring {i}."
+                            Message = $"Ordinary-road vertical profile '{sec.Definition.DebugName}' " +
+                                      $"exceeds its curvature envelope at ring {i} " +
+                                      $"(curvature {Mathf.Abs(frames[i].VerticalCurvature):G4}/" +
+                                      $"{maxVerticalCurvature:G4} rad/m, rate " +
+                                      $"{Mathf.Abs(frames[i].VerticalCurvatureRate):G4}/" +
+                                      $"{cfg.MaxVerticalCurvatureRate:G4} rad/m²)."
                         });
                         break;
                     }
@@ -609,7 +724,7 @@ namespace TrackGeneration.Validation
                     {
                         Quaternion transport = Quaternion.FromToRotation(frames[i - 1].Forward, frames[i].Forward);
                         float rollDelta = Vector3.Angle(transport * frames[i - 1].Up, frames[i].Up);
-                        if (rollDelta / ds > maxRollRate)
+                        if (rollDelta / ds > sectionMaxRollRate)
                         {
                             issues.Add(new ValidationIssue
                             {
@@ -618,9 +733,9 @@ namespace TrackGeneration.Validation
                                 Validator = "TransitionRates",
                                 Subject = sec.Definition.DebugName,
                                 Position = frames[i].Position,
-                                RequestedValue = maxRollRate,
+                                RequestedValue = sectionMaxRollRate,
                                 AchievedValue = rollDelta / ds,
-                                Message = $"Roll rate {rollDelta / ds:F2}°/m exceeds the {maxRollRate:F2}°/m limit in '{sec.Definition.DebugName}'."
+                                Message = $"Roll rate {rollDelta / ds:F2}°/m exceeds the {sectionMaxRollRate:F2}°/m limit in '{sec.Definition.DebugName}'."
                             });
                             break;
                         }

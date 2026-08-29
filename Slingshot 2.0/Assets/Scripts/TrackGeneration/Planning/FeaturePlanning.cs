@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using TrackGeneration.Definitions;
 using TrackGeneration.Design;
 using TrackGeneration.Macro;
 
@@ -85,6 +86,14 @@ namespace TrackGeneration.Planning
             TrackPatternType.AlternatingRadiusSequence => SemanticElementId.AlternatingRadiusSequence,
             TrackPatternType.FullPipe => SemanticElementId.FullPipe,
             TrackPatternType.WallrideTurn => SemanticElementId.WallrideTurn,
+            TrackPatternType.WideTurnaround => SemanticElementId.WideTurnaround,
+            TrackPatternType.Horseshoe => SemanticElementId.Horseshoe,
+            TrackPatternType.Camelback => SemanticElementId.Camelback,
+            TrackPatternType.Cutback => SemanticElementId.Cutback,
+            TrackPatternType.HeartlineRoll => SemanticElementId.HeartlineRoll,
+            TrackPatternType.ZeroGRoll => SemanticElementId.ZeroGRoll,
+            TrackPatternType.DiveLoop => SemanticElementId.DiveLoop,
+            TrackPatternType.Sidewinder => SemanticElementId.Sidewinder,
             _ => SemanticElementId.None
         };
 
@@ -94,15 +103,56 @@ namespace TrackGeneration.Planning
         /// precisely itself is never overwritten. Recovery straights keep their own
         /// structural identity.
         /// </summary>
-        public static void StampRange(List<TrackMacroSectionDefinition> defs, int from, SemanticElementId element)
+        public static void StampRange(List<TrackMacroSectionDefinition> defs, int from,
+            SemanticElementId element, ResolvedTrackGenerationConfig cfg = null)
         {
+            TrackFeatureDefinition definition = null;
+            string definitionHash = "";
+            string primitiveSequence = "";
+            float entryBudget = 0f;
+            float recoveryBudget = 0f;
+            if (element != SemanticElementId.None &&
+                TrackFeatureDefinitionCatalog.TryGet(element, out definition))
+            {
+                definitionHash = definition.ComputeContentHash();
+                primitiveSequence = string.Join(">",
+                    definition.Primitives.ConvertAll(primitive => primitive.PrimitiveId));
+                if (cfg != null)
+                {
+                    entryBudget = definition.EntryLength.ResolvedPreferred(cfg.DesignSpeedMps) *
+                                  cfg.FeatureFitScale;
+                    recoveryBudget = definition.RecoveryLength.ResolvedPreferred(cfg.DesignSpeedMps) *
+                                     cfg.FeatureFitScale;
+                }
+            }
+
             for (int i = from; i < defs.Count; i++)
             {
                 var d = defs[i];
-                if (d == null || d.SemanticElement != SemanticElementId.None) continue;
-                d.SemanticElement = d.SectionType == TrackMacroSectionType.RecoveryStraight
-                    ? SemanticElementId.RecoverySection
-                    : element;
+                if (d == null) continue;
+                if (d.FeatureFitRole == FeatureFitRole.None)
+                    d.FeatureFitRole = d.SectionType == TrackMacroSectionType.RecoveryStraight
+                        ? FeatureFitRole.ExitRecovery
+                        : FeatureFitRole.Core;
+                if (d.SemanticElement == SemanticElementId.None)
+                    d.SemanticElement = d.SectionType == TrackMacroSectionType.RecoveryStraight
+                        ? SemanticElementId.RecoverySection
+                        : element;
+
+                // Definition-native solvers stamp themselves because they may refine the
+                // primitive sequence. Legacy builders keep their proven geometry but still
+                // carry the exact source-controlled asset identity. This makes every current
+                // feature tunable/versioned without changing its accepted shape in this
+                // migration slice.
+                if (definition != null && string.IsNullOrWhiteSpace(d.FeatureDefinitionId))
+                {
+                    d.FeatureDefinitionId = definition.StableId;
+                    d.FeatureDefinitionVersion = definition.DefinitionVersion;
+                    d.FeatureDefinitionContentHash = definitionHash;
+                    d.FeaturePrimitiveSequence = primitiveSequence;
+                    d.FeatureDefinitionEntryBudget = entryBudget;
+                    d.FeatureDefinitionRecoveryBudget = recoveryBudget;
+                }
             }
         }
 
@@ -207,8 +257,22 @@ namespace TrackGeneration.Planning
             result.ExitState = exitLocal;
 
             result.PlanDisplacement = new Vector2(Vector3.Dot(delta, rightH), Vector3.Dot(delta, fwdH));
-            result.HeadingContributionDeg = Vector3.SignedAngle(
+            float measuredHeading = Vector3.SignedAngle(
                 fwdH, SectionFrameBuilders.Flatten(frame.Forward), Vector3.up);
+            // A final direction at exactly 180° has no unique signed-angle answer:
+            // tiny radius-dependent floating error can report the same authored right
+            // reversal as either +180 or -180. Preserve the measured magnitude, but at
+            // that one ambiguous boundary take the sign from the emitted definitions'
+            // explicit heading contract. Non-reversals remain purely geometry-measured.
+            if (Mathf.Abs(Mathf.Abs(measuredHeading) - 180f) <= 0.25f)
+            {
+                float intendedHeading = 0f;
+                for (int i = from; i < to; i++)
+                    if (defs[i] != null) intendedHeading += defs[i].Contract.HeadingDeltaDegrees;
+                if (Mathf.Abs(intendedHeading) > 0.01f)
+                    measuredHeading = Mathf.Sign(intendedHeading) * Mathf.Abs(measuredHeading);
+            }
+            result.HeadingContributionDeg = measuredHeading;
             result.ElevationChange = delta.y;
             result.MinElevation = minY;
             result.MaxElevation = maxY;

@@ -1,0 +1,26 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.spiral-to-corkscrew",
+  "DefinitionVersion": 1,
+  "DisplayName": "Spiral To Corkscrew",
+  "Family": "Compound Inversion",
+  "Enabled": true,
+  "SemanticElement": 27,
+  "HasPatternType": true,
+  "PatternType": 6,
+  "TopologyRole": 0,
+  "Solver": 0,
+  "SpeedIntent": 2,
+  "RiskLevel": 3,
+  "RequiresRecoveryAfter": true,
+  "Length": { "Minimum": 1600.0, "Preferred": 3800.0, "Maximum": 7600.0, "Resolution": 3, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryLength": { "Minimum": 180.0, "Preferred": 450.0, "Maximum": 1000.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "RecoveryLength": { "Minimum": 180.0, "Preferred": 450.0, "Maximum": 1000.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryContract": { "Orientation": 0, "RequiresUprightEntry": false, "MaximumBankDegrees": 15.0, "MaximumPitchDegrees": 15.0, "MaximumHorizontalCurvature": 0.00125, "MaximumRollRateDegreesPerMeter": 0.05, "AcceptsCurvedEntry": true },
+  "ExitContract": { "Orientation": 0, "RollChangeDegrees": 360.0 },
+  "Primitives": [
+    { "PrimitiveId": "spiral", "DisplayName": "Spiral", "PrimitiveType": 13, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.6, "RadiusSource": 0, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "inline-corkscrew", "DisplayName": "Inline Corkscrew", "PrimitiveType": 4, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.4, "RadiusSource": 2, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false }
+  ],
+  "MinimumClearanceMeters": 70.0
+}

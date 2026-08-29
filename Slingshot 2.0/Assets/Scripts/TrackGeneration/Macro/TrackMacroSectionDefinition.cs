@@ -4,6 +4,19 @@ using UnityEngine;
 
 namespace TrackGeneration.Macro
 {
+    /// <summary>Why non-core road exists around or inside an authored feature.</summary>
+    public enum FeatureFitRole
+    {
+        None = 0,
+        Core = 1,
+        EntryWarmup = 2,
+        ExitRecovery = 3,
+        InternalTransition = 4,
+        StructuralConnector = 5,
+        VerticalRecovery = 6,
+        SharedCorridor = 7
+    }
+
     /// <summary>
     /// The readable gameplay section types for the V1 macro generator.
     /// A macro section is ONE intentional gameplay unit ("90 degree banked curve"),
@@ -258,11 +271,25 @@ namespace TrackGeneration.Macro
         [Tooltip("Net-zero vertical bump inside this section (meters): + = hill/bridge crest, - = dip/underpass. Ends return to entry height.")]
         public float HillHeight;
 
+        [Tooltip("Definition-native C2 vertical bump lobe count. Zero keeps the legacy single ordinary-road bump.")]
+        public int FeatureVerticalLobeCount;
+        public bool FeatureVerticalStartsWithDip;
+        public bool FeatureVerticalAlternates;
+
         [Tooltip("Quarter of the lap this def belongs to (0..3), stamped by the planner. -1 before stamping.")]
         public int QuarterIndex = -1;
 
         [Tooltip("Road within the quarter: 0 = canonical road (route A), 1 = alternate road (route B) of a Dual Road Quarter.")]
         public int RoadId;
+
+        [Tooltip("Stable V2 identity of the gameplay demand this definition realizes. Empty for connectors and structural sections.")]
+        public string TopologySlotId;
+
+        [Tooltip("Stable canonical order of the V2 topology slot. -1 for definitions outside a gameplay-demand slot.")]
+        public int TopologySlotOrder = -1;
+
+        [Tooltip("Order of the slot within its quarter/road route. Connector subdivisions never affect this value.")]
+        public int TopologySlotRouteOrder = -1;
 
         [Tooltip("AirGap only: signed lateral displacement of the landing relative to the launch lip, along the lip's right vector (meters). Dual-quarter choice jumps land offset from the flight midline; ordinary jumps leave this 0.")]
         public float PlanLateralOffset;
@@ -314,11 +341,32 @@ namespace TrackGeneration.Macro
         [Tooltip("Minimum legal length for this section (meters). The closure solver and budget fitter never shrink it below this. 0 = generic floor.")]
         public float MinimumLength;
 
+        [Tooltip("Feature-fitting purpose of this section. Lets the planner share entry/recovery corridors without relying on debug names.")]
+        public FeatureFitRole FeatureFitRole;
+
         [Tooltip("Turn-complex this section belongs to (same-direction turn bridges group their two corners + connector). Empty for standalone sections. Reporting/surface-pass metadata — does NOT change pattern atomicity.")]
         public string TurnComplexId;
 
         [Tooltip("Authoritative semantic identity of the element this section belongs to (Stage A). Default None = legacy data; consumers fall back to PatternId/type inference for None.")]
         public SemanticElementId SemanticElement;
+
+        [Tooltip("Stable source definition ID. Empty means this legacy section has not yet been compiled from a Feature Definition.")]
+        public string FeatureDefinitionId;
+
+        [Tooltip("Version of FeatureDefinitionId used to compile this section.")]
+        public int FeatureDefinitionVersion;
+
+        [Tooltip("Content hash of the exact Feature Definition used to compile this section.")]
+        public string FeatureDefinitionContentHash;
+
+        [Tooltip("Ordered, atomic reusable primitive IDs compiled into this feature. Generic connectors are never inserted between these primitives.")]
+        public string FeaturePrimitiveSequence;
+
+        [Tooltip("Preferred entry distance owned by the source definition, in resolved track meters. Kept as a planning budget until entry sections migrate into the definition compiler.")]
+        public float FeatureDefinitionEntryBudget;
+
+        [Tooltip("Preferred recovery distance owned by the source definition, in resolved track meters. Kept as a planning budget until recovery sections migrate into the definition compiler.")]
+        public float FeatureDefinitionRecoveryBudget;
 
         [Tooltip("Orientation/heading contract of this section, used by the sequence-grammar validator.")]
         public SectionConnectionContract Contract;

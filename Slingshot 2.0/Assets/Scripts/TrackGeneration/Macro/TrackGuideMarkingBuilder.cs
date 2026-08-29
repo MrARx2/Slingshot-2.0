@@ -31,7 +31,7 @@ namespace TrackGeneration.Macro
 
         public static void Build(List<GeneratedTrackSection> sections, TrackRoadProfileSettings profile,
             TrackVisualSettings visual, Transform root, Material persistentMaterial = null,
-            float designRoadWidth = 0f)
+            float designRoadWidth = 0f, Material persistentWallMarkerMaterial = null)
         {
             if (visual == null || (!visual.CenterGuideEnabled && !visual.WallMarkersEnabled)) return;
             if (profile == null || !profile.IsHalfPipe) return;
@@ -58,15 +58,12 @@ namespace TrackGeneration.Macro
             markingRoot.transform.SetParent(root, false);
 
             // Generated previews are deliberately excluded from scene serialization.
-            // A material created only in memory can therefore lose its shader/reference
-            // during editor recovery and render magenta. Production tracks receive a
-            // persistent project material; the runtime material remains a test/fallback.
-            Material guideMat = persistentMaterial != null
-                ? persistentMaterial
-                : MakeMaterial(visual.CenterGuideColor, visual.CenterGuideEmission);
-            Material markerMat = persistentMaterial != null
-                ? persistentMaterial
-                : MakeMaterial(visual.WallMarkerColor, 1f);
+            // Never invent in-memory materials here: they disappear across editor cache
+            // recovery and exact replay, which used to leave magenta guide meshes.
+            Material guideMat = persistentMaterial;
+            Material markerMat = persistentWallMarkerMaterial != null
+                ? persistentWallMarkerMaterial
+                : persistentMaterial;
 
             var chains = CollectChains(sections);
             int chunkIndex = 0;
@@ -574,16 +571,5 @@ namespace TrackGeneration.Macro
             // Deliberately NO collider: markings must never create physical geometry.
         }
 
-        private static Material MakeMaterial(Color color, float emission)
-        {
-            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-            if (shader == null) shader = Shader.Find("Unlit/Color");
-            var mat = new Material(shader) { name = "TrackGuideMarking" };
-            Color hdr = color * (1f + Mathf.Max(0f, emission));
-            hdr.a = color.a;
-            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", hdr);
-            if (mat.HasProperty("_Color")) mat.SetColor("_Color", hdr);
-            return mat;
-        }
     }
 }

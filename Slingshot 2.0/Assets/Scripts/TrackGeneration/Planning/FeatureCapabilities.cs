@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TrackGeneration.Definitions;
 using TrackGeneration.Macro;
 
 namespace TrackGeneration.Planning
@@ -57,12 +58,30 @@ namespace TrackGeneration.Planning
     public static class FeatureCapabilities
     {
         public static bool TryGet(SemanticElementId element, out FeatureCapability capability)
-            => Table.TryGetValue(element, out capability);
+        {
+            if (Table.TryGetValue(element, out capability)) return true;
+            if (!TrackFeatureDefinitionCatalog.TryGet(element, out TrackFeatureDefinition definition) ||
+                !definition.Enabled)
+                return false;
+            capability = FromDefinition(definition);
+            return true;
+        }
 
         public static FeatureCapability Get(SemanticElementId element)
-            => Table.TryGetValue(element, out var c) ? c : null;
+            => TryGet(element, out FeatureCapability capability) ? capability : null;
 
-        public static IEnumerable<FeatureCapability> All => Table.Values;
+        public static IEnumerable<FeatureCapability> All
+        {
+            get
+            {
+                foreach (FeatureCapability capability in Table.Values) yield return capability;
+                foreach (TrackFeatureDefinition definition in TrackFeatureDefinitionCatalog.All)
+                {
+                    if (definition.Enabled && !Table.ContainsKey(definition.SemanticElement))
+                        yield return FromDefinition(definition);
+                }
+            }
+        }
 
         private static readonly Dictionary<SemanticElementId, FeatureCapability> Table = Build();
 
@@ -91,8 +110,6 @@ namespace TrackGeneration.Planning
             Add(Corner(SemanticElementId.SweeperIntoHairpin, recovery: true,
                 notes: "VERIFIED Stage B: single-demand recipe; adjacent sweeper slot NOT absorbed (selection heuristic only)"));
             Add(Corner(SemanticElementId.WallrideTurn, recovery: true, notes: "extreme-bank exit — physical recovery"));
-            Add(Corner(SemanticElementId.AlternatingRadiusSequence));
-
             // ── Transfers ──
             FeatureCapability Transfer(SemanticElementId id) => new FeatureCapability
             {
@@ -104,6 +121,9 @@ namespace TrackGeneration.Planning
             };
             Add(Transfer(SemanticElementId.SCurve));
             Add(Transfer(SemanticElementId.Chicane));
+            // The authored pattern is two S-curves separated by a link and has
+            // net-zero heading. It is a transfer, not a corner realization.
+            Add(Transfer(SemanticElementId.AlternatingRadiusSequence));
             Add(Transfer(SemanticElementId.ClosureTransfer));
             Add(Transfer(SemanticElementId.QuarterTransfer));
 
@@ -214,5 +234,22 @@ namespace TrackGeneration.Planning
 
             return t;
         }
+
+        private static FeatureCapability FromDefinition(TrackFeatureDefinition definition) =>
+            new FeatureCapability
+            {
+                Element = definition.SemanticElement,
+                Role = definition.TopologyRole,
+                RequiresUprightEntry = definition.EntryContract.RequiresUprightEntry,
+                MaxEntryBankDeg = definition.EntryContract.MaximumBankDegrees,
+                MaxEntryPitchDeg = definition.EntryContract.MaximumPitchDegrees,
+                MaxEntryHorizontalCurvature = definition.EntryContract.MaximumHorizontalCurvature,
+                MaxEntryRollRateDegPerM = definition.EntryContract.MaximumRollRateDegreesPerMeter,
+                AcceptsCurvedEntry = definition.EntryContract.AcceptsCurvedEntry,
+                RequiresRecoveryAfter = definition.RequiresRecoveryAfter,
+                EmitsOwnApproach = definition.EmitsOwnApproach,
+                EmitsOwnRecovery = definition.EmitsOwnRecovery,
+                Notes = $"Definition-native capability: {definition.StableId} v{definition.DefinitionVersion}"
+            };
     }
 }

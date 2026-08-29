@@ -49,6 +49,8 @@ namespace TrackGeneration.Planning
                 List<Node> nodes = BuildNodes(chain, cfg);
                 if (nodes.Count < 2) continue;
 
+                bool closed = IsClosedChain(chain);
+
                 float transitionLength = Mathf.Max(1f,
                     Mathf.Max(cfg.WidthTransitionLength, cfg.CrossSectionTransitionLength));
 
@@ -56,6 +58,14 @@ namespace TrackGeneration.Planning
                 // BEFORE rate limiting — a rate limiter faithfully tracks whatever targets it is
                 // given, so an incidental neutral target survives it as a visible valley.
                 BlendPassThroughHeights(nodes, transitionLength);
+
+                // A lap is cyclic, but its first and last subdivision frames are two
+                // serialized copies of the same physical weld. Treat that seam as one
+                // design boundary before rate limiting. Previously those copies could
+                // independently request (for example) normal and banked wall heights,
+                // producing the recurring 2.08 m section N -> 0 discontinuity.
+                if (closed)
+                    ShareClosedEndpointContract(nodes);
 
                 var widths = new float[nodes.Count];
                 var heights = new float[nodes.Count];
@@ -126,7 +136,68 @@ namespace TrackGeneration.Planning
                 chain.Add(section);
                 previous = section;
             }
+
+            // The canonical road may be split at the list boundary even though the
+            // physical road is continuous there. Join those pieces so blending and
+            // rate limiting can see road on both sides of the lap seam.
+            if (output.Count > 1)
+            {
+                List<GeneratedTrackSection> first = output[0];
+                List<GeneratedTrackSection> last = output[output.Count - 1];
+                if (CanWeld(last[last.Count - 1], first[0]))
+                {
+                    last.AddRange(first);
+                    output.RemoveAt(0);
+                }
+            }
             return output;
+        }
+
+        private static bool CanWeld(GeneratedTrackSection before,
+            GeneratedTrackSection after) =>
+            before != null && after != null &&
+            !before.IsEmptySpace && !after.IsEmptySpace &&
+            before.SubdivisionFrames != null && before.SubdivisionFrames.Length > 1 &&
+            after.SubdivisionFrames != null && after.SubdivisionFrames.Length > 1 &&
+            !before.OpenEnd && !after.OpenStart &&
+            before.RoadId == after.RoadId &&
+            (before.EndFrame.Position - after.StartFrame.Position).sqrMagnitude <= WeldToleranceSqr;
+
+        private static bool IsClosedChain(List<GeneratedTrackSection> chain) =>
+            chain != null && chain.Count > 0 &&
+            CanWeld(chain[chain.Count - 1], chain[0]);
+
+        private static void ShareClosedEndpointContract(List<Node> nodes)
+        {
+            if (nodes == null || nodes.Count < 2) return;
+            Node first = nodes[0];
+            Node last = nodes[nodes.Count - 1];
+            if ((first.Position - last.Position).sqrMagnitude > WeldToleranceSqr) return;
+
+            float width = SharedValue(first.DesiredWidth, first.WidthLocked,
+                last.DesiredWidth, last.WidthLocked);
+            float height = SharedValue(first.DesiredSideHeight, first.SideHeightLocked,
+                last.DesiredSideHeight, last.SideHeightLocked);
+
+            first.DesiredWidth = last.DesiredWidth = width;
+            first.DesiredSideHeight = last.DesiredSideHeight = height;
+            // Lock both serialized copies to their shared contract. The alternating
+            // projection then propagates the same legal transition inward from both
+            // sides instead of letting either endpoint drift away again.
+            first.WidthLocked = last.WidthLocked = true;
+            first.SideHeightLocked = last.SideHeightLocked = true;
+            first.HeightAnchor = last.HeightAnchor = true;
+        }
+
+        private static float SharedValue(float a, bool aLocked, float b, bool bLocked)
+        {
+            // Match the internal-weld ownership rule: the section after a weld owns
+            // the shared boundary when it is authored. At the lap seam that is the
+            // first section. This preserves its exact feature mouth rather than
+            // averaging two protected contracts into a shape authored by neither.
+            if (aLocked) return a;
+            if (bLocked) return b;
+            return 0.5f * (a + b);
         }
 
         private static List<Node> BuildNodes(List<GeneratedTrackSection> chain,

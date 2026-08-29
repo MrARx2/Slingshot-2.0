@@ -1,0 +1,26 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.immelmann",
+  "DefinitionVersion": 1,
+  "DisplayName": "Immelmann",
+  "Family": "Inversion",
+  "Enabled": true,
+  "SemanticElement": 24,
+  "HasPatternType": true,
+  "PatternType": 4,
+  "TopologyRole": 1,
+  "Solver": 0,
+  "SpeedIntent": 2,
+  "RiskLevel": 3,
+  "RequiresRecoveryAfter": true,
+  "Length": { "Minimum": 700.0, "Preferred": 1700.0, "Maximum": 3600.0, "Resolution": 3, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryLength": { "Minimum": 180.0, "Preferred": 450.0, "Maximum": 1000.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "RecoveryLength": { "Minimum": 180.0, "Preferred": 450.0, "Maximum": 1000.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryContract": { "Orientation": 0, "RequiresUprightEntry": true, "MaximumBankDegrees": 8.0, "MaximumPitchDegrees": 12.0, "MaximumHorizontalCurvature": 0.0008333333, "MaximumRollRateDegreesPerMeter": 0.05, "AcceptsCurvedEntry": true },
+  "ExitContract": { "Orientation": 0, "HeadingChangeDegrees": 180.0, "PitchChangeDegrees": 0.0, "RollChangeDegrees": 0.0, "ElevationChangeMeters": 0.0 },
+  "Primitives": [
+    { "PrimitiveId": "half-loop", "DisplayName": "Half Loop", "PrimitiveType": 3, "EntryOrientation": 0, "ExitOrientation": 1, "LengthFraction": 0.65, "RadiusSource": 1, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "upright-rollout", "DisplayName": "Upright Rollout", "PrimitiveType": 6, "EntryOrientation": 1, "ExitOrientation": 0, "LengthFraction": 0.35, "RadiusSource": 0, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false }
+  ],
+  "MinimumClearanceMeters": 55.0
+}

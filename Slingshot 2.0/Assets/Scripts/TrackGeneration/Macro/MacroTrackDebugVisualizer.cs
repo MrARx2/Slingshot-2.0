@@ -47,6 +47,9 @@ namespace TrackGeneration.Macro
         [Tooltip("The resolved half-pipe road profile the mesh was built with (for cross-section debug drawing).")]
         public TrackRoadProfileSettings RoadProfile;
 
+        [System.NonSerialized, HideInInspector]
+        public string HighlightedTopologySlotId;
+
         [Header("Draw Toggles")]
         public bool ShowLabels = true;
         public bool ShowFrames = true;
@@ -157,7 +160,8 @@ namespace TrackGeneration.Macro
 
         private void OnDrawGizmos()
         {
-            if (Level == TrackDebugVisualizationLevel.Off) return;
+            bool hasSlotHighlight = !string.IsNullOrEmpty(HighlightedTopologySlotId);
+            if (Level == TrackDebugVisualizationLevel.Off && !hasSlotHighlight) return;
             if (Sections == null || Sections.Count == 0) return;
 
             UpdateStrideBoost();
@@ -403,6 +407,9 @@ namespace TrackGeneration.Macro
 #endif
             }
 
+            if (hasSlotHighlight)
+                DrawTopologySlotHighlight(toWorld);
+
 #if UNITY_EDITOR
             if (showSectionLabels)
             {
@@ -411,6 +418,56 @@ namespace TrackGeneration.Macro
                     UnityEditor.Handles.Label(seedPos, $"Seed: {Seed}   Sections: {Sections.Count}   Length: {Sections[Sections.Count - 1].EndFrame.ArcLength:F0}m");
             }
 #endif
+        }
+
+        private void DrawTopologySlotHighlight(Matrix4x4 toWorld)
+        {
+            Color centerColor = new Color(1f, 0.72f, 0.12f, 1f);
+            Color edgeColor = new Color(0.2f, 1f, 1f, 0.95f);
+            bool drewEntry = false;
+            TrackConnectionFrame finalFrame = default;
+
+            for (int i = 0; i < Sections.Count; i++)
+            {
+                GeneratedTrackSection section = Sections[i];
+                if (section == null || !string.Equals(section.TopologySlotId,
+                        HighlightedTopologySlotId, System.StringComparison.Ordinal))
+                    continue;
+
+                TrackConnectionFrame[] frames = section.SubdivisionFrames;
+                if (frames == null || frames.Length < 2)
+                    frames = new[] { section.StartFrame, section.EndFrame };
+
+                if (!drewEntry)
+                {
+                    Vector3 entry = toWorld.MultiplyPoint3x4(frames[0].Position);
+                    Gizmos.color = centerColor;
+                    Gizmos.DrawWireSphere(entry, 3f);
+                    drewEntry = true;
+                }
+
+                int stride = Mathf.Max(1, frames.Length / 80);
+                for (int f = stride; f < frames.Length; f += stride)
+                {
+                    TrackConnectionFrame a = frames[Mathf.Max(0, f - stride)];
+                    TrackConnectionFrame b = frames[f];
+                    Gizmos.color = centerColor;
+                    Gizmos.DrawLine(toWorld.MultiplyPoint3x4(a.Position + a.Up * 1.5f),
+                        toWorld.MultiplyPoint3x4(b.Position + b.Up * 1.5f));
+
+                    Gizmos.color = edgeColor;
+                    Gizmos.DrawLine(
+                        toWorld.MultiplyPoint3x4(b.Position - b.Right * b.Width * 0.5f + b.Up),
+                        toWorld.MultiplyPoint3x4(b.Position + b.Right * b.Width * 0.5f + b.Up));
+                }
+                finalFrame = frames[frames.Length - 1];
+            }
+
+            if (drewEntry)
+            {
+                Gizmos.color = centerColor;
+                Gizmos.DrawWireSphere(toWorld.MultiplyPoint3x4(finalFrame.Position), 3f);
+            }
         }
 
         // Scratch buffer for the parametric cross-section polyline.

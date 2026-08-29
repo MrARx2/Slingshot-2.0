@@ -125,18 +125,51 @@ namespace TrackGeneration.Macro
         /// Never returns a negative value — no hidden dips below the section baseline.
         /// </summary>
         public float HeightAt(float normalizedX, float halfWidth, float sideHeight)
-            => HeightAt(normalizedX, halfWidth, sideHeight, Mathf.Clamp01(CenterFlatWidthRatio), WallCurve01);
+        {
+            ResolveCircularBowl(halfWidth, sideHeight, 0f,
+                out float flat, out float curve, out float evaluatedSideHeight);
+            return HeightAt(normalizedX, halfWidth, evaluatedSideHeight, flat, curve);
+        }
 
         /// <summary>
-        /// Circular-arc wall height with explicit flat ratio and wall curve (dynamic
-        /// turn rounding varies both per frame).
+        /// Resolves the ordinary-road bowl as a true circular arc. Width/depth and turn
+        /// rounding may move the floor-to-wall shoulder, but they cannot change the
+        /// wall's 90-degree sweep or stretch the arc into an ellipse. Explicit feature
+        /// signals (wallride/pipe morphs) are applied later by TrackCrossSection.
+        /// </summary>
+        public void ResolveCircularBowl(float halfWidth, float sideHeight, float rounding,
+            out float flat, out float curve, out float evaluatedSideHeight)
+        {
+            halfWidth = Mathf.Max(0.01f, halfWidth);
+            if (!IsHalfPipe)
+            {
+                flat = Mathf.Clamp01(CenterFlatWidthRatio);
+                curve = Mathf.Clamp01(WallCurve01);
+                evaluatedSideHeight = sideHeight;
+                return;
+            }
+
+            float depthScale = Mathf.Max(0.0001f, ShapeDepthScale);
+            float baseRadius = Mathf.Clamp(sideHeight * depthScale, 0.01f, halfWidth);
+            float roundedRadius = Mathf.Clamp(
+                halfWidth * (1f - Mathf.Clamp01(MinTurnCenterFlatRatio)),
+                baseRadius, halfWidth);
+            float radius = Mathf.Lerp(baseRadius, roundedRadius, Mathf.Clamp01(rounding));
+
+            flat = Mathf.Clamp01(1f - radius / halfWidth);
+            curve = 1f;
+            evaluatedSideHeight = radius / depthScale;
+        }
+
+        /// <summary>
+        /// Circular-arc wall height with explicit flat ratio and wall curve. Ordinary
+        /// half-pipe roads pass coherent values from ResolveCircularBowl; the explicit
+        /// arguments remain available for authored special-feature transitions.
         ///
         /// The wall is a CIRCULAR ARC of sweep θ = curve·90° spanning the rising span
         /// E = halfWidth·(1−flat): radius r = E/sinθ, h(x) = r − √(r² − x²). When
-        /// sideHeight == E (the resolver guarantees this at the designed width) the
-        /// wall is a true circle — at curve 1 a perfect quarter circle with a vertical
-        /// tip. Frames with boosted/overridden side heights scale the arc vertically
-        /// (a quarter ellipse), keeping the same footprint and flat-tangent base.
+        /// sideHeight == E the wall is a true circle — at curve 1 a perfect quarter
+        /// circle with a vertical tip.
         /// </summary>
         public float HeightAt(float normalizedX, float halfWidth, float sideHeight, float flat, float curve01)
         {
@@ -166,7 +199,11 @@ namespace TrackGeneration.Macro
 
         /// <summary>Wall TIP height for the profile's own flat ratio and curve.</summary>
         public float ClampedSideHeight(float halfWidth, float sideHeight)
-            => ClampedSideHeight(halfWidth, sideHeight, Mathf.Clamp01(CenterFlatWidthRatio), WallCurve01);
+        {
+            ResolveCircularBowl(halfWidth, sideHeight, 0f,
+                out float flat, out float curve, out float evaluatedSideHeight);
+            return ClampedSideHeight(halfWidth, evaluatedSideHeight, flat, curve);
+        }
 
         /// <summary>
         /// Wall TIP height (name kept from the legacy wall-angle clamp API). The arc

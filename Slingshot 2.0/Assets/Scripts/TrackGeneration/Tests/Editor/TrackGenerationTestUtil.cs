@@ -36,11 +36,12 @@ namespace TrackGeneration.Tests
             }
         }
 
-        /// <summary>Fast settings for bulk tests: first valid candidate, preset attempt budget, coarse rings (tests exercise logic, not mesh density).</summary>
+        /// <summary>Fast settings for bulk tests: first valid candidate and adaptive coarse rings (tests exercise logic, not production texture density).</summary>
         public static TrackDesignerSettings FastSettings(string presetName)
         {
             var s = TrackStylePresetLibrary.Create(presetName);
             s.Generation.SelectionMode = CandidateSelectionMode.FirstValid;
+            s.Generation.ConsistentTextureTopology = false;
             s.Generation.MetersPerRing = 2.5f;
             return s;
         }

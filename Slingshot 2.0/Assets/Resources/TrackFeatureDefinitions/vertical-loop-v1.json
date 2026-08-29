@@ -1,0 +1,98 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.vertical-loop",
+  "DefinitionVersion": 1,
+  "DisplayName": "Vertical Loop",
+  "Family": "Inversion",
+  "Enabled": true,
+  "SemanticElement": 20,
+  "HasPatternType": true,
+  "PatternType": 1,
+  "TopologyRole": 0,
+  "Solver": 1,
+  "SpeedIntent": 3,
+  "RiskLevel": 3,
+  "RequiresRecoveryAfter": false,
+  "EmitsOwnApproach": false,
+  "EmitsOwnRecovery": false,
+  "Length": {
+    "Minimum": 1225.99,
+    "Preferred": 4214.33,
+    "Maximum": 4597.46,
+    "Resolution": 1,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": false,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "EntryLength": {
+    "Minimum": 541.68,
+    "Preferred": 812.50,
+    "Maximum": 1083.34,
+    "Resolution": 0,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "RecoveryLength": {
+    "Minimum": 361.12,
+    "Preferred": 631.94,
+    "Maximum": 902.78,
+    "Resolution": 0,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "EntryContract": {
+    "Orientation": 0,
+    "RequiresUprightEntry": true,
+    "MaximumBankDegrees": 8.0,
+    "MaximumPitchDegrees": 12.0,
+    "MaximumHorizontalCurvature": 0.0008333333,
+    "MaximumRollRateDegreesPerMeter": 0.05,
+    "AcceptsCurvedEntry": true
+  },
+  "ExitContract": {
+    "Orientation": 0,
+    "HeadingChangeDegrees": 0.0,
+    "PitchChangeDegrees": 360.0,
+    "RollChangeDegrees": 0.0,
+    "ElevationChangeMeters": 0.0
+  },
+  "Loop": {
+    "FirstHalfRadius": { "Minimum": 160.0, "Preferred": 550.0, "Maximum": 600.0 },
+    "SecondHalfRadius": { "Minimum": 160.0, "Preferred": 550.0, "Maximum": 600.0 },
+    "VerticalRotationUnits": 4,
+    "AllowedVerticalRotationUnits": [4],
+    "DegreesPerUnit": 90.0,
+    "LimbSeparationYawDegrees": { "Minimum": 15.0, "Preferred": 30.0, "Maximum": 60.0 },
+    "LimbSeparationYawCandidates": [15.0, 20.0, 30.0, 45.0, 60.0],
+    "CurvatureEase": { "Minimum": 0.18, "Preferred": 0.18, "Maximum": 0.18 }
+  },
+  "Primitives": [
+    {
+      "PrimitiveId": "half-loop-up",
+      "DisplayName": "Half Loop Up",
+      "PrimitiveType": 3,
+      "EntryOrientation": 0,
+      "ExitOrientation": 1,
+      "LengthFraction": 0.5,
+      "RadiusSource": 1,
+      "ContinueCurvature": true,
+      "ContinueRollRate": true,
+      "AllowGenericConnectorBefore": false
+    },
+    {
+      "PrimitiveId": "half-loop-down",
+      "DisplayName": "Half Loop Down",
+      "PrimitiveType": 3,
+      "EntryOrientation": 1,
+      "ExitOrientation": 0,
+      "LengthFraction": 0.5,
+      "RadiusSource": 2,
+      "ContinueCurvature": true,
+      "ContinueRollRate": true,
+      "AllowGenericConnectorBefore": false
+    }
+  ],
+  "MinimumClearanceMeters": 45.0
+}

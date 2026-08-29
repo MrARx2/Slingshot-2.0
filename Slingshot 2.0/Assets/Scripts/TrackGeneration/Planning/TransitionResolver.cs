@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -19,16 +20,34 @@ namespace TrackGeneration.Planning
     }
 
     /// <summary>One resolved boundary decision with its per-channel reasoning.</summary>
+    [Serializable]
     public sealed class TransitionDecision
     {
         public TransitionKind Kind;
         public string From = "", To = "";
+
+        /// <summary>Stable section identities used to correlate this shadow decision with the built layout.</summary>
+        public int FromSectionIndex = -1, ToSectionIndex = -1;
+
+        /// <summary>Every connector section crossed between From and To, in track order.</summary>
+        public List<int> ConnectorSectionIndices = new List<int>();
+
+        /// <summary>Snapshot of the connector authority that actually shaped those sections.</summary>
+        public List<ConnectorBehavior> ActualConnectorBehaviors = new List<ConnectorBehavior>();
 
         /// <summary>Shortest legal transition (m). 0 for DirectWeld.</summary>
         public float MinBlendLength;
 
         /// <summary>Run currently available between the pair (connector straights), meters.</summary>
         public float AvailableLength;
+
+        // Physical boundary state. These structured values keep diagnostics useful to
+        // tools/tests without requiring them to parse the human-readable channel text.
+        public float ExitBankDeg, EntryBankDeg;
+        public float ExitPitchDeg, EntryPitchDeg;
+        public float ExitRollRateDegPerM, EntryRollRateDegPerM;
+        public float ExitWidth, EntryWidth;
+        public float ExitHorizontalCurvature, EntryHorizontalCurvature;
 
         /// <summary>Per-channel demands, e.g. "bank 34.2° → 155m". Empty for DirectWeld.</summary>
         public List<string> ChannelDemands = new List<string>();
@@ -45,6 +64,9 @@ namespace TrackGeneration.Planning
                 sb.Append($" | {string.Join(", ", ChannelDemands)}");
             if (!string.IsNullOrEmpty(Reason))
                 sb.Append($" | {Reason}");
+            sb.Append($" | state bank {ExitBankDeg:F1}->{EntryBankDeg:F1}deg, pitch {ExitPitchDeg:F1}->{EntryPitchDeg:F1}deg, " +
+                      $"rollRate {ExitRollRateDegPerM:F3}->{EntryRollRateDegPerM:F3}deg/m, " +
+                      $"width {ExitWidth:F1}->{EntryWidth:F1}m, curvature {ExitHorizontalCurvature:F5}->{EntryHorizontalCurvature:F5}/m");
             return sb.ToString();
         }
     }
@@ -82,6 +104,8 @@ namespace TrackGeneration.Planning
                 int j = (i + 1) % n;
                 int guard = 0;
                 bool crossedAirGap = false;
+                var connectorIndices = new List<int>();
+                var connectorBehaviors = new List<ConnectorBehavior>();
                 while (guard++ < n)
                 {
                     var s = sections[j];
@@ -89,6 +113,11 @@ namespace TrackGeneration.Planning
                     if (s.IsEmptySpace) { crossedAirGap = true; break; }   // jumps own their boundary
                     if (IsContent(s)) break;
                     run += s.Definition.Length;
+                    if (s.Definition.IsStraightFamily)
+                    {
+                        connectorIndices.Add(s.SectionIndex);
+                        connectorBehaviors.Add(s.Definition.ConnectorBehavior);
+                    }
                     j = (j + 1) % n;
                 }
                 if (crossedAirGap || guard >= n || j == i) continue;
@@ -105,7 +134,7 @@ namespace TrackGeneration.Planning
                 if (prev.RoadId != next.RoadId || prev.OpenEnd || next.OpenStart)
                     continue;
 
-                decisions.Add(Decide(prev, next, run, cfg));
+                decisions.Add(Decide(prev, next, run, cfg, connectorIndices, connectorBehaviors));
             }
 
             return decisions;
@@ -116,13 +145,28 @@ namespace TrackGeneration.Planning
                s.Definition.SectionType != TrackMacroSectionType.AirGap;
 
         private static TransitionDecision Decide(GeneratedTrackSection prev, GeneratedTrackSection next,
-            float availableRun, ResolvedTrackGenerationConfig cfg)
+            float availableRun, ResolvedTrackGenerationConfig cfg,
+            List<int> connectorIndices, List<ConnectorBehavior> connectorBehaviors)
         {
             var d = new TransitionDecision
             {
                 From = Name(prev),
                 To = Name(next),
-                AvailableLength = availableRun
+                FromSectionIndex = prev.SectionIndex,
+                ToSectionIndex = next.SectionIndex,
+                AvailableLength = availableRun,
+                ConnectorSectionIndices = connectorIndices ?? new List<int>(),
+                ActualConnectorBehaviors = connectorBehaviors ?? new List<ConnectorBehavior>(),
+                ExitBankDeg = prev.EndFrame.BankAngle,
+                EntryBankDeg = next.StartFrame.BankAngle,
+                ExitPitchDeg = prev.EndFrame.PitchAngle,
+                EntryPitchDeg = next.StartFrame.PitchAngle,
+                ExitRollRateDegPerM = prev.EndFrame.RoadRollRate,
+                EntryRollRateDegPerM = next.StartFrame.RoadRollRate,
+                ExitWidth = prev.EndFrame.Width,
+                EntryWidth = next.StartFrame.Width,
+                ExitHorizontalCurvature = prev.EndFrame.HorizontalCurvature,
+                EntryHorizontalCurvature = next.StartFrame.HorizontalCurvature
             };
 
             // 1. Physically required recovery wins outright — deliberate, not padding.

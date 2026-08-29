@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using TrackGeneration.Design;
+using TrackGeneration.Definitions;
 using TrackGeneration.Macro;
 
 namespace TrackGeneration.Planning
@@ -38,8 +40,11 @@ namespace TrackGeneration.Planning
     public static class SectionDefs
     {
         public static TrackMacroSectionDefinition Straight(TrackMacroSectionType type, float length, float width,
-            string name, bool locked = false, string patternId = null)
+            string name, bool locked = false, string patternId = null,
+            FeatureFitRole fitRole = FeatureFitRole.None)
         {
+            length = Mathf.Min(Mathf.Max(0f, length),
+                SectionFrameBuilders.MaxStraightSectionLength);
             return new TrackMacroSectionDefinition
             {
                 SectionType = type,
@@ -49,6 +54,7 @@ namespace TrackGeneration.Planning
                 SpeedIntent = SectionSpeedIntent.Fast,
                 RiskLevel = SectionRiskLevel.Safe,
                 LockLength = locked,
+                FeatureFitRole = fitRole,
                 DebugName = name,
                 PatternId = patternId,
                 Contract = SectionConnectionContract.Level()
@@ -287,7 +293,7 @@ namespace TrackGeneration.Planning
             if (!JumpBallistics.TrySolve(cfg, ref rng, out var s)) return false;
 
             var approach = SectionDefs.Straight(TrackMacroSectionType.BoostStraight, cfg.JumpApproachLength, cfg.RoadWidth,
-                "JumpApproach", locked: true, patternId);
+                "JumpApproach", locked: true, patternId, FeatureFitRole.EntryWarmup);
             approach.AllowsBoost = true;
             approach.SpeedIntent = SectionSpeedIntent.FullThrottle;
             output.Add(approach);
@@ -404,7 +410,7 @@ namespace TrackGeneration.Planning
             List<TrackMacroSectionDefinition> output)
         {
             output.Add(SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight, cfg.JumpRecoveryLength, cfg.RoadWidth,
-                "RecoveryStraight", locked: true, patternId));
+                "RecoveryStraight", locked: true, patternId, FeatureFitRole.ExitRecovery));
         }
     }
 
@@ -430,8 +436,9 @@ namespace TrackGeneration.Planning
             inner.RemoveAt(inner.Count - 1);
             output.AddRange(inner);
 
-            float radius = Mathf.Lerp(cfg.MinCurveRadius, cfg.MaxCurveRadius, 0.5f);
             float angle = 35f;
+            float radius = SectionFrameBuilders.ClampDesignerSCurveRadius(angle,
+                Mathf.Lerp(cfg.MinCurveRadius, cfg.MaxCurveRadius, 0.5f));
             SectionTurnDirection dir = rng.NextBool() ? SectionTurnDirection.Right : SectionTurnDirection.Left;
 
             output.Add(new TrackMacroSectionDefinition
@@ -452,7 +459,7 @@ namespace TrackGeneration.Planning
             });
 
             output.Add(SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight, cfg.JumpRecoveryLength, cfg.RoadWidth,
-                "RecoveryStraight", locked: true, patternId));
+                "RecoveryStraight", locked: true, patternId, FeatureFitRole.ExitRecovery));
             return true;
         }
     }
@@ -470,20 +477,42 @@ namespace TrackGeneration.Planning
 
         public bool TryPlan(ResolvedTrackGenerationConfig cfg, string patternId, ref Unity.Mathematics.Random rng,
             List<TrackMacroSectionDefinition> output)
+            => TrackFeatureDefinitionCompiler.TryPlanPattern(PatternType, cfg, patternId, ref rng, output);
+
+        /// <summary>
+        /// Proven V2 geometry solver retained behind the definition compiler. Keep its
+        /// random draw order stable while the numeric controls migrate into definition data.
+        /// </summary>
+        internal static bool TryPlanLegacy(TrackFeatureDefinition definition,
+            ResolvedTrackGenerationConfig cfg, string patternId,
+            ref Unity.Mathematics.Random rng, List<TrackMacroSectionDefinition> output)
         {
-            float radius = rng.NextFloat(cfg.MinLoopRadius, cfg.MaxLoopRadius);
-            float secondRadius = rng.NextFloat(cfg.MinLoopRadius, cfg.MaxLoopRadius);
-            int units = PickFullRotationUnits(cfg.AllowedLoopRotationUnits,
-                cfg.MaxLoopRotationUnits, ref rng);
+            float firstMinRadius = Mathf.Max(cfg.MinLoopRadius, definition.Loop.FirstHalfRadius.Minimum);
+            float firstMaxRadius = Mathf.Min(cfg.MaxLoopRadius, definition.Loop.FirstHalfRadius.Maximum);
+            float secondMinRadius = Mathf.Max(cfg.MinLoopRadius, definition.Loop.SecondHalfRadius.Minimum);
+            float secondMaxRadius = Mathf.Min(cfg.MaxLoopRadius, definition.Loop.SecondHalfRadius.Maximum);
+            if (firstMinRadius > firstMaxRadius || secondMinRadius > secondMaxRadius) return false;
+
+            float radius = rng.NextFloat(firstMinRadius, firstMaxRadius);
+            float secondRadius = rng.NextFloat(secondMinRadius, secondMaxRadius);
+            int[] allowedUnits = IntersectAllowedUnits(cfg.AllowedLoopRotationUnits,
+                definition.Loop.AllowedVerticalRotationUnits);
+            int definitionMaximumUnits = allowedUnits.Length > 0
+                ? allowedUnits[allowedUnits.Length - 1]
+                : definition.Loop.VerticalRotationUnits;
+            int units = PickFullRotationUnits(allowedUnits,
+                Mathf.Min(cfg.MaxLoopRotationUnits, definitionMaximumUnits), ref rng);
             if (units <= 0) return false;
 
             // A full eased 360-degree centerline otherwise returns almost exactly onto
             // its entry limb. Give each half a temporary, zero-end-rate yaw so the loop
             // is spatially offset while its exit heading remains closure-friendly.
             float sign = rng.NextBool() ? 1f : -1f;
-            float[] biasCandidates = { 15f, 20f, 30f, 45f, 60f };
-            float requiredClearance = cfg.RoadWidth * 1.05f;
-            for (int i = 0; i < biasCandidates.Length; i++)
+            List<float> biasCandidates = definition.Loop.LimbSeparationYawCandidates;
+            if (biasCandidates == null || biasCandidates.Count == 0) return false;
+            float requiredClearance = Mathf.Max(cfg.RoadWidth * 1.05f,
+                definition.MinimumClearanceMeters);
+            for (int i = 0; i < biasCandidates.Count; i++)
             {
                 var candidate = MakeLoopDef(cfg, radius, patternId, units, secondRadius, 0f,
                     sign * biasCandidates[i]);
@@ -506,6 +535,18 @@ namespace TrackGeneration.Planning
             foreach (int units in allowed)
                 if (units >= 2 && units <= maximum) legal.Add(units);
             return legal.Count > 0 ? legal[rng.NextInt(legal.Count)] : Mathf.Min(fallback, maximum);
+        }
+
+        internal static int[] IntersectAllowedUnits(int[] rulebookUnits, List<int> definitionUnits)
+        {
+            if (rulebookUnits == null) return new int[0];
+            if (definitionUnits == null || definitionUnits.Count == 0)
+                return (int[])rulebookUnits.Clone();
+
+            var allowed = new List<int>();
+            foreach (int units in rulebookUnits)
+                if (definitionUnits.Contains(units)) allowed.Add(units);
+            return allowed.ToArray();
         }
 
         internal static int PickFullRotationUnits(int[] allowed, int maximum,
@@ -639,12 +680,27 @@ namespace TrackGeneration.Planning
 
         public bool TryPlan(ResolvedTrackGenerationConfig cfg, string patternId, ref Unity.Mathematics.Random rng,
             List<TrackMacroSectionDefinition> output)
+            => TrackFeatureDefinitionCompiler.TryPlanPattern(PatternType, cfg, patternId, ref rng, output);
+
+        /// <summary>
+        /// Proven V2 geometry solver retained behind the definition compiler. Keep its
+        /// random draw order stable while the numeric controls migrate into definition data.
+        /// </summary>
+        internal static bool TryPlanLegacy(TrackFeatureDefinition definition,
+            ResolvedTrackGenerationConfig cfg, string patternId,
+            ref Unity.Mathematics.Random rng, List<TrackMacroSectionDefinition> output)
         {
-            int units = FullLoopPattern.PickFullRotationUnits(cfg.AllowedCorkscrewRotationUnits,
-                cfg.MaxCorkscrewRotationUnits, ref rng);
+            int[] allowedUnits = FullLoopPattern.IntersectAllowedUnits(
+                cfg.AllowedCorkscrewRotationUnits, definition.Corkscrew.AllowedRoadRollUnits);
+            int definitionMaximumUnits = allowedUnits.Length > 0
+                ? allowedUnits[allowedUnits.Length - 1]
+                : definition.Corkscrew.RoadRollUnits;
+            int units = FullLoopPattern.PickFullRotationUnits(allowedUnits,
+                Mathf.Min(cfg.MaxCorkscrewRotationUnits, definitionMaximumUnits), ref rng);
             if (units <= 0) return false;
             output.Add(MakeCorkscrewDef(cfg, ref rng,
-                units * cfg.RotationUnitDegrees * (rng.NextBool() ? 1f : -1f), patternId));
+                units * cfg.RotationUnitDegrees * (rng.NextBool() ? 1f : -1f), patternId,
+                featureDefinition: definition));
             return true;
         }
 
@@ -664,10 +720,12 @@ namespace TrackGeneration.Planning
         ///
         /// Fewer, correctly-shaped revolutions beat more degenerate ones.
         /// </summary>
-        private static int ClampUnitsToAchievableBarrel(ResolvedTrackGenerationConfig cfg, int units)
+        private static int ClampUnitsToAchievableBarrel(
+            ResolvedTrackGenerationConfig cfg, int units, float barrelClearanceMultiplier,
+            float maximumLength)
         {
             float barrelRadius = Mathf.Clamp(
-                cfg.RoadWidth * 0.5f * CorkscrewBarrelClearance,
+                cfg.RoadWidth * 0.5f * barrelClearanceMultiplier,
                 cfg.MinCorkscrewRadius, cfg.MaxCorkscrewRadius);
 
             float orbitLimitRad = Mathf.Max(4f,
@@ -678,7 +736,7 @@ namespace TrackGeneration.Planning
             //
             // The envelope belongs here too: without it this over-estimates how many
             // revolutions fit, because it assumes a lean the builder never applies.
-            float maxRevolutions = cfg.MaxCorkscrewLength * orbitLimitRad * CorkscrewOrbitEnvelopeMean /
+            float maxRevolutions = maximumLength * orbitLimitRad * CorkscrewOrbitEnvelopeMean /
                                    (2f * Mathf.PI * Mathf.Max(1f, barrelRadius));
 
             // Clamp in WHOLE REVOLUTIONS, never to a bare integer unit count.
@@ -705,18 +763,49 @@ namespace TrackGeneration.Planning
         }
 
         public static TrackMacroSectionDefinition MakeCorkscrewDef(ResolvedTrackGenerationConfig cfg,
-            ref Unity.Mathematics.Random rng, float signedRoll, string patternId, float horizontalTurn = 0f)
+            ref Unity.Mathematics.Random rng, float signedRoll, string patternId,
+            float horizontalTurn = 0f, TrackFeatureDefinition featureDefinition = null)
         {
+            if (featureDefinition == null)
+                TrackFeatureDefinitionCatalog.TryGet(TrackPatternType.Corkscrew, out featureDefinition);
+            CorkscrewDefinitionParameters authored = featureDefinition?.Corkscrew;
+            float barrelClearanceMultiplier = authored?.BarrelClearanceMultiplier ?? CorkscrewBarrelClearance;
+            float arrivalSpeedFraction = authored?.TargetArrivalSpeedFraction ?? CorkscrewHoldSpeedFraction;
+            float invertedContactLoadG = authored?.MinimumInvertedContactLoadG ?? CorkscrewHoldG;
+            float maximumPeakLoadG = authored?.MaximumPeakLoadG ?? CorkscrewPeakLoadCeilingG;
+
+            float definitionMinLength = featureDefinition != null
+                ? featureDefinition.Length.ResolvedMinimum(cfg.DesignSpeedMps)
+                : cfg.MinCorkscrewLength;
+            float definitionMaxLength = featureDefinition != null
+                ? featureDefinition.Length.ResolvedMaximum(cfg.DesignSpeedMps)
+                : cfg.MaxCorkscrewLength;
+            float maximumLength = Mathf.Min(cfg.MaxCorkscrewLength, definitionMaxLength);
+
             int units = Mathf.Max(1, Mathf.RoundToInt(Mathf.Abs(signedRoll) / cfg.RotationUnitDegrees));
-            units = ClampUnitsToAchievableBarrel(cfg, units);
+            units = ClampUnitsToAchievableBarrel(cfg, units, barrelClearanceMultiplier, maximumLength);
             signedRoll = Mathf.Sign(signedRoll) * units * cfg.RotationUnitDegrees;
-            signedRoll = Mathf.Sign(signedRoll) * units * cfg.RotationUnitDegrees;
-            float minLen = Mathf.Max(Mathf.Max(cfg.MinCorkscrewLength,
-                units * cfg.MinDistancePerRotationUnit), Mathf.Abs(signedRoll) * 1.5f / Mathf.Max(0.001f, cfg.MaxRollRateDegPerMeter));
-            float length = rng.NextFloat(minLen, Mathf.Max(minLen, cfg.MaxCorkscrewLength));
-            float radius = rng.NextFloat(cfg.MinCorkscrewRadius, cfg.MaxCorkscrewRadius);
-            float secondRadius = rng.NextFloat(cfg.MinCorkscrewRadius, cfg.MaxCorkscrewRadius);
-            float split = rng.NextFloat(0.40f, 0.60f);
+            float minLen = Mathf.Max(
+                Mathf.Max(
+                    Mathf.Max(cfg.MinCorkscrewLength, definitionMinLength),
+                    units * cfg.MinDistancePerRotationUnit),
+                Mathf.Abs(signedRoll) * 1.5f / Mathf.Max(0.001f, cfg.MaxRollRateDegPerMeter));
+            maximumLength = Mathf.Max(minLen, maximumLength);
+            float length = rng.NextFloat(minLen, maximumLength);
+            float firstMinRadius = Mathf.Max(cfg.MinCorkscrewRadius,
+                authored?.FirstHalfRadius.Minimum ?? cfg.MinCorkscrewRadius);
+            float firstMaxRadius = Mathf.Min(cfg.MaxCorkscrewRadius,
+                authored?.FirstHalfRadius.Maximum ?? cfg.MaxCorkscrewRadius);
+            float secondMinRadius = Mathf.Max(cfg.MinCorkscrewRadius,
+                authored?.SecondHalfRadius.Minimum ?? cfg.MinCorkscrewRadius);
+            float secondMaxRadius = Mathf.Min(cfg.MaxCorkscrewRadius,
+                authored?.SecondHalfRadius.Maximum ?? cfg.MaxCorkscrewRadius);
+            firstMaxRadius = Mathf.Max(firstMinRadius, firstMaxRadius);
+            secondMaxRadius = Mathf.Max(secondMinRadius, secondMaxRadius);
+            float radius = rng.NextFloat(firstMinRadius, firstMaxRadius);
+            float secondRadius = rng.NextFloat(secondMinRadius, secondMaxRadius);
+            float split = rng.NextFloat(authored?.PhaseSplit.Minimum ?? 0.40f,
+                authored?.PhaseSplit.Maximum ?? 0.60f);
             float verticalDrift = 0f;
             float firstPitchBias = 0f;
             float secondPitchBias = 0f;
@@ -773,26 +862,26 @@ namespace TrackGeneration.Planning
             // The length terms below scale with √r, so a wider barrel automatically
             // stretches the section to stay under the peak-load ceiling.
             float barrelRadius = Mathf.Clamp(
-                cfg.RoadWidth * 0.5f * CorkscrewBarrelClearance,
+                cfg.RoadWidth * 0.5f * barrelClearanceMultiplier,
                 cfg.MinCorkscrewRadius, cfg.MaxCorkscrewRadius);
 
             // Support scales with v², and the craft meets a corkscrew well below
             // the generator's contract speed — sizing at full design speed is
             // exactly what drops it out. Hold it down to this fraction instead.
-            float holdSpeed = Mathf.Max(1f, cfg.DesignSpeedMps * CorkscrewHoldSpeedFraction);
+            float holdSpeed = Mathf.Max(1f, cfg.DesignSpeedMps * arrivalSpeedFraction);
 
             // a ≥ (1 + HoldG)·g   ⇒   L ≤ 2·π·N·v·√( r / ((1 + HoldG)·g) )
             float maxLengthForSupport = 2f * Mathf.PI * revolutions * holdSpeed *
-                Mathf.Sqrt(barrelRadius / ((1f + CorkscrewHoldG) * gravity));
+                Mathf.Sqrt(barrelRadius / ((1f + invertedContactLoadG) * gravity));
 
             // The same relation run at the design speed gives the shortest barrel
             // that stays under the peak-load ceiling. Relieve load by STRETCHING
             // the corkscrew, never by shrinking the barrel: a smaller barrel would
             // fold the road's inner edge back through its own axis.
             float minLengthForComfort = 2f * Mathf.PI * revolutions * cfg.DesignSpeedMps *
-                Mathf.Sqrt(barrelRadius / (CorkscrewPeakLoadCeilingG * gravity));
+                Mathf.Sqrt(barrelRadius / (maximumPeakLoadG * gravity));
 
-            float lowerLength = Mathf.Max(minLen, Mathf.Min(minLengthForComfort, cfg.MaxCorkscrewLength));
+            float lowerLength = Mathf.Max(minLen, Mathf.Min(minLengthForComfort, maximumLength));
             length = Mathf.Clamp(length, lowerLength, Mathf.Max(lowerLength, maxLengthForSupport));
 
             // Solve the orbit for the barrel we actually want ON THE BUILT GEOMETRY.
@@ -879,30 +968,84 @@ namespace TrackGeneration.Planning
 
         public bool TryPlan(ResolvedTrackGenerationConfig cfg, string patternId, ref Unity.Mathematics.Random rng,
             List<TrackMacroSectionDefinition> output)
+            => TrackFeatureDefinitionCompiler.TryPlanPattern(
+                PatternType, cfg, patternId, ref rng, output);
+
+        internal static bool TryPlanLegacy(TrackFeatureDefinition definition,
+            ResolvedTrackGenerationConfig cfg, string patternId,
+            ref Unity.Mathematics.Random rng, List<TrackMacroSectionDefinition> output)
         {
-            output.Add(SectionDefs.Straight(TrackMacroSectionType.Straight, cfg.SpiralApproachLength, cfg.RoadWidth,
-                "SpiralApproach", locked: true, patternId));
+            TrackMacroSectionDefinition spiral = MakeSpiralDef(
+                definition, cfg, ref rng, patternId);
+            if (spiral == null) return false;
 
-            output.Add(MakeSpiralDef(cfg, ref rng, patternId));
+            float entryMinimum = definition.EntryLength.ResolvedMinimum(cfg.DesignSpeedMps) *
+                                 cfg.FeatureFitScale;
+            float entryMaximum = definition.EntryLength.ResolvedMaximum(cfg.DesignSpeedMps) *
+                                 cfg.FeatureFitScale;
+            float entryLength = Mathf.Clamp(cfg.SpiralApproachLength, entryMinimum, entryMaximum);
+            float recoveryMinimum = definition.RecoveryLength.ResolvedMinimum(cfg.DesignSpeedMps) *
+                                    cfg.FeatureFitScale;
+            float recoveryMaximum = definition.RecoveryLength.ResolvedMaximum(cfg.DesignSpeedMps) *
+                                    cfg.FeatureFitScale;
+            float recoveryLength = Mathf.Clamp(
+                cfg.SpiralRecoveryLength, recoveryMinimum, recoveryMaximum);
 
-            output.Add(SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight, cfg.SpiralRecoveryLength, cfg.RoadWidth,
-                "RecoveryStraight", locked: true, patternId));
+            output.Add(SectionDefs.Straight(TrackMacroSectionType.Straight,
+                entryLength, cfg.RoadWidth, "SpiralApproach", locked: true,
+                patternId, FeatureFitRole.EntryWarmup));
+            output.Add(spiral);
+            output.Add(SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight,
+                recoveryLength, cfg.RoadWidth, "RecoveryStraight", locked: true,
+                patternId, FeatureFitRole.ExitRecovery));
             return true;
         }
 
         internal static TrackMacroSectionDefinition MakeSpiralDef(ResolvedTrackGenerationConfig cfg,
             ref Unity.Mathematics.Random rng, string patternId)
         {
-            int revs = rng.NextInt(cfg.MinSpiralRevolutions, cfg.MaxSpiralRevolutions + 1);
-            float radius = rng.NextFloat(cfg.MinSpiralRadius, cfg.MaxSpiralRadius);
+            return TrackFeatureDefinitionCatalog.TryGet(
+                    TrackPatternType.Spiral, out TrackFeatureDefinition definition)
+                ? MakeSpiralDef(definition, cfg, ref rng, patternId)
+                : null;
+        }
+
+        internal static TrackMacroSectionDefinition MakeSpiralDef(
+            TrackFeatureDefinition definition, ResolvedTrackGenerationConfig cfg,
+            ref Unity.Mathematics.Random rng, string patternId)
+        {
+            if (definition == null || definition.Solver != FeatureDefinitionSolver.SpiralV1)
+                return null;
+
+            float minRadius = Mathf.Max(cfg.MinSpiralRadius, definition.Spiral.RadiusMeters.Minimum);
+            float maxRadius = Mathf.Min(cfg.MaxSpiralRadius, definition.Spiral.RadiusMeters.Maximum);
+            float minClimb = Mathf.Max(cfg.MinSpiralClimbPerRevolution,
+                definition.Spiral.ClimbPerStoryMeters.Minimum);
+            float maxClimb = Mathf.Min(cfg.MaxSpiralClimbPerRevolution,
+                definition.Spiral.ClimbPerStoryMeters.Maximum);
+            if (minRadius > maxRadius || minClimb > maxClimb) return null;
+
+            // Story count is a vertical-design choice. A 1.5-storey spiral uses one
+            // complete coil with a taller rise; this preserves the heading-neutral exit
+            // contract. Two storeys use two complete coils. Half-revolution exits are
+            // deliberately never emitted because they would face backward at the weld.
+            List<float> stories = definition.Spiral.AllowedStoryCounts
+                .Where(value => value >= cfg.MinSpiralRevolutions - 0.001f &&
+                                value <= cfg.MaxSpiralRevolutions + 0.001f)
+                .ToList();
+            if (stories.Count == 0) return null;
+            float storyCount = stories[rng.NextInt(0, stories.Count)];
+            int revs = storyCount >= 1.999f ? 2 : 1;
+            float radius = rng.NextFloat(minRadius, maxRadius);
             // Elevation is eased over the whole spiral, so clearance values are rounded
             // UP on a common vertical grid. Never round a safety separation downward.
-            float climbPerRev = SectionFrameBuilders.QuantizeElevationUp(
-                rng.NextFloat(cfg.MinSpiralClimbPerRevolution, cfg.MaxSpiralClimbPerRevolution), 5f);
+            float climbPerStory = SectionFrameBuilders.QuantizeElevationUp(
+                rng.NextFloat(minClimb, maxClimb), 5f);
 
             // Descending spirals are legal when the elevation plan may dip below start.
-            bool descending = cfg.GroundLevelPolicy == TrackGroundLevelPolicy.FreeFloating && rng.NextFloat() < 0.35f;
-            float climb = climbPerRev * revs * (descending ? -1f : 1f);
+            bool descending = cfg.GroundLevelPolicy == TrackGroundLevelPolicy.FreeFloating &&
+                              rng.NextFloat() < definition.Spiral.DescendingChance;
+            float climb = climbPerStory * storyCount * (descending ? -1f : 1f);
 
             // Spiral slope is clamped by the ordinary climb rules.
             float arcLen = 2f * Mathf.PI * radius * revs;
@@ -926,7 +1069,7 @@ namespace TrackGeneration.Planning
                 RequiresRecoveryAfter = true,
                 LockLength = true,
                 PatternId = patternId,
-                DebugName = $"Spiral_{revs}rev_{(climb >= 0 ? "Up" : "Down")}_{dir}",
+                DebugName = $"Spiral_{storyCount:0.#}story_{revs}rev_{(climb >= 0 ? "Up" : "Down")}_{dir}",
                 Contract = new SectionConnectionContract
                 {
                     RequiredEntryOrientation = TrackOrientationTag.Upright,
@@ -1110,7 +1253,7 @@ namespace TrackGeneration.Planning
 
         protected TrackMacroSectionDefinition Transition(ResolvedTrackGenerationConfig cfg, string patternId)
             => SectionDefs.Straight(TrackMacroSectionType.Straight, cfg.GenericTransitionLength, cfg.RoadWidth,
-                "CompoundTransition", locked: true, patternId);
+                "CompoundTransition", locked: true, patternId, FeatureFitRole.InternalTransition);
 
         protected abstract float ApproachLength(ResolvedTrackGenerationConfig cfg);
         protected abstract float RecoveryLength(ResolvedTrackGenerationConfig cfg);
@@ -1153,7 +1296,10 @@ namespace TrackGeneration.Planning
         protected override bool PlanElements(ResolvedTrackGenerationConfig cfg, string patternId,
             ref Unity.Mathematics.Random rng, List<TrackMacroSectionDefinition> output)
         {
-            output.Add(SpiralPattern.MakeSpiralDef(cfg, ref rng, patternId));
+            TrackMacroSectionDefinition spiral = SpiralPattern.MakeSpiralDef(
+                cfg, ref rng, patternId);
+            if (spiral == null) return false;
+            output.Add(spiral);
             output.Add(Transition(cfg, patternId));
             output.Add(CorkscrewPattern.MakeCorkscrewDef(cfg, ref rng, cfg.CorkscrewRollDegrees * (rng.NextBool() ? 1f : -1f), patternId));
             return true;
@@ -1208,7 +1354,7 @@ namespace TrackGeneration.Planning
             float pipeWidth = cfg.RoadWidth * cfg.FullPipeRadiusScale;
 
             output.Add(SectionDefs.Straight(TrackMacroSectionType.Straight, cfg.DefaultApproachLength, cfg.RoadWidth,
-                "FullPipeApproach", locked: true, patternId));
+                "FullPipeApproach", locked: true, patternId, FeatureFitRole.EntryWarmup));
 
             output.Add(new TrackMacroSectionDefinition
             {
@@ -1232,7 +1378,7 @@ namespace TrackGeneration.Planning
             });
 
             output.Add(SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight, cfg.DefaultRecoveryLength, cfg.RoadWidth,
-                "RecoveryStraight", locked: true, patternId));
+                "RecoveryStraight", locked: true, patternId, FeatureFitRole.ExitRecovery));
             return true;
         }
     }
@@ -1251,8 +1397,9 @@ namespace TrackGeneration.Planning
         public bool TryPlan(ResolvedTrackGenerationConfig cfg, string patternId, ref Unity.Mathematics.Random rng,
             List<TrackMacroSectionDefinition> output)
         {
-            float radius = Mathf.Lerp(cfg.MinCurveRadius, cfg.MaxCurveRadius, rng.NextFloat(0f, 0.5f));
             float angle = SectionFrameBuilders.QuantizeArcAngle(rng.NextFloat(35f, 60f));
+            float radius = SectionFrameBuilders.ClampDesignerSCurveRadius(angle,
+                Mathf.Lerp(cfg.MinCurveRadius, cfg.MaxCurveRadius, rng.NextFloat(0f, 0.5f)));
             SectionTurnDirection dir = rng.NextBool() ? SectionTurnDirection.Right : SectionTurnDirection.Left;
 
             output.Add(new TrackMacroSectionDefinition
@@ -1311,7 +1458,7 @@ namespace TrackGeneration.Planning
             });
 
             output.Add(SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight, cfg.DefaultRecoveryLength, cfg.RoadWidth,
-                "RecoveryStraight", locked: true, patternId));
+                "RecoveryStraight", locked: true, patternId, FeatureFitRole.ExitRecovery));
             return true;
         }
     }
@@ -1333,9 +1480,49 @@ namespace TrackGeneration.Planning
             var sCurve = new SCurvePattern();
             if (!sCurve.TryPlan(cfg, patternId, ref rng, output)) return false;
             output.Add(SectionDefs.Straight(TrackMacroSectionType.Straight, cfg.GenericTransitionLength, cfg.RoadWidth,
-                "AltRadiusLink", locked: true, patternId));
+                "AltRadiusLink", locked: true, patternId, FeatureFitRole.InternalTransition));
             return sCurve.TryPlan(cfg, patternId, ref rng, output);
         }
+    }
+
+    /// <summary>
+    /// Compact C²-continuous crest. The definition compiler owns its length, height,
+    /// weld contract, and high-speed vertical-envelope preflight.
+    /// </summary>
+    public sealed class CamelbackPattern : ITrackFeaturePattern
+    {
+        public TrackPatternType PatternType => TrackPatternType.Camelback;
+
+        public FeaturePatternRequirements GetRequirements(ResolvedTrackGenerationConfig cfg) =>
+            new FeaturePatternRequirements
+            {
+                EstimatedLength = cfg.EstimateFeatureFootprint(PatternType),
+                NetHeadingDeltaDegrees = 0f
+            };
+
+        public bool TryPlan(ResolvedTrackGenerationConfig cfg, string patternId,
+            ref Unity.Mathematics.Random rng, List<TrackMacroSectionDefinition> output) =>
+            TrackFeatureDefinitionCompiler.TryPlanPattern(
+                PatternType, cfg, patternId, ref rng, output);
+    }
+
+    /// <summary>Thin registry adapter for definition-native heading-neutral features.</summary>
+    public sealed class DefinitionNativePattern : ITrackFeaturePattern
+    {
+        public TrackPatternType PatternType { get; }
+
+        public DefinitionNativePattern(TrackPatternType patternType) => PatternType = patternType;
+
+        public FeaturePatternRequirements GetRequirements(ResolvedTrackGenerationConfig cfg) =>
+            new FeaturePatternRequirements
+            {
+                EstimatedLength = cfg.EstimateFeatureFootprint(PatternType),
+                NetHeadingDeltaDegrees = 0f
+            };
+
+        public bool TryPlan(ResolvedTrackGenerationConfig cfg, string patternId,
+            ref Unity.Mathematics.Random rng, List<TrackMacroSectionDefinition> output) =>
+            TrackFeatureDefinitionCompiler.TryPlanPattern(PatternType, cfg, patternId, ref rng, output);
     }
 
     // ═══════════════════════════ Registry ═══════════════════════════
@@ -1359,7 +1546,10 @@ namespace TrackGeneration.Planning
                 { TrackPatternType.SCurve, new SCurvePattern() },
                 { TrackPatternType.Chicane, new ChicanePattern() },
                 { TrackPatternType.AlternatingRadiusSequence, new AlternatingRadiusPattern() },
-                { TrackPatternType.FullPipe, new FullPipePattern() }
+                { TrackPatternType.FullPipe, new FullPipePattern() },
+                { TrackPatternType.Camelback, new CamelbackPattern() },
+                { TrackPatternType.HeartlineRoll, new DefinitionNativePattern(TrackPatternType.HeartlineRoll) },
+                { TrackPatternType.ZeroGRoll, new DefinitionNativePattern(TrackPatternType.ZeroGRoll) }
             };
 
         /// <summary>Corner-slot patterns are realized by the corner planner, not here.</summary>
@@ -1371,6 +1561,11 @@ namespace TrackGeneration.Planning
             TrackPatternType.OpeningCorner => true,
             TrackPatternType.SweeperIntoHairpin => true,
             TrackPatternType.WallrideTurn => true,
+            TrackPatternType.WideTurnaround => true,
+            TrackPatternType.Horseshoe => true,
+            TrackPatternType.Cutback => true,
+            TrackPatternType.DiveLoop => true,
+            TrackPatternType.Sidewinder => true,
             _ => false
         };
 

@@ -1,0 +1,225 @@
+{
+    "SchemaVersion": 1,
+    "AlgorithmVersion": "slingshot-trackgen-v2-dev1",
+    "FeatureCatalogVersion": "semantic-catalog-v1",
+    "FeatureDefinitions": [
+        {
+            "StableId": "slingshot.alternating-radius-sequence",
+            "DefinitionVersion": 1,
+            "ContentHash": "afa0522835aa289faf4fda45a1cd0263f8f9cb6b547bf28aac73dd6eef1aeb06"
+        },
+        {
+            "StableId": "slingshot.camelback",
+            "DefinitionVersion": 1,
+            "ContentHash": "702eefc0434b2376371c3477e56cbcb8f0485adfb341b394af67c36d110fa620"
+        },
+        {
+            "StableId": "slingshot.chicane",
+            "DefinitionVersion": 1,
+            "ContentHash": "95e0ef35c72c6eb82126cec24d3404d7a862f5623d0e63526142363269424067"
+        },
+        {
+            "StableId": "slingshot.cutback",
+            "DefinitionVersion": 1,
+            "ContentHash": "8c4f07f2ec8532742d5cacd4c89b7f2741c94e28cbd3811be9deec96543bc688"
+        },
+        {
+            "StableId": "slingshot.directional-corkscrew",
+            "DefinitionVersion": 1,
+            "ContentHash": "1f8021af532085422af73de07f6621592245fbf42ce401db570c8be752528a7d"
+        },
+        {
+            "StableId": "slingshot.dive-loop",
+            "DefinitionVersion": 2,
+            "ContentHash": "a230f79a920202220218a06a88304c5b947b1b0e026fc08cf74d085abe2ad607"
+        },
+        {
+            "StableId": "slingshot.double-apex",
+            "DefinitionVersion": 1,
+            "ContentHash": "0421296dc24ebe7da2e33b0324c5358461e6220e440b2d06013e114634dc67b9"
+        },
+        {
+            "StableId": "slingshot.double-corkscrew",
+            "DefinitionVersion": 1,
+            "ContentHash": "0641f856d744e46e497e086ac5be3ccc68c4270b092dbb113ae8b93e6ea5a494"
+        },
+        {
+            "StableId": "slingshot.full-pipe",
+            "DefinitionVersion": 1,
+            "ContentHash": "e1ae3b88ebe65af95b10a1a5bf56c149e0ec6c34e49a5fd0b2760e9b80ace79b"
+        },
+        {
+            "StableId": "slingshot.hairpin",
+            "DefinitionVersion": 1,
+            "ContentHash": "71e0ec85cc96dd030ad7c955a56285b87eae730ad4eb9b37dfadec4c5bee0cbc"
+        },
+        {
+            "StableId": "slingshot.half-loop-to-corkscrew",
+            "DefinitionVersion": 1,
+            "ContentHash": "f80d531a86072a4577be25f61751c82e28d4b46ee15d892935bbcbb9e6b60b92"
+        },
+        {
+            "StableId": "slingshot.heartline-roll",
+            "DefinitionVersion": 3,
+            "ContentHash": "f9a505edde228988c0c535d966118b84b403b1abeb3de35c2cf8555b251228e9"
+        },
+        {
+            "StableId": "slingshot.horseshoe",
+            "DefinitionVersion": 1,
+            "ContentHash": "bf6d11c2d10b08f9df971063ec96975d88fcbc68035ebeaa842aaca777ddfb53"
+        },
+        {
+            "StableId": "slingshot.immelmann",
+            "DefinitionVersion": 1,
+            "ContentHash": "e4b8fa97db71b4e1641b672872b0a2e109b41ecc582ade2fb2530cf4bee2f655"
+        },
+        {
+            "StableId": "slingshot.inline-corkscrew",
+            "DefinitionVersion": 1,
+            "ContentHash": "0b8db56ba4903ccef7d81b98ba9873a3fcc9eba36f7c15beba5b57f7ebf7064e"
+        },
+        {
+            "StableId": "slingshot.jump-gap",
+            "DefinitionVersion": 1,
+            "ContentHash": "b9fba7814d9578cbd62fce4fe58c94c103eb28260ecd5e3833d8580b64f02fe9"
+        },
+        {
+            "StableId": "slingshot.jump-to-banked-landing",
+            "DefinitionVersion": 1,
+            "ContentHash": "5baf0312268a1f26caf5b486e31ea6ac5db8de238660c6b16c9f9fd3f006e655"
+        },
+        {
+            "StableId": "slingshot.loop-to-corkscrew",
+            "DefinitionVersion": 1,
+            "ContentHash": "8d6113a5adc7bd804abb95a8b39b5debbc73155a09b5c12b48594eab8d5a44c3"
+        },
+        {
+            "StableId": "slingshot.opening-corner",
+            "DefinitionVersion": 1,
+            "ContentHash": "5b59c0d40d050d9c9408acfb8fd626d0e36ab0420109bb35719c645d259f59f6"
+        },
+        {
+            "StableId": "slingshot.ordinary-curve",
+            "DefinitionVersion": 1,
+            "ContentHash": "71a6091e48d50ca793c68eb5b7dc42a69baffba7d8e7c2666794437150206920"
+        },
+        {
+            "StableId": "slingshot.s-curve",
+            "DefinitionVersion": 1,
+            "ContentHash": "42925557f921cd16478ef3605b84ca6c4f28f63590ed9482cfbd510742cb969e"
+        },
+        {
+            "StableId": "slingshot.sidewinder",
+            "DefinitionVersion": 2,
+            "ContentHash": "df09b3b45ddc058b9f3310f089388ef7d1d28530a60e87deaf1144b67a78cc21"
+        },
+        {
+            "StableId": "slingshot.spiral",
+            "DefinitionVersion": 1,
+            "ContentHash": "a2c58ba0e78d3e3fe4eb169328c095ea1b90b69fc8aba39e4787efff400dc3cd"
+        },
+        {
+            "StableId": "slingshot.spiral-to-corkscrew",
+            "DefinitionVersion": 1,
+            "ContentHash": "c40ef8333c52d11bbd4e23f9b43dd0c3392cad5aedbf2260b9c978432c545323"
+        },
+        {
+            "StableId": "slingshot.sweeper-into-hairpin",
+            "DefinitionVersion": 1,
+            "ContentHash": "743a694db42115665c559ab1c0e13bed54bc077b5b988cc86b8bd8263098daf6"
+        },
+        {
+            "StableId": "slingshot.tightening-corner",
+            "DefinitionVersion": 1,
+            "ContentHash": "5c147c706bcc3d463afe447585650ad41c1c24bb120b354d6cd4c8e6e817d9c8"
+        },
+        {
+            "StableId": "slingshot.vertical-loop",
+            "DefinitionVersion": 1,
+            "ContentHash": "79e414a0c4609dc9890b1da1f926ecaa67b77b73d51cbd1a08549321c0fd1ea4"
+        },
+        {
+            "StableId": "slingshot.wallride-turn",
+            "DefinitionVersion": 1,
+            "ContentHash": "a28b46628d65ff1665ea85d1c4cdb61cdc61fffdccbbfd9560297dd2f8fe020f"
+        },
+        {
+            "StableId": "slingshot.wide-turnaround",
+            "DefinitionVersion": 1,
+            "ContentHash": "aa13877b14a4dbcb4af3603d99495c3a178c680402ed21e819bd2dd636cc9449"
+        },
+        {
+            "StableId": "slingshot.zero-g-roll",
+            "DefinitionVersion": 3,
+            "ContentHash": "7d0f01606f9bef63f7e9a4423032882e8cf320a9a7b85dace954c0c03db353b3"
+        }
+    ],
+    "BaseSeed": -319814854,
+    "SeedDisplayName": "Seed_-319814854",
+    "SeedStreams": {
+        "LayoutSeed": -117449224,
+        "FeatureSeed": 791068342,
+        "ElevationSeed": 450436061,
+        "QuarterSeed": -1873287572,
+        "SurfaceSeed": -82956179,
+        "VisualSeed": 176056846,
+        "PresetResolutionSeed": 1260734201
+    },
+    "DesignerSettingsJson": "{\"AppliedPresetName\":\"Rollercoaster\",\"ModifiedSincePreset\":true,\"appliedPresetSnapshotJson\":\"\",\"Scale\":{\"DesignSpeedKph\":1300.0,\"TargetLapTimeSeconds\":75.0,\"MaxTrackLengthMeters\":60000.0,\"PacingVariation\":0.20000000298023225},\"Layout\":{\"MinTurnCount\":8,\"MaxTurnCount\":9,\"DirectionPattern\":0,\"MinStraightSeconds\":0.800000011920929,\"MaxStraightSeconds\":3.0,\"CornerSequenceChance\":0.0},\"Corners\":{\"MinCurveRadius\":550.0,\"MaxCurveRadius\":1800.0,\"TurnWeights\":{\"GentleBend\":1.5,\"Sweeper\":3.0,\"StandardCorner\":3.0,\"SharpCorner\":1.0,\"Hairpin\":0.20000000298023225},\"BankingStrength\":0.949999988079071,\"MaxBankAngle\":80.0,\"FloorTiltStrength\":0.20000000298023225},\"Road\":{\"FlatCenterWidth\":48.0,\"WallHeight\":26.0,\"WallCurve\":1.0,\"RoadScale\":1.0,\"SafetyLipHeight\":1.0,\"ProfileResolution\":32,\"ColliderProfileResolution\":40,\"DynamicTurnRounding\":false,\"TurnRoundingStrength\":0.8500000238418579,\"MinimumTurnCenterFlatRatio\":0.05000000074505806,\"OutsideCatchWall\":true,\"CatchWallStrength\":0.6000000238418579,\"MaxOverhangAngle\":18.0,\"OverhangRadius\":10.0,\"CatchWallMinimumDemand\":0.3499999940395355},\"Transitions\":{\"GenericTransitionSeconds\":1.2000000476837159,\"BankTransitionSeconds\":1.399999976158142,\"PitchTransitionSeconds\":1.600000023841858,\"RollTransitionSeconds\":1.7999999523162842,\"WidthTransitionSeconds\":0.8999999761581421,\"CrossSectionTransitionSeconds\":1.0,\"BlendCurve\":2,\"MinimumConnectorSeconds\":0.4000000059604645,\"ConnectorInheritanceStrength\":1.0,\"SameDirectionBridgeSeconds\":2.200000047683716,\"MinimumBankReversalSeconds\":0.8999999761581421,\"AllowConnectorExpansion\":true,\"AllowConnectorAbsorption\":true,\"FeatureFitScale\":0.5,\"DefaultApproachSeconds\":2.0,\"DefaultRecoverySeconds\":1.5,\"DangerousSpacingSeconds\":1.7999999523162842,\"VisualPreviewSeconds\":2.200000047683716},\"Elevation\":{\"Profile\":2,\"TargetElevationAmplitude\":300.0,\"MinMajorElevationSections\":5,\"MaxMajorElevationSections\":5,\"MaxClimbAngle\":34.0,\"MaxDropAngle\":36.0,\"MaxCurvatureInducedG\":15.0,\"MaxVerticalCurvatureRate\":0.000019999999494757503,\"Crests\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Bridges\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Underpasses\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"GroundLevelPolicy\":1},\"Features\":{\"Jumps\":{\"Enabled\":false,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":1.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"TargetJumpApexHeight\":100.0,\"JumpLipEmphasis\":0.699999988079071,\"JumpCaptureSpeedVariation\":0.05999999865889549,\"Loops\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":1.5,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Corkscrews\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":1.5,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Spirals\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":1.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"HalfLoops\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"FullPipes\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Camelbacks\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":0.44999998807907107,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"HeartlineRolls\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":0.3499999940395355,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"ZeroGRolls\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":0.30000001192092898,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"DiveLoops\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":0.25,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Sidewinders\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":0.30000001192092898,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Wallrides\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":0.699999988079071,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"MinFullPipeSeconds\":5.0,\"MaxFullPipeSeconds\":9.0,\"FullPipeRadiusScale\":1.100000023841858,\"PipeTransitionSeconds\":1.2000000476837159,\"Chicanes\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"SCurves\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"ProceduralRhythmSettingsVersion\":3,\"EnforceProceduralRhythm\":true,\"MaxConsecutiveSCurveEncounters\":1,\"SCurveDiversityWindow\":5,\"MaxSCurveEncountersPerWindow\":2,\"SameFamilyCooldownEncounters\":1,\"Hairpins\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":0.20000000298023225,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"WideTurnarounds\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Horseshoes\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Cutbacks\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":0.3499999940395355,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"MinFeatureGroups\":4,\"MaxFeatureGroups\":4,\"CompoundFeatureChance\":0.0,\"MaxCompoundElements\":3,\"RequiredPatterns\":[]},\"Quarters\":{\"MinimumDualQuarterCount\":0,\"MaximumDualQuarterCount\":0,\"QuarterTypeOverrides\":[0,0,0,0],\"PreventAdjacentDualQuarters\":false,\"AllowQ1Dual\":false,\"AllowQ4Dual\":true,\"ChoiceType\":1,\"LaneSeparationMeters\":24.0,\"CatchWidthScale\":1.7000000476837159,\"DualRoadWidthScale\":1.0,\"RoadLengthTolerance\":0.20000000298023225,\"NeutralTimeTolerancePercent\":4.0,\"RequireArchetypeDifferentiation\":true,\"BalancePolicy\":0},\"Generation\":{\"MaxAttempts\":300,\"SelectionMode\":0,\"CandidatesToScore\":4,\"FailurePolicy\":2,\"ClosureReserveFraction\":0.20000000298023225,\"ConsistentTextureTopology\":true,\"TextureTopologyMetersPerRing\":1.0,\"MetersPerRing\":1.5,\"MaxFacetAngleDegrees\":0.5,\"TargetTotalRings\":20000,\"DynamicFeatureAdjacency\":true,\"UseCanonicalTurns\":true,\"ClosureAngleRelief\":false,\"RobustDualQuarterFit\":false,\"DirectionalCorkscrews\":true,\"SmoothCorkscrewFloor\":true},\"Visual\":{\"CenterGuideEnabled\":true,\"CenterGuideColor\":{\"r\":0.550000011920929,\"g\":0.949999988079071,\"b\":1.0,\"a\":1.0},\"CenterGuideWidth\":0.3499999940395355,\"CenterGuideEmission\":1.2000000476837159,\"LaneEdgePosition\":1.0,\"LaneMergeFraction\":0.7799999713897705,\"LaneSplitFraction\":0.8999999761581421,\"WallMarkersEnabled\":true,\"WallMarkerColor\":{\"r\":0.550000011920929,\"g\":0.949999988079071,\"b\":1.0,\"a\":1.0},\"WallMarkerWidth\":0.800000011920929,\"WallMarkerSpacingMeters\":48.0,\"MarkerFadeDistance\":800.0}}",
+    "RulebookSchemaVersion": 2,
+    "RulebookHash": "6ff36ff9998547ad5618a74507db00ffd15f3ca0a4c817bb6816c9bfeb6a5f1e",
+    "AppliedPresetName": "Rollercoaster",
+    "SettingsLocks": {
+        "ScaleAndSpeed": false,
+        "Layout": false,
+        "Corners": false,
+        "RoadShape": false,
+        "Transitions": false,
+        "Elevation": false,
+        "Features": false,
+        "Quarters": false,
+        "GenerationBehavior": false,
+        "Visual": false
+    },
+    "LayoutLockMode": 0,
+    "Origin": {
+        "Position": {
+            "x": 9386.6796875,
+            "y": -0.0002099999983329326,
+            "z": 12094.2919921875
+        },
+        "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 1.0
+        },
+        "Scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        }
+    },
+    "SelectionMode": 0,
+    "MaximumAttempts": 300,
+    "CandidatesToScore": 4,
+    "BaseRecipeHash": "0eb49ab093aacdb374cdf7d72698dfa6cb30a179cb757b6a133d2c9324789e4d",
+    "RecipeRevision": 0,
+    "TopologySlotOverrides": [],
+    "DesignerAuthoredVariant": false,
+    "AuthoringBaselineAttemptIndex": -1,
+    "AuthoringBaselineLapLengthMeters": 0.0,
+    "AuthoringElevationBaseline": [],
+    "ExpectedLayoutHash": "be0fc205c74ea8896fba45cae87967a2aa285a0e81b93be4a5faabe5ea3a4d6c",
+    "Rating": {
+        "Version": 1,
+        "Overall": 61,
+        "Flow": 52,
+        "Variety": 100,
+        "RequestFit": 38,
+        "TechnicalQuality": 52,
+        "RatedLayoutHash": "be0fc205c74ea8896fba45cae87967a2aa285a0e81b93be4a5faabe5ea3a4d6c",
+        "Source": "Accepted generation metrics"
+    },
+    "RecipeHash": "0eb49ab093aacdb374cdf7d72698dfa6cb30a179cb757b6a133d2c9324789e4d"
+}

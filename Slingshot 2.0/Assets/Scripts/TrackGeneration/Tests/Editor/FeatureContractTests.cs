@@ -157,5 +157,45 @@ namespace TrackGeneration.Tests
             }
             finally { Object.DestroyImmediate(config); }
         }
+
+        [Test]
+        public void AuthoredRoadSections_RespectOneKilometreCaps()
+        {
+            TrackMacroSectionDefinition straight = SectionDefs.Straight(
+                TrackMacroSectionType.Straight, 8200f, 40f, "LongStraight");
+            Assert.AreEqual(SectionFrameBuilders.MaxStraightSectionLength,
+                straight.Length, 0.01f);
+
+            float ordinaryRadius = SectionFrameBuilders.ClampOrdinaryCurveRadius(90f, 5000f);
+            float ordinaryLength = SectionFrameBuilders.EasedArcLength(90f, ordinaryRadius);
+            Assert.LessOrEqual(ordinaryLength,
+                SectionFrameBuilders.MaxOrdinaryCurveLength + 0.01f);
+
+            foreach (float angle in new[] { 35f, 47.5f, 60f })
+            {
+                float radius = SectionFrameBuilders.ClampDesignerSCurveRadius(angle, 5000f);
+                float length = 2f * SectionFrameBuilders.EasedArcLength(angle, radius);
+                Assert.LessOrEqual(length,
+                    SectionFrameBuilders.MaxDesignerSCurveLength + 0.01f,
+                    $"{angle:F1} degree S-curve exceeded its complete-length ceiling.");
+            }
+
+            ResolvedTrackGenerationConfig cfg = Cfg(out TrackConfig config);
+            try
+            {
+                for (uint seed = 1; seed <= 32; seed++)
+                {
+                    var definitions = new List<TrackMacroSectionDefinition>();
+                    var rng = new Unity.Mathematics.Random(seed);
+                    Assert.IsTrue(new SCurvePattern().TryPlan(cfg, $"SCurve_{seed}",
+                        ref rng, definitions));
+                    Assert.AreEqual(1, definitions.Count);
+                    Assert.LessOrEqual(definitions[0].Length,
+                        SectionFrameBuilders.MaxDesignerSCurveLength + 0.01f,
+                        $"Seed {seed} produced an oversized S-curve.");
+                }
+            }
+            finally { Object.DestroyImmediate(config); }
+        }
     }
 }

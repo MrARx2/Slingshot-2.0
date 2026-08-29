@@ -118,7 +118,7 @@ MonoBehaviour:
   minSpiralRadius: 120
   maxSpiralRadius: 700
   minSpiralRevolutions: 1
-  maxSpiralRevolutions: 3
+  maxSpiralRevolutions: 2
   minSpiralClimbPerRevolution: 35
   maxSpiralClimbPerRevolution: 140
   minSpiralApproachSeconds: 1.2

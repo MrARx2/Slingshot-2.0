@@ -1,0 +1,90 @@
+{
+    "SchemaVersion": 1,
+    "AlgorithmVersion": "slingshot-trackgen-v2-dev1",
+    "FeatureCatalogVersion": "semantic-catalog-v1",
+    "FeatureDefinitions": [
+        {
+            "StableId": "slingshot.horseshoe",
+            "DefinitionVersion": 1,
+            "ContentHash": "76034a5e4d1be285855802c574cffc44ee822212dd3ed8e4f44ead222c583c1b"
+        },
+        {
+            "StableId": "slingshot.inline-corkscrew",
+            "DefinitionVersion": 1,
+            "ContentHash": "bef215d53f481d8bfc7a2f536e7e895f91813923993d574abf5af21e83be91e5"
+        },
+        {
+            "StableId": "slingshot.spiral",
+            "DefinitionVersion": 1,
+            "ContentHash": "31da3ebfa865484270150d52faa3357da6ddd9c00c6cdc198ac2816b4ec67e1c"
+        },
+        {
+            "StableId": "slingshot.vertical-loop",
+            "DefinitionVersion": 1,
+            "ContentHash": "9376e98667bf96a70df3fae419f460ecbffd0f3f402e57b291bf50951987e455"
+        },
+        {
+            "StableId": "slingshot.wide-turnaround",
+            "DefinitionVersion": 1,
+            "ContentHash": "0b08a42cee9c9fdf3fcd612524505b97ec8cc1f6f2e868481f765f9d2b931fd1"
+        }
+    ],
+    "BaseSeed": 1897379308,
+    "SeedDisplayName": "Seed_1897379308",
+    "SeedStreams": {
+        "LayoutSeed": -103906938,
+        "FeatureSeed": 804610628,
+        "ElevationSeed": 463978347,
+        "QuarterSeed": -1859745286,
+        "SurfaceSeed": -69413893,
+        "VisualSeed": 189599132,
+        "PresetResolutionSeed": 1274276487
+    },
+    "DesignerSettingsJson": "{\"AppliedPresetName\":\"Rollercoaster\",\"ModifiedSincePreset\":true,\"appliedPresetSnapshotJson\":\"\",\"Scale\":{\"DesignSpeedKph\":1300.0,\"TargetLapTimeSeconds\":75.0,\"MaxTrackLengthMeters\":60000.0,\"PacingVariation\":0.20000000298023225},\"Layout\":{\"MinTurnCount\":8,\"MaxTurnCount\":9,\"DirectionPattern\":0,\"MinStraightSeconds\":0.800000011920929,\"MaxStraightSeconds\":3.0,\"CornerSequenceChance\":0.0},\"Corners\":{\"MinCurveRadius\":550.0,\"MaxCurveRadius\":1800.0,\"TurnWeights\":{\"GentleBend\":1.5,\"Sweeper\":3.0,\"StandardCorner\":3.0,\"SharpCorner\":1.0,\"Hairpin\":0.20000000298023225},\"BankingStrength\":0.949999988079071,\"MaxBankAngle\":80.0,\"FloorTiltStrength\":0.20000000298023225},\"Road\":{\"FlatCenterWidth\":48.0,\"WallHeight\":26.0,\"WallCurve\":1.0,\"RoadScale\":1.0,\"SafetyLipHeight\":1.0,\"ProfileResolution\":32,\"ColliderProfileResolution\":40,\"DynamicTurnRounding\":false,\"TurnRoundingStrength\":0.8500000238418579,\"MinimumTurnCenterFlatRatio\":0.05000000074505806,\"OutsideCatchWall\":true,\"CatchWallStrength\":0.6000000238418579,\"MaxOverhangAngle\":18.0,\"OverhangRadius\":10.0,\"CatchWallMinimumDemand\":0.3499999940395355},\"Transitions\":{\"GenericTransitionSeconds\":1.2000000476837159,\"BankTransitionSeconds\":1.399999976158142,\"PitchTransitionSeconds\":1.600000023841858,\"RollTransitionSeconds\":1.7999999523162842,\"WidthTransitionSeconds\":0.8999999761581421,\"CrossSectionTransitionSeconds\":1.0,\"BlendCurve\":2,\"MinimumConnectorSeconds\":0.4000000059604645,\"ConnectorInheritanceStrength\":1.0,\"SameDirectionBridgeSeconds\":2.200000047683716,\"MinimumBankReversalSeconds\":0.8999999761581421,\"AllowConnectorExpansion\":true,\"AllowConnectorAbsorption\":true,\"FeatureFitScale\":0.5,\"DefaultApproachSeconds\":2.0,\"DefaultRecoverySeconds\":1.5,\"DangerousSpacingSeconds\":1.7999999523162842,\"VisualPreviewSeconds\":2.200000047683716},\"Elevation\":{\"Profile\":2,\"TargetElevationAmplitude\":300.0,\"MinMajorElevationSections\":5,\"MaxMajorElevationSections\":5,\"MaxClimbAngle\":34.0,\"MaxDropAngle\":36.0,\"MaxCurvatureInducedG\":15.0,\"MaxVerticalCurvatureRate\":0.000019999999494757503,\"Crests\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Bridges\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Underpasses\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"GroundLevelPolicy\":1},\"Features\":{\"Jumps\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":1.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"TargetJumpApexHeight\":100.0,\"JumpLipEmphasis\":0.699999988079071,\"JumpCaptureSpeedVariation\":0.05999999865889549,\"Loops\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":1.5,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Corkscrews\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":1.5,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Spirals\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":1.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"HalfLoops\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"FullPipes\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Wallrides\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":0.699999988079071,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"MinFullPipeSeconds\":5.0,\"MaxFullPipeSeconds\":9.0,\"FullPipeRadiusScale\":1.100000023841858,\"PipeTransitionSeconds\":1.2000000476837159,\"Chicanes\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"SCurves\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"ProceduralRhythmSettingsVersion\":1,\"EnforceProceduralRhythm\":true,\"MaxConsecutiveSCurveEncounters\":1,\"SCurveDiversityWindow\":5,\"MaxSCurveEncountersPerWindow\":2,\"SameFamilyCooldownEncounters\":1,\"Hairpins\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":0.20000000298023225,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"WideTurnarounds\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Horseshoes\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"MinFeatureGroups\":4,\"MaxFeatureGroups\":4,\"CompoundFeatureChance\":0.0,\"MaxCompoundElements\":3,\"RequiredPatterns\":[]},\"Quarters\":{\"MinimumDualQuarterCount\":0,\"MaximumDualQuarterCount\":0,\"QuarterTypeOverrides\":[0,0,0,0],\"PreventAdjacentDualQuarters\":false,\"AllowQ1Dual\":false,\"AllowQ4Dual\":true,\"ChoiceType\":1,\"LaneSeparationMeters\":24.0,\"CatchWidthScale\":1.7000000476837159,\"DualRoadWidthScale\":1.0,\"RoadLengthTolerance\":0.20000000298023225,\"NeutralTimeTolerancePercent\":4.0,\"RequireArchetypeDifferentiation\":true,\"BalancePolicy\":0},\"Generation\":{\"MaxAttempts\":300,\"SelectionMode\":0,\"CandidatesToScore\":4,\"FailurePolicy\":2,\"ClosureReserveFraction\":0.20000000298023225,\"ConsistentTextureTopology\":true,\"TextureTopologyMetersPerRing\":1.0,\"MetersPerRing\":1.5,\"MaxFacetAngleDegrees\":0.5,\"TargetTotalRings\":20000,\"DynamicFeatureAdjacency\":true,\"UseCanonicalTurns\":true,\"ClosureAngleRelief\":false,\"RobustDualQuarterFit\":false,\"DirectionalCorkscrews\":true,\"SmoothCorkscrewFloor\":true},\"Visual\":{\"CenterGuideEnabled\":true,\"CenterGuideColor\":{\"r\":0.550000011920929,\"g\":0.949999988079071,\"b\":1.0,\"a\":1.0},\"CenterGuideWidth\":0.3499999940395355,\"CenterGuideEmission\":1.2000000476837159,\"LaneEdgePosition\":1.0,\"LaneMergeFraction\":0.7799999713897705,\"LaneSplitFraction\":0.8999999761581421,\"WallMarkersEnabled\":true,\"WallMarkerColor\":{\"r\":0.550000011920929,\"g\":0.949999988079071,\"b\":1.0,\"a\":1.0},\"WallMarkerWidth\":0.800000011920929,\"WallMarkerSpacingMeters\":48.0,\"MarkerFadeDistance\":800.0}}",
+    "RulebookSchemaVersion": 2,
+    "RulebookHash": "6ff36ff9998547ad5618a74507db00ffd15f3ca0a4c817bb6816c9bfeb6a5f1e",
+    "AppliedPresetName": "Rollercoaster",
+    "SettingsLocks": {
+        "ScaleAndSpeed": false,
+        "Layout": false,
+        "Corners": false,
+        "RoadShape": false,
+        "Transitions": false,
+        "Elevation": false,
+        "Features": false,
+        "Quarters": false,
+        "GenerationBehavior": false,
+        "Visual": false
+    },
+    "LayoutLockMode": 0,
+    "Origin": {
+        "Position": {
+            "x": 9386.6796875,
+            "y": -0.0002099999983329326,
+            "z": 12094.2919921875
+        },
+        "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 1.0
+        },
+        "Scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        }
+    },
+    "SelectionMode": 0,
+    "MaximumAttempts": 300,
+    "CandidatesToScore": 4,
+    "BaseRecipeHash": "948405046c14b1425091b4ffcfba1e73bcec68991e525b5bffe1c7d76ec78efd",
+    "RecipeRevision": 0,
+    "TopologySlotOverrides": [],
+    "DesignerAuthoredVariant": false,
+    "AuthoringBaselineAttemptIndex": -1,
+    "AuthoringBaselineLapLengthMeters": 0.0,
+    "AuthoringElevationBaseline": [],
+    "ExpectedLayoutHash": "0114e66cb73ebe5208a92ac931c3226384a793c5678e1e09bd35a63193aa847f",
+    "RecipeHash": "948405046c14b1425091b4ffcfba1e73bcec68991e525b5bffe1c7d76ec78efd"
+}

@@ -1,0 +1,25 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.directional-corkscrew",
+  "DefinitionVersion": 1,
+  "DisplayName": "Directional Corkscrew",
+  "Family": "Inversion Turn",
+  "Enabled": true,
+  "SemanticElement": 50,
+  "HasPatternType": false,
+  "TopologyRole": 1,
+  "Solver": 0,
+  "SpeedIntent": 2,
+  "RiskLevel": 3,
+  "RequiresRecoveryAfter": true,
+  "Length": { "Minimum": 700.0, "Preferred": 2000.0, "Maximum": 4200.0, "Resolution": 2, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryLength": { "Minimum": 180.0, "Preferred": 450.0, "Maximum": 1000.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "RecoveryLength": { "Minimum": 180.0, "Preferred": 450.0, "Maximum": 1000.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryContract": { "Orientation": 0, "RequiresUprightEntry": false, "MaximumBankDegrees": 25.0, "MaximumPitchDegrees": 20.0, "MaximumHorizontalCurvature": 0.00125, "MaximumRollRateDegreesPerMeter": 0.08, "AcceptsCurvedEntry": true },
+  "ExitContract": { "Orientation": 0, "RollChangeDegrees": 360.0 },
+  "Primitives": [
+    { "PrimitiveId": "turning-half-corkscrew-in", "DisplayName": "Turning Half Corkscrew In", "PrimitiveType": 4, "EntryOrientation": 0, "ExitOrientation": 1, "LengthFraction": 0.5, "RadiusSource": 1, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "turning-half-corkscrew-out", "DisplayName": "Turning Half Corkscrew Out", "PrimitiveType": 4, "EntryOrientation": 1, "ExitOrientation": 0, "LengthFraction": 0.5, "RadiusSource": 2, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false }
+  ],
+  "MinimumClearanceMeters": 55.0
+}

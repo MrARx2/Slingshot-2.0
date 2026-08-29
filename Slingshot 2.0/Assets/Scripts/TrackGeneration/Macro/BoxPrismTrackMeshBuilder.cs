@@ -43,7 +43,9 @@ namespace TrackGeneration.Macro
         // letting it tunnel through the road.
         private const float ColliderThickness = 5f;
 
-        // UV tiling length along the track in meters.
+        // UV tiling length in world meters. Both axes use physical surface distance,
+        // so a checker or authored texture keeps the same scale on floors, walls,
+        // loops and pipes instead of stretching with vertex index or section length.
         private const float TileLength = 10f;
 
         // Cross-section resolution used for COLLISION only. Collision does not need
@@ -71,6 +73,11 @@ namespace TrackGeneration.Macro
         private Vector2[] _pts;
         private float[] _cross;
         private Vector2[] _outward;
+        private Vector2[] _outerPts;
+        private float[] _innerSurfaceArc;
+        private float[] _outerSurfaceArc;
+        private readonly int _floorFirstPoint;
+        private readonly int _floorLastPoint;
 
         // Separate buffers for the coarser collision chain.
         private Vector2[] _colPts;
@@ -101,6 +108,28 @@ namespace TrackGeneration.Macro
             _pts = new Vector2[n];
             _cross = new float[n];
             _outward = new Vector2[n];
+            _outerPts = new Vector2[n];
+            _innerSurfaceArc = new float[n];
+            _outerSurfaceArc = new float[n];
+
+            // Material bands are a topology contract, not a per-ring geometry test.
+            // Turn rounding may narrow the physical flat, but it must never move a
+            // floor/wall submesh seam from one vertex column to another.
+            int ext = TrackCrossSection.ExtensionPointCount(_profile);
+            int bowl = _profile.ProfilePointCount;
+            float authoredFlat = Mathf.Clamp01(_profile.CenterFlatWidthRatio);
+            int first = 0, last = bowl - 1;
+            float firstError = float.MaxValue, lastError = float.MaxValue;
+            for (int i = 0; i < bowl; i++)
+            {
+                float x = _profile.ProfileXAt(i, bowl, authoredFlat);
+                float leftError = Mathf.Abs(x + authoredFlat);
+                float rightError = Mathf.Abs(x - authoredFlat);
+                if (leftError < firstError) { firstError = leftError; first = i; }
+                if (rightError < lastError) { lastError = rightError; last = i; }
+            }
+            _floorFirstPoint = ext + Mathf.Min(first, last);
+            _floorLastPoint = ext + Mathf.Max(first, last);
 
             int cn = ColliderPointCount;
             _colPts = new Vector2[cn];
@@ -112,6 +141,15 @@ namespace TrackGeneration.Macro
         /// chain colliders. AirGap sections emit nothing (they ARE the hole).
         /// </summary>
         public void Build(List<GeneratedTrackSection> sections, Material roadMaterial, Material sideMaterial, Transform root)
+            => Build(sections, roadMaterial, roadMaterial, sideMaterial, root);
+
+        /// <summary>
+        /// Three-surface material contract: driving floor, rideable inner walls, and
+        /// non-drivable outer shell. The legacy overload maps inner walls to the road
+        /// material so existing callers and material sets remain visually valid.
+        /// </summary>
+        public void Build(List<GeneratedTrackSection> sections, Material roadMaterial,
+            Material innerWallMaterial, Material outerShellMaterial, Transform root)
         {
             if (!_profile.IsHalfPipe && !_warnedMissingProfile)
             {
@@ -122,7 +160,7 @@ namespace TrackGeneration.Macro
             var chains = CollectChains(sections);
             for (int c = 0; c < chains.Count; c++)
             {
-                BuildRenderChain(chains[c], c, roadMaterial, sideMaterial, root);
+                BuildRenderChain(chains[c], c, roadMaterial, innerWallMaterial, outerShellMaterial, root);
                 BuildChainCollider(chains[c], c, root);
             }
         }
@@ -407,7 +445,7 @@ namespace TrackGeneration.Macro
         /// the identical accumulated normal.
         /// </summary>
         private void BuildRenderChain(List<GeneratedTrackSection> chain, int index,
-            Material roadMaterial, Material sideMaterial, Transform root)
+            Material roadMaterial, Material innerWallMaterial, Material outerShellMaterial, Transform root)
         {
             var frames = ChainFrames(chain, out bool circular);
             if (frames.Count < 2) return;
@@ -463,13 +501,15 @@ namespace TrackGeneration.Macro
                 bool capHead = c == 0 && !circular && head.CapStart && !head.OpenStart;
                 bool capTail = c == chunkCount - 1 && !circular && tail.CapEnd && !tail.OpenEnd;
                 BuildRenderChunk(frames, positions, uvs, colors, normals, chainOrigin, r0, r1,
-                    $"Track_{index:D2}_{c:D2}", roadMaterial, sideMaterial, root, capHead, capTail);
+                    $"Track_{index:D2}_{c:D2}", roadMaterial, innerWallMaterial,
+                    outerShellMaterial, root, capHead, capTail);
             }
         }
 
         private void BuildRenderChunk(List<TrackConnectionFrame> frames, Vector3[] positions, Vector2[] uvs,
             Color[] colors, Vector3[] normals, Vector3 chainOrigin, int r0, int r1, string name,
-            Material roadMaterial, Material sideMaterial, Transform root, bool capHead, bool capTail)
+            Material roadMaterial, Material innerWallMaterial, Material outerShellMaterial,
+            Transform root, bool capHead, bool capTail)
         {
             int n = InnerPointCount;
             int vpr = VertsPerRing;
@@ -508,38 +548,42 @@ namespace TrackGeneration.Macro
                     }
                 }
 
-                var roadTris = new List<int>((ringIdx.Count - 1) * (n - 1) * 6);
-                var sideTris = new List<int>((ringIdx.Count - 1) * (n + 1) * 6 + 64);
+                var roadTris = new List<int>((ringIdx.Count - 1) * (n - 1) * 3);
+                var innerWallTris = new List<int>((ringIdx.Count - 1) * (n - 1) * 3);
+                var outerShellTris = new List<int>((ringIdx.Count - 1) * (n + 1) * 6 + 64);
                 for (int r = 0; r < ringIdx.Count - 1; r++)
                 {
                     int a = r * vpr;
                     int b = (r + 1) * vpr;
                     for (int i = 0; i < n - 1; i++)
                     {
-                        // Inner drivable surface.
-                        roadTris.Add(a + i); roadTris.Add(b + i); roadTris.Add(b + i + 1);
-                        roadTris.Add(a + i); roadTris.Add(b + i + 1); roadTris.Add(a + i + 1);
+                        // Stable semantic band: the same longitudinal vertex columns
+                        // remain floor/wall on every ring, even through rounded turns.
+                        List<int> innerTris = i >= _floorFirstPoint && i < _floorLastPoint
+                            ? roadTris : innerWallTris;
+                        innerTris.Add(a + i); innerTris.Add(b + i); innerTris.Add(b + i + 1);
+                        innerTris.Add(a + i); innerTris.Add(b + i + 1); innerTris.Add(a + i + 1);
                         // Outer shell (reversed winding — faces away from the road).
-                        sideTris.Add(a + n + i); sideTris.Add(b + n + i + 1); sideTris.Add(b + n + i);
-                        sideTris.Add(a + n + i); sideTris.Add(a + n + i + 1); sideTris.Add(b + n + i + 1);
+                        outerShellTris.Add(a + n + i); outerShellTris.Add(b + n + i + 1); outerShellTris.Add(b + n + i);
+                        outerShellTris.Add(a + n + i); outerShellTris.Add(a + n + i + 1); outerShellTris.Add(b + n + i + 1);
                     }
                     // Tip cap strips (duplicated verts — crisp edges).
                     for (int s = 0; s < 2; s++)
                     {
                         int p = 2 * n + s * 2;
-                        sideTris.Add(a + p); sideTris.Add(b + p); sideTris.Add(b + p + 1);
-                        sideTris.Add(a + p); sideTris.Add(b + p + 1); sideTris.Add(a + p + 1);
+                        outerShellTris.Add(a + p); outerShellTris.Add(b + p); outerShellTris.Add(b + p + 1);
+                        outerShellTris.Add(a + p); outerShellTris.Add(b + p + 1); outerShellTris.Add(a + p + 1);
                     }
                 }
 
                 if (capHead)
                 {
-                    AddCap(verts, uv, col, sideTris, frames[r0 % ringCount], chunkOrigin, facingForward: false);
+                    AddCap(verts, uv, col, outerShellTris, frames[r0 % ringCount], chunkOrigin, facingForward: false);
                     while (norm.Count < verts.Count) norm.Add(-frames[r0 % ringCount].Forward);
                 }
                 if (capTail)
                 {
-                    AddCap(verts, uv, col, sideTris, frames[r1 % ringCount], chunkOrigin, facingForward: true);
+                    AddCap(verts, uv, col, outerShellTris, frames[r1 % ringCount], chunkOrigin, facingForward: true);
                     while (norm.Count < verts.Count) norm.Add(frames[r1 % ringCount].Forward);
                 }
 
@@ -549,9 +593,10 @@ namespace TrackGeneration.Macro
                 mesh.SetUVs(0, uv);
                 mesh.SetColors(col);
                 mesh.SetNormals(norm);
-                mesh.subMeshCount = 2;
+                mesh.subMeshCount = 3;
                 mesh.SetTriangles(roadTris, 0);
-                mesh.SetTriangles(sideTris, 1);
+                mesh.SetTriangles(innerWallTris, 1);
+                mesh.SetTriangles(outerShellTris, 2);
                 mesh.RecalculateBounds();
                 mesh.RecalculateTangents();
 
@@ -560,7 +605,7 @@ namespace TrackGeneration.Macro
                 var filter = lodObj.AddComponent<MeshFilter>();
                 filter.sharedMesh = mesh;
                 var renderer = lodObj.AddComponent<MeshRenderer>();
-                renderer.sharedMaterials = new[] { roadMaterial, sideMaterial };
+                renderer.sharedMaterials = new[] { roadMaterial, innerWallMaterial, outerShellMaterial };
                 if (lod == LodRingStrides.Length - 1)
                     renderer.shadowCastingMode = ShadowCastingMode.Off; // far track: no shadow passes
 
@@ -575,8 +620,8 @@ namespace TrackGeneration.Macro
         /// <summary>
         /// One render ring written into the chain-wide arrays at <paramref name="baseIdx"/>.
         /// Layout per ring (base index r*vpr):
-        ///  0..n-1     : drivable parametric chain, left tip → right tip (road submesh)
-        ///  n..2n-1    : outer shell, inner chain offset outward (side submesh)
+        ///  0..n-1     : drivable parametric chain, split into floor and inner-wall submeshes
+        ///  n..2n-1    : outer shell, inner chain offset outward (outer-shell submesh)
         ///  2n / 2n+1  : left tip cap strip (outer tip, inner tip — duplicated, crisp edge)
         ///  2n+2 / 2n+3: right tip cap strip (inner tip, outer tip)
         /// Vertex colors carry guidance data for the road shaders:
@@ -593,17 +638,29 @@ namespace TrackGeneration.Macro
 
             EvaluateRing(f);
 
+            _innerSurfaceArc[0] = 0f;
+            _outerSurfaceArc[0] = 0f;
+            for (int k = 0; k < n; k++)
+            {
+                _outerPts[k] = _pts[k] + _outward[k] * RoadThickness;
+                if (k == 0) continue;
+                _innerSurfaceArc[k] = _innerSurfaceArc[k - 1] + Vector2.Distance(_pts[k - 1], _pts[k]);
+                _outerSurfaceArc[k] = _outerSurfaceArc[k - 1] + Vector2.Distance(_outerPts[k - 1], _outerPts[k]);
+            }
+            float innerCenter = _innerSurfaceArc[n / 2];
+            float outerCenter = _outerSurfaceArc[n / 2];
+
             for (int k = 0; k < n; k++)
             {
                 positions[w + k] = f.Position + f.Right * _pts[k].x + f.Up * _pts[k].y - origin;
-                uvs[w + k] = new Vector2(k / (float)(n - 1), v);
+                uvs[w + k] = new Vector2((_innerSurfaceArc[k] - innerCenter) / TileLength, v);
                 colors[w + k] = RingColor(f, k);
             }
             for (int k = 0; k < n; k++)
             {
-                Vector2 o = _pts[k] + _outward[k] * RoadThickness;
+                Vector2 o = _outerPts[k];
                 positions[w + n + k] = f.Position + f.Right * o.x + f.Up * o.y - origin;
-                uvs[w + n + k] = new Vector2(k / (float)(n - 1), v);
+                uvs[w + n + k] = new Vector2((_outerSurfaceArc[k] - outerCenter) / TileLength, v);
                 colors[w + n + k] = RingColor(f, k);
             }
 
@@ -614,7 +671,8 @@ namespace TrackGeneration.Macro
             positions[w + 2 * n + 3] = positions[w + 2 * n - 1]; // right outer tip
             for (int d = 0; d < 4; d++)
             {
-                uvs[w + 2 * n + d] = new Vector2(d < 2 ? 0f : 1f, v);
+                int source = d == 0 ? n : d == 1 ? 0 : d == 2 ? n - 1 : 2 * n - 1;
+                uvs[w + 2 * n + d] = uvs[w + source];
                 colors[w + 2 * n + d] = RingColor(f, d < 2 ? 0 : n - 1);
             }
         }

@@ -46,8 +46,12 @@ namespace TrackGeneration.Tests
 
                 Assert.Greater(text.Length, 5000, "Report suspiciously short.");
                 StringAssert.Contains("SCENE SETTINGS", text);
+                StringAssert.Contains("MATERIAL CONTRACT", text);
+                StringAssert.Contains("RoadSurface:", text);
                 StringAssert.Contains("RESOLVED", text);
                 StringAssert.Contains("CHAIN MAP", text);
+                StringAssert.Contains("VERTICAL SILHOUETTE", text);
+                StringAssert.Contains("longest sustained grade", text);
                 StringAssert.Contains("FULL SECTION + RING DUMP", text);
                 StringAssert.Contains("CONNECTOR AUDIT", text);
                 StringAssert.Contains("WALL-WAVE HOTSPOTS", text);

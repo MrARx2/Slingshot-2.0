@@ -26,6 +26,13 @@ namespace TrackGeneration.Planning
             Failure = GenerationFailureReason.None;
             FailureMessage = "";
 
+            return BuildInternal(plan, cfg, 0);
+        }
+
+        private GeneratedTrackLayout BuildInternal(TopologyPlan plan,
+            ResolvedTrackGenerationConfig cfg, int authoringClosurePass)
+        {
+
             var layout = new GeneratedTrackLayout();
             var defs = plan.Defs;
             var ctx = FrameBuildContext.From(cfg);
@@ -191,6 +198,24 @@ namespace TrackGeneration.Planning
             if (posErr > weldWindow)
             {
                 Vector3 closureDelta = endF.Position - startFrame.Position;
+
+                // A focused edit preserves most of an accepted route, including
+                // authored rotational features whose plan stamp was measured from a
+                // level reference pose. When such a feature is entered on the accepted
+                // route's small grade/bank, its true built displacement can differ by
+                // a few metres from that reference stamp. Feed the measured endpoint
+                // back into the existing legal closure variables and rebuild. This is
+                // route fitting, not a weld relaxation: the rebuilt candidate still has
+                // to pass this unchanged 10 m window and every downstream validator.
+                if (cfg.DesignerAuthoringMode && authoringClosurePass < 2 &&
+                    TrackTopologyPlanner.TryRefineAuthoringBuiltClosure(
+                        cfg, plan, closureDelta, out string refinement))
+                {
+                    if (!string.IsNullOrEmpty(refinement))
+                        plan.Warnings.Add(refinement);
+                    return BuildInternal(plan, cfg, authoringClosurePass + 1);
+                }
+
                 string worstStampedDrift = "none";
                 float worstStampedDriftMeters = 0f;
                 foreach (var builtSection in layout.Sections)
@@ -268,6 +293,29 @@ namespace TrackGeneration.Planning
             // the finished driving line (anchors: weld ring, gates, air-gap lips) ──
             TrackRetopology.Apply(layout, cfg);
 
+            // Retopology resamples the finished 3D path. On a focused edit that last
+            // interpolation can slightly sharpen an otherwise-legal ordinary-road
+            // grade transition (the reported Chicane ring was measured after this
+            // step). Re-run the deterministic profile solve on the final ring grid so
+            // the geometry the validator sees is the geometry that was constrained.
+            if (cfg.DesignerAuthoringMode &&
+                !VerticalProfilePlanner.TryApply(layout.Sections, cfg,
+                    out string finalVerticalFailure))
+            {
+                Fail(GenerationFailureReason.TransitionRateExceeded,
+                    finalVerticalFailure ??
+                    "The final Track Editor ring grid could not satisfy the vertical transition envelope.");
+                return null;
+            }
+            TrackRetopology.RefreshVerticalMetrics(layout.Sections);
+
+            // Corkscrews always keep a shallow concave floor through their rolling
+            // body. This is deliberately independent of Dynamic Turn Rounding: that
+            // option controls ordinary-corner shaping, while the corkscrew belly is a
+            // driveability contract. A flat floor rotating at speed offers no lateral
+            // restoring surface and can throw the craft across the low edge.
+            ApplyCorkscrewBelly(layout.Sections, cfg);
+
             foreach (var sec in layout.Sections)
             {
                 sec.Definition.SubdivisionCount = Mathf.Max(0, (sec.SubdivisionFrames?.Length ?? 1) - 1);
@@ -293,7 +341,10 @@ namespace TrackGeneration.Planning
                 SubdivisionFrames = frames,
                 PatternId = def.PatternId,
                 QuarterIndex = def.QuarterIndex,
-                RoadId = def.RoadId
+                RoadId = def.RoadId,
+                TopologySlotId = def.TopologySlotId,
+                TopologySlotOrder = def.TopologySlotOrder,
+                TopologySlotRouteOrder = def.TopologySlotRouteOrder
             };
 
             if (frames != null && frames.Length > 0)
@@ -563,9 +614,8 @@ namespace TrackGeneration.Planning
                 ProcessBankingChain(alternate, circular: false, cfg);
         }
 
-        /// <summary>Frames of these sections may carry field banking (everything else keeps its authored orientation).</summary>
         /// <summary>
-        /// Turn-rounding held through loops/corkscrews/half-loops — a PARTIAL bowl.
+        /// Partial floor rounding used by rotational features.
         ///
         /// The road still has to be a road inside a stunt. Driving it to 1 closes the
         /// flat centre completely (a 48 m floor collapses to ~6 m), which turns the
@@ -583,6 +633,115 @@ namespace TrackGeneration.Planning
         /// to 0 to carry the stock cross-section through stunts unchanged.
         /// </summary>
         private const float RotationalBowlRounding = 0.45f;
+
+        /// <summary>
+        /// Stamps the mandatory shallow concave belly onto every complete corkscrew
+        /// roll, including inline, directional, double and compound variants.
+        ///
+        /// Identification is geometry-based rather than name-based: any RoadRoll phase
+        /// carrying at least one complete revolution is a corkscrew body. This also
+        /// covers future variants automatically, while excluding the 180-degree rollout
+        /// of a plain Immelmann. Legacy Corkscrew sections without phase data receive
+        /// the same treatment across their complete body.
+        ///
+        /// The weight eases from zero at the roll boundaries to 0.45 in the body. That
+        /// retains a broad road floor while replacing the dead-flat center with enough
+        /// inward curvature to guide a fast craft through every road orientation.
+        /// Existing stronger turn rounding is preserved.
+        /// </summary>
+        private static void ApplyCorkscrewBelly(List<GeneratedTrackSection> sections,
+            ResolvedTrackGenerationConfig cfg)
+        {
+            if (sections == null || cfg == null) return;
+
+            foreach (GeneratedTrackSection sec in sections)
+            {
+                TrackConnectionFrame[] frames = sec?.SubdivisionFrames;
+                if (sec?.Definition == null || frames == null || frames.Length < 2)
+                    continue;
+
+                bool changed = false;
+                for (int i = 0; i < frames.Length; i++)
+                {
+                    float weight = CorkscrewBellyWeight(sec, frames[i], cfg);
+                    if (weight <= 0.0001f) continue;
+
+                    TrackConnectionFrame frame = frames[i];
+                    float belly = weight * RotationalBowlRounding;
+                    if (frame.TurnRounding + 0.0001f >= belly) continue;
+                    frame.TurnRounding = belly;
+                    frames[i] = frame;
+                    changed = true;
+                }
+
+                if (!changed) continue;
+                sec.StartFrame = frames[0];
+                sec.EndFrame = frames[frames.Length - 1];
+            }
+        }
+
+        /// <summary>0..1 engagement of the corkscrew belly at one finished ring.</summary>
+        private static float CorkscrewBellyWeight(GeneratedTrackSection sec,
+            in TrackConnectionFrame frame, ResolvedTrackGenerationConfig cfg)
+        {
+            TrackMacroSectionDefinition def = sec?.Definition;
+            if (def == null) return 0f;
+
+            float sectionStart = sec.StartFrame.ArcLength;
+            float sectionLength = Mathf.Max(1f, sec.EndFrame.ArcLength - sectionStart);
+            float localDistance = Mathf.Clamp(frame.ArcLength - sectionStart, 0f, sectionLength);
+
+            // Old serialized tracks can still contain the dedicated legacy type with
+            // no rotational phase manifest. Keep those driveable as well.
+            var phases = def.RotationalPhases;
+            if (def.SectionType == TrackMacroSectionType.Corkscrew &&
+                (phases == null || phases.Count == 0))
+                return BellyWindowWeight(localDistance, 0f, sectionLength, cfg);
+
+            if (phases == null || phases.Count == 0) return 0f;
+
+            float cursor = 0f;
+            float strongest = 0f;
+            for (int p = 0; p < phases.Count; p++)
+            {
+                RotationalPhaseDefinition phase = phases[p];
+                float phaseLength = phase?.Length ?? 1f;
+                if (p > 0)
+                {
+                    RotationalPhaseDefinition previous = phases[p - 1];
+                    cursor -= SectionFrameBuilders.RotationalBlendFraction(
+                                  previous?.BlendToNext ?? RotationalBlendPreset.None) *
+                              Mathf.Min(previous?.Length ?? 1f, phaseLength);
+                }
+
+                float start = cursor;
+                float end = start + phaseLength;
+                cursor = end;
+
+                if (phase == null || phase.Axis != RotationalPhaseAxis.RoadRoll)
+                    continue;
+
+                float rollDegrees = Mathf.Abs(phase.Degrees(cfg.RotationUnitDegrees));
+                if (rollDegrees < 359f) continue; // plain Immelmann rollout is not a corkscrew
+
+                strongest = Mathf.Max(strongest,
+                    BellyWindowWeight(localDistance, start, end, cfg));
+            }
+
+            return strongest;
+        }
+
+        private static float BellyWindowWeight(float distance, float start, float end,
+            ResolvedTrackGenerationConfig cfg)
+        {
+            if (distance <= start || distance >= end) return 0f;
+            float length = Mathf.Max(1f, end - start);
+            float blend = Mathf.Min(length * 0.25f,
+                Mathf.Max(50f, cfg.BankTransitionLength * 0.5f));
+            float fromBoundary = Mathf.Min(distance - start, end - distance);
+            return SectionFrameBuilders.Smooth01(
+                Mathf.Clamp01(fromBoundary / Mathf.Max(1f, blend)));
+        }
 
         /// <summary>
         /// Road width through a ROLLING rotational phase, as a fraction of the normal
@@ -652,6 +811,7 @@ namespace TrackGeneration.Planning
             return SectionFrameBuilders.Smooth01(Mathf.Clamp01(fromEnd / Mathf.Max(1f, blend)));
         }
 
+        /// <summary>Frames of these sections may carry field banking (everything else keeps its authored orientation).</summary>
         private static bool IsBankable(GeneratedTrackSection sec)
         {
             switch (sec.Definition.SectionType)
@@ -972,7 +1132,7 @@ namespace TrackGeneration.Planning
                 }
             }
 
-            // ── Apply: wall boost + floor tilt + bank metadata from the field ──
+            // ── Apply: whole-profile floor tilt + bank metadata from the field ──
             for (int i = 0; i < n; i++)
             {
                 if (!bankable[i]) continue;
@@ -1006,10 +1166,10 @@ namespace TrackGeneration.Planning
                 // physical floor rotation, against 0.68° on a loop — which is precisely
                 // why loops looked right while corkscrews did not.
                 //
-                // The rings stay in the field for wall support and bank METADATA (both
-                // harmless, and the wall emphasis is symmetrised below); only the
-                // frame-rewriting tilt is withheld, faded out with the same eased weight
-                // so the boundary with ordinary road stays continuous.
+                // The rings stay in the field for bank metadata and circular-bowl
+                // rounding. Only the frame-rewriting tilt is withheld, faded out with
+                // the same eased weight so the boundary with ordinary road stays
+                // continuous.
                 tilt *= 1f - rotational;
 
                 if (tilt > 0.01f)
@@ -1021,50 +1181,11 @@ namespace TrackGeneration.Planning
                     f.Right = Vector3.Cross(up, f.Forward).normalized;
                 }
 
-                // Outside wall boost / inside trim, split by side emphasis. In a full
-                // corner (|signed| = mag) this is the classic bobsled boost/trim; through
-                // an opposite-direction transfer (signed → 0 while mag stays up) BOTH
-                // walls hold partial support and the emphasis hands over smoothly —
-                // support never collapses on both sides before the new side rises.
-                // wLeft is the LEFT wall's share of the outside emphasis (a right turn,
-                // signed > 0, boosts the LEFT wall).
-                float wLeft = mag > 1e-4f ? 0.5f * (1f + signed / mag) : 0.5f;
-                float commit = mag > 1e-4f ? sAbs / mag : 0f; // 1 = committed to a side, 0 = mid-transfer
-                float newLeft = -0.75f * mag * wLeft + 0.35f * mag * (1f - wLeft) * commit;
-                float newRight = -0.75f * mag * (1f - wLeft) + 0.35f * mag * wLeft * commit;
-
-                // ── Rotational events keep the half-pipe, and keep it SYMMETRIC ──
-                //
-                // A loop or corkscrew rolls the road through every orientation, so the
-                // craft can be anywhere across the width with any part of the section
-                // pointing at the ground. Two things follow, and neither is true of an
-                // ordinary corner:
-                //
-                //  (1) The flat centre is dead weight. On a 120 m road with the stock
-                //      0.50 flat ratio, 30 m either side of centre has ZERO restoring
-                //      tilt — rolled onto its side there is simply nothing holding the
-                //      craft, and it slides off the low edge. The bowl has to stay a
-                //      bowl through the whole feature.
-                //
-                //  (2) There is no "inside" or "outside" wall to emphasise. The field
-                //      still sees the event's small residual yaw as a turn and trims one
-                //      wall while boosting the other — measured at 35 % shorter on one
-                //      side mid-corkscrew. That asymmetry is meaningless here and it is
-                //      exactly the wall a craft on that lane falls over.
-                //
-                // Both are eased in and out across the section ends, so the weld with
-                // the neighbouring road stays continuous.
-                if (rotational > 0.001f)
-                {
-                    float symmetric = 0.5f * (newLeft + newRight);
-                    newLeft = Mathf.Lerp(newLeft, symmetric, rotational);
-                    newRight = Mathf.Lerp(newRight, symmetric, rotational);
-                }
-
-                // Junction masks (positive suppression set by the split/merge throats)
-                // always win on their side.
-                f.LeftWallSuppression = f.LeftWallSuppression > 0.001f ? Mathf.Max(f.LeftWallSuppression, newLeft) : newLeft;
-                f.RightWallSuppression = f.RightWallSuppression > 0.001f ? Mathf.Max(f.RightWallSuppression, newRight) : newRight;
+                // Ordinary roads never author one-sided wall height or angle here.
+                // Banking rotates the complete cross-section as a rigid half-pipe; it
+                // must not stretch the outside wall, trim the inside wall, or create a
+                // wallride by accident. Explicit wallrides and pipe features stamp
+                // their own suppression/morph signals in their section builders.
 
                 // Dynamic turn rounding: the same committed field drives how far the
                 // flat center closes into a continuous bowl (full rounding at apex,
@@ -1083,19 +1204,8 @@ namespace TrackGeneration.Planning
                     f.TurnRounding = rounding;
                 }
 
-                // Outside catch wall: past a demand threshold, the OUTSIDE wall curls
-                // toward (and past) vertical to hold the craft in the bowl. Emphasis
-                // follows the side weights, so transfers hand the curl over smoothly.
-                if (cfg.CatchWallEnabled)
-                {
-                    float engage = Mathf.Clamp01((mag - cfg.CatchWallMinimumDemand) /
-                                   Mathf.Max(0.05f, 1f - cfg.CatchWallMinimumDemand)) * cfg.CatchWallStrength;
-                    if (engage > 0.001f)
-                    {
-                        f.LeftOverhang = Mathf.Max(f.LeftOverhang, engage * wLeft * commit);
-                        f.RightOverhang = Mathf.Max(f.RightOverhang, engage * (1f - wLeft) * commit);
-                    }
-                }
+                // Likewise, ordinary turn demand never authors overhang. Overhang is
+                // reserved for an explicitly selected wallride/pipe feature.
 
                 // ── Narrow the road through ROLLING phases ──
                 //

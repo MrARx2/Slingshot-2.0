@@ -75,10 +75,10 @@ namespace TrackGeneration.Macro
         [Tooltip("Dynamic turn rounding 0..1: 0 = configured center-flat ratio, 1 = fully rounded bowl (flat center gone). Set by the global turn-rounding field.")]
         public float TurnRounding;
 
-        [Tooltip("LEFT wall overhang engagement 0..1: 0 = ordinary wall (safety-lip curl only), 1 = full catch-wall curl past vertical. Set by the catch-wall/wallride passes.")]
+        [Tooltip("LEFT wall overhang engagement 0..1. Reserved for explicitly authored wallride/pipe features; ordinary road leaves it at zero.")]
         public float LeftOverhang;
 
-        [Tooltip("RIGHT wall overhang engagement 0..1.")]
+        [Tooltip("RIGHT wall overhang engagement 0..1. Reserved for explicitly authored wallride/pipe features.")]
         public float RightOverhang;
 
         [Tooltip("Pipe closure 0..1: 0 = open half-pipe road, 1 = fully closed tube. Set by full-pipe feature sections; the cross-section morphs smoothly between them.")]

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using TrackGeneration.Design;
@@ -7,9 +9,9 @@ using TrackGeneration.Planning;
 namespace TrackGeneration.Tests
 {
     /// <summary>
-    /// Stage 3 guards: the unified parametric cross-section — stable topology, no
-    /// self-intersection with catch walls past vertical, seamless pipe closure,
-    /// dynamic rounding reaching its targets, and smooth per-frame evolution.
+    /// Stage 3 guards: the unified parametric cross-section — stable topology, circular
+    /// ordinary half-pipes, explicit-feature overhang, seamless pipe closure, dynamic
+    /// rounding reaching its targets, and smooth per-frame evolution.
     /// </summary>
     public class CrossSectionTests
     {
@@ -182,6 +184,194 @@ namespace TrackGeneration.Tests
             for (int i = 1; i < bowl; i++)
                 Assert.GreaterOrEqual(roundPts[ext + i].x, roundPts[ext + i - 1].x - 1e-4f,
                     "Rounded bowl x-order broke.");
+        }
+
+        [Test]
+        public void CorkscrewBelly_IsMandatoryForEveryFullRollVariant()
+        {
+            var cfg = new ResolvedTrackGenerationConfig
+            {
+                RotationUnitDegrees = 90f,
+                BankTransitionLength = 100f,
+                DynamicTurnRoundingEnabled = false
+            };
+
+            RotationalPhaseDefinition Phase(RotationalPhaseAxis axis, int units,
+                float length, float horizontalTurn = 0f)
+                => new RotationalPhaseDefinition
+                {
+                    Axis = axis,
+                    RotationUnits = units,
+                    FirstHalfLength = length * 0.5f,
+                    SecondHalfLength = length * 0.5f,
+                    FirstHalfRadius = 200f,
+                    SecondHalfRadius = 200f,
+                    HorizontalTurnDegrees = horizontalTurn,
+                    BlendToNext = RotationalBlendPreset.None
+                };
+
+            GeneratedTrackSection Section(TrackMacroSectionType type,
+                params RotationalPhaseDefinition[] phases)
+            {
+                var definition = new TrackMacroSectionDefinition
+                {
+                    SectionType = type,
+                    Width = 100f,
+                    RotationalPhases = phases.Length > 0
+                        ? new List<RotationalPhaseDefinition>(phases)
+                        : null
+                };
+                float length = phases.Length > 0
+                    ? SectionFrameBuilders.RotationalEventLength(definition)
+                    : 800f;
+                var frames = new TrackConnectionFrame[25];
+                for (int i = 0; i < frames.Length; i++)
+                {
+                    frames[i] = TrackConnectionFrame.Origin(100f);
+                    frames[i].ArcLength = length * i / (frames.Length - 1);
+                }
+                return new GeneratedTrackSection
+                {
+                    Definition = definition,
+                    StartFrame = frames[0],
+                    EndFrame = frames[frames.Length - 1],
+                    SubdivisionFrames = frames
+                };
+            }
+
+            var inline = Section(TrackMacroSectionType.RotationalEvent,
+                Phase(RotationalPhaseAxis.RoadRoll, 4, 800f));
+            var directional = Section(TrackMacroSectionType.RotationalEvent,
+                Phase(RotationalPhaseAxis.RoadRoll, 4, 800f, 90f));
+            var doubled = Section(TrackMacroSectionType.RotationalEvent,
+                Phase(RotationalPhaseAxis.RoadRoll, 8, 1400f));
+            var loopToCorkscrew = Section(TrackMacroSectionType.RotationalEvent,
+                Phase(RotationalPhaseAxis.VerticalCenterline, 4, 600f),
+                Phase(RotationalPhaseAxis.RoadRoll, 4, 800f));
+            var halfLoopToCorkscrew = Section(TrackMacroSectionType.RotationalEvent,
+                Phase(RotationalPhaseAxis.VerticalCenterline, 2, 400f),
+                Phase(RotationalPhaseAxis.RoadRoll, 6, 1000f));
+            var legacy = Section(TrackMacroSectionType.Corkscrew);
+            var immelmann = Section(TrackMacroSectionType.RotationalEvent,
+                Phase(RotationalPhaseAxis.VerticalCenterline, 2, 400f),
+                Phase(RotationalPhaseAxis.RoadRoll, 2, 500f));
+
+            var sections = new List<GeneratedTrackSection>
+            {
+                inline, directional, doubled, loopToCorkscrew,
+                halfLoopToCorkscrew, legacy, immelmann
+            };
+            MethodInfo apply = typeof(TrackCandidateBuilder).GetMethod(
+                "ApplyCorkscrewBelly", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(apply, "The finished-frame corkscrew belly pass is missing.");
+            apply.Invoke(null, new object[] { sections, cfg });
+
+            void AssertBelly(GeneratedTrackSection section, string variant)
+            {
+                float peak = 0f;
+                foreach (TrackConnectionFrame frame in section.SubdivisionFrames)
+                    peak = Mathf.Max(peak, frame.TurnRounding);
+                Assert.AreEqual(0.45f, peak, 0.001f,
+                    $"{variant} did not receive the shallow concave belly.");
+                Assert.AreEqual(0f, section.SubdivisionFrames[0].TurnRounding, 0.0001f,
+                    $"{variant} belly did not fade to zero at entry.");
+                Assert.AreEqual(0f,
+                    section.SubdivisionFrames[section.SubdivisionFrames.Length - 1].TurnRounding,
+                    0.0001f, $"{variant} belly did not fade to zero at exit.");
+            }
+
+            AssertBelly(inline, "Inline corkscrew");
+            AssertBelly(directional, "Directional corkscrew");
+            AssertBelly(doubled, "Double corkscrew");
+            AssertBelly(loopToCorkscrew, "Loop-to-corkscrew");
+            AssertBelly(halfLoopToCorkscrew, "Half-loop-to-corkscrew");
+            AssertBelly(legacy, "Legacy corkscrew");
+
+            foreach (TrackConnectionFrame frame in immelmann.SubdivisionFrames)
+                Assert.AreEqual(0f, frame.TurnRounding, 0.0001f,
+                    "A plain Immelmann rollout was incorrectly treated as a corkscrew.");
+        }
+
+        [Test]
+        public void OrdinaryHalfPipeStaysCircularWhenItsDepthChanges()
+        {
+            var p = Profile();
+            var f = Frame();
+            f.SideHeight = 8f;
+            var pts = Evaluate(p, f);
+
+            float halfW = f.Width * 0.5f;
+            p.ResolveCircularBowl(halfW, f.SideHeight, f.TurnRounding,
+                out float flat, out _, out float evaluatedSideHeight);
+            float radius = evaluatedSideHeight * p.ShapeDepthScale;
+            float shoulder = halfW * flat;
+            int ext = TrackCrossSection.ExtensionPointCount(p);
+
+            Assert.AreEqual(8f, radius, 1e-4f, "Per-frame wall depth was not preserved as the circle radius.");
+            Assert.AreEqual(halfW - radius, shoulder, 1e-4f,
+                "The floor shoulder did not move with the circular wall radius.");
+
+            for (int i = 0; i < p.ProfilePointCount; i++)
+            {
+                Vector2 point = pts[ext + i];
+                if (Mathf.Abs(point.x) <= shoulder + 0.01f) continue;
+
+                float centerX = Mathf.Sign(point.x) * shoulder;
+                float measuredRadius = Vector2.Distance(point, new Vector2(centerX, radius));
+                Assert.AreEqual(radius, measuredRadius, 0.01f,
+                    $"Bowl sample {i} became elliptical instead of circular.");
+            }
+        }
+
+        [Test]
+        public void OrdinaryGeneratedRoadDoesNotBecomeAnImplicitWallride()
+        {
+            TrackGenerationResult result = null;
+            for (int s = 7640; s < 7650 && (result == null || !result.Success); s++)
+            {
+                var settings = TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Technical);
+                settings.Road.OutsideCatchWall = true; // legacy serialized toggle must remain harmless
+                result = TrackGenerationTestUtil.Generate(settings, s);
+            }
+            Assert.IsTrue(result is { Success: true }, "No valid track generated.");
+
+            int ordinaryFrames = 0;
+            foreach (var sec in result.Layout.Sections)
+            {
+                if (sec.SubdivisionFrames == null) continue;
+                if (sec.Definition.SectionType == TrackMacroSectionType.WallrideTurn) continue;
+                foreach (TrackConnectionFrame frame in sec.SubdivisionFrames)
+                {
+                    ordinaryFrames++;
+                    Assert.AreEqual(0f, frame.LeftOverhang, 1e-5f,
+                        $"Ordinary section {sec.Definition.DebugName} authored a left overhang.");
+                    Assert.AreEqual(0f, frame.RightOverhang, 1e-5f,
+                        $"Ordinary section {sec.Definition.DebugName} authored a right overhang.");
+                    Assert.GreaterOrEqual(frame.LeftWallSuppression, -1e-5f,
+                        $"Ordinary section {sec.Definition.DebugName} stretched its left wall.");
+                    Assert.GreaterOrEqual(frame.RightWallSuppression, -1e-5f,
+                        $"Ordinary section {sec.Definition.DebugName} stretched its right wall.");
+                }
+            }
+
+            Assert.Greater(ordinaryFrames, 20, "The generated track did not exercise ordinary road frames.");
+        }
+
+        [Test]
+        public void TurnRoundingKeepsTextureColumnsAtStableLateralPositions()
+        {
+            var p = Profile();
+            var flat = Frame();
+            var rounded = Frame();
+            rounded.TurnRounding = 1f;
+
+            Vector2[] flatPoints = Evaluate(p, flat);
+            Vector2[] roundedPoints = Evaluate(p, rounded);
+            Assert.AreEqual(flatPoints.Length, roundedPoints.Length);
+            int ext = TrackCrossSection.ExtensionPointCount(p);
+            for (int i = 0; i < p.ProfilePointCount; i++)
+                Assert.AreEqual(flatPoints[ext + i].x, roundedPoints[ext + i].x, 1e-4f,
+                    $"Bowl texture column {i} moved laterally when the turn rounded.");
         }
 
         [Test]

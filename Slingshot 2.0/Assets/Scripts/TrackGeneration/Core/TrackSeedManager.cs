@@ -174,6 +174,21 @@ namespace TrackGeneration.Core
             return activeSeed;
         }
 
+        /// <summary>
+        /// Activates an exact seed supplied by a Generation Recipe without drawing new
+        /// entropy. Kept separate from <see cref="InitializeSeed"/> so recipe replay can
+        /// never accidentally substitute a random master seed.
+        /// </summary>
+        public TrackSeed ActivateSeed(int baseSeed, string displayName = null)
+        {
+            activeSeed = TrackSeed.CreateNew(baseSeed);
+            if (!string.IsNullOrWhiteSpace(displayName)) activeSeed.DisplayName = displayName.Trim();
+            currentSeedInput = baseSeed;
+            useRandomSeed = false;
+            lastGeneratedHash = activeSeed.ComputeHash();
+            return activeSeed;
+        }
+
         // ──────────────────────────────────────────────
         //  Private Helpers
         // ──────────────────────────────────────────────

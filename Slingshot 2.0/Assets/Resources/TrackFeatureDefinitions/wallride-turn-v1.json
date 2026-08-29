@@ -1,0 +1,27 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.wallride-turn",
+  "DefinitionVersion": 1,
+  "DisplayName": "Wallride Turn",
+  "Family": "Turn",
+  "Enabled": true,
+  "SemanticElement": 7,
+  "HasPatternType": true,
+  "PatternType": 19,
+  "TopologyRole": 1,
+  "Solver": 0,
+  "SpeedIntent": 2,
+  "RiskLevel": 3,
+  "RequiresRecoveryAfter": true,
+  "Length": { "Minimum": 350.0, "Preferred": 950.0, "Maximum": 1900.0, "Resolution": 1, "MayAutoExpand": true, "ScaleWithDesignSpeed": false, "ReferenceSpeedMps": 361.1111 },
+  "EntryLength": { "Minimum": 180.0, "Preferred": 360.0, "Maximum": 900.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "RecoveryLength": { "Minimum": 180.0, "Preferred": 450.0, "Maximum": 1000.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryContract": { "Orientation": 0, "RequiresUprightEntry": false, "MaximumBankDegrees": 35.0, "MaximumPitchDegrees": 25.0, "MaximumHorizontalCurvature": 0.0025, "MaximumRollRateDegreesPerMeter": 0.1, "AcceptsCurvedEntry": true },
+  "ExitContract": { "Orientation": 0 },
+  "Primitives": [
+    { "PrimitiveId": "wallride-bank-in", "DisplayName": "Wallride Bank In", "PrimitiveType": 6, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.2, "RadiusSource": 0, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "wallride-arc", "DisplayName": "Wallride Arc", "PrimitiveType": 2, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.6, "RadiusSource": 3, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "wallride-bank-out", "DisplayName": "Wallride Bank Out", "PrimitiveType": 6, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.2, "RadiusSource": 0, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false }
+  ],
+  "MinimumClearanceMeters": 50.0
+}

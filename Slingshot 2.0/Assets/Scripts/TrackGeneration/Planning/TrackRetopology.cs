@@ -44,8 +44,126 @@ namespace TrackGeneration.Planning
             for (int i = 0; i < segments.Count; i++)
             {
                 ResampleSegment(segments[i], regions[i].Intervals);
+                RefreshVerticalMetrics(segments[i]);
                 layout.SubdivisionRegions.Add(regions[i].ToRecord(i));
             }
+        }
+
+        /// <summary>
+        /// Remeasures vertical curvature and its spatial derivative from the final
+        /// retopologized driving line. Interpolating the source metadata is not
+        /// authoritative: a section boundary can retain a builder's coarse one-ring
+        /// derivative even when the final Hermite road is smooth, producing a false
+        /// TransitionRateExceeded result. Shared section-boundary rings receive one
+        /// canonical measurement.
+        /// </summary>
+        public static void RefreshVerticalMetrics(List<GeneratedTrackSection> sections)
+        {
+            if (sections == null || sections.Count == 0) return;
+
+            bool IsMeasuredOrdinary(GeneratedTrackSection section)
+            {
+                TrackMacroSectionDefinition definition = section?.Definition;
+                if (definition == null || section.SubdivisionFrames == null ||
+                    section.SubdivisionFrames.Length < 2) return false;
+                bool ordinary;
+                switch (definition.SectionType)
+                {
+                    case TrackMacroSectionType.Straight:
+                    case TrackMacroSectionType.WideStraight:
+                    case TrackMacroSectionType.BoostStraight:
+                    case TrackMacroSectionType.BankedCurve:
+                    case TrackMacroSectionType.BankedHairpin:
+                    case TrackMacroSectionType.SCurve:
+                    case TrackMacroSectionType.Chicane:
+                        ordinary = true;
+                        break;
+                    default:
+                        ordinary = false;
+                        break;
+                }
+                return ordinary && (Mathf.Abs(definition.HillHeight) < 0.001f ||
+                                    definition.SemanticElement == SemanticElementId.Horseshoe);
+            }
+
+            void RefreshRun(List<GeneratedTrackSection> run)
+            {
+                if (run.Count == 0) return;
+                var frames = new List<TrackConnectionFrame>();
+                var ringMap = new List<int[]>(run.Count);
+                for (int s = 0; s < run.Count; s++)
+                {
+                    TrackConnectionFrame[] source = run[s].SubdivisionFrames;
+                    var map = new int[source.Length];
+                    for (int i = 0; i < source.Length; i++)
+                    {
+                        if (i == 0 && frames.Count > 0 &&
+                            (source[i].Position - frames[frames.Count - 1].Position).sqrMagnitude <= 0.25f)
+                        {
+                            map[i] = frames.Count - 1;
+                            continue;
+                        }
+                        map[i] = frames.Count;
+                        frames.Add(source[i]);
+                    }
+                    ringMap.Add(map);
+                }
+                if (frames.Count < 2) return;
+
+                int count = frames.Count;
+                var pitch = new float[count];
+                var curvature = new float[count];
+                var rate = new float[count];
+                for (int i = 0; i < count; i++)
+                    pitch[i] = Mathf.Asin(Mathf.Clamp(frames[i].Forward.normalized.y, -1f, 1f));
+
+                float Distance(int a, int b)
+                {
+                    float measured = Vector3.Distance(frames[a].Position, frames[b].Position);
+                    return Mathf.Max(0.05f, measured);
+                }
+
+                curvature[0] = (pitch[1] - pitch[0]) / Distance(0, 1);
+                for (int i = 1; i < count - 1; i++)
+                    curvature[i] = (pitch[i + 1] - pitch[i - 1]) / Distance(i - 1, i + 1);
+                curvature[count - 1] = (pitch[count - 1] - pitch[count - 2]) /
+                                       Distance(count - 2, count - 1);
+
+                rate[0] = (curvature[1] - curvature[0]) / Distance(0, 1);
+                for (int i = 1; i < count - 1; i++)
+                    rate[i] = (curvature[i + 1] - curvature[i - 1]) / Distance(i - 1, i + 1);
+                rate[count - 1] = (curvature[count - 1] - curvature[count - 2]) /
+                                  Distance(count - 2, count - 1);
+
+                for (int s = 0; s < run.Count; s++)
+                {
+                    int[] map = ringMap[s];
+                    TrackConnectionFrame[] target = run[s].SubdivisionFrames;
+                    for (int i = 0; i < target.Length; i++)
+                    {
+                        TrackConnectionFrame frame = target[i];
+                        frame.VerticalCurvature = curvature[map[i]];
+                        frame.VerticalCurvatureRate = rate[map[i]];
+                        target[i] = frame;
+                    }
+                    run[s].StartFrame = target[0];
+                    run[s].EndFrame = target[target.Length - 1];
+                }
+            }
+
+            var current = new List<GeneratedTrackSection>();
+            for (int i = 0; i < sections.Count; i++)
+            {
+                GeneratedTrackSection section = sections[i];
+                if (IsMeasuredOrdinary(section))
+                {
+                    current.Add(section);
+                    continue;
+                }
+                RefreshRun(current);
+                current.Clear();
+            }
+            RefreshRun(current);
         }
 
         /// <summary>Selects the first approved tier ≥ the raw requirement (spec: never round down below the physical quality requirement).</summary>
@@ -159,6 +277,7 @@ namespace TrackGeneration.Planning
             ResolvedTrackGenerationConfig cfg)
         {
             float baseSpacing = Mathf.Max(0.5f, cfg.MeshMetersPerRing);
+            float textureSpacing = Mathf.Max(0.5f, cfg.TextureTopologyMetersPerRing);
             float facetLimit = Mathf.Max(0.1f, cfg.MaxRingFacetAngle);
             float featureFloor = Mathf.Max(0.5f, cfg.FeatureMetersPerRing);
             var ladder = cfg.SubdivisionLadder;
@@ -207,14 +326,22 @@ namespace TrackGeneration.Planning
                         frames[frames.Length - 1].ArcLength - frames[0].ArcLength);
                 }
 
-                if (spacing < featureFloor)
+                if (cfg.ConsistentTextureTopology)
+                {
+                    // Production texture topology: geometry may bend and roll, but its
+                    // final longitudinal grid never changes density by feature, score,
+                    // candidate, or performance budget.
+                    spacing = textureSpacing;
+                    limiting = "fixed texture topology";
+                }
+                else if (spacing < featureFloor)
                 {
                     spacing = featureFloor;
                     limiting = "feature ring floor";
                 }
 
                 // Per-section ring cap (boundary rings duplicated, hence headroom).
-                if (cfg.MaxRingsPerSection > 2)
+                if (!cfg.ConsistentTextureTopology && cfg.MaxRingsPerSection > 2)
                 {
                     float capSpacing = maxSectionLength / (cfg.MaxRingsPerSection - 2);
                     if (spacing < capSpacing)
@@ -253,7 +380,7 @@ namespace TrackGeneration.Planning
             float perfBudget = cfg.RenderRingBudget > 0 ? cfg.RenderRingBudget : float.MaxValue;
             float budget = Mathf.Min(hardBudget > 0 ? hardBudget : float.MaxValue, perfBudget);
 
-            if (expectedRings > budget)
+            if (!cfg.ConsistentTextureTopology && expectedRings > budget)
             {
                 bool anyRollHeavy = false;
                 foreach (var r in regions) if (r.IsRollHeavy) { anyRollHeavy = true; break; }
@@ -306,7 +433,9 @@ namespace TrackGeneration.Planning
             foreach (var r in regions)
             {
                 r.RawRequirement = Mathf.Max(1, Mathf.CeilToInt(r.Length / r.DemandSpacing));
-                r.Intervals = SelectSubdivisionTier(r.RawRequirement, ladder);
+                r.Intervals = cfg.ConsistentTextureTopology
+                    ? r.RawRequirement
+                    : SelectSubdivisionTier(r.RawRequirement, ladder);
 
                 // Structural floor: each section needs at least one interval of its own.
                 int structural = r.Sections.Count + 1;
@@ -320,7 +449,8 @@ namespace TrackGeneration.Planning
             // ── Shared-anchor reconciliation: regions that meet at an anchor ring
             // (section runs, branch gates, the start/finish weld) may use different
             // tiers, but their spacings must not step across the shared ring.
-            ReconcileNeighbors(regions, ladder);
+            if (!cfg.ConsistentTextureTopology)
+                ReconcileNeighbors(regions, ladder);
 
             return regions;
         }

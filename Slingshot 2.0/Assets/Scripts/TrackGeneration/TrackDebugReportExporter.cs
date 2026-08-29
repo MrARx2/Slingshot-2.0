@@ -1,12 +1,153 @@
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
+using TrackGeneration.Definitions;
 using TrackGeneration.Design;
 using TrackGeneration.Macro;
 using TrackGeneration.Planning;
 
 namespace TrackGeneration
 {
+    public struct VerticalSilhouetteMeasurement
+    {
+        public bool HasGeometry;
+        public float MinElevation;
+        public float MaxElevation;
+        public int PlannedMajorCarrierCount;
+        public float LongestSustainedGradeLength;
+        public float LongestSustainedGradeRise;
+        public float LongestSustainedGradeAngleDegrees;
+
+        public float ElevationRange => HasGeometry ? MaxElevation - MinElevation : 0f;
+    }
+
+    /// <summary>
+    /// Read-only measurements for the authored vertical rhythm. Keeping this separate
+    /// from generation lets reports and tests describe the resulting silhouette without
+    /// feeding diagnostic heuristics back into the planner.
+    /// </summary>
+    public static class VerticalSilhouetteDiagnostics
+    {
+        private const float MinimumSustainedGradeDegrees = 1f;
+        private const float WeldToleranceSquared = 0.0025f;
+
+        public static VerticalSilhouetteMeasurement Measure(IReadOnlyList<GeneratedTrackSection> sections)
+        {
+            var measurement = new VerticalSilhouetteMeasurement
+            {
+                MinElevation = float.PositiveInfinity,
+                MaxElevation = float.NegativeInfinity
+            };
+
+            if (sections == null)
+                return measurement;
+
+            TrackConnectionFrame previousFrame = default;
+            GeneratedTrackSection previousSection = null;
+            bool hasPreviousFrame = false;
+            float activeLength = 0f;
+            float activeRise = 0f;
+            int activeSign = 0;
+
+            void ResetGrade()
+            {
+                activeLength = 0f;
+                activeRise = 0f;
+                activeSign = 0;
+            }
+
+            void ConsiderFrame(TrackConnectionFrame frame)
+            {
+                measurement.HasGeometry = true;
+                measurement.MinElevation = Mathf.Min(measurement.MinElevation, frame.Position.y);
+                measurement.MaxElevation = Mathf.Max(measurement.MaxElevation, frame.Position.y);
+
+                if (!hasPreviousFrame)
+                {
+                    previousFrame = frame;
+                    hasPreviousFrame = true;
+                    return;
+                }
+
+                Vector3 delta = frame.Position - previousFrame.Position;
+                float distance = delta.magnitude;
+                previousFrame = frame;
+                if (distance <= 0.0001f)
+                    return;
+
+                float angle = Mathf.Asin(Mathf.Clamp(delta.y / distance, -1f, 1f)) * Mathf.Rad2Deg;
+                if (Mathf.Abs(angle) < MinimumSustainedGradeDegrees)
+                {
+                    ResetGrade();
+                    return;
+                }
+
+                int sign = angle > 0f ? 1 : -1;
+                if (activeSign != 0 && activeSign != sign)
+                    ResetGrade();
+
+                activeSign = sign;
+                activeLength += distance;
+                activeRise += delta.y;
+                if (activeLength > measurement.LongestSustainedGradeLength)
+                {
+                    measurement.LongestSustainedGradeLength = activeLength;
+                    measurement.LongestSustainedGradeRise = activeRise;
+                    measurement.LongestSustainedGradeAngleDegrees =
+                        Mathf.Asin(Mathf.Clamp(activeRise / activeLength, -1f, 1f)) * Mathf.Rad2Deg;
+                }
+            }
+
+            for (int i = 0; i < sections.Count; i++)
+            {
+                GeneratedTrackSection section = sections[i];
+                if (section == null)
+                    continue;
+
+                TrackMacroSectionDefinition definition = section.Definition;
+                if (definition != null && definition.IsStraightFamily &&
+                    Mathf.Abs(definition.ElevationChange) >= 1f &&
+                    !string.IsNullOrEmpty(definition.DebugName) &&
+                    (definition.DebugName.Contains("_Climb") || definition.DebugName.Contains("_Drop")))
+                {
+                    measurement.PlannedMajorCarrierCount++;
+                }
+
+                TrackConnectionFrame[] frames = section.SubdivisionFrames;
+                if (section.IsEmptySpace || frames == null || frames.Length == 0)
+                {
+                    hasPreviousFrame = false;
+                    previousSection = null;
+                    ResetGrade();
+                    continue;
+                }
+
+                bool connects = previousSection != null &&
+                    previousSection.RoadId == section.RoadId &&
+                    !previousSection.OpenEnd && !section.OpenStart &&
+                    (previousSection.EndFrame.Position - section.StartFrame.Position).sqrMagnitude <= WeldToleranceSquared;
+                if (!connects)
+                {
+                    hasPreviousFrame = false;
+                    ResetGrade();
+                }
+
+                for (int f = 0; f < frames.Length; f++)
+                    ConsiderFrame(frames[f]);
+
+                previousSection = section;
+            }
+
+            if (!measurement.HasGeometry)
+            {
+                measurement.MinElevation = 0f;
+                measurement.MaxElevation = 0f;
+            }
+
+            return measurement;
+        }
+    }
+
     /// <summary>
     /// Exports a COMPLETE text diagnostic report of the current generated track —
     /// enough to reconstruct the track from the file alone:
@@ -86,9 +227,12 @@ namespace TrackGeneration
                 resolved = ResolvedTrackGenerationConfig.Resolve(generator.Config, generator.Designer.Clone());
 
             Header(sb, generator, resolved);
+            MaterialContractDump(sb, generator);
             SceneSettingsDump(sb, generator);
             ResolvedDump(sb, resolved);
+            FeatureDefinitionCatalogDump(sb, resolved);
             ChainMap(sb, sections);
+            VerticalSilhouette(sb, sections, resolved);
             ConnectorAudit(sb, sections, resolved);
             WallWaveHotspots(sb, sections, resolved);
             CrossSectionTransitionDiagnostics.AppendReport(sb, sections, resolved); // V2.1 read-only
@@ -128,6 +272,7 @@ namespace TrackGeneration
             {
                 sb.AppendLine($"Seed {report.Seed} | {(report.Success ? "SUCCESS" : "FAILED")} | Command: {report.RegenerationCommand}");
                 sb.AppendLine($"Attempts {report.AttemptsEvaluated} | Candidates {report.ValidCandidateCount} | Score {report.SelectedCandidateScore:F1}");
+                sb.AppendLine($"Generation {report.GenerationDurationSeconds:F2}s | Pipeline passes {Mathf.Max(1, report.PipelinePassCount)} | Accepted pass: {report.AcceptedPass}");
                 if (report.PreservedStreams.Count > 0)
                     sb.AppendLine($"Streams preserved: {string.Join(",", report.PreservedStreams)} | changed: {string.Join(",", report.ChangedStreams)}");
                 if (report.LockedSettingsGroups.Count > 0)
@@ -138,6 +283,7 @@ namespace TrackGeneration
                 sb.AppendLine($"Lap {m.LapLengthMeters / 1000f:F2}km | est {m.EstimatedNeutralLapTimeSeconds:F1}s | turns {m.TurnCount} | rings {m.TotalRings} | max facet {m.MaxFacetAngleObserved:F2}°");
                 sb.AppendLine($"loops {m.LoopCount} corks {m.CorkscrewCount} spirals {m.SpiralCount} halfloops {m.HalfLoopCount} jumps {m.JumpCount} pipes {m.FullPipeCount} wallrides {m.WallrideCount} dualQuarters {m.DualRoadQuarterCount}");
                 sb.AppendLine($"elevation {m.MinElevation:F0}..{m.MaxElevation:F0}m");
+                sb.AppendLine($"rhythm {m.RhythmScore:F0}/100 | encounters {m.EncounterCount} | families {m.DistinctEncounterFamilies} | longest S-flow streak {m.LongestSCurveFamilyStreak} | window peak {m.MaxSCurveFamilyInWindow}");
             }
             sb.AppendLine($"Designer provenance: {generator.Designer?.AppliedPresetName ?? "?"}{(generator.Designer?.ModifiedSincePreset == true ? " (modified)" : "")}");
             sb.AppendLine();
@@ -152,19 +298,41 @@ namespace TrackGeneration
             sb.AppendLine($"Scale: speed {d.Scale.DesignSpeedKph:F0}km/h, lap {d.Scale.TargetLapTimeSeconds:F1}s, cap {d.Scale.MaxTrackLengthMeters / 1000f:F1}km, pacing {d.Scale.PacingVariation:F2}");
             sb.AppendLine($"Layout: turns {d.Layout.MinTurnCount}-{d.Layout.MaxTurnCount} {d.Layout.DirectionPattern}, straights {d.Layout.MinStraightSeconds:F2}-{d.Layout.MaxStraightSeconds:F2}s, seqChance {d.Layout.CornerSequenceChance:F2}");
             sb.AppendLine($"Corners: R {d.Corners.MinCurveRadius:F0}-{d.Corners.MaxCurveRadius:F0}m, bankStrength {d.Corners.BankingStrength:F2}, maxBank {d.Corners.MaxBankAngle:F0}°, floorTilt {d.Corners.FloorTiltStrength:F2}");
-            sb.AppendLine($"Road: flat {d.Road.FlatCenterWidth:F0}m, wallH {d.Road.WallHeight:F1}m, curve {d.Road.WallCurve:F2}, scale {d.Road.RoadScale:F2} (total {(d.Road.FlatCenterWidth + 2f * d.Road.WallHeight) * d.Road.RoadScale:F0}m), lip {d.Road.SafetyLipHeight:F1}m, res {d.Road.ProfileResolution}");
-            sb.AppendLine($"Road dynamics: rounding {(d.Road.DynamicTurnRounding ? $"ON {d.Road.TurnRoundingStrength:F2} minFlat {d.Road.MinimumTurnCenterFlatRatio:F2}" : "OFF")}, catchWall {(d.Road.OutsideCatchWall ? $"ON {d.Road.CatchWallStrength:F2} maxOver {d.Road.MaxOverhangAngle:F0}° r{d.Road.OverhangRadius:F0}m demand {d.Road.CatchWallMinimumDemand:F2}" : "OFF")}");
+            sb.AppendLine($"Road: flat {d.Road.FlatCenterWidth:F0}m, wallH {d.Road.WallHeight:F1}m, circular half-pipe enforced, scale {d.Road.RoadScale:F2} (total {(d.Road.FlatCenterWidth + 2f * d.Road.WallHeight) * d.Road.RoadScale:F0}m), lip {d.Road.SafetyLipHeight:F1}m, res {d.Road.ProfileResolution}");
+            sb.AppendLine($"Road dynamics: circular rounding {(d.Road.DynamicTurnRounding ? $"ON {d.Road.TurnRoundingStrength:F2} minFlat {d.Road.MinimumTurnCenterFlatRatio:F2}" : "OFF")}, ordinary catch wall OFF (explicit features only)");
             sb.AppendLine($"Transitions: generic {d.Transitions.GenericTransitionSeconds:F2}s bank {d.Transitions.BankTransitionSeconds:F2}s pitch {d.Transitions.PitchTransitionSeconds:F2}s roll {d.Transitions.RollTransitionSeconds:F2}s width {d.Transitions.WidthTransitionSeconds:F2}s cross {d.Transitions.CrossSectionTransitionSeconds:F2}s");
             sb.AppendLine($"Connectors: minDur {d.Transitions.MinimumConnectorSeconds:F2}s | INHERITANCE {d.Transitions.ConnectorInheritanceStrength:F2} | bankReversal {d.Transitions.MinimumBankReversalSeconds:F2}s | BRIDGE {d.Transitions.SameDirectionBridgeSeconds:F2}s | expand {d.Transitions.AllowConnectorExpansion} absorb {d.Transitions.AllowConnectorAbsorption}");
             sb.AppendLine($"Quarters: dual {d.Quarters.MinimumDualQuarterCount}-{d.Quarters.MaximumDualQuarterCount} | choice {d.Quarters.ChoiceType} | laneSep {d.Quarters.LaneSeparationMeters:F0}m | catchScale {d.Quarters.CatchWidthScale:F2} | roadB width×{d.Quarters.DualRoadWidthScale:F2} | lenTol {d.Quarters.RoadLengthTolerance:P0} | balanceTol {d.Quarters.NeutralTimeTolerancePercent:F1}% policy {d.Quarters.BalancePolicy}{(d.Quarters.PreventAdjacentDualQuarters ? " | noAdjacent" : "")}{(d.Quarters.AllowQ1Dual ? " | Q1ok" : "")}{(d.Quarters.AllowQ4Dual ? " | Q4ok" : "")}");
-            sb.AppendLine($"Features: groups {d.Features.MinFeatureGroups}-{d.Features.MaxFeatureGroups} | wallrides {RuleStr(d.Features.Wallrides)} | pipes {RuleStr(d.Features.FullPipes)} | jumps {RuleStr(d.Features.Jumps)} | loops {RuleStr(d.Features.Loops)} | corks {RuleStr(d.Features.Corkscrews)} | spirals {RuleStr(d.Features.Spirals)} | halfloops {RuleStr(d.Features.HalfLoops)} | hairpins {RuleStr(d.Features.Hairpins)} | chicanes {RuleStr(d.Features.Chicanes)} | scurves {RuleStr(d.Features.SCurves)}");
-            sb.AppendLine($"Elevation: amp {d.Elevation.TargetElevationAmplitude:F0}m majors {d.Elevation.MinMajorElevationSections}-{d.Elevation.MaxMajorElevationSections} climb ≤{d.Elevation.MaxClimbAngle:F0}° drop ≤{d.Elevation.MaxDropAngle:F0}° policy {d.Elevation.GroundLevelPolicy}");
-            sb.AppendLine($"Generation: attempts {d.Generation.MaxAttempts} {d.Generation.SelectionMode} score {d.Generation.CandidatesToScore} | mpr {d.Generation.MetersPerRing:F2} facet {d.Generation.MaxFacetAngleDegrees:F2}° ringBudget {d.Generation.TargetTotalRings} | closureReserve {d.Generation.ClosureReserveFraction:F2}");
+            sb.AppendLine($"Features: groups {d.Features.MinFeatureGroups}-{d.Features.MaxFeatureGroups} | wallrides {RuleStr(d.Features.Wallrides)} | pipes {RuleStr(d.Features.FullPipes)} | jumps {RuleStr(d.Features.Jumps)} | loops {RuleStr(d.Features.Loops)} | corks {RuleStr(d.Features.Corkscrews)} | spirals {RuleStr(d.Features.Spirals)} | halfloops {RuleStr(d.Features.HalfLoops)} | camelbacks {RuleStr(d.Features.Camelbacks)} | heartline rolls {RuleStr(d.Features.HeartlineRolls)} | zero-g rolls {RuleStr(d.Features.ZeroGRolls)} | dive loops {RuleStr(d.Features.DiveLoops)} | sidewinders {RuleStr(d.Features.Sidewinders)} | hairpins {RuleStr(d.Features.Hairpins)} | wide turnarounds {RuleStr(d.Features.WideTurnarounds)} | horseshoes {RuleStr(d.Features.Horseshoes)} | cutbacks {RuleStr(d.Features.Cutbacks)} | chicanes {RuleStr(d.Features.Chicanes)} | scurves {RuleStr(d.Features.SCurves)}");
+            sb.AppendLine($"Rhythm: {(d.Features.EnforceProceduralRhythm ? "ON" : "off")} | consecutive S-flow ≤{d.Features.MaxConsecutiveSCurveEncounters} | S-flow ≤{d.Features.MaxSCurveEncountersPerWindow} in {d.Features.SCurveDiversityWindow} | family cooldown {d.Features.SameFamilyCooldownEncounters}");
+            sb.AppendLine($"Elevation: {d.Elevation.Profile} · amp {d.Elevation.TargetElevationAmplitude:F0}m majors {d.Elevation.MinMajorElevationSections}-{d.Elevation.MaxMajorElevationSections} climb ≤{d.Elevation.MaxClimbAngle:F0}° drop ≤{d.Elevation.MaxDropAngle:F0}° policy {d.Elevation.GroundLevelPolicy}");
+            sb.AppendLine($"Generation: attempts {d.Generation.MaxAttempts} {d.Generation.SelectionMode} score {d.Generation.CandidatesToScore} | mpr {d.Generation.MetersPerRing:F2} textureGrid {(d.Generation.ConsistentTextureTopology ? d.Generation.TextureTopologyMetersPerRing.ToString("F2") + "m" : "adaptive")} facet {d.Generation.MaxFacetAngleDegrees:F2}° ringBudget {d.Generation.TargetTotalRings} | closureReserve {d.Generation.ClosureReserveFraction:F2}");
             sb.AppendLine();
         }
 
         private static string RuleStr(TrackFeatureRule r)
             => r == null ? "null" : r.Enabled ? $"{r.MinimumCount}-{r.MaximumCount}(w{r.OptionalWeight:F1})" : "off";
+
+        private static void FeatureDefinitionCatalogDump(
+            StringBuilder sb, ResolvedTrackGenerationConfig resolved)
+        {
+            float speed = resolved?.DesignSpeedMps ?? 361.1111f;
+            sb.AppendLine("── FEATURE DEFINITIONS (versioned source data) ──");
+            foreach (TrackFeatureDefinition definition in TrackFeatureDefinitionCatalog.All)
+            {
+                string hash = definition.ComputeContentHash();
+                if (hash.Length > 12) hash = hash.Substring(0, 12);
+                sb.AppendLine(
+                    $"  {definition.StableId} v{definition.DefinitionVersion} [{hash}] " +
+                    $"core {definition.Length.ResolvedPreferred(speed):F0}m + " +
+                    $"entry {definition.EntryLength.ResolvedPreferred(speed):F0}m + " +
+                    $"recovery {definition.RecoveryLength.ResolvedPreferred(speed):F0}m | " +
+                    $"{string.Join(" > ", definition.Primitives.ConvertAll(p => p.PrimitiveId))}");
+            }
+            foreach (string error in TrackFeatureDefinitionCatalog.LoadErrors)
+                sb.AppendLine($"  [INVALID] {error}");
+            sb.AppendLine();
+        }
 
         private static void ResolvedDump(StringBuilder sb, ResolvedTrackGenerationConfig r)
         {
@@ -172,11 +340,13 @@ namespace TrackGeneration
             sb.AppendLine("── RESOLVED (rulebook-clamped, meters) ──");
             sb.AppendLine($"speed {r.DesignSpeedMps:F0}m/s | straights {r.MinStraightLength:F0}-{r.MaxStraightLength:F0}m | R {r.MinCurveRadius:F0}-{r.MaxCurveRadius:F0}m | width {r.RoadWidth:F0}m wallH {r.RoadProfile.SideHeight:F1}m flat {r.RoadProfile.CenterFlatWidthRatio:F2} wallCurve {r.RoadProfile.WallCurve01:F2} lip {r.RoadProfile.SafetyLipHeight:F1}m");
             sb.AppendLine($"bankBlend {r.BankTransitionLength:F0}m | minConnector {r.MinimumConnectorLength:F0}m | BRIDGE {r.SameDirectionBridgeLength:F0}m | bankReversal {r.MinimumBankReversalLength:F0}m | inherit {r.ConnectorInheritanceStrength:F2}");
+            sb.AppendLine($"feature fitting {r.FeatureFitScale:P0} | entry {r.DefaultApproachLength:F0}m | recovery {r.DefaultRecoveryLength:F0}m | structural gap/closure corridors remain full and independently adjustable");
             sb.AppendLine($"field blur radius (bank) = max(60, {r.BankTransitionLength * 0.5f:F0}, {r.MinimumBankReversalLength * 0.5f:F0}) = {Mathf.Max(60f, Mathf.Max(r.BankTransitionLength * 0.5f, r.MinimumBankReversalLength * 0.5f)):F0}m");
             sb.AppendLine($"quarters: dual {r.MinDualQuarters}-{r.MaxDualQuarters} {r.QuarterChoiceType} | laneSep {r.LaneSeparation:F0}m | catch {r.QuarterCatchWidth:F0}m | roadB width {r.DualRoadWidth:F0}m | lenTol {r.RoadLengthTolerance:P0} | balanceTol {r.NeutralTimeTolerance:P1}");
             sb.AppendLine($"jumps: approach {r.JumpApproachLength:F0}m launch {r.MinLaunchTransitionLength:F0}-{r.MaxLaunchTransitionLength:F0}m at {r.MinJumpLaunchPitchDegrees:F1}-{r.MaxJumpLaunchPitchDegrees:F1}deg | airtime {r.MinJumpAirtimeSeconds:F2}-{r.MaxJumpAirtimeSeconds:F2}s landing {r.MinLandingTransitionLength:F0}-{r.JumpLandingPlanningLength:F0}m planned, {r.MaxLandingTransitionLength:F0}m solver cap | lip {r.MinJumpHeight:F0}-{r.MaxJumpHeight:F0}m");
             sb.AppendLine($"spirals: {r.MinSpiralRevolutions}-{r.MaxSpiralRevolutions} rev | quantized climb {r.MinSpiralClimbPerRevolution:F0}-{r.MaxSpiralClimbPerRevolution:F0}m/rev | built-layer clearance {r.SpiralClearance:F0}m");
             sb.AppendLine($"pipes: len {r.MinFullPipeLength:F0}-{r.MaxFullPipeLength:F0}m transition {r.PipeTransitionLength:F0}m radiusScale {r.FullPipeRadiusScale:F2} | rounding {(r.DynamicTurnRoundingEnabled ? r.TurnRoundingStrength.ToString("F2") : "off")} catchWall {(r.CatchWallEnabled ? r.CatchWallStrength.ToString("F2") : "off")}");
+            sb.AppendLine($"vertical: {r.VerticalProfile} | effective amp {r.TargetElevationAmplitude:F0}m majors {r.MinMajorElevationSections}-{r.MaxMajorElevationSections} | preferred carrier ≥{r.ElevationPreferredCarrierLength:F0}m | rise target {r.ElevationRisingTargetMinimum:P0}-{r.ElevationRisingTargetMaximum:P0} | recovery {r.ElevationRecoveryThreshold:P0}→{r.ElevationRecoveryTargetFraction:P0} | safety climb ≤{r.MaxClimbAngle:F0}° drop ≤{r.MaxDropAngle:F0}°");
             foreach (var issue in r.Issues)
                 sb.AppendLine($"  [{issue.Severity}] {issue.Field}: {issue.Message}");
             sb.AppendLine();
@@ -226,6 +396,50 @@ namespace TrackGeneration
             sb.AppendLine();
         }
 
+        /// <summary>
+        /// Records the complete visual-material contract used by generated geometry.
+        /// This makes cached-preview and exact-replay material regressions visible in
+        /// the same report designers already use for topology and geometry diagnosis.
+        /// </summary>
+        private static void MaterialContractDump(StringBuilder sb, TrackGenerator generator)
+        {
+            ResolvedTrackMaterials materials = generator.ResolveMaterials();
+            List<string> missing = materials.GetMissingRequiredRoles(generator.BuildsRaceCourse);
+
+            sb.AppendLine("── MATERIAL CONTRACT (persistent visual roles) ──");
+            sb.AppendLine($"Palette asset: {(generator.MaterialSet != null ? generator.MaterialSet.name : "not assigned — legacy fields are being used")}");
+            sb.AppendLine($"Status: {(missing.Count == 0 ? "READY" : $"MISSING {string.Join(", ", missing)}")}");
+            sb.AppendLine($"RoadSurface: {MaterialName(materials.RoadSurface)} | InnerWallSurface: {MaterialName(materials.InnerWallSurface)} | WallSide: {MaterialName(materials.WallSide)}");
+            sb.AppendLine($"GuideMarking: {MaterialName(materials.GuideMarking)} | WallMarker: {MaterialName(materials.WallMarker)} | BoostSurface: {MaterialName(materials.BoostSurface)}");
+            sb.AppendLine($"StartFinish: {MaterialName(materials.StartFinish)} | StartGatePillar: {MaterialName(materials.StartGatePillar)} | Checkpoint: {MaterialName(materials.Checkpoint)} | RaceGate fallback: {MaterialName(materials.RaceGate)}");
+            sb.AppendLine();
+        }
+
+        private static string MaterialName(Material material)
+            => material != null ? material.name : "MISSING";
+
+        private static void VerticalSilhouette(
+            StringBuilder sb,
+            List<GeneratedTrackSection> sections,
+            ResolvedTrackGenerationConfig resolved)
+        {
+            VerticalSilhouetteMeasurement measurement = VerticalSilhouetteDiagnostics.Measure(sections);
+            sb.AppendLine("── VERTICAL SILHOUETTE (measured generated geometry) ──");
+            sb.AppendLine($"  profile: {resolved?.VerticalProfile.ToString() ?? "unknown"}");
+            if (!measurement.HasGeometry)
+            {
+                sb.AppendLine("  no meshed road geometry available");
+                sb.AppendLine();
+                return;
+            }
+
+            sb.AppendLine($"  elevation: {measurement.MinElevation:F1}..{measurement.MaxElevation:F1}m (range {measurement.ElevationRange:F1}m)");
+            sb.AppendLine($"  planned major climb/drop carriers: {measurement.PlannedMajorCarrierCount}");
+            sb.AppendLine($"  longest sustained grade: {measurement.LongestSustainedGradeLength:F1}m, rise {measurement.LongestSustainedGradeRise:+0.0;-0.0;0.0}m, average {measurement.LongestSustainedGradeAngleDegrees:+0.0;-0.0;0.0}°");
+            sb.AppendLine("  sustained grade threshold: 1.0°; air gaps, open edges, road branches, flats, and grade reversals reset the measurement");
+            sb.AppendLine();
+        }
+
         // ─────────────────────────── Full section + ring dump ───────────────────────────
 
         /// <summary>
@@ -262,6 +476,8 @@ namespace TrackGeneration
                 if (d.PlanHorizontalLength > 0.001f) meta.Add($"planRun {d.PlanHorizontalLength:F0}m");
                 if (d.PipeCloseFraction > 0.001f) meta.Add($"pipeClose@{d.PipeCloseFraction:F2} open@{d.PipeOpenFraction:F2}");
                 if (d.MinimumLength > 0.1f) meta.Add($"minLen {d.MinimumLength:F0}m");
+                if (!string.IsNullOrEmpty(d.FeatureDefinitionId))
+                    meta.Add($"definition {d.FeatureDefinitionId} v{d.FeatureDefinitionVersion} [{d.FeatureDefinitionContentHash?.Substring(0, Mathf.Min(12, d.FeatureDefinitionContentHash.Length))}]");
                 meta.Add($"intent {d.SpeedIntent}/{d.RiskLevel}");
                 sb.AppendLine($"      def: {string.Join(" | ", meta)}");
 
@@ -277,6 +493,8 @@ namespace TrackGeneration
                 string ids = $"conn {d.ConnectorBehavior}" +
                              (string.IsNullOrEmpty(d.PatternId) ? "" : $" | pattern {d.PatternId}") +
                              (string.IsNullOrEmpty(d.TurnComplexId) ? "" : $" | complex {d.TurnComplexId}") +
+                             (string.IsNullOrEmpty(d.TopologySlotId) ? "" : $" | slot {d.TopologySlotId}") +
+                             (string.IsNullOrEmpty(d.FeaturePrimitiveSequence) ? "" : $" | primitives {d.FeaturePrimitiveSequence}") +
                              ($" | Q{sec.QuarterIndex + 1}{(sec.RoadId == 1 ? "/roadB" : "")}");
                 sb.AppendLine($"      {ids}{(flags.Count > 0 ? " | " + string.Join(",", flags) : "")}");
                 sb.AppendLine($"      contract: entry {d.Contract.RequiredEntryOrientation} exit {d.Contract.ExitOrientation} headingΔ {d.Contract.HeadingDeltaDegrees:F0}° elevΔ {d.Contract.ElevationDelta:F0}m");
@@ -575,10 +793,24 @@ namespace TrackGeneration
                 foreach (var r in report.FeatureExitRecords) sb.AppendLine("  " + r);
                 sb.AppendLine();
             }
+            if (report.TopologySlots.Count > 0)
+            {
+                sb.AppendLine("── V2 TOPOLOGY SLOTS (stable gameplay-demand identities; reporting only) ──");
+                foreach (var slot in report.TopologySlots) sb.AppendLine("  " + slot);
+                sb.AppendLine();
+            }
             if (report.TransitionRecords.Count > 0)
             {
                 sb.AppendLine("── TRANSITION RESOLVER (Stage C: boundary classification, reporting only) ──");
                 foreach (var t in report.TransitionRecords) sb.AppendLine("  " + t);
+                sb.AppendLine();
+            }
+            if (report.ConnectorShadowRecords.Count > 0)
+            {
+                sb.AppendLine("── V2 CONNECTOR SHADOW AUDIT (reporting only; current geometry unchanged) ──");
+                if (report.ConnectorShadowSummary != null)
+                    sb.AppendLine("  " + report.ConnectorShadowSummary);
+                foreach (var record in report.ConnectorShadowRecords) sb.AppendLine("  " + record);
                 sb.AppendLine();
             }
             if (report.ConnectorDecisions.Count > 0)
@@ -591,6 +823,13 @@ namespace TrackGeneration
             {
                 sb.AppendLine("── SUBDIVISION REGIONS ──");
                 foreach (var r in report.SubdivisionRegions) sb.AppendLine("  " + r);
+                sb.AppendLine();
+            }
+            if (!string.IsNullOrEmpty(report.RhythmSummary) || report.EncounterTimelines.Count > 0)
+            {
+                sb.AppendLine("── TRACK RHYTHM ──");
+                if (!string.IsNullOrEmpty(report.RhythmSummary)) sb.AppendLine("  " + report.RhythmSummary);
+                foreach (string timeline in report.EncounterTimelines) sb.AppendLine("  " + timeline);
                 sb.AppendLine();
             }
             if (report.Warnings.Count > 0)
@@ -606,6 +845,14 @@ namespace TrackGeneration
                 sb.AppendLine($"── FAILURE MODE BREAKDOWN ({total} failed attempts) ──");
                 foreach (var (reason, count) in reasonCounts)
                     sb.AppendLine($"  {count,5} ({(total > 0 ? 100f * count / total : 0f),4:F0}%)  {reason}");
+                sb.AppendLine();
+
+                sb.AppendLine("── REPRESENTATIVE FAILURE DETAILS (one retained per mode) ──");
+                foreach (var (reason, _) in reasonCounts)
+                {
+                    GenerationAttemptFailure representative = report.RepresentativeFailure(reason);
+                    if (representative != null) sb.AppendLine("  " + representative);
+                }
                 sb.AppendLine();
             }
             sb.AppendLine(report.AngleReliefEnabled

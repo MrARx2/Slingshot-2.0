@@ -24,6 +24,8 @@ namespace TrackGeneration.Macro
         OpeningCorner = 5,
         SweeperIntoHairpin = 6,
         WallrideTurn = 7,
+        WideTurnaround = 8,
+        Horseshoe = 9,
 
         // ── Transfers ──
         SCurve = 10,
@@ -50,10 +52,22 @@ namespace TrackGeneration.Macro
 
         // ── Stage F: transported-roll family ──
         DirectionalCorkscrew = 50,   // barrel roll whose axis also turns ±45/±90 (consumes a turn token)
+        HeartlineRoll = 53,
+        ZeroGRoll = 54,
+
+        // ── Definition-native corner features ──
+        Cutback = 51,
+
+        // ── Definition-native elevation features ──
+        Camelback = 60,
+
+        // Serialized values 61 and 62 are retired and must not be reused.
 
         // ── Reserved for future catalog waves (F–J); values assigned when implemented ──
-        // Cutback = 51, InlineTwist = 52, HeartlineRoll = 53,
-        // Camelback = 60, SpeedHill = 61, DoubleDip = 62, TopHat = 63, DiveDrop = 64,
-        // DiveLoop = 70, Sidewinder = 71, JuniorImmelmann = 72, …
+        // InlineTwist = 52,
+        // TopHat = 63, DiveDrop = 64,
+        DiveLoop = 70,
+        Sidewinder = 71,
+        // JuniorImmelmann = 72, …
     }
 }

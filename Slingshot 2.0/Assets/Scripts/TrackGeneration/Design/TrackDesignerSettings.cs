@@ -57,6 +57,25 @@ namespace TrackGeneration.Design
     }
 
     /// <summary>
+    /// Designer-facing character for ordinary-road elevation. These profiles only
+    /// steer the existing legal elevation solver; they never relax slope, curvature,
+    /// clearance, closure, or feature-specific geometry limits.
+    /// </summary>
+    public enum VerticalGenerationProfile
+    {
+        // Balanced must remain zero. Older JSON recipes do not contain this field,
+        // so their deserialized default must reproduce the historical generator.
+        [Tooltip("The established Slingshot elevation rhythm. Existing recipes and seeds keep this behavior exactly.")]
+        Balanced = 0,
+
+        [Tooltip("Lower vertical amplitude, fewer major climbs and longer, calmer elevation carriers.")]
+        Subtle = 1,
+
+        [Tooltip("Larger elevation range and more decisive major climbs while retaining every safety limit.")]
+        Extreme = 2
+    }
+
+    /// <summary>
     /// Feature/corner pattern identifiers. A pattern is an ATOMIC group: approach,
     /// internal elements and recovery are planned and validated as one unit.
     /// </summary>
@@ -88,7 +107,24 @@ namespace TrackGeneration.Design
 
         // Advanced road features (appended — serialized by int, never reorder)
         FullPipe,
-        WallrideTurn
+        WallrideTurn,
+
+        // Definition-native turnarounds (appended — serialized by int, never reorder)
+        WideTurnaround,
+        Horseshoe,
+
+        // Definition-native elevation feature. Serialized value 23 is retired and
+        // must not be reused.
+        Camelback = 22,
+
+        // Definition-native corner feature. Never reuse retired value 23 or 25.
+        Cutback = 24,
+
+        // Compact transported-roll and moderate-inversion catalog wave.
+        HeartlineRoll = 26,
+        ZeroGRoll = 27,
+        DiveLoop = 28,
+        Sidewinder = 29
     }
 
     /// <summary>One required pattern request: this pattern must appear exactly/at least Count times.</summary>
@@ -276,11 +312,11 @@ namespace TrackGeneration.Design
         [Tooltip("Center-flat ratio at FULL rounding. 0 = the apex may become fully rounded across its width.")]
         [Range(0f, 0.5f)] public float MinimumTurnCenterFlatRatio = 0.05f;
 
-        [Header("Outside Catch Wall")]
-        [Tooltip("In demanding turns the outside wall continues past vertical into a gentle inward curl that guides the craft back toward the bowl. Still an open road — not a pipe, not a wallride.")]
-        public bool OutsideCatchWall = true;
+        [Header("Legacy Automatic Catch Wall")]
+        [Tooltip("Retained so older scenes deserialize safely. Ordinary road no longer uses turn demand to become a catch wall; select an explicit Wallride feature instead.")]
+        public bool OutsideCatchWall = false;
 
-        [Tooltip("Maximum catch-wall engagement. 1 = full curl (Maximum Overhang Angle past vertical) on the most demanding corners.")]
+        [Tooltip("Legacy serialized value. Automatic ordinary-road catch walls are disabled.")]
         [Range(0f, 1f)] public float CatchWallStrength = 0.6f;
 
         [Tooltip("How far past vertical the catch wall may curl (degrees). 10–30° is the useful range.")]
@@ -289,7 +325,7 @@ namespace TrackGeneration.Design
         [Tooltip("Radius of the capture curl (meters).")]
         [Range(2f, 60f)] public float OverhangRadius = 10f;
 
-        [Tooltip("Turn demand (0..1 of full support) below which the catch wall stays disengaged — gentle corners keep the ordinary wall + safety lip.")]
+        [Tooltip("Legacy serialized value. Automatic ordinary-road catch walls are disabled.")]
         [Range(0f, 1f)] public float CatchWallMinimumDemand = 0.35f;
 
         public void Sanitize()
@@ -354,6 +390,9 @@ namespace TrackGeneration.Design
         public bool AllowConnectorAbsorption = true;
 
         [Header("Safety & Readability")]
+        [Tooltip("Preferred non-core road around authored features. 0.5 keeps the existing safety/closure expansion ceiling but starts approaches, recoveries, and feature-adjacent gap roads at half their legacy size.")]
+        [Range(0.25f, 1f)] public float FeatureFitScale = 0.5f;
+
         [Tooltip("Default readable approach BEFORE a major feature, seconds (1.4 s ≈ 506 m at 1300 km/h). Feature-specific approaches override via max(), never sum.")]
         [Range(0.8f, 4f)] public float DefaultApproachSeconds = 1.4f;
 
@@ -378,6 +417,8 @@ namespace TrackGeneration.Design
             ConnectorInheritanceStrength = Mathf.Clamp01(ConnectorInheritanceStrength);
             MinimumBankReversalSeconds = Mathf.Max(0.1f, MinimumBankReversalSeconds);
             SameDirectionBridgeSeconds = Mathf.Max(0.2f, SameDirectionBridgeSeconds);
+            if (FeatureFitScale <= 0f) FeatureFitScale = 0.5f;
+            FeatureFitScale = Mathf.Clamp(FeatureFitScale, 0.25f, 1f);
             DefaultApproachSeconds = Mathf.Max(0.2f, DefaultApproachSeconds);
             DefaultRecoverySeconds = Mathf.Max(0.2f, DefaultRecoverySeconds);
             DangerousSpacingSeconds = Mathf.Max(0.2f, DangerousSpacingSeconds);
@@ -389,6 +430,9 @@ namespace TrackGeneration.Design
     [Serializable]
     public class TrackElevationSettings
     {
+        [Tooltip("Controls the character of ordinary climbs and drops. Balanced is the established generator behavior; safety limits remain unchanged in every profile.")]
+        public VerticalGenerationProfile Profile = VerticalGenerationProfile.Balanced;
+
         [Tooltip("Target height range of the lap (meters). The generator plans climbs/drops so the actual range approaches this value.")]
         [Range(0f, 1200f)] public float TargetElevationAmplitude = 180f;
 
@@ -424,6 +468,8 @@ namespace TrackGeneration.Design
 
         public void Sanitize()
         {
+            if (!Enum.IsDefined(typeof(VerticalGenerationProfile), Profile))
+                Profile = VerticalGenerationProfile.Balanced;
             TargetElevationAmplitude = Mathf.Max(0f, TargetElevationAmplitude);
             MinMajorElevationSections = Mathf.Max(0, MinMajorElevationSections);
             MaxMajorElevationSections = Mathf.Max(MinMajorElevationSections, MaxMajorElevationSections);
@@ -471,6 +517,24 @@ namespace TrackGeneration.Design
         [Tooltip("Full closed-pipe road sections: the cross-section closes gradually into a tube the craft can roll around, then reopens.")]
         public TrackFeatureRule FullPipes = new TrackFeatureRule(true, 0, 1, 0.6f);
 
+        [Header("Definition-native elevation features")]
+        [Tooltip("Tall, level-exit C² crests compiled from the Camelback definition asset.")]
+        public TrackFeatureRule Camelbacks = new TrackFeatureRule(false, 0, 1, 0.45f);
+
+        [Header("Transported-roll features")]
+        [Tooltip("Compact full rolls whose centerline follows a shallow heartline orbit instead of a flat axial spin.")]
+        public TrackFeatureRule HeartlineRolls = new TrackFeatureRule(false, 0, 1, 0.35f);
+
+        [Tooltip("Airy full rolls with a smooth rise-and-fall centerline and a level exit.")]
+        public TrackFeatureRule ZeroGRolls = new TrackFeatureRule(false, 0, 1, 0.30f);
+
+        [Header("Moderate inversion features")]
+        [Tooltip("Roll-first descending half-loop reversals compiled from the Dive Loop definition asset.")]
+        public TrackFeatureRule DiveLoops = new TrackFeatureRule(false, 0, 1, 0.25f);
+
+        [Tooltip("Compact half-loop-to-roll 90-degree inversions compiled from the Sidewinder definition asset.")]
+        public TrackFeatureRule Sidewinders = new TrackFeatureRule(false, 0, 1, 0.30f);
+
         [Tooltip("Wallride turns: corners where the boosted, over-curled outside wall becomes the primary driving surface.")]
         public TrackFeatureRule Wallrides = new TrackFeatureRule(true, 0, 2, 0.7f);
 
@@ -492,8 +556,35 @@ namespace TrackGeneration.Design
         [Tooltip("S-curve patterns (two opposed sweepers).")]
         public TrackFeatureRule SCurves = new TrackFeatureRule(true, 0, 2, 1f);
 
+        [Header("Procedural Track Rhythm")]
+        [SerializeField, HideInInspector] private int ProceduralRhythmSettingsVersion = 3;
+
+        [Tooltip("Distributes procedural features as paced encounters instead of scattering them independently. Explicit Track Editor choices remain unrestricted.")]
+        public bool EnforceProceduralRhythm = true;
+
+        [Tooltip("Maximum number of separate S-curve-family encounters allowed consecutively. Alternating Radius Sequence counts as one compound encounter.")]
+        [Range(1, 3)] public int MaxConsecutiveSCurveEncounters = 1;
+
+        [Tooltip("Number of feature encounters used to measure local S-curve concentration.")]
+        [Range(3, 8)] public int SCurveDiversityWindow = 5;
+
+        [Tooltip("Maximum S-curve-family encounters allowed inside the diversity window.")]
+        [Range(1, 4)] public int MaxSCurveEncountersPerWindow = 2;
+
+        [Tooltip("How many other feature encounters should separate repeated non-corner feature families when alternatives exist.")]
+        [Range(0, 3)] public int SameFamilyCooldownEncounters = 1;
+
         [Tooltip("Hairpin corner patterns (150–180° reversals).")]
         public TrackFeatureRule Hairpins = new TrackFeatureRule(true, 0, 1, 0.5f);
+
+        [Tooltip("Broad, level 150–180° reversals compiled from the Wide Turnaround feature definition.")]
+        public TrackFeatureRule WideTurnarounds = new TrackFeatureRule(true, 0, 1, 0.35f);
+
+        [Tooltip("Elevated, banked 150–180° reversals compiled from the Horseshoe feature definition.")]
+        public TrackFeatureRule Horseshoes = new TrackFeatureRule(true, 0, 1, 0.25f);
+
+        [Tooltip("Compact 120–150° direction reversals compiled from the Cutback feature definition.")]
+        public TrackFeatureRule Cutbacks = new TrackFeatureRule(false, 0, 1, 0.35f);
 
         [Header("Grouping")]
         [Tooltip("Minimum number of feature groups (single features or compound patterns) on the lap.")]
@@ -513,16 +604,58 @@ namespace TrackGeneration.Design
 
         public void Sanitize()
         {
+            // Existing scenes predate these fields. Migrate them to the intended
+            // playable defaults once, while preserving an explicit later opt-out.
+            if (ProceduralRhythmSettingsVersion < 1)
+            {
+                EnforceProceduralRhythm = true;
+                MaxConsecutiveSCurveEncounters = 1;
+                SCurveDiversityWindow = 5;
+                MaxSCurveEncountersPerWindow = 2;
+                SameFamilyCooldownEncounters = 1;
+                ProceduralRhythmSettingsVersion = 1;
+            }
+
+            // Version 2 introduced definition-native feature amount rows. Existing
+            // scenes and recipes must remain byte-for-byte opt-in: a missing serialized
+            // rule can never wake a new feature merely because TrackFeatureRule's
+            // generic constructor defaults Enabled to true.
+            if (ProceduralRhythmSettingsVersion < 2)
+            {
+                Camelbacks = new TrackFeatureRule(false, 0, 1, 0.45f);
+                Cutbacks = new TrackFeatureRule(false, 0, 1, 0.35f);
+                ProceduralRhythmSettingsVersion = 2;
+            }
+
+            // Version 3 adds four definition-native rotational features. They are
+            // additive opt-ins so old scenes and exact recipes retain their content.
+            if (ProceduralRhythmSettingsVersion < 3)
+            {
+                HeartlineRolls = new TrackFeatureRule(false, 0, 1, 0.35f);
+                ZeroGRolls = new TrackFeatureRule(false, 0, 1, 0.30f);
+                DiveLoops = new TrackFeatureRule(false, 0, 1, 0.25f);
+                Sidewinders = new TrackFeatureRule(false, 0, 1, 0.30f);
+                ProceduralRhythmSettingsVersion = 3;
+            }
+
             (Jumps ??= new TrackFeatureRule()).Sanitize();
             (Loops ??= new TrackFeatureRule()).Sanitize();
             (Corkscrews ??= new TrackFeatureRule()).Sanitize();
             (Spirals ??= new TrackFeatureRule()).Sanitize();
             (HalfLoops ??= new TrackFeatureRule()).Sanitize();
             (FullPipes ??= new TrackFeatureRule()).Sanitize();
+            (Camelbacks ??= new TrackFeatureRule(false, 0, 1, 0.45f)).Sanitize();
+            (HeartlineRolls ??= new TrackFeatureRule(false, 0, 1, 0.35f)).Sanitize();
+            (ZeroGRolls ??= new TrackFeatureRule(false, 0, 1, 0.30f)).Sanitize();
+            (DiveLoops ??= new TrackFeatureRule(false, 0, 1, 0.25f)).Sanitize();
+            (Sidewinders ??= new TrackFeatureRule(false, 0, 1, 0.30f)).Sanitize();
             (Wallrides ??= new TrackFeatureRule()).Sanitize();
             (Chicanes ??= new TrackFeatureRule()).Sanitize();
             (SCurves ??= new TrackFeatureRule()).Sanitize();
             (Hairpins ??= new TrackFeatureRule()).Sanitize();
+            (WideTurnarounds ??= new TrackFeatureRule()).Sanitize();
+            (Horseshoes ??= new TrackFeatureRule()).Sanitize();
+            (Cutbacks ??= new TrackFeatureRule(false, 0, 1, 0.35f)).Sanitize();
             if (TargetJumpApexHeight <= 0f) TargetJumpApexHeight = 45f;
             TargetJumpApexHeight = Mathf.Clamp(TargetJumpApexHeight, 1f, 500f);
             JumpLipEmphasis = Mathf.Clamp01(JumpLipEmphasis);
@@ -535,6 +668,11 @@ namespace TrackGeneration.Design
             MaxFeatureGroups = Mathf.Max(MinFeatureGroups, MaxFeatureGroups);
             CompoundFeatureChance = Mathf.Clamp01(CompoundFeatureChance);
             MaxCompoundElements = Mathf.Clamp(MaxCompoundElements, 1, 4);
+            MaxConsecutiveSCurveEncounters = Mathf.Clamp(MaxConsecutiveSCurveEncounters, 1, 3);
+            SCurveDiversityWindow = Mathf.Clamp(SCurveDiversityWindow, 3, 8);
+            MaxSCurveEncountersPerWindow = Mathf.Clamp(
+                MaxSCurveEncountersPerWindow, 1, SCurveDiversityWindow);
+            SameFamilyCooldownEncounters = Mathf.Clamp(SameFamilyCooldownEncounters, 0, 3);
             RequiredPatterns ??= new List<RequiredPatternEntry>();
             foreach (var p in RequiredPatterns)
                 if (p != null) p.Count = Mathf.Max(1, p.Count);
@@ -746,6 +884,12 @@ namespace TrackGeneration.Design
         [Range(0.1f, 0.35f)] public float ClosureReserveFraction = 0.2f;
 
         [Header("Mesh Quality (advanced)")]
+        [Tooltip("Keeps every final LOD0 ring on one global meter cadence. This is the texture-authoring mode: no curvature tiers or performance-budget relaxation can change texel density between features.")]
+        public bool ConsistentTextureTopology = true;
+
+        [Tooltip("Final LOD0 distance between rings when Consistent Texture Topology is enabled. 1 meter is the high-definition production default.")]
+        [Range(0.5f, 2f)] public float TextureTopologyMetersPerRing = 1f;
+
         [Tooltip("Target meters between mesh rings — the global retopology pass spreads rings at this spacing over the whole track (tightened automatically where features demand it).")]
         [Range(0.5f, 8f)] public float MetersPerRing = 1.5f;
 
@@ -779,6 +923,7 @@ namespace TrackGeneration.Design
             MaxAttempts = Mathf.Clamp(MaxAttempts, 1, 512);
             CandidatesToScore = Mathf.Clamp(CandidatesToScore, 1, 32);
             ClosureReserveFraction = Mathf.Clamp(ClosureReserveFraction, 0.05f, 0.4f);
+            TextureTopologyMetersPerRing = Mathf.Clamp(TextureTopologyMetersPerRing, 0.5f, 2f);
             MetersPerRing = Mathf.Clamp(MetersPerRing, 0.5f, 16f);
             MaxFacetAngleDegrees = Mathf.Clamp(MaxFacetAngleDegrees, 0.1f, 2f);
             TargetTotalRings = Mathf.Clamp(TargetTotalRings, 2000, 150000);

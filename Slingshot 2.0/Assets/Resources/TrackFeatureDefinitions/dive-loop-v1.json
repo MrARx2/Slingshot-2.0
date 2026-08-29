@@ -1,0 +1,43 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.dive-loop",
+  "DefinitionVersion": 2,
+  "DisplayName": "Dive Loop",
+  "Family": "Moderate Inversion",
+  "Enabled": true,
+  "SemanticElement": 70,
+  "HasPatternType": true,
+  "PatternType": 28,
+  "TopologyRole": 1,
+  "Solver": 6,
+  "SpeedIntent": 2,
+  "RiskLevel": 2,
+  "RequiresRecoveryAfter": true,
+  "EmitsOwnApproach": false,
+  "EmitsOwnRecovery": true,
+  "Length": { "Minimum": 1500.0, "Preferred": 2050.0, "Maximum": 2800.0, "Resolution": 3, "MayAutoExpand": false, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryLength": { "Minimum": 150.0, "Preferred": 260.0, "Maximum": 450.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "RecoveryLength": { "Minimum": 180.0, "Preferred": 320.0, "Maximum": 550.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryContract": { "Orientation": 0, "RequiresUprightEntry": true, "MaximumBankDegrees": 8.0, "MaximumPitchDegrees": 10.0, "MaximumHorizontalCurvature": 0.0006666667, "MaximumRollRateDegreesPerMeter": 0.04, "AcceptsCurvedEntry": true },
+  "ExitContract": { "Orientation": 0, "HeadingChangeDegrees": 180.0, "PitchChangeDegrees": 0.0, "RollChangeDegrees": 180.0, "ElevationChangeMeters": 0.0 },
+  "Turn": { "HeadingDegrees": { "Minimum": 170.0, "Preferred": 180.0, "Maximum": 180.0 }, "RadiusMultiplier": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 }, "AbsoluteRadiusMeters": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 }, "CrestHeightMeters": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 }, "BankMultiplier": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 }, "CoreSectionType": 22, "UseRecommendedBank": false },
+  "Rotational": {
+    "RoadRollUnits": 2,
+    "VerticalRotationUnits": 2,
+    "MaximumCoreRollRateDegreesPerSecond": 90.0,
+    "DescendingVerticalPhase": true,
+    "AutomaticHandedness": true,
+    "FirstHalfRadius": { "Minimum": 300.0, "Preferred": 335.0, "Maximum": 390.0 },
+    "SecondHalfRadius": { "Minimum": 300.0, "Preferred": 350.0, "Maximum": 410.0 },
+    "PhaseSplit": { "Minimum": 0.45, "Preferred": 0.50, "Maximum": 0.55 },
+    "CenterlineOrbitDegrees": { "Minimum": 4.0, "Preferred": 6.0, "Maximum": 8.0 },
+    "FirstHalfPitchBiasDegrees": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 },
+    "SecondHalfPitchBiasDegrees": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 },
+    "LimbYawBiasDegrees": { "Minimum": 8.0, "Preferred": 12.0, "Maximum": 16.0 }
+  },
+  "Primitives": [
+    { "PrimitiveId": "dive-half-roll", "DisplayName": "Half Roll Into Dive", "PrimitiveType": 6, "EntryOrientation": 0, "ExitOrientation": 1, "LengthFraction": 0.30, "RadiusSource": 1, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "descending-half-loop", "DisplayName": "Descending Half Loop", "PrimitiveType": 5, "EntryOrientation": 1, "ExitOrientation": 0, "LengthFraction": 0.70, "RadiusSource": 2, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false }
+  ],
+  "MinimumClearanceMeters": 65.0
+}

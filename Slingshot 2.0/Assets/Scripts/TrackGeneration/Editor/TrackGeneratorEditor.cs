@@ -7,6 +7,7 @@ using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using TrackGeneration.Core;
+using TrackGeneration.Definitions;
 using TrackGeneration.Design;
 using TrackGeneration.Macro;
 using TrackGeneration.Planning;
@@ -448,9 +449,12 @@ namespace TrackGeneration.Editor
         private PresetRandomizationMode _randomMode = PresetRandomizationMode.Curated;
 
         private bool _showTechnicalReport;
-        private bool _showLocks = true;
+        private bool _showLocks;
+        private bool _showFeatureAmounts = true;
+        private bool _showAdvancedGeneration;
+        private bool _showDiagnosticsAndMaintenance;
+        private bool _showInspectorPerformance;
         private bool _showResolvedPreview;
-
         private static string _lastPresetApplication = "";
 
         // The inspector's ordinary job is to DRAW this cache. Settings resolution and
@@ -528,15 +532,6 @@ namespace TrackGeneration.Editor
         // fields, in order. The hidden generation output (lastReport/lastMetrics) is
         // deliberately absent — the report card shows its cached summary instead.
         // settingsLocks and layoutLockMode are owned by the lock panel / toolbar.
-        private static readonly string[] SettingsFieldNames =
-        {
-            "Designer", "Config", "MainRoadMaterial", "WallMaterial", "RoadLineMaterial",
-            "StartFinishMaterial", "StartGatePillarMaterial", "CheckpointMaterial", "trackRoot",
-            "buildRaceCourse", "checkpointCount", "startLineArcOffset",
-            "generateOnStart", "keepEditorTrackOnPlay", "placeHovercraftOnStart",
-            "startLineForwardOffset", "resetHovercraftWithBackspace", "seedStreams"
-        };
-
         private void OnEnable()
         {
             // Idempotent subscription makes duplicate OnEnable calls observable and safe.
@@ -624,7 +619,6 @@ namespace TrackGeneration.Editor
                 DrawTopToolbar(generator);
                 DrawReportCard(generator);
                 DrawLockPanel(generator);
-                DrawInspectorDiagnostics(generator);
                 _headerWatch.Stop();
                 // A toolbar button may have run a synchronous generator command this pass;
                 // its seconds are the command, not repaint leakage — don't record or warn.
@@ -637,15 +631,16 @@ namespace TrackGeneration.Editor
 
             // ── Settings: retained-mode property fields ──
             var settingsBlock = new VisualElement { style = { marginTop = 6 } };
-            foreach (var name in SettingsFieldNames)
-            {
-                var prop = serializedObject.FindProperty(name);
-                if (prop != null)
-                {
-                    settingsBlock.Add(new PropertyField(prop));
-                    _settingsPropertyFieldCount++;
-                }
-            }
+            AddPropertyGroup(settingsBlock, "TRACK DESIGN SETTINGS", false,
+                "Designer", "Config");
+            AddMaterialGroup(settingsBlock, generator);
+            AddPropertyGroup(settingsBlock, "RACE COURSE", false,
+                "buildRaceCourse", "checkpointCount", "startLineArcOffset");
+            AddPropertyGroup(settingsBlock, "PLAY MODE", false,
+                "generateOnStart", "keepEditorTrackOnPlay", "placeHovercraftOnStart",
+                "startLineForwardOffset", "resetHovercraftWithBackspace");
+            AddPropertyGroup(settingsBlock, "ADVANCED OUTPUT & SEEDS", false,
+                "trackRoot", "seedStreams");
             root.Add(settingsBlock);
 
             // ── Footer: cached resolved preview + mesh stats (bounded IMGUI) ──
@@ -677,6 +672,92 @@ namespace TrackGeneration.Editor
             });
 
             return root;
+        }
+
+        private void AddPropertyGroup(VisualElement parent, string title, bool expanded,
+            params string[] propertyNames)
+        {
+            var foldout = new Foldout { text = title, value = expanded };
+            foldout.style.marginLeft = 3;
+            foldout.style.marginRight = 3;
+            foldout.style.marginTop = 2;
+            foldout.style.marginBottom = 2;
+
+            for (int i = 0; i < propertyNames.Length; i++)
+            {
+                SerializedProperty property = serializedObject.FindProperty(propertyNames[i]);
+                if (property == null) continue;
+                foldout.Add(new PropertyField(property));
+                _settingsPropertyFieldCount++;
+            }
+
+            parent.Add(foldout);
+        }
+
+        private void AddMaterialGroup(VisualElement parent, TrackGenerator generator)
+        {
+            var foldout = new Foldout { text = "MATERIALS", value = false };
+            foldout.style.marginLeft = 3;
+            foldout.style.marginRight = 3;
+            foldout.style.marginTop = 2;
+            foldout.style.marginBottom = 2;
+
+            string[] propertyNames =
+            {
+                "MaterialSet", "MainRoadMaterial", "WallMaterial", "RoadLineMaterial",
+                "StartFinishMaterial", "StartGatePillarMaterial", "CheckpointMaterial"
+            };
+            for (int i = 0; i < propertyNames.Length; i++)
+            {
+                SerializedProperty property = serializedObject.FindProperty(propertyNames[i]);
+                if (property == null) continue;
+                foldout.Add(new PropertyField(property));
+                _settingsPropertyFieldCount++;
+            }
+
+            foldout.Add(new IMGUIContainer(() =>
+            {
+                EditorGUILayout.Space(3f);
+                List<string> missing = generator.ResolveMaterials().GetMissingRequiredRoles(generator.BuildsRaceCourse);
+                if (missing.Count == 0)
+                {
+                    EditorGUILayout.HelpBox(
+                        generator.MaterialSet != null
+                            ? "Persistent material set ready. Road, markings and race-course visuals will survive cache reloads and Exact Replay."
+                            : "Material roles resolve through legacy references. Assign a Material Set to make the visual contract portable and explicit.",
+                        generator.MaterialSet != null ? MessageType.Info : MessageType.Warning);
+                }
+                else
+                {
+                    EditorGUILayout.HelpBox(
+                        "Generation is blocked until these persistent roles are assigned: " + string.Join(", ", missing),
+                        MessageType.Error);
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    var repairContent = new GUIContent(
+                        "Create / Repair Default Set",
+                        "Creates any missing persistent material assets and reconnects the role set. Existing material colors, emission, textures, and other authored tuning are preserved.");
+                    if (GUILayout.Button(repairContent, GUILayout.Height(22f)))
+                    {
+                        Undo.RecordObject(generator, "Assign Track Material Set");
+                        generator.MaterialSet = TrackMaterialGenerator.GenerateOrLoadMaterialSet();
+                        EditorUtility.SetDirty(generator);
+                        serializedObject.Update();
+                    }
+
+                    EditorGUI.BeginDisabledGroup(generator.MaterialSet == null);
+                    if (GUILayout.Button("Select Set", GUILayout.Height(22f)))
+                    {
+                        Selection.activeObject = generator.MaterialSet;
+                        EditorGUIUtility.PingObject(generator.MaterialSet);
+                    }
+                    EditorGUI.EndDisabledGroup();
+                }
+            }));
+
+            parent.Add(foldout);
         }
 
         private static double _lastSlowLogTime;
@@ -764,11 +845,83 @@ namespace TrackGeneration.Editor
         private static string _lastExportPath = "";
         private static GUIStyle _bigButtonStyle;
         private static GUIStyle _warnButtonStyle;
+        private static GUIStyle _cardTitleStyle;
+        private bool _exactReplayQueued;
+        private bool _recipeIoQueued;
+        private bool _reportExportQueued;
+
+        // One restrained visual language for the whole tool. Structural UI uses
+        // cyan-teal; green, amber, and red are reserved for actual result states.
+        private static readonly Color ProfileAccent = new Color(0.48f, 0.51f, 0.53f, 1f);
+        private static readonly Color FeatureAccent = new Color(0.34f, 0.58f, 0.62f, 1f);
+        private static readonly Color GenerationAccent = new Color(0.27f, 0.66f, 0.70f, 1f);
+        private static readonly Color GenerationActionTint = new Color(0.22f, 0.50f, 0.57f, 1f);
+        private static readonly Color RecipeAccent = new Color(0.66f, 0.55f, 0.79f, 1f);
+        private static readonly Color ReplayActionTint = new Color(0.54f, 0.45f, 0.68f, 1f);
+        private static readonly Color EditorAccent = new Color(0.55f, 0.41f, 0.76f, 1f);
+        private static readonly Color EditorActionTint = new Color(0.40f, 0.30f, 0.58f, 1f);
+
+        private static string GetDefaultRecipeDirectory()
+        {
+            string directory = Path.Combine(Application.dataPath, "Scripts", "TrackGeneration", "GenerationTrackRecipes");
+            try
+            {
+                Directory.CreateDirectory(directory);
+                return directory;
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogWarning($"[TrackGenerator] Could not create the default recipe folder '{directory}': {exception.Message}");
+                return Application.dataPath;
+            }
+        }
+
+        private static GUIContent CopyRecipeIcon()
+        {
+            const string tooltip = "Copy the complete exact recipe JSON for the last accepted track to the clipboard.";
+            GUIContent builtIn = EditorGUIUtility.IconContent("Clipboard");
+            return builtIn != null && builtIn.image != null
+                ? new GUIContent(builtIn.image, tooltip)
+                : new GUIContent("⧉", tooltip);
+        }
 
         private static void SectionHeader(string title)
         {
             EditorGUILayout.Space(3);
             EditorGUILayout.LabelField(title, EditorStyles.miniBoldLabel);
+        }
+
+        private static void CardHeader(string title, string subtitle, Color accent)
+        {
+            Rect accentLine = EditorGUILayout.GetControlRect(false, 3f);
+            accentLine.xMin += 1f;
+            accentLine.xMax -= 1f;
+            EditorGUI.DrawRect(accentLine, accent);
+            EditorGUILayout.Space(3f);
+            EditorGUILayout.LabelField(title, CardTitleStyle());
+            if (!string.IsNullOrEmpty(subtitle))
+                EditorGUILayout.LabelField(subtitle, EditorStyles.wordWrappedMiniLabel);
+            EditorGUILayout.Space(2f);
+        }
+
+        private static GUIStyle CardTitleStyle() => _cardTitleStyle ??= new GUIStyle(EditorStyles.boldLabel)
+        {
+            fontSize = 12
+        };
+
+        private static bool AccentButton(string label, string tooltip, Color tint,
+            float height = 28f, bool bold = true)
+        {
+            Color previous = GUI.backgroundColor;
+            GUI.backgroundColor = tint;
+            var style = new GUIStyle(GUI.skin.button)
+            {
+                fontStyle = bold ? FontStyle.Bold : FontStyle.Normal,
+                alignment = TextAnchor.MiddleCenter
+            };
+            bool pressed = GUILayout.Button(new GUIContent(label, tooltip), style, GUILayout.Height(height));
+            GUI.backgroundColor = previous;
+            return pressed;
         }
 
         private static bool Btn(string label, string tooltip, float height = 22f)
@@ -778,84 +931,524 @@ namespace TrackGeneration.Editor
         private void AfterGeneratorCommand(TrackGenerator generator)
         {
             _commandEpoch++; // mark this IMGUI pass as command-driven, not an idle repaint
+            // Generator commands mutate hidden serialized recipe/report fields while the
+            // retained UI still owns its pre-click SerializedObject snapshot. Refresh it
+            // immediately so binding cannot write that stale snapshot back over the
+            // newly accepted recipe (which previously erased the visible rating).
+            serializedObject.Update();
             _cache.MarkSettingsDirty(); // relaxation policies may have adjusted settings
             EditorUtility.SetDirty(generator);
             TrackGeneratorPlayPreviewCache.Capture(generator);
         }
 
+        private bool ImportRecipeJson(TrackGenerator generator, string json)
+        {
+            Undo.RecordObject(generator, "Import Generation Recipe");
+            TrackSeedManager seedManager = generator.GetComponent<TrackSeedManager>();
+            if (seedManager != null) Undo.RecordObject(seedManager, "Import Generation Recipe Seed");
+            if (!generator.TryImportGenerationRecipe(json, RecipeReplayMode.Strict, out string importError))
+            {
+                EditorUtility.DisplayDialog("Recipe Import Failed", importError, "OK");
+                return false;
+            }
+
+            EditorUtility.SetDirty(generator);
+            if (seedManager != null) EditorUtility.SetDirty(seedManager);
+            serializedObject.Update();
+            Debug.Log("[TrackGenerator] Imported exact Generation Recipe inputs. Press Exact Replay to verify and build it.");
+            return true;
+        }
+
         private void DrawTopToolbar(TrackGenerator generator)
         {
             EditorGUILayout.Space(2);
+            DrawProfileCard(generator);
+            DrawFeatureAmountsCard(generator);
+            DrawFeatureDefinitionsCard();
+            DrawGenerationCard(generator);
+            DrawExactRecipeCard(generator);
+            DrawTrackEditorCard(generator);
+            DrawAdvancedGeneration(generator);
+            DrawDiagnosticsAndMaintenance(generator);
+        }
+
+        private static void DrawFeatureDefinitionsCard()
+        {
+            EditorGUILayout.Space(3f);
             using (new EditorGUILayout.VerticalScope("HelpBox"))
             {
-                // Provenance line.
+                bool complete = TrackFeatureDefinitionCatalog.TryValidateDesignerCoverage(
+                    out string summary, out List<TrackPatternType> missing);
+                CardHeader("FEATURE DEFINITIONS", summary, FeatureAccent);
+
+                if (!complete)
+                {
+                    string details = TrackFeatureDefinitionCatalog.LoadErrors.Count > 0
+                        ? string.Join("\n", TrackFeatureDefinitionCatalog.LoadErrors)
+                        : "Missing individual assets: " + string.Join(", ", missing);
+                    EditorGUILayout.HelpBox(details, MessageType.Error);
+                }
+
+                if (Btn("Open Feature Definitions",
+                        "Edit the versioned parameters and contracts for each individual feature asset.", 23f))
+                    EditorApplication.ExecuteMenuItem("Track/V2/Feature Definitions");
+            }
+        }
+
+        private void DrawProfileCard(TrackGenerator generator)
+        {
+            using (new EditorGUILayout.VerticalScope("HelpBox"))
+            {
                 string provenance = string.IsNullOrEmpty(generator.Designer.AppliedPresetName)
-                    ? "Custom (no preset applied)"
+                    ? "Custom setup"
                     : generator.Designer.ModifiedSincePreset
-                        ? $"Custom — based on {generator.Designer.AppliedPresetName}"
+                        ? $"Custom · based on {generator.Designer.AppliedPresetName}"
                         : generator.Designer.AppliedPresetName;
-                EditorGUILayout.LabelField($"Settings: {provenance}", EditorStyles.miniLabel);
+                CardHeader("TRACK PROFILE", provenance,
+                    ProfileAccent);
 
-                // ── PRESETS ──
-                SectionHeader("PRESETS");
+                DrawProfilePopup("STYLE", ref _styleIndex, StyleOptions());
+                DrawVerticalProfilePopup(generator);
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    EditorGUILayout.LabelField("Style", GUILayout.Width(40));
-                    _styleIndex = EditorGUILayout.Popup(_styleIndex, StyleOptions());
-                    EditorGUILayout.LabelField("Difficulty", GUILayout.Width(58));
-                    _difficultyIndex = EditorGUILayout.Popup(_difficultyIndex, DifficultyOptions);
-                    EditorGUILayout.LabelField("Size", GUILayout.Width(32));
-                    _sizeIndex = EditorGUILayout.Popup(_sizeIndex, SizeOptions);
-                }
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    _randomMode = (PresetRandomizationMode)EditorGUILayout.EnumPopup("Random Mode", _randomMode);
-                    var seedManager = generator.GetComponent<TrackSeedManager>();
-                    if (seedManager != null)
-                    {
-                        seedManager.UseRandomSeed = EditorGUILayout.ToggleLeft(
-                            new GUIContent("Random Seed", "On: every Generate New Track draws a fresh master seed. Off: the seed field is used verbatim."),
-                            seedManager.UseRandomSeed, GUILayout.Width(100));
-                        using (new EditorGUI.DisabledScope(seedManager.UseRandomSeed))
-                            seedManager.CurrentSeedInput = EditorGUILayout.IntField(seedManager.CurrentSeedInput);
-                    }
-                }
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    if (Btn("Apply Presets",
-                        "Applies the selected Style/Difficulty/Size to the designer settings. Locked settings groups are skipped; Random selectors resolve deterministically from the PresetResolution seed. Does NOT generate a track."))
-                        ApplyPresets(generator);
-                    if (Btn("Reset Unlocked",
-                        "Restores every UNLOCKED settings group to the last applied preset snapshot. Locked groups keep their manual edits. Does NOT generate a track."))
-                    {
-                        Undo.RecordObject(generator, "Reset Unlocked Groups");
-                        PresetApplicator.ResetUnlockedGroups(generator.Designer, generator.SettingsLocks);
-                        EditorUtility.SetDirty(generator);
-                    }
+                    DrawProfilePopup("DIFFICULTY", ref _difficultyIndex, DifficultyOptions);
+                    GUILayout.Space(4f);
+                    DrawProfilePopup("SIZE", ref _sizeIndex, SizeOptions);
                 }
 
-                // ── RANDOMIZATION ──
-                SectionHeader("RANDOMIZATION");
+                EditorGUILayout.Space(2f);
+                if (AccentButton("APPLY PROFILE",
+                    "Applies Style, Difficulty and Size without generating. Locked settings stay untouched.",
+                    Color.white, 24f))
+                    ApplyPresets(generator);
+
+                if (!string.IsNullOrEmpty(_lastPresetApplication))
+                    EditorGUILayout.LabelField(_lastPresetApplication, EditorStyles.wordWrappedMiniLabel);
+            }
+        }
+
+        private void DrawVerticalProfilePopup(TrackGenerator generator)
+        {
+            if (generator?.Designer?.Elevation == null) return;
+
+            EditorGUILayout.LabelField("ELEVATION", EditorStyles.miniBoldLabel);
+            VerticalGenerationProfile current = generator.Designer.Elevation.Profile;
+            EditorGUI.BeginChangeCheck();
+            VerticalGenerationProfile selected = (VerticalGenerationProfile)EditorGUILayout.EnumPopup(current);
+            if (!EditorGUI.EndChangeCheck()) return;
+
+            Undo.RecordObject(generator, "Change Vertical Profile");
+            generator.Designer.Elevation.Profile = selected;
+            generator.Designer.ModifiedSincePreset = true;
+            _cache.MarkSettingsDirty();
+            EditorUtility.SetDirty(generator);
+        }
+
+        private static void DrawProfilePopup(string label, ref int index, string[] options)
+        {
+            using (new EditorGUILayout.VerticalScope())
+            {
+                EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
+                index = EditorGUILayout.Popup(index, options, GUILayout.MinWidth(80f), GUILayout.ExpandWidth(true));
+            }
+        }
+
+        private void DrawFeatureAmountsCard(TrackGenerator generator)
+        {
+            EditorGUILayout.Space(3);
+            using (new EditorGUILayout.VerticalScope("HelpBox"))
+            {
+                TrackFeatureSettings features = generator.Designer?.Features;
+                int required = 0;
+                int maximum = 0;
+                if (features != null)
+                {
+                    AccumulateFeatureCounts(features.Jumps, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.Loops, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.Corkscrews, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.Spirals, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.HalfLoops, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.FullPipes, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.Camelbacks, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.HeartlineRolls, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.ZeroGRolls, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.DiveLoops, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.Sidewinders, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.Wallrides, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.Chicanes, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.SCurves, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.Hairpins, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.WideTurnarounds, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.Horseshoes, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.Cutbacks, ref required, ref maximum);
+                }
+
+                CardHeader("FEATURE AMOUNTS",
+                    $"Guaranteed minimum {required} · combined cap {maximum}", FeatureAccent);
+                _showFeatureAmounts = EditorGUILayout.Foldout(_showFeatureAmounts,
+                    _showFeatureAmounts ? "Hide feature limits" : "Edit feature limits", true);
+                if (!_showFeatureAmounts)
+                    return;
+
+                SerializedProperty designerProperty = serializedObject.FindProperty("Designer");
+                SerializedProperty featureProperty = designerProperty?.FindPropertyRelative("Features");
+                if (featureProperty == null)
+                {
+                    EditorGUILayout.HelpBox("Feature rules are unavailable until the designer settings are initialized.",
+                        MessageType.Info);
+                    return;
+                }
+
+                EditorGUILayout.Space(2f);
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (Btn("Randomize All Unlocked",
-                        "Re-rolls every seed stream the layout lock allows (Unlocked: everything; Skeleton: keeps Layout+Quarter; Geometry: only Surface+Visual) and regenerates. Locked settings groups are never modified."))
+                    GUILayout.Label("FEATURE", EditorStyles.miniBoldLabel, GUILayout.MinWidth(104f));
+                    GUILayout.FlexibleSpace();
+                    GUILayout.Label("ON", EditorStyles.miniBoldLabel, GUILayout.Width(24f));
+                    GUILayout.Label("MIN", EditorStyles.miniBoldLabel, GUILayout.Width(42f));
+                    GUILayout.Label("MAX", EditorStyles.miniBoldLabel, GUILayout.Width(42f));
+                }
+
+                EditorGUI.BeginChangeCheck();
+                DrawFeatureAmountRow(featureProperty, "Jumps", "Air Gaps");
+                DrawFeatureAmountRow(featureProperty, "Loops", "Loops");
+                DrawFeatureAmountRow(featureProperty, "Corkscrews", "Corkscrews");
+                DrawFeatureAmountRow(featureProperty, "Spirals", "Spirals");
+                DrawFeatureAmountRow(featureProperty, "HalfLoops", "Half-Loops");
+                DrawFeatureAmountRow(featureProperty, "FullPipes", "Full Pipes");
+                DrawFeatureAmountRow(featureProperty, "Camelbacks", "Camelbacks");
+                DrawFeatureAmountRow(featureProperty, "HeartlineRolls", "Heartline Rolls");
+                DrawFeatureAmountRow(featureProperty, "ZeroGRolls", "Zero-G Rolls");
+                DrawFeatureAmountRow(featureProperty, "DiveLoops", "Dive Loops");
+                DrawFeatureAmountRow(featureProperty, "Sidewinders", "Sidewinders");
+                DrawFeatureAmountRow(featureProperty, "Wallrides", "Wallrides");
+                DrawFeatureAmountRow(featureProperty, "Chicanes", "Chicanes");
+                DrawFeatureAmountRow(featureProperty, "SCurves", "S-Curves");
+                DrawFeatureAmountRow(featureProperty, "Hairpins", "Hairpins");
+                DrawFeatureAmountRow(featureProperty, "WideTurnarounds", "Wide Turnarounds");
+                DrawFeatureAmountRow(featureProperty, "Horseshoes", "Horseshoes");
+                DrawFeatureAmountRow(featureProperty, "Cutbacks", "Cutbacks");
+
+                EditorGUILayout.Space(5f);
+                EditorGUILayout.LabelField("PROCEDURAL RHYTHM", EditorStyles.miniBoldLabel);
+                SerializedProperty rhythmEnabled = featureProperty.FindPropertyRelative("EnforceProceduralRhythm");
+                EditorGUILayout.PropertyField(rhythmEnabled, new GUIContent("Balanced encounter spacing"));
+                if (rhythmEnabled != null && rhythmEnabled.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        featureProperty.FindPropertyRelative("MaxConsecutiveSCurveEncounters"),
+                        new GUIContent("Consecutive S-flow maximum"));
+                    EditorGUILayout.PropertyField(
+                        featureProperty.FindPropertyRelative("SCurveDiversityWindow"),
+                        new GUIContent("S-flow window"));
+                    EditorGUILayout.PropertyField(
+                        featureProperty.FindPropertyRelative("MaxSCurveEncountersPerWindow"),
+                        new GUIContent("S-flow maximum in window"));
+                    EditorGUILayout.PropertyField(
+                        featureProperty.FindPropertyRelative("SameFamilyCooldownEncounters"),
+                        new GUIContent("Other-family cooldown"));
+                    EditorGUI.indentLevel--;
+                }
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    generator.Designer.Features.Sanitize();
+                    generator.Designer.ModifiedSincePreset = true;
+                    EditorUtility.SetDirty(generator);
+                    _cache.MarkSettingsDirty();
+                }
+
+                EditorGUILayout.Space(2f);
+                EditorGUILayout.LabelField(
+                    "Minimum is guaranteed. If it cannot fit safely, generation fails clearly instead of silently dropping it. Maximum is a hard cap; 0 disables placement.",
+                    EditorStyles.wordWrappedMiniLabel);
+            }
+        }
+
+        private static void AccumulateFeatureCounts(TrackFeatureRule rule, ref int minimum, ref int maximum)
+        {
+            if (rule == null) return;
+            minimum += rule.EffectiveMinimum;
+            maximum += rule.EffectiveMaximum;
+        }
+
+        private static void DrawFeatureAmountRow(SerializedProperty featureProperty,
+            string propertyName, string label)
+        {
+            SerializedProperty rule = featureProperty.FindPropertyRelative(propertyName);
+            if (rule == null) return;
+
+            SerializedProperty enabledProperty = rule.FindPropertyRelative("Enabled");
+            SerializedProperty minimumProperty = rule.FindPropertyRelative("MinimumCount");
+            SerializedProperty maximumProperty = rule.FindPropertyRelative("MaximumCount");
+            if (enabledProperty == null || minimumProperty == null || maximumProperty == null) return;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Label(label, GUILayout.MinWidth(104f));
+                GUILayout.FlexibleSpace();
+                enabledProperty.boolValue = EditorGUILayout.Toggle(enabledProperty.boolValue, GUILayout.Width(24f));
+
+                int minimum = Mathf.Max(0,
+                    EditorGUILayout.IntField(minimumProperty.intValue, GUILayout.Width(42f)));
+                int maximum = Mathf.Max(minimum,
+                    EditorGUILayout.IntField(maximumProperty.intValue, GUILayout.Width(42f)));
+                minimumProperty.intValue = minimum;
+                maximumProperty.intValue = maximum;
+            }
+        }
+
+        private void DrawGenerationCard(TrackGenerator generator)
+        {
+            EditorGUILayout.Space(3);
+            using (new EditorGUILayout.VerticalScope("HelpBox"))
+            {
+                CardHeader("GENERATION", "Build a fresh route, replay this seed, or export its report.",
+                    GenerationAccent);
+                if (AccentButton("GENERATE NEW TRACK",
+                    "Creates a completely new track from a fresh master seed. The previous valid track is preserved if generation fails.",
+                    GenerationActionTint, 40f))
+                {
+                    generator.GenerateNewEverything();
+                    AfterGeneratorCommand(generator);
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (Btn("Same Seed",
+                        "Rebuilds the current seed with the current settings."))
                     {
-                        Undo.RecordObject(generator, "Randomize All Unlocked");
-                        generator.RandomizeAllUnlocked();
+                        generator.RegenerateSameSettings();
                         AfterGeneratorCommand(generator);
                     }
+                    if (Btn("Validate",
+                        "Shows resolved rules and warnings without changing the track."))
+                        _showResolvedPreview = true;
                 }
+
+                EditorGUILayout.Space(2f);
+                using (new EditorGUI.DisabledScope(_reportExportQueued))
+                {
+                    if (Btn(_reportExportQueued ? "Opening…" : "Export Debug Report",
+                        "Saves the complete diagnostic report for the current generated track.", 20f))
+                        QueueExportDebugReport(generator);
+                }
+            }
+        }
+
+        private void QueueExportDebugReport(TrackGenerator generator)
+        {
+            if (_reportExportQueued || generator == null) return;
+            _reportExportQueued = true;
+            EditorApplication.delayCall += () =>
+            {
+                _reportExportQueued = false;
+                if (this == null || generator == null) return;
+                ExportDebugReport(generator);
+                Repaint();
+            };
+        }
+
+        private static void ExportDebugReport(TrackGenerator generator)
+        {
+            string path = EditorUtility.SaveFilePanel("Export Track Debug Report",
+                Path.GetDirectoryName(Application.dataPath),
+                $"TrackReport_{generator.LastReport?.Seed ?? 0}", "txt");
+            if (string.IsNullOrEmpty(path)) return;
+
+            TrackDebugReportExporter.Export(generator, path);
+            _lastExportPath = path;
+            EditorUtility.RevealInFinder(path);
+        }
+
+        private void DrawExactRecipeCard(TrackGenerator generator)
+        {
+            EditorGUILayout.Space(3);
+            using (new EditorGUILayout.VerticalScope("HelpBox"))
+            {
+                string acceptedHash = generator.LastResultManifest?.CanonicalLayoutHash;
+                string identity = string.IsNullOrEmpty(acceptedHash)
+                        ? "No accepted recipe yet"
+                        : $"Layout ID · {acceptedHash.Substring(0, Mathf.Min(12, acceptedHash.Length))}…";
+                CardHeader("EXACT RECIPE", identity,
+                    RecipeAccent);
+
+                TrackRecipeRating rating = generator.DisplayedRecipeRating;
+                if (rating != null && rating.IsRated)
+                {
+                    EditorGUILayout.LabelField($"TRACK RATING   {rating.Overall} / 100",
+                        EditorStyles.boldLabel);
+                    Rect barRect = GUILayoutUtility.GetRect(1f, 7f, GUILayout.ExpandWidth(true));
+                    EditorGUI.DrawRect(barRect, new Color(0.12f, 0.12f, 0.14f, 1f));
+                    Rect fillRect = barRect;
+                    fillRect.width *= rating.Overall / 100f;
+                    Color ratingColor = Color.Lerp(new Color(0.85f, 0.30f, 0.25f),
+                        new Color(0.20f, 0.78f, 0.62f), rating.Overall / 100f);
+                    EditorGUI.DrawRect(fillRect, ratingColor);
+                    EditorGUILayout.LabelField(
+                        $"Flow {rating.Flow}   Variety {rating.Variety}   Request fit {rating.RequestFit}   Technical {rating.TechnicalQuality}",
+                        EditorStyles.centeredGreyMiniLabel);
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("TRACK RATING   Unrated — replay or generate this recipe",
+                        EditorStyles.centeredGreyMiniLabel);
+                }
+
+                EditorGUILayout.Space(3f);
+
+                using (new EditorGUI.DisabledScope(_recipeIoQueued))
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (Btn("Same Layout, New Content",
-                        "Keeps the corner skeleton and quarter topology (Layout + Quarter seeds); re-rolls features, elevation, surface and visuals. On failure the previous track is preserved."))
+                    if (GUILayout.Button(CopyRecipeIcon(), GUILayout.Width(32f), GUILayout.Height(23f)))
+                    {
+                        GUIUtility.systemCopyBuffer = generator.ExportGenerationRecipe(preferLastAccepted: true);
+                        Debug.Log("[TrackGenerator] Copied exact Generation Recipe JSON to the clipboard.");
+                    }
+                    if (Btn(_recipeIoQueued ? "Opening…" : "Save",
+                            "Save the accepted recipe as a portable JSON file.", 23f))
+                        QueueRecipeIo(generator, save: true);
+                    if (Btn(_recipeIoQueued ? "Opening…" : "Load",
+                            "Load and validate a recipe JSON. Exact Replay remains a separate action.", 23f))
+                        QueueRecipeIo(generator, save: false);
+                }
+
+                EditorGUILayout.Space(3f);
+                using (new EditorGUI.DisabledScope(_exactReplayQueued))
+                {
+                    if (AccentButton(_exactReplayQueued ? "REPLAYING…" : "EXACT REPLAY",
+                            "Rebuilds the loaded or last accepted recipe and verifies its exact layout identity.",
+                            ReplayActionTint, 30f))
+                        QueueExactReplay(generator);
+                }
+            }
+        }
+
+        private void QueueExactReplay(TrackGenerator generator)
+        {
+            if (_exactReplayQueued || generator == null) return;
+            _exactReplayQueued = true;
+
+            // Generation and failure dialogs mutate Selection/Inspector state. Running
+            // either while IMGUI still owns VerticalScope/HorizontalScope groups causes
+            // Unity's "EndLayoutGroup: BeginLayoutGroup must be called first" error.
+            // Defer the complete command until this Inspector pass has closed cleanly.
+            EditorApplication.delayCall += () =>
+            {
+                _exactReplayQueued = false;
+                if (this == null || generator == null) return;
+
+                if (!generator.RegenerateExactRecipe(out string replayError))
+                    EditorUtility.DisplayDialog("Exact Recipe Replay Failed", replayError, "OK");
+                AfterGeneratorCommand(generator);
+                Repaint();
+            };
+        }
+
+        private void SaveRecipe(TrackGenerator generator)
+        {
+            string path = EditorUtility.SaveFilePanel("Save Generation Recipe",
+                GetDefaultRecipeDirectory(), "SlingshotTrackRecipe", "json");
+            if (string.IsNullOrEmpty(path)) return;
+            try
+            {
+                File.WriteAllText(path, generator.ExportGenerationRecipe(preferLastAccepted: true));
+                if (path.StartsWith(Application.dataPath, System.StringComparison.OrdinalIgnoreCase))
+                    AssetDatabase.Refresh();
+                Debug.Log($"[TrackGenerator] Saved Generation Recipe: {path}");
+            }
+            catch (System.Exception exception)
+            {
+                EditorUtility.DisplayDialog("Recipe Save Failed", exception.Message, "OK");
+            }
+        }
+
+        private void QueueRecipeIo(TrackGenerator generator, bool save)
+        {
+            if (_recipeIoQueued || generator == null) return;
+            _recipeIoQueued = true;
+
+            // Native file panels and their validation dialogs can invalidate the UIElements-backed
+            // Inspector while its IMGUI scopes are still open. Run the complete interaction after
+            // this draw pass, just like Exact Replay, so every layout group closes first.
+            EditorApplication.delayCall += () =>
+            {
+                _recipeIoQueued = false;
+                if (this == null || generator == null) return;
+                if (save) SaveRecipe(generator);
+                else LoadRecipe(generator);
+                Repaint();
+            };
+        }
+
+        private void LoadRecipe(TrackGenerator generator)
+        {
+            string path = EditorUtility.OpenFilePanel("Load Generation Recipe",
+                GetDefaultRecipeDirectory(), "json");
+            if (string.IsNullOrEmpty(path)) return;
+            try { ImportRecipeJson(generator, File.ReadAllText(path)); }
+            catch (System.Exception exception)
+            {
+                EditorUtility.DisplayDialog("Recipe Load Failed", exception.Message, "OK");
+            }
+        }
+
+        private static void DrawTrackEditorCard(TrackGenerator generator)
+        {
+            EditorGUILayout.Space(3);
+            using (new EditorGUILayout.VerticalScope("HelpBox"))
+            {
+                TrackEditor child = generator.GetComponentInChildren<TrackEditor>(true);
+                CardHeader("TRACK EDITOR", child != null
+                        ? "Ready · edit generated segments and topology choices"
+                        : "Creates a lightweight editing tool under this TrackGenerator",
+                    EditorAccent);
+                if (AccentButton(child != null ? "OPEN TRACK EDITOR" : "CREATE TRACK EDITOR",
+                        "Selects the TrackEditor for this generator, creating and parenting it when needed.",
+                        EditorActionTint, 25f))
+                    TrackEditorEditor.SelectOrCreateFor(generator);
+            }
+        }
+
+        private void DrawAdvancedGeneration(TrackGenerator generator)
+        {
+            EditorGUILayout.Space(3);
+            _showAdvancedGeneration = EditorGUILayout.Foldout(_showAdvancedGeneration,
+                "Advanced Regeneration", true);
+            if (!_showAdvancedGeneration) return;
+
+            using (new EditorGUILayout.VerticalScope("HelpBox"))
+            {
+                _randomMode = (PresetRandomizationMode)EditorGUILayout.EnumPopup("Random Style", _randomMode);
+                TrackSeedManager seedManager = generator.GetComponent<TrackSeedManager>();
+                if (seedManager != null)
+                {
+                    EditorGUI.BeginChangeCheck();
+                    bool useRandom = EditorGUILayout.ToggleLeft(
+                        new GUIContent("Use a fresh seed for new tracks", "Turn off to generate from the entered master seed."),
+                        seedManager.UseRandomSeed);
+                    using (new EditorGUI.DisabledScope(useRandom))
+                        seedManager.CurrentSeedInput = EditorGUILayout.IntField("Master Seed", seedManager.CurrentSeedInput);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(seedManager, "Change Track Seed Mode");
+                        seedManager.UseRandomSeed = useRandom;
+                        EditorUtility.SetDirty(seedManager);
+                    }
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (Btn("Same Layout · New Content",
+                        "Keeps the skeleton and quarter topology while re-rolling content."))
                     {
                         generator.SameLayoutNewContent();
                         AfterGeneratorCommand(generator);
                     }
-                    if (Btn("Same Geometry, New Surface",
-                        "Keeps ALL generation geometry; re-rolls only surface treatment and visuals (Surface + Visual seeds)."))
+                    if (Btn("Same Geometry · New Surface",
+                        "Keeps all geometry and changes only surface treatment and visuals."))
                     {
                         generator.SameGeometryNewSurface();
                         AfterGeneratorCommand(generator);
@@ -863,192 +1456,114 @@ namespace TrackGeneration.Editor
                 }
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (Btn("New Features Only",
-                        "Re-rolls only the Feature seed: which features fill the gaps and their parameters. Corner skeleton, quarters, elevation, surface and visuals are preserved.", 20f))
+                    if (Btn("Features Only", "Re-rolls only feature choices.", 20f))
                     {
                         generator.NewFeaturesOnly();
                         AfterGeneratorCommand(generator);
                     }
-                    if (Btn("New Quarter Content Only",
-                        "Re-rolls only the Quarter seed: which quarters are dual and their alternate road content. The corner skeleton and feature placement are preserved; existing features may become part of a dual quarter.", 20f))
+                    if (Btn("Quarter Content", "Re-rolls only quarter content.", 20f))
                     {
                         generator.NewQuarterContentOnly();
                         AfterGeneratorCommand(generator);
                     }
-                    if (Btn("New Visuals Only",
-                        "Re-rolls only the Visual seed: marker phasing and decoration. Geometry is untouched.", 20f))
+                    if (Btn("Visuals Only", "Re-rolls visuals without changing geometry.", 20f))
                     {
                         generator.NewVisualsOnly();
                         AfterGeneratorCommand(generator);
                     }
                 }
-
-                // ── GENERATION ──
-                SectionHeader("GENERATION");
-                using (new EditorGUILayout.HorizontalScope())
+                if (Btn("Randomize Everything Unlocked",
+                    "Re-rolls every stream allowed by the current layout and settings locks."))
                 {
-                    var big = new GUIStyle(GUI.skin.button) { fontStyle = FontStyle.Bold };
-                    if (GUILayout.Button(new GUIContent("Generate New Track",
-                            "Draws a fresh master seed (all streams re-derive) and generates a completely new track. On failure the previous valid track is preserved and the report card explains why."),
-                            big, GUILayout.Height(34)))
-                    {
-                        generator.GenerateNewEverything();
-                        AfterGeneratorCommand(generator);
-                    }
-                }
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    if (Btn("Regenerate Same Seed",
-                        "Deterministic re-run of the current master seed with the current settings — the same track unless settings changed."))
-                    {
-                        generator.RegenerateSameSettings();
-                        AfterGeneratorCommand(generator);
-                    }
-                    if (Btn("Validate Current Track",
-                        "Resolves the current settings against the rulebook and shows the derived values and any clamp warnings below. Does not modify the track."))
-                        _showResolvedPreview = true;
+                    Undo.RecordObject(generator, "Randomize All Unlocked");
+                    generator.RandomizeAllUnlocked();
+                    AfterGeneratorCommand(generator);
                 }
 
-                // ── LOCKS ──
-                SectionHeader("LOCKS");
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    EditorGUI.BeginChangeCheck();
-                    var mode = (LayoutLockMode)EditorGUILayout.EnumPopup(
-                        new GUIContent("Layout Lock", "Unlocked: everything may regenerate. Skeleton: corner plan + quarter topology preserved. Geometry: exact geometry preserved, only surface/visuals change."),
-                        generator.LayoutLockMode);
-                    if (EditorGUI.EndChangeCheck())
+                    if (Btn("Reset Unlocked Settings",
+                        "Restores unlocked groups to the applied profile.", 20f))
                     {
-                        Undo.RecordObject(generator, "Layout Lock Mode");
-                        generator.LayoutLockMode = mode;
+                        Undo.RecordObject(generator, "Reset Unlocked Groups");
+                        PresetApplicator.ResetUnlockedGroups(generator.Designer, generator.SettingsLocks);
                         EditorUtility.SetDirty(generator);
                     }
-                    if (Btn("Lock Current Layout",
-                        "Sets the layout lock to Skeleton: the current corner plan and quarter topology survive every regeneration command."))
-                    {
-                        Undo.RecordObject(generator, "Lock Current Layout");
-                        generator.LayoutLockMode = LayoutLockMode.Skeleton;
-                        EditorUtility.SetDirty(generator);
-                    }
+                    if (Btn("Save Profile Asset",
+                        "Saves the current design settings as a reusable project asset.", 20f))
+                        SaveAsPresetAsset(generator.Designer);
                 }
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    if (Btn("Lock Modified Groups",
-                        "Locks every settings group whose values differ from the last applied preset — your manual edits survive future presets and randomization.", 20f))
-                    {
-                        Undo.RecordObject(generator, "Lock Modified Groups");
-                        PresetApplicator.LockModifiedGroups(generator.Designer, generator.SettingsLocks);
-                        EditorUtility.SetDirty(generator);
-                    }
-                    if (Btn("Lock All", "Locks every settings group.", 20f))
-                    {
-                        Undo.RecordObject(generator, "Lock All Groups");
-                        generator.SettingsLocks.SetAll(true);
-                        EditorUtility.SetDirty(generator);
-                    }
-                    if (Btn("Unlock All", "Unlocks every settings group.", 20f))
-                    {
-                        Undo.RecordObject(generator, "Unlock All Groups");
-                        generator.SettingsLocks.SetAll(false);
-                        EditorUtility.SetDirty(generator);
-                    }
-                }
+            }
+        }
 
-                // ── DIAGNOSTICS ──
-                SectionHeader("DIAGNOSTICS");
+        private void DrawDiagnosticsAndMaintenance(TrackGenerator generator)
+        {
+            EditorGUILayout.Space(3);
+            _showDiagnosticsAndMaintenance = EditorGUILayout.Foldout(_showDiagnosticsAndMaintenance,
+                "Diagnostics & Maintenance", true);
+            if (!_showDiagnosticsAndMaintenance) return;
+
+            using (new EditorGUILayout.VerticalScope("HelpBox"))
+            {
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (Btn("Export Debug Report",
-                        "Writes the full text report (settings, resolved values, section+ring dump, connector audit, hotspots, quarter dissection) to a file of your choice. Never regenerates or mutates the track."))
-                    {
-                        string path = EditorUtility.SaveFilePanel("Export Track Debug Report",
-                            System.IO.Path.GetDirectoryName(Application.dataPath),
-                            $"TrackReport_{generator.LastReport?.Seed ?? 0}", "txt");
-                        if (!string.IsNullOrEmpty(path))
-                        {
-                            TrackDebugReportExporter.Export(generator, path);
-                            _lastExportPath = path;
-                            EditorUtility.RevealInFinder(path);
-                        }
-                    }
-                    if (Btn("Open Export Folder",
-                        "Reveals the most recent debug export in the file browser (or the project folder when nothing was exported yet)."))
-                    {
+                    if (Btn("Export Report", "Writes the complete track diagnostic report to a text file."))
+                        ExportDebugReport(generator);
+                    if (Btn("Open Reports", "Opens the most recent report location."))
                         EditorUtility.RevealInFinder(string.IsNullOrEmpty(_lastExportPath)
-                            ? System.IO.Path.GetDirectoryName(Application.dataPath)
+                            ? Path.GetDirectoryName(Application.dataPath)
                             : _lastExportPath);
-                    }
                 }
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (Btn("Copy Debug Summary",
-                        "Copies the last generation report (metrics, streams, warnings, failures) to the clipboard, paste-friendly.", 20f))
+                    if (Btn("Copy Summary", "Copies the last compact generation report.", 20f))
                         EditorGUIUtility.systemCopyBuffer = FullReportText(generator.LastReport, generator.LastMetrics);
-                    if (Btn("Focus Primary Failure",
-                        "Frames the scene view on the position of the last recorded failure (when the failure was positional).", 20f))
+                    if (Btn("Focus Failure", "Frames the last positional generation failure.", 20f))
                         FocusPrimaryFailure(generator);
-                    if (Btn("Toggle Debug View",
-                        "Enables/disables the track debug visualizer component (quarter boundaries, road colors, wall masks, open edges).", 20f))
+                    if (Btn("Debug View", "Toggles track diagnostics in the Scene view.", 20f))
                         ToggleDebugView(generator);
                 }
 
-                // ── TRACK MANAGEMENT (destructive — kept visually separate) ──
-                SectionHeader("TRACK MANAGEMENT");
+                SectionHeader("V2 STABILITY");
+                EditorGUILayout.LabelField(
+                    "Run a small, time-bounded seed audit without building meshes or changing the scene.",
+                    EditorStyles.wordWrappedMiniLabel);
+                if (Btn("Open Bounded Stability Audit",
+                    "Measures strict planning reliability across deterministic seeds and writes a compact report.", 24f))
+                    V2StabilitySweepWindow.OpenFor(generator);
+
+                SectionHeader("PREVIEW CARE");
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button(new GUIContent("Repair Cached Preview",
-                            "Transactionally rebuilds the exact cached track layout. Use this after a cancelled Play transition; it does not generate a new seed or design."),
-                            GUILayout.Height(20)))
+                    if (Btn("Repair Cached Preview", "Rebuilds the exact cached preview without a new seed.", 20f) &&
+                        !TrackGeneratorPlayPreviewCache.Repair(generator))
+                        EditorUtility.DisplayDialog("Cached Preview Unavailable",
+                            "No valid cached layout exists. Generate a track once to create it.", "OK");
+                    if (Btn("Clean Stale Previews", "Removes duplicate and abandoned generated roots.", 20f))
                     {
-                        bool repaired = TrackGeneratorPlayPreviewCache.Repair(generator);
-                        if (!repaired)
-                            EditorUtility.DisplayDialog("Cached Preview Unavailable",
-                                "No valid cached layout exists for this TrackGenerator. Generate a track once to create it.",
-                                "OK");
-                    }
-
-                    if (GUILayout.Button(new GUIContent("Clean Stale Previews",
-                            "Keeps the current generated track, removes abandoned pending builds and duplicate/orphaned generated roots, and hides track diagnostics."),
-                            GUILayout.Height(20)))
-                    {
-                        // Do not register procedural meshes with Undo: a duplicate track
-                        // can be several GB and copying it into Undo is itself a crash risk.
                         Undo.RecordObject(generator, "Clean Stale Track Previews");
                         generator.CleanStaleGeneratedTracks();
                         EditorUtility.SetDirty(generator);
                     }
-
-                    var warnStyle = new GUIStyle(GUI.skin.button);
-                    warnStyle.normal.textColor = new Color(1f, 0.55f, 0.4f);
-                    if (GUILayout.Button(new GUIContent("Clear Generated Track",
-                            "Destroys every current, duplicate and pending generated track GameObject after confirmation. Settings, seeds and locks are kept — Regenerate Same Seed rebuilds the identical track."),
-                            warnStyle, GUILayout.Height(20)))
-                    {
-                        if (EditorUtility.DisplayDialog("Clear Track",
-                                "Destroy the current generated track?", "Clear", "Cancel"))
-                        {
-                            // A generated track may hold several GB of procedural mesh data.
-                            // Registering that hierarchy with Undo duplicates it in memory and
-                            // can freeze the editor before it has a chance to clear the track.
-                            Undo.RecordObject(generator, "Clear Track");
-                            generator.ClearTrack();
-                            TrackGeneratorPlayPreviewCache.Forget(generator);
-                            EditorUtility.SetDirty(generator);
-                        }
-                    }
                 }
 
-                // ── PRESET ASSETS ──
-                SectionHeader("PRESET ASSETS");
-                using (new EditorGUILayout.HorizontalScope())
+                Color previous = GUI.color;
+                GUI.color = new Color(1f, 0.68f, 0.58f);
+                if (Btn("Clear Generated Track…",
+                    "Destroys generated track objects after confirmation; settings and recipes remain.", 22f) &&
+                    EditorUtility.DisplayDialog("Clear Track", "Destroy the current generated track?", "Clear", "Cancel"))
                 {
-                    if (Btn("Save Current as Preset Asset",
-                        "Saves the current designer settings as a reusable TrackStylePreset asset in the project.", 20f))
-                        SaveAsPresetAsset(generator.Designer);
+                    Undo.RecordObject(generator, "Clear Track");
+                    generator.ClearTrack();
+                    TrackGeneratorPlayPreviewCache.Forget(generator);
+                    EditorUtility.SetDirty(generator);
                 }
+                GUI.color = previous;
 
-                if (!string.IsNullOrEmpty(_lastPresetApplication))
-                    EditorGUILayout.HelpBox(_lastPresetApplication, MessageType.None);
+                _showInspectorPerformance = EditorGUILayout.Foldout(_showInspectorPerformance,
+                    "Inspector performance details", true);
+                if (_showInspectorPerformance)
+                    DrawInspectorDiagnostics(generator);
             }
         }
 
@@ -1056,6 +1571,8 @@ namespace TrackGeneration.Editor
         private void ApplyPresets(TrackGenerator generator)
         {
             Undo.RecordObject(generator, "Apply Presets");
+            VerticalGenerationProfile verticalProfile = generator.Designer?.Elevation?.Profile
+                ?? VerticalGenerationProfile.Balanced;
 
             var req = new PresetRandomizer.Request
             {
@@ -1079,6 +1596,10 @@ namespace TrackGeneration.Editor
             incoming.AppliedPresetName = selection.Style;
 
             var applied = PresetApplicator.Apply(generator.Designer, incoming, generator.SettingsLocks);
+            // Elevation character is an independent V2 authoring choice, not part of
+            // Style/Difficulty/Size. Applying another profile must not silently reset it.
+            if (generator.Designer?.Elevation != null)
+                generator.Designer.Elevation.Profile = verticalProfile;
 
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"Applied: {selection.Style} / {selection.Difficulty} / {selection.Size}");
@@ -1143,8 +1664,8 @@ namespace TrackGeneration.Editor
 
         private static void EnsureReportStyles()
         {
-            _reportHeaderStyle ??= new GUIStyle(EditorStyles.boldLabel) { fontSize = 15 };
-            _reportBodyStyle ??= new GUIStyle(EditorStyles.label) { fontSize = 12, richText = true, wordWrap = true };
+            _reportHeaderStyle ??= new GUIStyle(EditorStyles.boldLabel) { fontSize = 13 };
+            _reportBodyStyle ??= new GUIStyle(EditorStyles.label) { fontSize = 11, richText = true, wordWrap = true };
             _miniWrapStyle ??= new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
         }
 
@@ -1163,16 +1684,16 @@ namespace TrackGeneration.Editor
             EnsureReportStyles();
             var report = generator.LastReport;
 
-            Color bg = _cache.ReportSuccess
-                ? (report.Warnings.Count > 0 ? new Color(0.85f, 0.75f, 0.2f, 0.25f) : new Color(0.2f, 0.8f, 0.3f, 0.22f))
-                : new Color(0.9f, 0.25f, 0.2f, 0.28f);
-
-            var prev = GUI.backgroundColor;
-            GUI.backgroundColor = bg * 4f;
             using (new EditorGUILayout.VerticalScope("HelpBox"))
             {
-                GUI.backgroundColor = prev;
-
+                Color accent = _cache.ReportSuccess
+                    ? (report.Warnings.Count > 0
+                        ? new Color(0.86f, 0.64f, 0.28f, 1f)
+                        : new Color(0.38f, 0.74f, 0.52f, 1f))
+                    : new Color(0.86f, 0.34f, 0.32f, 1f);
+                Rect accentLine = EditorGUILayout.GetControlRect(false, 4f);
+                EditorGUI.DrawRect(accentLine, accent);
+                EditorGUILayout.Space(3f);
                 EditorGUILayout.LabelField(_cache.ReportHeadline, _reportHeaderStyle);
                 EditorGUILayout.LabelField(_cache.ReportBody, _reportBodyStyle);
 
@@ -1185,7 +1706,7 @@ namespace TrackGeneration.Editor
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Copy Report", GUILayout.Width(100)))
+                    if (GUILayout.Button("Copy Summary", GUILayout.Width(105)))
                         EditorGUIUtility.systemCopyBuffer = FullReportText(report, generator.LastMetrics);
                     _showTechnicalReport = EditorGUILayout.Foldout(_showTechnicalReport, "Technical details", true);
                 }
@@ -1217,6 +1738,15 @@ namespace TrackGeneration.Editor
             }
 
             DrawCapped("Connector decisions", report.ConnectorDecisions);
+            if (report.ConnectorShadowSummary != null && report.ConnectorShadowSummary.BoundaryCount > 0)
+            {
+                MessageType type = report.ConnectorShadowSummary.HasBlockingMismatch
+                    ? MessageType.Warning
+                    : MessageType.Info;
+                EditorGUILayout.HelpBox("V2 connector shadow audit: " + report.ConnectorShadowSummary, type);
+            }
+            DrawCapped("Connector shadow audit", report.ConnectorShadowRecords);
+            DrawCapped("V2 topology slots", report.TopologySlots);
             DrawCapped("Subdivision regions", report.SubdivisionRegions);
             DrawCapped("Dual-quarter balance", report.QuarterBalance);
             DrawCapped("Relaxed settings", report.RelaxedSettings);
@@ -1242,7 +1772,8 @@ namespace TrackGeneration.Editor
             var sb = new System.Text.StringBuilder();
             sb.AppendLine(report.Success ? "GENERATED SUCCESSFULLY" : "GENERATION FAILED");
             sb.AppendLine($"Seed: {report.Seed}   Command: {report.RegenerationCommand}");
-            sb.AppendLine($"Attempts: {report.AttemptsEvaluated}   Valid candidates: {report.ValidCandidateCount}   Score: {report.SelectedCandidateScore:F1}");
+            sb.AppendLine($"Generation: {report.GenerationDurationSeconds:F2}s across {Mathf.Max(1, report.PipelinePassCount)} pipeline pass(es)   Accepted: {report.AcceptedPass}");
+            sb.AppendLine($"Rating: {report.TrackRating}/100   Attempts: {report.AttemptsEvaluated}   Valid candidates: {report.ValidCandidateCount}   Internal score: {report.SelectedCandidateScore:F1}");
             sb.AppendLine(report.AngleReliefEnabled
                 ? $"Closure relief: ON — invoked on {report.AngleReliefAttempts} solves, closed {report.AngleReliefClosures}"
                 : "Closure relief: OFF (flag disabled this run)");
@@ -1267,6 +1798,10 @@ namespace TrackGeneration.Editor
             if (report.PreservedStreams.Count > 0) sb.AppendLine($"Preserved streams: {string.Join(", ", report.PreservedStreams)}");
             if (report.ChangedStreams.Count > 0) sb.AppendLine($"Changed streams: {string.Join(", ", report.ChangedStreams)}");
             foreach (var d in report.ConnectorDecisions) sb.AppendLine("Connector: " + d);
+            if (report.ConnectorShadowSummary != null && report.ConnectorShadowSummary.BoundaryCount > 0)
+                sb.AppendLine("Connector shadow: " + report.ConnectorShadowSummary);
+            foreach (var d in report.ConnectorShadowRecords) sb.AppendLine("Connector shadow detail: " + d);
+            foreach (var slot in report.TopologySlots) sb.AppendLine("Topology slot: " + slot);
             foreach (var r in report.SubdivisionRegions) sb.AppendLine("Region: " + r);
             foreach (var b in report.QuarterBalance) sb.AppendLine(b.ToString());
             foreach (var w in report.Warnings) sb.AppendLine("Warning: " + w);
@@ -1280,12 +1815,42 @@ namespace TrackGeneration.Editor
         {
             EditorGUILayout.Space(4);
             _showLocks = EditorGUILayout.Foldout(_showLocks,
-                $"Settings Locks ({generator.SettingsLocks.LockedCount}/{SettingsLockState.GroupNames.Length} locked)", true);
+                $"Locks · {generator.LayoutLockMode} layout · " +
+                $"{generator.SettingsLocks.LockedCount}/{SettingsLockState.GroupNames.Length} settings groups", true);
             if (!_showLocks) return;
 
             var locks = generator.SettingsLocks;
             using (new EditorGUILayout.VerticalScope("HelpBox"))
             {
+                SectionHeader("LAYOUT PRESERVATION");
+                EditorGUILayout.LabelField(
+                    "Choose how much of the generated route must stay unchanged during regeneration.",
+                    EditorStyles.wordWrappedMiniLabel);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUI.BeginChangeCheck();
+                    LayoutLockMode mode = (LayoutLockMode)EditorGUILayout.EnumPopup(
+                        new GUIContent("Mode", "Unlocked changes everything. Skeleton preserves route topology. Geometry preserves the exact shape."),
+                        generator.LayoutLockMode);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(generator, "Layout Lock Mode");
+                        generator.LayoutLockMode = mode;
+                        EditorUtility.SetDirty(generator);
+                    }
+                    if (Btn("Keep Current Layout",
+                        "Preserves the current corner plan and quarter topology on future regeneration commands.", 20f))
+                    {
+                        Undo.RecordObject(generator, "Lock Current Layout");
+                        generator.LayoutLockMode = LayoutLockMode.Skeleton;
+                        EditorUtility.SetDirty(generator);
+                    }
+                }
+
+                SectionHeader("DESIGN SETTING LOCKS");
+                EditorGUILayout.LabelField(
+                    "Checked groups keep your hand-tuned values when profiles or randomization are applied.",
+                    EditorStyles.wordWrappedMiniLabel);
                 EditorGUI.BeginChangeCheck();
                 for (int i = 0; i < SettingsLockState.GroupNames.Length; i += 2)
                 {
@@ -1304,9 +1869,24 @@ namespace TrackGeneration.Editor
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Lock All")) { Undo.RecordObject(generator, "Lock All"); locks.SetAll(true); EditorUtility.SetDirty(generator); }
-                    if (GUILayout.Button("Unlock All")) { Undo.RecordObject(generator, "Unlock All"); locks.SetAll(false); EditorUtility.SetDirty(generator); }
-                    if (GUILayout.Button("Invert")) { Undo.RecordObject(generator, "Invert Locks"); locks.Invert(); EditorUtility.SetDirty(generator); }
+                    if (GUILayout.Button("Lock All"))
+                    {
+                        Undo.RecordObject(generator, "Lock All");
+                        locks.SetAll(true);
+                        EditorUtility.SetDirty(generator);
+                    }
+                    if (GUILayout.Button("Unlock All"))
+                    {
+                        Undo.RecordObject(generator, "Unlock All");
+                        locks.SetAll(false);
+                        EditorUtility.SetDirty(generator);
+                    }
+                    if (GUILayout.Button("Invert"))
+                    {
+                        Undo.RecordObject(generator, "Invert Locks");
+                        locks.Invert();
+                        EditorUtility.SetDirty(generator);
+                    }
                 }
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -1396,6 +1976,66 @@ namespace TrackGeneration.Editor
             AssetDatabase.CreateAsset(preset, path);
             AssetDatabase.SaveAssets();
             EditorGUIUtility.PingObject(preset);
+        }
+    }
+
+    /// <summary>
+    /// The seed component is infrastructure, so its default serialized Inspector is far
+    /// more technical than the designer needs. Keep the everyday seed choice compact and
+    /// move bookmarks and hashes behind one explicit diagnostics foldout.
+    /// </summary>
+    [CustomEditor(typeof(TrackSeedManager))]
+    public sealed class TrackSeedManagerEditor : UnityEditor.Editor
+    {
+        private bool _showSeedDetails;
+        private GUIStyle _seedTitleStyle;
+
+        public override void OnInspectorGUI()
+        {
+            serializedObject.Update();
+            SerializedProperty config = serializedObject.FindProperty("config");
+            SerializedProperty seedInput = serializedObject.FindProperty("currentSeedInput");
+            SerializedProperty useRandom = serializedObject.FindProperty("useRandomSeed");
+            SerializedProperty activeSeed = serializedObject.FindProperty("activeSeed");
+            SerializedProperty savedSeeds = serializedObject.FindProperty("savedSeeds");
+            SerializedProperty lastHash = serializedObject.FindProperty("lastGeneratedHash");
+
+            using (new EditorGUILayout.VerticalScope("HelpBox"))
+            {
+                Rect accent = EditorGUILayout.GetControlRect(false, 3f);
+                EditorGUI.DrawRect(accent, new Color(0.27f, 0.66f, 0.70f, 1f));
+                EditorGUILayout.Space(3f);
+                _seedTitleStyle ??= new GUIStyle(EditorStyles.boldLabel) { fontSize = 12 };
+                EditorGUILayout.LabelField("SEED SOURCE", _seedTitleStyle);
+                EditorGUILayout.LabelField(
+                    "Controls whether new tracks use a fresh seed or a repeatable number.",
+                    EditorStyles.wordWrappedMiniLabel);
+
+                if (config != null)
+                    EditorGUILayout.PropertyField(config, new GUIContent("Rulebook"));
+                if (useRandom != null)
+                    EditorGUILayout.PropertyField(useRandom, new GUIContent("Fresh Seed Each Time"));
+                if (seedInput != null)
+                {
+                    using (new EditorGUI.DisabledScope(useRandom != null && useRandom.boolValue))
+                        EditorGUILayout.PropertyField(seedInput, new GUIContent("Master Seed"));
+                }
+            }
+
+            _showSeedDetails = EditorGUILayout.Foldout(_showSeedDetails,
+                $"Bookmarks & diagnostics ({savedSeeds?.arraySize ?? 0})", true);
+            if (_showSeedDetails)
+            {
+                using (new EditorGUILayout.VerticalScope("HelpBox"))
+                using (new EditorGUI.DisabledScope(true))
+                {
+                    if (activeSeed != null) EditorGUILayout.PropertyField(activeSeed);
+                    if (savedSeeds != null) EditorGUILayout.PropertyField(savedSeeds, true);
+                    if (lastHash != null) EditorGUILayout.PropertyField(lastHash, new GUIContent("Last Layout Hash"));
+                }
+            }
+
+            serializedObject.ApplyModifiedProperties();
         }
     }
 }

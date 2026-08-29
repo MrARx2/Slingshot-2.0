@@ -5,6 +5,37 @@ Companion docs: `TRACK_GENERATOR_STABLE_AUDIT.md` (audit), `TRACK_GENERATOR_V2_S
 `TRACK_GENERATOR_V2_ROADMAP.md` (task board), `TRACK_GENERATOR_V2_1_PLAN.md` (wall work),
 `TRACK_GENERATOR_V2_1B_CURVATURE_FLOW.md` (curvature investigation).
 
+## Current implementation update — 2026-08-26
+
+Track Editor V2 is no longer a preview-only experiment. Its designer flow is now **choose a section
+→ preview a design → Build & Apply**. Selection automatically frames the section, preview geometry is
+non-destructive, and Build & Apply rebuilds the authoritative route with its connectors and all final
+validation. The current track is replaced only when the edited route succeeds; failure preserves the
+accepted geometry and restores the complete previous recipe/Inspector state.
+
+Applied section choices are normalized topology overrides inside the Exact Recipe. The base seed
+identity stays stable, while the edited recipe receives its own deterministic identity. Consequently,
+Save, Load and Exact Replay can reproduce both the generated layout and the designer's accepted
+section substitutions. Multiple planned substitutions are applied together and are labelled as such
+in the editor. The focused V2 gate includes override persistence/identity coverage; runtime and editor
+assemblies compile with zero errors. Unity Test Runner and manual visual sign-off remain the final
+acceptance steps for this milestone.
+
+Track Editor edits now persist a structural demand anchor in addition to the human-readable finished
+slot ID. This fixes a discovered phase-boundary mismatch where a valid Horseshoe, Immelmann or Wide
+Turnaround preview could fail before geometry solving because connector/closure insertion had shifted
+the slot's route-order token. The fallback matches quarter, road, topology role, signed heading and
+original realization strictly; it does not widen any safety tolerance. A future fitting-freedom
+control should be added only when distinct replan neighborhoods are truly implemented.
+
+Vertical Profiles are now implemented as a separate, recipe-persisted design axis. The Track Profile
+card offers **Subtle / Balanced / Extreme** elevation while Style, Difficulty, Size and feature
+amounts keep their existing responsibilities. Balanced maps to the historical elevation constants
+exactly; Subtle and Extreme steer amplitude, major-event count, sustained-grade length and recovery
+rhythm without raising any safety ceiling. Debug reports include a measured vertical silhouette so
+the three modes can be calibrated from evidence instead of screenshots alone. Runtime and editor
+assemblies compile cleanly; Unity `V2FastGate`, yield comparison and visual sign-off remain.
+
 ---
 
 ## 1. The project
@@ -56,7 +87,9 @@ violations, deterministic reproduction, zero crashes, plus visual review.
 - Whole-candidate rejection stays as the recovery model (no per-section backtracking).
 - Balanced is the default vertical profile; the three profiles are Subtle / Balanced / Extreme.
 - Feature Min/Max is a primary designer interface.
-- Materials are supplied externally — the generator must not create materials.
+- Materials are persistent authored assets — the runtime generator must never create or silently
+  retune materials. Editor tooling may create missing defaults, but repairing the palette must preserve
+  every existing material's authored color, emission, texture, and render settings.
 - Pacing/director logic and full speed-state simulation are **deferred** out of V2.
 
 ---
@@ -67,11 +100,12 @@ violations, deterministic reproduction, zero crashes, plus visual review.
 V2.0 Baseline            DONE       frozen 8-track golden corpus + determinism, all green
 V2.1 Wall stability      DONE*      SideHeight fix implemented + verified (*needs rebaseline + visual sign-off)
 V2.1b Curvature flow     INVESTIGATED, not implemented — see §7
-V2.2 Vertical profiles   TODO       Subtle / Balanced / Extreme
-V2.3 Inspector V2        TODO
-V2.4 Feature Min/Max     TODO
-V2.5 Materials           TODO
-V2.6 Stability pass      TODO       includes #6
+V2.2 Vertical profiles   90%        implemented; Unity calibration/sign-off remains
+V2.3 Inspector V2        90%        primary workflow redesigned; advanced groups retained
+V2.3c Topology editing   90%        transactional apply + automatic connectors + exact overrides
+V2.4 Feature Min/Max     80%        primary controls and enforcement; acceptance matrix remains
+V2.5 Materials           90%        persistent material contract integrated; Unity visual/domain-reload sign-off remains
+V2.6 Stability pass      60%        #6 fixed; timing + bounded deterministic seed audit integrated
 V2.7 Advanced features   TODO       includes #36 dual roads, Stage F
 V2.8 Polish              TODO
 V2.9 Performance         TODO       includes #28 crash
@@ -272,13 +306,19 @@ Materials + Debug. **No serialized field renames** (use `[FormerlySerializedAs]`
 Enforce minimums with explicit `RequiredFeatureMissing` failure; respect maximums; weights/lengths/
 radii move to advanced.
 
-**V2.5 Materials.** `TrackMaterialSet` with the six real slots (RoadSurface, WallSide, GuideMarking,
-WallMarker, BoostSurface, RaceGate). Remove runtime `new Material` (`TrackGuideMarkingBuilder:581`,
-`RaceCourseBuilder:341-366`, `BoostPadActor:108`) and generator-side material *repair*
-(`TrackGenerator:1042/1060`) from the normal path.
+**V2.5 Materials.** Implemented as a persistent `TrackMaterialSet` contract with explicit roles for
+RoadSurface, WallSide, GuideMarking, WallMarker, BoostSurface, RaceGate, StartFinish,
+StartGatePillar, and Checkpoint. Runtime builders and cache restore resolve through that contract;
+legacy references remain a migration fallback. Exact Replay and cached previews rebind the persistent
+assets, debug reports expose the resolved contract, and the inspector can create/repair the default
+palette without overwriting existing authored material tuning. Remaining acceptance work is a Unity
+domain-reload/cache-reload visual pass plus confirmation of every race-course marker role.
 
-**V2.6 Stability.** Fix #6; promote cross-section/sequence guards to gates (corpus-gated,
-WARNING→ERROR); instrument failure rate, dominant reasons, time, strict vs relaxed usage; 100-seed sweep.
+**V2.6 Stability.** The rendered-bounds ground-clearance fix and generation timing instrumentation are
+implemented. `Track/V2/Bounded Stability Sweep` provides a deterministic, cancellable planning-only
+audit with strict/non-strict counts, dominant failures, average/slowest timing, and reproducible failing
+seeds. Remaining work is evidence-led: run bounded sweeps first, then promote only proven sequence or
+cross-section warnings into hard gates and expand toward the full corpus/100-seed acceptance sweep.
 
 **V2.7 Advanced features.** #36 dual roads, #13–16 Stage F. No new spectacle features.
 

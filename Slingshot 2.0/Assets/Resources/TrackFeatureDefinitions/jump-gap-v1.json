@@ -1,0 +1,29 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.jump-gap",
+  "DefinitionVersion": 1,
+  "DisplayName": "Jump Gap",
+  "Family": "Air",
+  "Enabled": true,
+  "SemanticElement": 28,
+  "HasPatternType": true,
+  "PatternType": 0,
+  "TopologyRole": 0,
+  "Solver": 0,
+  "SpeedIntent": 3,
+  "RiskLevel": 3,
+  "RequiresRecoveryAfter": true,
+  "EmitsOwnApproach": true,
+  "EmitsOwnRecovery": true,
+  "Length": { "Minimum": 350.0, "Preferred": 900.0, "Maximum": 1800.0, "Resolution": 3, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryLength": { "Minimum": 180.0, "Preferred": 360.0, "Maximum": 900.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "RecoveryLength": { "Minimum": 180.0, "Preferred": 360.0, "Maximum": 900.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryContract": { "Orientation": 0, "RequiresUprightEntry": true, "MaximumBankDegrees": 5.0, "MaximumPitchDegrees": 5.0, "MaximumHorizontalCurvature": 0.0005, "MaximumRollRateDegreesPerMeter": 0.02, "AcceptsCurvedEntry": false },
+  "ExitContract": { "Orientation": 0 },
+  "Primitives": [
+    { "PrimitiveId": "launch-ramp", "DisplayName": "Launch Ramp", "PrimitiveType": 5, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.25, "RadiusSource": 0, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "air-gap", "DisplayName": "Air Gap", "PrimitiveType": 7, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.5, "RadiusSource": 0, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "landing-ramp", "DisplayName": "Landing Ramp", "PrimitiveType": 8, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.25, "RadiusSource": 0, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false }
+  ],
+  "MinimumClearanceMeters": 50.0
+}

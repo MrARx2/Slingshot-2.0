@@ -77,6 +77,14 @@ namespace TrackGeneration.Planning
         // per 0.5°-quantized angle and shared by the PLANNER and the BUILDER, so the 2D
         // closure model and the built geometry agree to float precision.
         public const float ArcCurvatureEaseFraction = 0.18f;
+        /// <summary>
+        /// Hard per-section size ceiling for ordinary authored road. Long routes are
+        /// composed from more sections instead of hiding multi-kilometre primitives.
+        /// </summary>
+        public const float MaxAuthoredRoadSectionLength = 1000f;
+        public const float MaxDesignerSCurveLength = MaxAuthoredRoadSectionLength;
+        public const float MaxOrdinaryCurveLength = MaxAuthoredRoadSectionLength;
+        public const float MaxStraightSectionLength = MaxAuthoredRoadSectionLength;
         private const int ArcProfileSamples = 256;
         private static readonly System.Collections.Generic.Dictionary<int, (float[] theta, Vector2[] plane)> ArcProfiles =
             new System.Collections.Generic.Dictionary<int, (float[], Vector2[])>();
@@ -115,6 +123,61 @@ namespace TrackGeneration.Planning
         /// <summary>Arc length of an eased arc: the circular length grown by 1/(1−ease) so the PEAK radius keeps its designed value.</summary>
         public static float EasedArcLength(float angleDeg, float radius)
             => Mathf.Deg2Rad * QuantizeArcAngle(angleDeg) * radius / (1f - ArcCurvatureEaseFraction);
+
+        /// <summary>
+        /// Keeps both opposed sweeps inside the designer S-curve length ceiling while
+        /// preserving the selected angle. This feature-local radius may be tighter than
+        /// the ordinary-corner style band; S-curves are authored features, not ordinary
+        /// route corners.
+        /// </summary>
+        public static float ClampDesignerSCurveRadius(float angleDeg, float desiredRadius)
+        {
+            float maximumRadius = MaximumRadiusForEasedLength(angleDeg, 2f,
+                MaxDesignerSCurveLength);
+            return Mathf.Clamp(desiredRadius, 1f, maximumRadius);
+        }
+
+        /// <summary>Caps a single ordinary eased curve without changing its heading.</summary>
+        public static float ClampOrdinaryCurveRadius(float angleDeg, float desiredRadius)
+        {
+            float maximumRadius = MaximumRadiusForEasedLength(angleDeg, 1f,
+                MaxOrdinaryCurveLength);
+            return Mathf.Clamp(desiredRadius, 1f, maximumRadius);
+        }
+
+        /// <summary>Largest radius whose composed eased arcs fit inside a length ceiling.</summary>
+        public static float MaximumRadiusForEasedLength(float angleDeg, float arcCount,
+            float maximumLength)
+        {
+            float lengthAtUnitRadius = Mathf.Max(0.0001f, arcCount) *
+                                       EasedArcLength(angleDeg, 1f);
+            return Mathf.Max(1f, maximumLength /
+                                 Mathf.Max(0.0001f, lengthAtUnitRadius));
+        }
+
+        /// <summary>
+        /// Driving-line length of an eased horizontal arc carrying a net-zero vertical
+        /// crest. The horizontal curve is parameterized by arc length, so integrating
+        /// sqrt(1 + verticalSlope²) gives the shared definition/build budget.
+        /// </summary>
+        public static float ElevatedEasedArcLength(float angleDeg, float radius, float crestHeight)
+        {
+            float horizontalLength = EasedArcLength(angleDeg, radius);
+            if (Mathf.Abs(crestHeight) <= 0.001f) return horizontalLength;
+
+            const int steps = 256;
+            float length = 0f;
+            float ds = horizontalLength / steps;
+            float previousHeight = crestHeight * CrestBump(0f);
+            for (int i = 1; i <= steps; i++)
+            {
+                float height = crestHeight * CrestBump((float)i / steps);
+                float dh = height - previousHeight;
+                length += Mathf.Sqrt(ds * ds + dh * dh);
+                previousHeight = height;
+            }
+            return length;
+        }
 
         /// <summary>End offset of an eased arc in entry-local axes: (forward run, lateral toward the turn side). Linear in radius.</summary>
         public static Vector2 EasedArcEndOffset(float angleDeg, float radius)
@@ -207,6 +270,36 @@ namespace TrackGeneration.Planning
         /// <summary>Analytic derivative of <see cref="Bump"/>; peak magnitude ≈ 3.04.</summary>
         public static float BumpDerivative(float u) => 24f * u * (1f - u) * (Smooth01(1f - u) - Smooth01(u));
 
+        /// <summary>
+        /// Quintic smoothstep used by definition-owned elevated turns. Unlike the
+        /// ordinary hill carrier, its first AND second derivatives are zero at both
+        /// ends, so a net-zero crest can weld to level track without a vertical
+        /// curvature step.
+        /// </summary>
+        private static float Smoother01(float u)
+        {
+            u = Mathf.Clamp01(u);
+            return u * u * u * (u * (u * 6f - 15f) + 10f);
+        }
+
+        private static float Smoother01Derivative(float u)
+        {
+            u = Mathf.Clamp01(u);
+            return 30f * u * u * (1f - u) * (1f - u);
+        }
+
+        /// <summary>
+        /// C2 net-zero crest 0→1→0 for elevated curve primitives. The value, slope,
+        /// and vertical curvature all return to zero at each owned boundary.
+        /// </summary>
+        public static float CrestBump(float u)
+            => 4f * Smoother01(u) * Smoother01(1f - u);
+
+        /// <summary>Analytic derivative of <see cref="CrestBump"/>.</summary>
+        public static float CrestBumpDerivative(float u)
+            => 4f * (Smoother01Derivative(u) * Smoother01(1f - u) -
+                     Smoother01(u) * Smoother01Derivative(1f - u));
+
         /// <summary>Ease 0→1 over easeFrac, hold, 1→0 over the exit easeFrac.</summary>
         /// <summary>
         /// Node slopes for monotone cubic Hermite interpolation of a CDF
@@ -270,7 +363,11 @@ namespace TrackGeneration.Planning
             {
                 case TrackMacroSectionType.BankedCurve:
                 case TrackMacroSectionType.BankedHairpin:
-                    return BuildArc(entry, def.TurnAngle * def.TurnSign, def.Radius, def.BankingAngle, ctx);
+                    return Mathf.Abs(def.HillHeight) > 0.001f
+                        ? BuildElevatedArc(entry, def.TurnAngle * def.TurnSign, def.Radius,
+                            def.BankingAngle, def.HillHeight, ctx)
+                        : BuildArc(entry, def.TurnAngle * def.TurnSign, def.Radius,
+                            def.BankingAngle, ctx);
 
                 case TrackMacroSectionType.SCurve:
                     return BuildComposedArcs(entry,
@@ -526,8 +623,18 @@ namespace TrackGeneration.Planning
                 float u = (float)i / (rings - 1);
                 float s = length * u;
 
-                float h = delta * Smooth01(u) + hill * Bump(u);
-                float slope = (delta * 6f * u * (1f - u) + hill * BumpDerivative(u)) / Mathf.Max(length, 0.01f);
+                bool definitionOwnedVerticalBump = def.FeatureVerticalLobeCount > 0;
+                float bump;
+                float bumpDerivative;
+                if (definitionOwnedVerticalBump)
+                    SampleDefinitionVerticalBump(def, u, out bump, out bumpDerivative);
+                else
+                {
+                    bump = Bump(u);
+                    bumpDerivative = BumpDerivative(u);
+                }
+                float h = delta * Smooth01(u) + hill * bump;
+                float slope = (delta * 6f * u * (1f - u) + hill * bumpDerivative) / Mathf.Max(length, 0.01f);
 
                 Vector3 fwd = (entryForward + Vector3.up * slope).normalized;
                 Quaternion transport = Quaternion.FromToRotation(entryForward, fwd);
@@ -602,6 +709,19 @@ namespace TrackGeneration.Planning
             return frames;
         }
 
+        private static void SampleDefinitionVerticalBump(
+            TrackMacroSectionDefinition def, float u, out float value, out float derivative)
+        {
+            int lobes = Mathf.Clamp(def.FeatureVerticalLobeCount, 1, 4);
+            float scaled = Mathf.Clamp01(u) * lobes;
+            int lobe = Mathf.Min(lobes - 1, Mathf.FloorToInt(scaled));
+            float localU = lobe == lobes - 1 && u >= 1f ? 1f : scaled - lobe;
+            float sign = def.FeatureVerticalStartsWithDip ? -1f : 1f;
+            if (def.FeatureVerticalAlternates && (lobe & 1) != 0) sign = -sign;
+            value = sign * CrestBump(localU);
+            derivative = sign * CrestBumpDerivative(localU) * lobes;
+        }
+
         // ─────────────────────────── Arcs (bobsled banked) ───────────────────────────
 
         /// <summary>
@@ -641,17 +761,68 @@ namespace TrackGeneration.Planning
         /// </summary>
         public static TrackConnectionFrame[] BuildArc(TrackConnectionFrame entry, float signedAngleDeg, float radius,
             float bankDeg, in FrameBuildContext ctx)
+            => BuildArcInternal(entry, signedAngleDeg, radius, bankDeg, 0f, ctx);
+
+        /// <summary>
+        /// Eased turn with a definition-owned 0→crest→0 elevation profile. Both end
+        /// slopes and vertical curvature return to zero, preserving the corresponding
+        /// level turn's exact heading and elevation boundary.
+        /// </summary>
+        public static TrackConnectionFrame[] BuildElevatedArc(
+            TrackConnectionFrame entry,
+            float signedAngleDeg,
+            float radius,
+            float bankDeg,
+            float crestHeight,
+            in FrameBuildContext ctx)
+            => BuildArcInternal(entry, signedAngleDeg, radius, bankDeg, crestHeight, ctx);
+
+        private static TrackConnectionFrame[] BuildArcInternal(
+            TrackConnectionFrame entry,
+            float signedAngleDeg,
+            float radius,
+            float bankDeg,
+            float crestHeight,
+            in FrameBuildContext ctx)
         {
             float side = Mathf.Sign(signedAngleDeg);
             float angleAbs = QuantizeArcAngle(Mathf.Abs(signedAngleDeg));
             var profile = GetArcProfile(angleAbs);
-            float arcLen = EasedArcLength(angleAbs, radius);
+            float horizontalArcLen = EasedArcLength(angleAbs, radius);
+            float drivingArcLen = ElevatedEasedArcLength(angleAbs, radius, crestHeight);
 
             // Peak yaw rate matches the circular arc (peak κ = 1/R), so the facet bound
             // uses the eased-equivalent angle budget, like the loop builder.
             int facetRings = Mathf.CeilToInt(angleAbs / ((1f - ArcCurvatureEaseFraction) * ctx.MaxFacetAngle)) + 1;
-            int rings = Mathf.Clamp(Mathf.Max(Mathf.CeilToInt(arcLen / ctx.MetersPerRing) + 1, facetRings), 9, ctx.MaxRingsPerSection);
+            int rings = Mathf.Clamp(Mathf.Max(
+                Mathf.CeilToInt(drivingArcLen / ctx.MetersPerRing) + 1,
+                facetRings), 9, ctx.MaxRingsPerSection);
             var frames = new TrackConnectionFrame[rings];
+            var heights = new float[rings];
+            var slopes = new float[rings];
+            var distances = new float[rings];
+
+            float horizontalStep = horizontalArcLen / Mathf.Max(1, rings - 1);
+            for (int i = 0; i < rings; i++)
+            {
+                float u = (float)i / (rings - 1);
+                heights[i] = crestHeight * CrestBump(u);
+                slopes[i] = crestHeight * CrestBumpDerivative(u) /
+                            Mathf.Max(horizontalArcLen, 0.01f);
+                if (i > 0)
+                {
+                    float dh = heights[i] - heights[i - 1];
+                    distances[i] = distances[i - 1] +
+                                   Mathf.Sqrt(horizontalStep * horizontalStep + dh * dh);
+                }
+            }
+
+            // The definition compiler and builder share the fixed-resolution length
+            // above. Normalize the ring-specific cumulative approximation so the
+            // authored section budget and its final frame remain exactly identical.
+            float distanceScale = drivingArcLen /
+                                  Mathf.Max(0.001f, distances[rings - 1]);
+            for (int i = 1; i < rings; i++) distances[i] *= distanceScale;
 
             PhysicalRollBasis(entry, out Vector3 baseForward, out Vector3 baseRight,
                 out Vector3 baseUp, out float physicalRollDegrees);
@@ -661,23 +832,33 @@ namespace TrackGeneration.Planning
             {
                 float u = (float)i / (rings - 1);
                 float thetaDeg = side * SampleTable(profile.theta, u) * Mathf.Rad2Deg;
-                Vector2 pl = SampleTable(profile.plane, u) * arcLen;
+                Vector2 pl = SampleTable(profile.plane, u) * horizontalArcLen;
+                float height = heights[i];
+                float verticalSlope = slopes[i];
                 float curvature;
+                float verticalCurvature;
                 if (i == 0 || i == rings - 1)
                 {
                     curvature = 0f;
+                    verticalCurvature = 0f;
                 }
                 else
                 {
                     float du = 1f / (rings - 1);
                     float thetaBefore = SampleTable(profile.theta, u - du);
                     float thetaAfter = SampleTable(profile.theta, u + du);
+                    float slopeBefore = slopes[i - 1];
+                    float slopeAfter = slopes[i + 1];
+                    float localDistance = distances[i + 1] - distances[i - 1];
                     curvature = side * (thetaAfter - thetaBefore) /
-                                Mathf.Max(0.001f, 2f * du * arcLen);
+                                Mathf.Max(0.001f, localDistance);
+                    verticalCurvature = (Mathf.Atan(slopeAfter) - Mathf.Atan(slopeBefore)) /
+                                        Mathf.Max(0.001f, localDistance);
                 }
 
                 Quaternion yaw = Quaternion.AngleAxis(thetaDeg, baseUp);
-                Vector3 forward = (yaw * baseForward).normalized;
+                Vector3 horizontalForward = (yaw * baseForward).normalized;
+                Vector3 forward = (horizontalForward + baseUp * verticalSlope).normalized;
                 Vector3 unrolledRight = (yaw * baseRight).normalized;
                 Quaternion explicitRoll = Quaternion.AngleAxis(physicalRollDegrees, forward);
                 Vector3 right = (explicitRoll * unrolledRight).normalized;
@@ -685,7 +866,8 @@ namespace TrackGeneration.Planning
 
                 frames[i] = new TrackConnectionFrame
                 {
-                    Position = basePos + baseForward * pl.x + baseRight * (side * pl.y),
+                    Position = basePos + baseForward * pl.x + baseRight * (side * pl.y) +
+                               baseUp * height,
                     Forward = forward,
                     Right = right,
                     Up = up,
@@ -697,15 +879,20 @@ namespace TrackGeneration.Planning
                     HorizontalCurvature = curvature,
                     HorizontalCurvatureRate = i > 0
                         ? (curvature - frames[i - 1].HorizontalCurvature) /
-                          Mathf.Max(0.001f, arcLen / (rings - 1))
+                          Mathf.Max(0.001f, distances[i] - distances[i - 1])
+                        : 0f,
+                    VerticalCurvature = verticalCurvature,
+                    VerticalCurvatureRate = i > 0
+                        ? (verticalCurvature - frames[i - 1].VerticalCurvature) /
+                          Mathf.Max(0.001f, distances[i] - distances[i - 1])
                         : 0f,
                     RoadRollRate = entry.RoadRollRate,
-                    ArcLength = entry.ArcLength + arcLen * u
+                    ArcLength = entry.ArcLength + distances[i]
                 };
             }
 
             // Exact eased end pose (identical to the planner's 2D model).
-            Vector2 endPl = profile.plane[profile.plane.Length - 1] * arcLen;
+            Vector2 endPl = profile.plane[profile.plane.Length - 1] * horizontalArcLen;
             Quaternion endYaw = Quaternion.AngleAxis(side * angleAbs, baseUp);
             var last = frames[rings - 1];
             last.Position = basePos + baseForward * endPl.x + baseRight * (side * endPl.y);
@@ -716,6 +903,8 @@ namespace TrackGeneration.Planning
             last.PitchAngle = Mathf.Asin(Mathf.Clamp(last.Forward.y, -1f, 1f)) * Mathf.Rad2Deg;
             last.HorizontalCurvature = 0f;
             last.HorizontalCurvatureRate = 0f;
+            last.VerticalCurvature = 0f;
+            last.VerticalCurvatureRate = 0f;
             frames[rings - 1] = last;
 
             frames[0] = entry;

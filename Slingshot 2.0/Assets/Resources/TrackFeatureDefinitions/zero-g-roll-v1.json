@@ -1,0 +1,41 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.zero-g-roll",
+  "DefinitionVersion": 3,
+  "DisplayName": "Zero-G Roll",
+  "Family": "Transported Roll",
+  "Enabled": true,
+  "SemanticElement": 54,
+  "HasPatternType": true,
+  "PatternType": 27,
+  "TopologyRole": 0,
+  "Solver": 6,
+  "SpeedIntent": 3,
+  "RiskLevel": 2,
+  "RequiresRecoveryAfter": false,
+  "EmitsOwnApproach": false,
+  "EmitsOwnRecovery": false,
+  "Length": { "Minimum": 1100.0, "Preferred": 1500.0, "Maximum": 2200.0, "Resolution": 2, "MayAutoExpand": false, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryLength": { "Minimum": 120.0, "Preferred": 220.0, "Maximum": 380.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "RecoveryLength": { "Minimum": 120.0, "Preferred": 220.0, "Maximum": 380.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryContract": { "Orientation": 0, "RequiresUprightEntry": true, "MaximumBankDegrees": 8.0, "MaximumPitchDegrees": 8.0, "MaximumHorizontalCurvature": 0.0006666667, "MaximumRollRateDegreesPerMeter": 0.04, "AcceptsCurvedEntry": true },
+  "ExitContract": { "Orientation": 0, "HeadingChangeDegrees": 0.0, "PitchChangeDegrees": 0.0, "RollChangeDegrees": 360.0, "ElevationChangeMeters": 0.0 },
+  "Rotational": {
+    "RoadRollUnits": 4,
+    "VerticalRotationUnits": 0,
+    "MaximumCoreRollRateDegreesPerSecond": 125.0,
+    "DescendingVerticalPhase": false,
+    "AutomaticHandedness": true,
+    "FirstHalfRadius": { "Minimum": 170.0, "Preferred": 215.0, "Maximum": 270.0 },
+    "SecondHalfRadius": { "Minimum": 170.0, "Preferred": 215.0, "Maximum": 270.0 },
+    "PhaseSplit": { "Minimum": 0.45, "Preferred": 0.50, "Maximum": 0.55 },
+    "CenterlineOrbitDegrees": { "Minimum": 6.0, "Preferred": 9.0, "Maximum": 12.0 },
+    "FirstHalfPitchBiasDegrees": { "Minimum": 6.0, "Preferred": 8.0, "Maximum": 10.0 },
+    "SecondHalfPitchBiasDegrees": { "Minimum": -10.0, "Preferred": -8.0, "Maximum": -6.0 },
+    "LimbYawBiasDegrees": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 }
+  },
+  "Primitives": [
+    { "PrimitiveId": "zero-g-roll", "DisplayName": "Rising and Falling Zero-G Roll", "PrimitiveType": 6, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 1.0, "RadiusSource": 1, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false }
+  ],
+  "MinimumClearanceMeters": 55.0
+}

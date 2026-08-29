@@ -1,0 +1,26 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.double-apex",
+  "DefinitionVersion": 1,
+  "DisplayName": "Double Apex",
+  "Family": "Turn",
+  "Enabled": true,
+  "SemanticElement": 3,
+  "HasPatternType": true,
+  "PatternType": 12,
+  "TopologyRole": 1,
+  "Solver": 0,
+  "SpeedIntent": 1,
+  "RiskLevel": 1,
+  "Length": { "Minimum": 240.0, "Preferred": 700.0, "Maximum": 1400.0, "Resolution": 3, "MayAutoExpand": true, "ScaleWithDesignSpeed": false, "ReferenceSpeedMps": 361.1111 },
+  "EntryLength": { "Minimum": 90.0, "Preferred": 180.0, "Maximum": 500.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "RecoveryLength": { "Minimum": 90.0, "Preferred": 180.0, "Maximum": 500.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryContract": { "Orientation": 0, "RequiresUprightEntry": false, "MaximumBankDegrees": 35.0, "MaximumPitchDegrees": 25.0, "MaximumHorizontalCurvature": 0.0025, "MaximumRollRateDegreesPerMeter": 0.1, "AcceptsCurvedEntry": true },
+  "ExitContract": { "Orientation": 0 },
+  "Primitives": [
+    { "PrimitiveId": "first-apex", "DisplayName": "First Apex", "PrimitiveType": 2, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.45, "RadiusSource": 3, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "apex-link", "DisplayName": "Apex Link", "PrimitiveType": 0, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.1, "RadiusSource": 0, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "second-apex", "DisplayName": "Second Apex", "PrimitiveType": 2, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.45, "RadiusSource": 3, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false }
+  ],
+  "MinimumClearanceMeters": 40.0
+}

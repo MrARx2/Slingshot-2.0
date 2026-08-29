@@ -28,6 +28,10 @@ namespace TrackGeneration.Stunts
         [Range(0.01f, 0.2f)]
         public float SurfaceLift = 0.06f;
 
+        [Header("Visuals")]
+        [Tooltip("Persistent project material used by the generated pad surface.")]
+        public Material SurfaceMaterial;
+
         // ──────────────────────────────────────────────
         //  Placement
         // ──────────────────────────────────────────────
@@ -78,10 +82,12 @@ namespace TrackGeneration.Stunts
         /// <summary>
         /// Procedurally generates the pad mesh and trigger, oriented to the given road frame.
         /// </summary>
-        public void Generate(TrackConnectionFrame trackFrame, float roadWidth, int targetLane, float boostStrength)
+        public void Generate(TrackConnectionFrame trackFrame, float roadWidth, int targetLane, float boostStrength,
+            Material surfaceMaterial = null)
         {
             Lane = targetLane;
             BoostStrength = boostStrength;
+            if (surfaceMaterial != null) SurfaceMaterial = surfaceMaterial;
 
             if (Lane == 0)
             {
@@ -105,14 +111,9 @@ namespace TrackGeneration.Stunts
 
             padMeshFilter = padObj.AddComponent<MeshFilter>();
             var renderer = padObj.AddComponent<MeshRenderer>();
-            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            mat.color = new Color(0f, 0.8f, 1f, 1f);
-            if (mat.HasProperty("_EmissionColor"))
-            {
-                mat.EnableKeyword("_EMISSION");
-                mat.SetColor("_EmissionColor", new Color(0f, 0.6f, 1f) * 2f);
-            }
-            renderer.sharedMaterial = mat;
+            renderer.sharedMaterial = SurfaceMaterial;
+            if (SurfaceMaterial == null)
+                Debug.LogWarning("[BoostPadActor] No persistent BoostSurface material was supplied.", this);
 
             padMeshFilter.sharedMesh = BuildPadMesh();
 

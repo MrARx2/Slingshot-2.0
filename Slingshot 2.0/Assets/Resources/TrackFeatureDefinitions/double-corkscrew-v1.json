@@ -1,0 +1,26 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.double-corkscrew",
+  "DefinitionVersion": 1,
+  "DisplayName": "Double Corkscrew",
+  "Family": "Inversion",
+  "Enabled": true,
+  "SemanticElement": 22,
+  "HasPatternType": true,
+  "PatternType": 8,
+  "TopologyRole": 0,
+  "Solver": 0,
+  "SpeedIntent": 2,
+  "RiskLevel": 3,
+  "RequiresRecoveryAfter": true,
+  "Length": { "Minimum": 1100.0, "Preferred": 3000.0, "Maximum": 6000.0, "Resolution": 2, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryLength": { "Minimum": 180.0, "Preferred": 450.0, "Maximum": 1000.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "RecoveryLength": { "Minimum": 180.0, "Preferred": 450.0, "Maximum": 1000.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryContract": { "Orientation": 0, "RequiresUprightEntry": false, "MaximumBankDegrees": 25.0, "MaximumPitchDegrees": 20.0, "MaximumHorizontalCurvature": 0.00125, "MaximumRollRateDegreesPerMeter": 0.08, "AcceptsCurvedEntry": true },
+  "ExitContract": { "Orientation": 0, "RollChangeDegrees": 720.0 },
+  "Primitives": [
+    { "PrimitiveId": "corkscrew-one", "DisplayName": "Corkscrew One", "PrimitiveType": 4, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.5, "RadiusSource": 1, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "corkscrew-two", "DisplayName": "Corkscrew Two", "PrimitiveType": 4, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.5, "RadiusSource": 2, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false }
+  ],
+  "MinimumClearanceMeters": 55.0
+}

@@ -541,6 +541,100 @@ The designer may deliberately unlock the conflicting neighbor or allow a broader
 
 “Half Helix Turnaround” is a useful game-specific name for a 180-degree rising or descending half-helix. A conventional roller-coaster helix is usually described as a spiral exceeding one full turn, so the game should not rely on “180° helix” as an industry-standard label.
 
+### 8.8 Definition-driven features and reusable geometry primitives (locked direction)
+
+Every feature realization must have its own versioned definition instead of being added as another
+hard-coded branch inside the topology planner or generator. The central generator asks for topology,
+loads compatible definitions from a catalog, resolves one definition into concrete geometry, and then
+uses the existing authoritative builders and validators. A definition may initially reference a
+code-backed solver for genuinely specialized math, but identity, parameters, capabilities, phase
+composition, approach/recovery ownership and recipe versioning belong to the definition.
+
+The model has three layers:
+
+1. **Feature Definition** — one asset/file per named realization, with stable ID/version, designer
+   metadata, topology capabilities, authored parameter ranges, geometry-phase recipe and safety
+   declarations;
+2. **Reusable Geometry Primitives** — generic straight, recovery, eased turn, half-loop,
+   half-corkscrew, vertical arc, road-roll, air-gap, landing, width/cross-section and pipe phases;
+3. **Resolved Feature Instance** — the exact selected lengths, radii, directions, handedness, phase
+   splits and exits emitted as `TrackMacroSectionDefinition` data for one generated track.
+
+Every Feature Definition has these common spatial parameters at minimum:
+
+```text
+Length          // core maneuver only; excludes entry and recovery
+EntryLength     // owned preparation/transition capacity before the core
+RecoveryLength  // owned stabilization/transition capacity after the core
+
+TotalOccupiedLength = EntryLength + Length + RecoveryLength
+```
+
+Each parameter supports Minimum, Preferred and Maximum values plus a `MayAutoExpand`/resolution
+policy where appropriate. `Length` is a budget and resolved output, not an independent value that may
+contradict radius, roll rate or curvature. For a loop, the selected radii determine the exact legal
+core length inside the authored Length range. For a corkscrew, barrel radius, rotation, roll-rate and
+craft-retention constraints jointly resolve the exact legal Length. The definition may add unique
+parameters such as radius, height, handedness, rotation units, yaw separation, phase split or airtime.
+Global driveability ceilings remain inherited from the rulebook and cannot be weakened by a feature
+asset.
+
+Illustrative Full Loop definition contract:
+
+```text
+FullLoopDefinition
+  Id / Version / Family / TopologyRole
+  Length              { Min, Preferred, Max, Resolution = DerivedFromRadii }
+  EntryLength         { Min, Preferred, Max, MayAutoExpand = true }
+  RecoveryLength      { Min, Preferred, Max, MayAutoExpand = true }
+  FirstHalfRadius     { Min, Preferred, Max }
+  SecondHalfRadius    { Min, Preferred, Max }
+  VerticalRotationUnits = 4 × 90°
+  LimbSeparationYaw  { Min, Preferred, Max }
+  CurvatureEase      { Min, Preferred, Max }
+  Phases
+    HalfLoop          Upright → Inverted, uses FirstHalfRadius
+    HalfLoop          Inverted → Upright, uses SecondHalfRadius, continuous blend
+  Exit                same heading, upright, level, zero net elevation
+  Clearance / speed / load constraints inherited from definition + rulebook
+```
+
+Illustrative Inline Corkscrew definition contract:
+
+```text
+InlineCorkscrewDefinition
+  Id / Version / Family / TopologyRole
+  Length              { Min, Preferred, Max, Resolution = PhysicsAndRollRateSolved }
+  EntryLength         { Min, Preferred, Max, MayAutoExpand = true }
+  RecoveryLength      { Min, Preferred, Max, MayAutoExpand = true }
+  FirstHalfRadius     { Min, Preferred, Max }
+  SecondHalfRadius    { Min, Preferred, Max }
+  RoadRollUnits       = 4 × 90°
+  Handedness          = Left | Right | Automatic
+  PhaseSplit          { Min, Preferred, Max }
+  BarrelClearanceMultiplier
+  Phases
+    HalfCorkscrew     Upright → Inverted
+    HalfCorkscrew     Inverted → Upright, same handedness, continuous blend
+  Exit                same heading, upright, level, one accumulated full roll
+  Clearance / roll-rate / contact-load constraints inherited from definition + rulebook
+```
+
+Full Loop and Corkscrew are therefore themselves compositions of reusable half primitives. Batwing,
+Cobra Roll, Sea Serpent and other compound elements reuse the same half-loop and half-corkscrew
+primitives in definition-authored sequences. Internal primitive boundaries must never receive generic
+connectors or independently reset curvature/roll. The complete compound is length-budgeted, solved,
+previewed and validated atomically as one continuous feature with one entry/exit contract.
+
+Designer counting remains at the feature-definition level: a Batwing is one Batwing for Min/Max,
+weighting and repetition. Diagnostics may report its internal primitive inventory, but two half-loops
+and two half-corkscrews must not accidentally count as four separately placed features.
+
+Exact Recipe stores the stable definition ID, definition version/content hash, ordered primitive
+sequence and every resolved parameter. Replaying an older recipe must either use the compatible
+definition version and reproduce its canonical hash or report an explicit catalog incompatibility;
+editing a project asset must never silently change an already shared track.
+
 ---
 
 ## 9. Future feature catalog
@@ -555,8 +649,6 @@ These can reuse much of the current elevation, roll, and curve machinery:
 - Horseshoe;
 - Half Helix Turnaround;
 - Camelback;
-- Speed Hill;
-- Double Dip;
 - Inline Twist;
 - Heartline Roll;
 - Zero-G Roll;
@@ -677,16 +769,35 @@ Exit gate:
 Deliverables:
 
 - `TopologyDemand`;
-- `FeatureRealizationDescriptor` and versioned catalog;
+- versioned `FeatureDefinition` asset/file schema and catalog, superseding feature-specific central
+  planner switch growth;
+- reusable geometry-primitive schema/compiler, beginning with Half Loop and Half Corkscrew;
+- common mandatory `Length`, `EntryLength` and `RecoveryLength` parameter contracts;
+- definition-owned unique parameters and code-backed solver reference where specialized math remains
+  necessary;
+- migrate existing Loop and Corkscrew through definitions without changing accepted geometry;
 - deterministic filter → preview → score → select process;
 - exact-exit preview contract verified against final builder output;
 - repetition, style, intensity, footprint, elevation, speed, and closure scoring;
 - ordinary curve/straight fallbacks;
 - Inspector preview of compatible realizations for each feature rule.
 
+Implementation checkpoint (2026-08-24): the schema, deterministic JSON catalog, reusable Half Loop /
+Half Corkscrew composition, Loop and Inline Corkscrew compiler adapters, generated-section identity,
+Exact Recipe definition hashes, debug-report catalog dump and focused definition tests are implemented.
+Wide Turnaround is also migrated from its prototype planner branch into a versioned definition using
+the generic Eased Turn compiler path. The code-backed adapters deliberately preserve accepted
+geometry/RNG behavior. Unity definition-gate refresh, remaining realization migration and the generic
+compound primitive compiler are still pending.
+
 Exit gate:
 
-- existing hairpins, curves, wallrides, corkscrews, loops, and jumps can be selected through the new catalog without changing their accepted baseline geometry;
+- existing hairpins, curves, wallrides, corkscrews, loops, and jumps can be selected through their own
+  definitions without changing accepted baseline geometry;
+- Full Loop composes two Half Loop primitives and Inline Corkscrew composes two Half Corkscrew
+  primitives while keeping continuous internal curvature/orientation state;
+- definitions expose correct total occupied length and cannot author a Length/radius/roll-rate
+  combination the compiler cannot solve legally;
 - exact preview and final exit agree within tolerance;
 - optional feature failure falls back cleanly; required feature failure explains why.
 
@@ -707,6 +818,53 @@ Deliverables:
 - variant revision history sufficient to undo/revert applied edits;
 - final canonical-hash verification after every accepted replacement.
 
+Implementation checkpoint (2026-08-26): Track Editor replacement requests now carry both the
+finished-route slot ID and a strict structural demand anchor. This resolves the same quarter/road/
+role/heading/original-realization demand when connector or closure insertion shifts its earlier
+route-order token, without weakening any geometric validator. Successful application normalizes the
+request to the rebuilt finished-route ID; old recipes without the new anchor retain legacy hash
+compatibility.
+Transactional replan-scope escalation now includes the first designer-facing Area of Impact level:
+independent Backward/Before and Forward/After semantic-feature reach within the selected quarter
+route. The planner consumes only stable identities explicitly captured and confirmed by the editor;
+count-only or overlapping imported windows fail instead of guessing.
+
+Designer-authoring checkpoint (2026-08-26): Track Editor no longer treats an edit as a fresh random
+generation search. Every accepted result records its absolute deterministic attempt index; an edited
+variant rebuilds that exact visible design, preserving its route and selected topology demand instead
+of spending hundreds of attempts on unrelated layouts. Procedural target/max lap length becomes an
+authoring preference during this focused rebuild, with generous numerical headroom and larger safe
+closure radii/straight authority. Minimum radius, slope, roll/pitch rate, weld continuity, clearance,
+self-intersection and mesh budgets remain hard validators. The authoring baseline attempt and lap
+length are versioned exact-recipe data, so Save/Load/Exact Replay restores the same edit policy.
+
+The first explicit **Area of Impact** selector is implemented. Backward/Before and Forward/After are
+independent feature-count controls in track travel direction. Zero protects nearby semantic features;
+non-zero reach highlights the exact window in the Scene, lists every affected realization, exposes
+compatible replacement suggestions and offers an Edit action. Build & Apply then requires
+**Override Features Anyway** before the window can remove those features and rebuild the intervening
+road. The selector is creative authority—not a safety tolerance slider. Future expansion may add
+cross-quarter/whole-track reach and simultaneous per-feature replacement choices on top of the same
+stable impact-member recipe data.
+
+The first focused authoring run exposed a 94.1m vertical residual after the accepted route's ordinary
+elevation carriers were exhausted. Authoring mode now opens unused, level-boundary recovery straights
+as a final vertical-balance reserve. It distributes only the remaining displacement, uses the same
+conservative eased-grade capacity as normal major carriers, and does not relax maximum climb/drop
+angles or weld validation.
+
+The first runtime failure report also proved that replacement ownership must include a superseded
+adjacent recovery: a definition-native replacement that emits recovery now consumes the old feature's
+immediately following recovery inside `OwnedConnectors`, instead of stacking two locked recoveries and
+wasting closure reserve. Report storage retains one representative detail per failure mode so rare
+closure evidence survives the bounded chronological tail.
+
+Original-feature restoration is also distinct from replacement authoring. When a designer chooses
+the recorded original realization after an accepted replacement and no neighboring impact is
+requested, Track Editor removes the override and regenerates the deterministic procedural recipe.
+This restores the original sampled parameters and surrounding recovery/closure as one transaction,
+instead of emitting a new generic realization that can collide with the already-authored route.
+
 Exit gate:
 
 - replacing a compatible realization reproduces identically after scene reload and recipe import;
@@ -719,12 +877,40 @@ Exit gate:
 
 **Goal:** prove that one topology demand can choose multiple shapes.
 
+**Prerequisite:** complete the definition/primitive foundation in §8.8 and migrate the existing Loop,
+Corkscrew and Wide Turnaround paths before adding more realization-specific generator branches.
+
 Recommended first set:
 
 1. Wide Turnaround;
 2. Horseshoe;
 3. Half Helix Turnaround;
 4. Hammerhead Turn.
+
+**Implementation checkpoint (2026-08-24):** Wide Turnaround is integrated as the first additive,
+designer-opt-in realization. A 150–180° topology slot offers a broad-radius alternative through the
+same authoritative corner emitter and transactional Track Editor pipeline used by existing
+replacements. Its stable, versioned definition owns heading range, radius multiplier, core section,
+banking choice, common length contracts, recovery and primitive identity; the central planner contains
+no Wide-specific geometry constants. It retains the accepted hairpin count/recovery behavior and exact
+signed exit heading while using a measurably larger footprint. Automatic seed generation remains
+unchanged. Focused catalog, definition identity, signed-exit, parity and footprint coverage is included.
+Horseshoe begins only after the refreshed definition gate is green.
+
+**Implementation checkpoint (2026-08-25):** the complete prerequisite gate passed 42/42 in Unity.
+Horseshoe is now implemented as a second additive, designer-opt-in definition-native realization. It
+uses a reusable Elevated Eased Turn primitive: definition-owned radius, crest height and bank
+multiplier resolve into one continuous 0→crest→0 reversal with level/elevation-neutral exact exit,
+owned recovery and measured vertical curvature. Generic catalog capability discovery makes it
+available without a Horseshoe-specific planner branch. Its C2 crest carrier returns elevation, slope
+and vertical curvature to zero at both owned boundaries, while ring-level distance is normalized to
+the definition compiler's deterministic driving-line budget. Definition-native turn compilation also
+propagates exact missing/disabled/malformed/solver/heading-window failure reasons without mutating the
+caller's section list. Seven focused cases cover definition validity, both signed exits, global
+vertical-load/rate limits, generic topology-candidate construction, the crest boundary contract,
+definition/build length agreement and explicit failure diagnostics. Unity refresh and the resulting
+49-case gate plus one visual Track Editor application remain the checkpoint before Half Helix
+Turnaround.
 
 All four target the user's 180-degree example and exercise footprint, banking, elevation, and speed constraints without immediately requiring the most complex compound inversions.
 
@@ -739,12 +925,13 @@ Exit gate:
 
 Recommended order:
 
-- Camelback, Speed Hill, Double Dip;
+- Camelback;
 - Inline Twist, Heartline Roll, Zero-G Roll;
 - Cutback and Sidewinder;
 - Immelmann and Dive Loop.
 
-This order builds reusable elevation and rotation phase primitives before more complex compounds.
+This order extends the reusable primitive vocabulary established in §8.8 before more complex
+compounds.
 
 ### Stage 7 — Compound feature composition
 
@@ -755,7 +942,9 @@ Add compound elements only from verified primitives:
 - Twisted Horseshoe Roll;
 - Norwegian and Pretzel families.
 
-Each compound stores its phase sequence, exact relative exit, swept-volume envelope, and recovery contract as versioned recipe data.
+Each compound is authored as a Feature Definition over reusable primitives, compiled and validated
+atomically, and stores its phase sequence, resolved parameters, exact relative exit, swept-volume
+envelope, and recovery contract as versioned recipe data.
 
 ### Stage 8 — Client generation and sharing
 

@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
+using TrackGeneration.Core;
+using TrackGeneration.Definitions;
 using TrackGeneration.Design;
 using TrackGeneration.Macro;
 
@@ -35,6 +38,12 @@ namespace TrackGeneration.Planning
 
         /// <summary>Stage A: formatted result lines for the serialized report.</summary>
         public List<string> FeatureExitRecords = new List<string>();
+
+        /// <summary>
+        /// V2 stable gameplay-demand identities. Reporting-only until the interactive
+        /// replacement stage consumes them transactionally.
+        /// </summary>
+        public List<TopologySlotRecord> TopologySlots = new List<TopologySlotRecord>();
 
         public GenerationFailureReason Failure = GenerationFailureReason.None;
         public string FailureMessage = "";
@@ -73,6 +82,7 @@ namespace TrackGeneration.Planning
     public class TrackTopologyPlanner
     {
         private const float MinAdjustableStraight = 40f;
+        private const int MaxClosureRescueRounds = 12;
         private const int MaxAlternateDualPlacementsPerCandidate = 1;
 
         // ─────────────────────────── Corner slot model ───────────────────────────
@@ -84,6 +94,8 @@ namespace TrackGeneration.Planning
             public bool IsHalfLoop;                       // realized as a half-loop pattern (vertical reversal)
             public TrackPatternType HalfLoopType;
             public bool IsSpecial;                        // corner pattern realization (double apex, …)
+            public bool ForceOrdinary;                    // replacement preview may explicitly request an ordinary 150° curve
+            public SemanticElementId DefinitionRealization; // definition-native turn; None for legacy corner emitters
             public bool AllowHairpinMagnitude;            // may reach 150–180° (counts against the hairpin rule)
             public int Magnitude => Mathf.Abs(SignedAngle);
             public int Sign => SignedAngle >= 0 ? 1 : -1;
@@ -91,7 +103,7 @@ namespace TrackGeneration.Planning
 
         /// <summary>Legacy single-RNG entry: forks the independent streams from one attempt RNG.</summary>
         public TopologyPlan Plan(ResolvedTrackGenerationConfig cfg, ref Unity.Mathematics.Random rng)
-            => Plan(cfg, PlanRandomStreams.FromSingle(ref rng));
+            => Plan(cfg, PlanRandomStreams.FromSingle(ref rng), null);
 
         /// <summary>
         /// Plans one candidate. Returns a plan whose Failure explains any rejection.
@@ -103,9 +115,14 @@ namespace TrackGeneration.Planning
         /// tries the other legal quarter placements from the same random-stream state.
         /// This relocates a REQUIRED dual quarter instead of silently deleting it.
         /// </summary>
-        public TopologyPlan Plan(ResolvedTrackGenerationConfig cfg, PlanRandomStreams rngs)
+        public TopologyPlan Plan(
+            ResolvedTrackGenerationConfig cfg,
+            PlanRandomStreams rngs,
+            IReadOnlyList<TopologySlotOverride> topologyOverrides = null,
+            IReadOnlyList<AuthoringElevationBaselineEntry> authoringElevationBaseline = null)
         {
-            TopologyPlan initial = PlanCore(cfg, rngs.Copy(), null, out _);
+            TopologyPlan initial = PlanCore(cfg, rngs.Copy(), null, topologyOverrides,
+                authoringElevationBaseline, out _);
             if (MeetsDualRequirement(initial, cfg)) return initial;
 
             // Re-running a whole candidate is expensive: it includes closure,
@@ -145,7 +162,9 @@ namespace TrackGeneration.Planning
 
                     var explicitMask = new bool[4];
                     for (int q = 0; q < 4; q++) explicitMask[q] = (mask & (1 << q)) != 0;
-                    TopologyPlan alternate = PlanCore(cfg, rngs.Copy(), explicitMask, out _);
+                    TopologyPlan alternate = PlanCore(
+                        cfg, rngs.Copy(), explicitMask, topologyOverrides,
+                        authoringElevationBaseline, out _);
                     alternatesTried++;
                     if (MeetsDualRequirement(alternate, cfg))
                     {
@@ -196,8 +215,13 @@ namespace TrackGeneration.Planning
         /// quarters are dual (demotion re-runs). <paramref name="failedQuarter"/> is the
         /// quarter whose alternate road failed, -1 for non-quarter failures.
         /// </summary>
-        private TopologyPlan PlanCore(ResolvedTrackGenerationConfig cfg, PlanRandomStreams rngs,
-            bool[] dualMask, out int failedQuarter)
+        private TopologyPlan PlanCore(
+            ResolvedTrackGenerationConfig cfg,
+            PlanRandomStreams rngs,
+            bool[] dualMask,
+            IReadOnlyList<TopologySlotOverride> topologyOverrides,
+            IReadOnlyList<AuthoringElevationBaselineEntry> authoringElevationBaseline,
+            out int failedQuarter)
         {
             failedQuarter = -1;
             var plan = new TopologyPlan();
@@ -244,6 +268,8 @@ namespace TrackGeneration.Planning
                                cfg.DefaultRecoveryLength;
                 else if (c.IsSpecial && c.Realization == TrackPatternType.WallrideTurn)
                     realized = drawnArc + cfg.DefaultRecoveryLength;
+                else if (c.DefinitionRealization != SemanticElementId.None)
+                    realized = cfg.EstimateFeatureFootprint(c.Realization);
                 else if (c.IsSpecial && (c.Realization == TrackPatternType.Hairpin ||
                                          c.Realization == TrackPatternType.SweeperIntoHairpin))
                     realized = cfg.EstimateFeatureFootprint(c.Realization);
@@ -269,29 +295,49 @@ namespace TrackGeneration.Planning
             List<TrackPatternType> gapFeatures = PlanGapFeatures(cfg, plan, usableGaps, featureBudget, ref rngs.Feature);
             if (plan.Failed) return plan;
 
-            // Deterministic shuffled gap order (Layout stream draws are identical
-            // regardless of the dual selection). Quarter re-rolls therefore preserve
-            // feature placement even when a containing quarter becomes dual.
-            var gapOrder = new List<int>();
-            for (int i = 0; i < usableGaps; i++) gapOrder.Add(i);
-            Shuffle(gapOrder, ref rngs.Layout);
-
             var featureByGap = new Dictionary<int, TrackPatternType>();
-            int cursor = 0;
-            foreach (var f in gapFeatures)
+            if (cfg.EnforceProceduralRhythm)
             {
-                if (cursor >= gapOrder.Count)
+                List<TrackPatternType> encounterOrder = TrackRhythm.ArrangeFeatureSequence(
+                    gapFeatures, cfg, ref rngs.Layout, out int rhythmPenalty);
+                List<int> selectedGaps = SelectRhythmicFeatureGaps(
+                    usableGaps, gapCount, encounterOrder.Count, plan, ref rngs.Layout);
+                if (selectedGaps.Count < encounterOrder.Count)
                 {
                     plan.Fail(GenerationFailureReason.InsufficientLengthBudget,
-                        $"{gapFeatures.Count} feature groups need more free gaps than remain between {gapCount} corners " +
+                        $"{encounterOrder.Count} feature groups need more free gaps than remain between {gapCount} corners " +
                         $"(closure reserves {closureGaps}).");
                     return plan;
                 }
-                featureByGap[gapOrder[cursor++]] = f;
+                for (int i = 0; i < encounterOrder.Count; i++)
+                    featureByGap[selectedGaps[i]] = encounterOrder[i];
+
+                // Explicit required quantities always win. Warn when their multiset is
+                // impossible to diversify instead of rejecting an otherwise valid lap.
+                if (rhythmPenalty > 0)
+                    plan.Warnings.Add("[Rhythm] Explicit feature quantities cannot fully satisfy the current " +
+                                      "spacing rules; every requested feature was kept and spread as widely as possible.");
+            }
+            else
+            {
+                // Legacy placement path retained behind the toggle for exact comparisons.
+                var gapOrder = new List<int>();
+                for (int i = 0; i < usableGaps; i++) gapOrder.Add(i);
+                Shuffle(gapOrder, ref rngs.Layout);
+                for (int i = 0; i < gapFeatures.Count; i++)
+                    featureByGap[gapOrder[i]] = gapFeatures[i];
             }
 
             // ── 4. Emit definitions gap-by-gap, corner-by-corner, with quarter gates ──
             EmitDefinitions(cfg, plan, corners, featureByGap, closureGaps, rngs);
+            if (plan.Failed) return plan;
+
+            // Exact Recipe V2 edits are authored against stable gameplay slots, not
+            // section indices. Apply them before connector analysis and closure so the
+            // normal whole-route solver owns every bridge, recovery and downstream
+            // adjustment. A failed edited candidate is rejected transactionally by the
+            // pipeline; the currently accepted scene track is never spliced in place.
+            ApplyTopologyOverrides(cfg, plan, topologyOverrides);
             if (plan.Failed) return plan;
 
             // ── 4b. Connector analysis: classify straights between content, absorb
@@ -305,8 +351,37 @@ namespace TrackGeneration.Planning
 
             // ── 6. Elevation plan (BEFORE the proximity check: planned climbs are what
             // legally separate folded mountain-pass legs) ──
-            PlanElevation(cfg, plan, ref rngs.Elevation);
+            int restoredElevationSections = cfg.DesignerAuthoringMode
+                ? RestoreAuthoringElevationBaseline(plan.Defs, authoringElevationBaseline)
+                : 0;
+            if (restoredElevationSections == 0)
+                PlanElevation(cfg, plan, ref rngs.Elevation);
+            else
+                plan.Warnings.Add($"Track Editor preserved the accepted elevation plan on " +
+                                  $"{restoredElevationSections} unchanged route sections.");
             if (plan.Failed) return plan;
+
+            // Removing an Area-of-Impact neighbour can also remove elevation that was
+            // balancing the accepted lap. PlanElevation owns newly selected majors,
+            // but an exact-recipe route may carry authored deltas on other definitions.
+            // Reconcile the complete canonical definition stream before Road B is
+            // fitted or geometry is built; this avoids discovering a pure Y closure
+            // residual only after an otherwise-valid focused candidate is complete.
+            if (cfg.DesignerAuthoringMode && restoredElevationSections == 0)
+            {
+                float elevationResidual = ReconcileAuthoringNetElevation(
+                    cfg, plan.Defs, out float balancedElevation);
+                if (Mathf.Abs(balancedElevation) > 0.01f)
+                    plan.Warnings.Add($"Track Editor balanced {Mathf.Abs(balancedElevation):F1}m " +
+                                      "of Area-of-Impact lap elevation on safe ordinary roads.");
+                if (Mathf.Abs(elevationResidual) > 0.5f)
+                {
+                    plan.Fail(GenerationFailureReason.ClosureElevationFailure,
+                        $"Area-of-Impact left {elevationResidual:F1}m of canonical lap elevation " +
+                        "that cannot fit on the remaining safe roads.");
+                    return plan;
+                }
+            }
 
             // ── 6b. Quarter-index stamping (closure/elevation inserted defs inherit) ──
             StampQuarterIndices(plan);
@@ -328,8 +403,83 @@ namespace TrackGeneration.Planning
                 }
             }
 
+            // A focused edit is free to reshape its replacement and confirmed AOI,
+            // but unchanged accepted features are altitude anchors. Reconcile against
+            // actual frame-builder exits (not only Definition.ElevationChange):
+            // rotational events and landing geometry can have authoritative vertical
+            // displacement that is not represented by a single scalar definition.
+            if (cfg.DesignerAuthoringMode && restoredElevationSections > 0)
+            {
+                float anchorResidual = ReconcileAuthoringElevationForEditor(
+                    cfg, plan.Defs, authoringElevationBaseline,
+                    out float anchoredElevation, out bool relaxedAcceptedLayers);
+                if (Mathf.Abs(anchoredElevation) > 0.01f)
+                    plan.Warnings.Add($"Track Editor reconnected {Mathf.Abs(anchoredElevation):F1}m " +
+                                      "of vertical change between accepted altitude anchors.");
+                if (relaxedAcceptedLayers)
+                    plan.Warnings.Add("Track Editor kept the requested feature by adapting legal ordinary/recovery road " +
+                                      "outside the exact accepted altitude layers. Feature identity and all final safety checks remain protected.");
+                if (Mathf.Abs(anchorResidual) > 0.5f)
+                {
+                    plan.Fail(GenerationFailureReason.ClosureElevationFailure,
+                        $"The edited route still needs {Mathf.Abs(anchorResidual):F1}m more legal vertical " +
+                        "recovery after the Track Editor used every safe ordinary/recovery road available to it.");
+                    return plan;
+                }
+            }
+
+            if (cfg.DesignerAuthoringMode && restoredElevationSections == 0)
+            {
+                float builtResidual = ReconcileAuthoringBuiltElevation(
+                    cfg, plan.Defs, out float builtBalance);
+                if (Mathf.Abs(builtBalance) > 0.01f)
+                    plan.Warnings.Add($"Track Editor balanced {Mathf.Abs(builtBalance):F1}m " +
+                                      "of measured geometry elevation before closure.");
+                if (Mathf.Abs(builtResidual) > 0.5f)
+                {
+                    plan.Fail(GenerationFailureReason.ClosureElevationFailure,
+                        $"The rebuilt geometry retains {builtResidual:F1}m of vertical closure " +
+                        "error after all legal authoring recovery roads were used.");
+                    return plan;
+                }
+            }
+
             // ── 7. Cheap elevation-aware 2D self-proximity check (canonical road) ──
-            string collision = Validate2DWalk(cfg, plan);
+            // In designer mode, keep the authored geometry and use the level-welded
+            // approach/recovery roads around an existing feature as a vertical bridge.
+            // This is deterministic, preserves the lap endpoint and never weakens the
+            // final 3D validator. A bounded pass per plausible route section allows one
+            // repair to reveal the next genuinely unrelated crossing. Three passes were
+            // too small for designer edits on feature-rich laps: the solver was stopping
+            // after fixing three real crossings and reporting the fourth.
+            PlanProximityCollision collisionDetails;
+            string collision = Validate2DWalk(cfg, plan, out collisionDetails);
+            if (cfg.DesignerAuthoringMode)
+            {
+                // A dense authored lap can expose a chain of independent crossings as
+                // each earlier one is lifted. Spend up to one repair per two route
+                // definitions (bounded at 24) before declaring the designer request
+                // impossible; procedural generation never pays this authoring cost.
+                int maximumClearanceRepairs = Mathf.Clamp(plan.Defs.Count / 2, 8, 24);
+                for (int rescue = 0; collision != null && collisionDetails != null &&
+                     rescue < maximumClearanceRepairs; rescue++)
+                {
+                    bool repaired = TryApplyAuthoringVerticalClearance(cfg, plan.Defs,
+                            collisionDetails.FirstOwner, collisionDetails.FirstHeight,
+                            collisionDetails.SecondOwner, collisionDetails.SecondHeight,
+                            out string repairNote);
+                    if (!repaired)
+                        repaired = TryApplyAuthoringRouteClearance(cfg, plan.Defs,
+                            collisionDetails.FirstOwner, collisionDetails.FirstHeight,
+                            collisionDetails.SecondOwner, collisionDetails.SecondHeight,
+                            out repairNote);
+                    if (!repaired)
+                        break;
+
+                    plan.Warnings.Add(repairNote);
+                    collision = Validate2DWalk(cfg, plan, out collisionDetails);
+                }
+            }
             if (collision != null)
             {
                 plan.Fail(GenerationFailureReason.SelfIntersection,
@@ -337,12 +487,375 @@ namespace TrackGeneration.Planning
                 return plan;
             }
 
-            // ── 8. Stage A: exact measured plan results for every feature group.
+            // ── 8. V2: assign stable gameplay-demand identities only after both
+            // routes and every inserted definition have reached their final order.
+            // Reporting only — no planning or geometry consumer reads these yet.
+            plan.TopologySlots = TopologySlotCatalog.Assign(plan.Defs);
+            MarkAppliedTopologyOverrides(plan, topologyOverrides);
+            if (plan.Failed) return plan;
+
+            // ── 9. Stage A: exact measured plan results for every feature group.
             // Runs only on plans that survived every gate above (≈ candidates), so the
             // extra frame builds cost a bounded handful per generation, not per attempt.
             ComputeFeatureResults(cfg, plan);
 
             return plan;
+        }
+
+        private static void ApplyTopologyOverrides(
+            ResolvedTrackGenerationConfig cfg,
+            TopologyPlan plan,
+            IReadOnlyList<TopologySlotOverride> overrides)
+        {
+            if (overrides == null || overrides.Count == 0) return;
+
+            plan.TopologySlots = TopologySlotCatalog.Assign(plan.Defs);
+            var work = new List<(TopologySlotOverride Request, TopologySlotRecord Slot,
+                int WindowFirst, int WindowLast, List<TopologySlotRecord> Impacted)>();
+            for (int i = 0; i < overrides.Count; i++)
+            {
+                TopologySlotOverride request = overrides[i];
+                if (request == null || string.IsNullOrWhiteSpace(request.TopologySlotId)) continue;
+
+                if (!TopologySlotCatalog.TryResolveOverride(plan.TopologySlots, request,
+                        out TopologySlotRecord slot, out string resolutionFailure))
+                {
+                    plan.Fail(GenerationFailureReason.RecipeCompatibilityFailure,
+                        resolutionFailure + " " +
+                        "The previous valid track was kept.");
+                    return;
+                }
+
+                if (!string.Equals(slot.TopologySlotId, request.TopologySlotId,
+                        System.StringComparison.Ordinal))
+                {
+                    plan.Warnings.Add($"Track Editor structurally resolved {request.TopologySlotId} " +
+                                      $"to pre-connector slot {slot.TopologySlotId}.");
+                }
+
+                FeatureCapability capability = FeatureCapabilities.Get(request.RequestedRealization);
+                if (request.RequestedRealization == SemanticElementId.None || capability == null ||
+                    capability.Role != slot.DemandType)
+                {
+                    plan.Fail(GenerationFailureReason.RecipeCompatibilityFailure,
+                        $"{request.RequestedRealization} cannot satisfy the {slot.DemandType} demand of " +
+                        $"edited segment '{slot.TopologySlotId}'. The previous valid track was kept.");
+                    return;
+                }
+
+                if (!TryResolveAuthoringImpactWindow(plan.TopologySlots, request, slot,
+                        out int windowFirst, out int windowLast,
+                        out List<TopologySlotRecord> impacted, out string impactFailure))
+                {
+                    plan.Fail(GenerationFailureReason.RecipeCompatibilityFailure,
+                        impactFailure + " The previous valid track was kept.");
+                    return;
+                }
+
+                work.Add((request, slot, windowFirst, windowLast, impacted));
+            }
+
+            // Two simultaneous authoring windows must never consume each other's
+            // definition ownership. The inspector applies one change at a time, while
+            // this guard keeps imported or hand-edited recipes transactional.
+            for (int i = 0; i < work.Count; i++)
+            for (int j = i + 1; j < work.Count; j++)
+            {
+                if (work[i].WindowFirst > work[j].WindowLast ||
+                    work[j].WindowFirst > work[i].WindowLast)
+                    continue;
+                plan.Fail(GenerationFailureReason.RecipeCompatibilityFailure,
+                    $"Track Editor impact windows for '{work[i].Slot.TopologySlotId}' and " +
+                    $"'{work[j].Slot.TopologySlotId}' overlap. Apply those changes separately.");
+                return;
+            }
+
+            // Work backwards so replacing an earlier group cannot invalidate the
+            // definition indices captured for a later group.
+            work.Sort((a, b) => b.WindowFirst.CompareTo(a.WindowFirst));
+            for (int i = 0; i < work.Count; i++)
+            {
+                TopologySlotOverride request = work[i].Request;
+                TopologySlotRecord slot = work[i].Slot;
+                int first = work[i].WindowFirst;
+                int count = work[i].WindowLast - first + 1;
+                if (first < 0 || count <= 0 || first + count > plan.Defs.Count)
+                {
+                    plan.Fail(GenerationFailureReason.RecipeCompatibilityFailure,
+                        $"Edited segment '{slot.TopologySlotId}' has stale ownership data. " +
+                        "The previous valid track was kept.");
+                    return;
+                }
+
+                float width = Mathf.Max(1f, plan.Defs[first]?.Width ?? cfg.RoadWidth);
+                FeaturePlanResult candidate = BuildReplacementCandidate(
+                    cfg, slot, request.RequestedRealization, TrackConnectionFrame.Origin(width));
+                if (candidate == null || candidate.Failed || candidate.Definitions == null ||
+                    candidate.Definitions.Count == 0)
+                {
+                    string reason = candidate?.FailureReason;
+                    plan.Fail(GenerationFailureReason.RecipeCompatibilityFailure,
+                        $"{request.RequestedRealization} could not be built for edited segment " +
+                        $"'{slot.TopologySlotId}': {reason ?? "no geometry was produced"}. " +
+                        "The previous valid track was kept.");
+                    return;
+                }
+
+                bool hasImpact = work[i].Impacted.Count > 0;
+                bool consumedSupersededRecovery = false;
+                if (!hasImpact)
+                {
+                    int ownedCount = ComputeReplacementRemovalCount(
+                        plan.Defs, slot, candidate.Definitions, request.MaximumReplanScope);
+                    consumedSupersededRecovery = ownedCount > count;
+                    count = ownedCount;
+                }
+
+                float authoredRecoveryLength = 0f;
+                float authoredRecoveryElevation = 0f;
+                if (cfg.DesignerAuthoringMode)
+                    EnsureAuthoringVerticalRecovery(cfg, candidate.Definitions,
+                        out authoredRecoveryLength, out authoredRecoveryElevation);
+
+                // Carry an exact, generation-local identity through Area of Impact.
+                // Removing a feature after the selection can legitimately renumber or
+                // even re-quarter the finished route slot; the replacement geometry
+                // itself is the authoritative identity in that case.
+                string appliedPatternId = AppliedReplacementPatternId(request);
+
+                for (int d = 0; d < candidate.Definitions.Count; d++)
+                {
+                    TrackMacroSectionDefinition definition = candidate.Definitions[d];
+                    if (definition == null) continue;
+                    definition.QuarterIndex = slot.QuarterIndex;
+                    definition.RoadId = slot.RoadId;
+                    definition.TopologySlotId = "";
+                    definition.TopologySlotOrder = -1;
+                    definition.TopologySlotRouteOrder = -1;
+                    definition.PatternId = appliedPatternId;
+                }
+
+                plan.Defs.RemoveRange(first, count);
+                plan.Defs.InsertRange(first, candidate.Definitions);
+                if (hasImpact)
+                {
+                    var removedNames = new List<string>();
+                    for (int affected = 0; affected < work[i].Impacted.Count; affected++)
+                        removedNames.Add(work[i].Impacted[affected].CurrentRealization.ToString());
+                    plan.Warnings.Add($"Track Editor Area of Impact removed " +
+                                      $"{string.Join(", ", removedNames)} around {slot.TopologySlotId}; " +
+                                      "the route and mesh were rebuilt across the authorized window.");
+                }
+                if (consumedSupersededRecovery)
+                    plan.Warnings.Add($"Track Editor consumed the superseded recovery after " +
+                                      $"{slot.TopologySlotId}; the replacement owns its recovery.");
+                if (authoredRecoveryLength > 0f)
+                    plan.Warnings.Add(
+                        $"Track Editor added {authoredRecoveryLength:F0}m of owned recovery road " +
+                        $"to return {Mathf.Abs(authoredRecoveryElevation):F1}m to grade after " +
+                        $"{request.RequestedRealization}.");
+                plan.Warnings.Add(request.RebuildCurrentRealization
+                    ? $"Track Editor regenerated {slot.TopologySlotId} as " +
+                      $"{request.RequestedRealization}; connectors and closure were solved automatically."
+                    : $"Track Editor rebuilt {slot.TopologySlotId}: {slot.CurrentRealization} → " +
+                      $"{request.RequestedRealization}; connectors and closure were solved automatically.");
+            }
+
+        }
+
+        /// <summary>
+        /// Resolves the exact feature identities authorized by an Area of Impact
+        /// request and returns one contiguous definition window. No count-only fallback
+        /// exists: a recipe may remove only the neighboring features its designer saw
+        /// and explicitly confirmed.
+        /// </summary>
+        public static bool TryResolveAuthoringImpactWindow(
+            IReadOnlyList<TopologySlotRecord> slots,
+            TopologySlotOverride request,
+            TopologySlotRecord selected,
+            out int firstDefinitionIndex,
+            out int lastDefinitionIndex,
+            out List<TopologySlotRecord> impacted,
+            out string reason)
+        {
+            firstDefinitionIndex = selected?.FirstDefinitionIndex ?? -1;
+            lastDefinitionIndex = selected?.LastDefinitionIndex ?? -1;
+            impacted = new List<TopologySlotRecord>();
+            reason = "";
+            if (selected == null || request == null)
+            {
+                reason = "The Track Editor impact request has no selected feature.";
+                return false;
+            }
+
+            request.ImpactMembers ??= new List<TopologyImpactMember>();
+            if (request.ImpactMembers.Count == 0) return true;
+            if (!request.AllowFeatureOverrides)
+            {
+                reason = "Nearby features were included in the Area of Impact but were not confirmed for override.";
+                return false;
+            }
+
+            var seen = new HashSet<string>(System.StringComparer.Ordinal);
+            for (int i = 0; i < request.ImpactMembers.Count; i++)
+            {
+                TopologyImpactMember member = request.ImpactMembers[i];
+                if (member == null || string.IsNullOrWhiteSpace(member.TopologySlotId)) continue;
+                var identity = new TopologySlotOverride
+                {
+                    TopologySlotId = member.TopologySlotId,
+                    StructuralAnchor = member.StructuralAnchor,
+                    OriginalRealization = member.OriginalRealization
+                };
+                if (!TopologySlotCatalog.TryResolveOverride(slots, identity,
+                        out TopologySlotRecord affected, out string resolutionFailure))
+                {
+                    reason = $"Area of Impact feature '{member.TopologySlotId}' is no longer " +
+                             $"the feature that was confirmed: {resolutionFailure}";
+                    return false;
+                }
+                if (!TrackEditorImpact.SharesTravelPath(selected, affected))
+                {
+                    reason = $"Area of Impact feature '{affected.TopologySlotId}' is outside " +
+                             "the selected travel path.";
+                    return false;
+                }
+                if (!seen.Add(affected.TopologySlotId)) continue;
+                impacted.Add(affected);
+                firstDefinitionIndex = Mathf.Min(firstDefinitionIndex, affected.FirstDefinitionIndex);
+                lastDefinitionIndex = Mathf.Max(lastDefinitionIndex, affected.LastDefinitionIndex);
+            }
+
+            impacted.Sort((left, right) => left.FirstDefinitionIndex.CompareTo(
+                right.FirstDefinitionIndex));
+            return true;
+        }
+
+        /// <summary>
+        /// Computes the replacement's legal removal scope. When a realization emits
+        /// its own recovery, an immediately adjacent recovery generated for the old
+        /// realization is superseded and belongs to OwnedConnectors. Keeping both
+        /// wastes closure reserve and creates a false fit penalty.
+        /// </summary>
+        public static int ComputeReplacementRemovalCount(
+            IReadOnlyList<TrackMacroSectionDefinition> existing,
+            TopologySlotRecord slot,
+            IReadOnlyList<TrackMacroSectionDefinition> replacement,
+            LocalReplanScope scope)
+        {
+            if (slot == null) return 0;
+            int baseCount = slot.LastDefinitionIndex - slot.FirstDefinitionIndex + 1;
+            if (existing == null || replacement == null || baseCount <= 0 ||
+                scope < LocalReplanScope.OwnedConnectors)
+                return Mathf.Max(0, baseCount);
+
+            bool replacementOwnsRecovery = false;
+            for (int i = 0; i < replacement.Count; i++)
+            {
+                TrackMacroSectionDefinition definition = replacement[i];
+                if (definition != null &&
+                    definition.SectionType == TrackMacroSectionType.RecoveryStraight)
+                {
+                    replacementOwnsRecovery = true;
+                    break;
+                }
+            }
+            if (!replacementOwnsRecovery) return baseCount;
+
+            bool originalRequiresRecovery = false;
+            int ownedStart = Mathf.Max(0, slot.FirstDefinitionIndex);
+            int ownedEnd = Mathf.Min(existing.Count - 1, slot.LastDefinitionIndex);
+            for (int i = ownedStart; i <= ownedEnd; i++)
+            {
+                TrackMacroSectionDefinition definition = existing[i];
+                if (definition != null && definition.RequiresRecoveryAfter)
+                {
+                    originalRequiresRecovery = true;
+                    break;
+                }
+            }
+            if (!originalRequiresRecovery) return baseCount;
+
+            int adjacentIndex = slot.LastDefinitionIndex + 1;
+            if (adjacentIndex < 0 || adjacentIndex >= existing.Count) return baseCount;
+            TrackMacroSectionDefinition adjacent = existing[adjacentIndex];
+            if (adjacent == null ||
+                adjacent.SectionType != TrackMacroSectionType.RecoveryStraight ||
+                (slot.QuarterIndex >= 0 && adjacent.QuarterIndex != slot.QuarterIndex) ||
+                adjacent.RoadId != slot.RoadId ||
+                (!string.IsNullOrEmpty(adjacent.PatternId) &&
+                 !string.Equals(adjacent.PatternId, slot.PatternId,
+                     System.StringComparison.Ordinal)))
+                return baseCount;
+
+            return baseCount + 1;
+        }
+
+        private static void MarkAppliedTopologyOverrides(
+            TopologyPlan plan,
+            IReadOnlyList<TopologySlotOverride> overrides)
+        {
+            if (plan?.TopologySlots == null || overrides == null) return;
+
+            for (int i = 0; i < overrides.Count; i++)
+            {
+                TopologySlotOverride request = overrides[i];
+                if (request == null) continue;
+                if (TryResolveAppliedReplacementSlot(plan.TopologySlots, request,
+                        out TopologySlotRecord slot))
+                {
+                    // Keep the rebuilt route's naturally assigned finished identity.
+                    // The accepted recipe is normalized only after candidate selection,
+                    // so rejected attempts can never mutate the shared request list.
+                    slot.OriginalRealization = request.OriginalRealization;
+                    slot.CurrentRealization = request.RequestedRealization;
+                    slot.OverrideState = TopologySlotOverrideState.Applied;
+                    slot.LocalReplanPolicy = request.MaximumReplanScope;
+                    continue;
+                }
+
+                plan.Fail(GenerationFailureReason.RecipeCompatibilityFailure,
+                    $"Applied Track Editor replacement '{request.TopologySlotId}' could not be " +
+                    "identified in the rebuilt route. The previous valid track was kept.");
+                return;
+            }
+        }
+
+        private static string AppliedReplacementPatternId(TopologySlotOverride request) =>
+            request == null
+                ? ""
+                : $"track-editor:{request.TopologySlotId}:{request.RequestedRealization}";
+
+        /// <summary>
+        /// Resolves an applied replacement by its structural demand first, then by the
+        /// exact marker stamped on the replacement geometry. The marker fallback is
+        /// required when Area of Impact removes a later cross-quarter feature and the
+        /// finished route's reporting identity necessarily shifts.
+        /// </summary>
+        public static bool TryResolveAppliedReplacementSlot(
+            IReadOnlyList<TopologySlotRecord> slots,
+            TopologySlotOverride request,
+            out TopologySlotRecord resolved)
+        {
+            if (TopologySlotCatalog.TryResolveOverride(slots, request, out resolved,
+                    out _, appliedRealization: true))
+                return true;
+
+            resolved = null;
+            if (slots == null || request == null) return false;
+            string marker = AppliedReplacementPatternId(request);
+            for (int i = 0; i < slots.Count; i++)
+            {
+                TopologySlotRecord candidate = slots[i];
+                if (candidate == null || !string.Equals(candidate.PatternId, marker,
+                        System.StringComparison.Ordinal) ||
+                    (candidate.CurrentRealization != request.RequestedRealization &&
+                     candidate.OriginalRealization != request.RequestedRealization))
+                    continue;
+                if (resolved != null) return false;
+                resolved = candidate;
+            }
+            return resolved != null;
         }
 
         /// <summary>
@@ -434,10 +947,13 @@ namespace TrackGeneration.Planning
                 _ => 0.5f
             };
 
-            // The hairpin RULE caps how many corners may reach hairpin magnitudes
-            // (150–180°) — the turn-family weights select candidates, never override
-            // the rule's maximum count.
-            int hairpinBudget = cfg.Hairpins.Enabled ? cfg.Hairpins.MaximumCount : 0;
+            // Reversal realizations share the 150–180° corner-demand pool. The turn
+            // family only creates as many reversal-capable slots as the enabled
+            // Hairpin/Wide Turnaround/Horseshoe rules can consume.
+            int hairpinBudget =
+                (cfg.Hairpins.Enabled ? cfg.Hairpins.MaximumCount : 0) +
+                (cfg.WideTurnarounds.Enabled ? cfg.WideTurnarounds.MaximumCount : 0) +
+                (cfg.Horseshoes.Enabled ? cfg.Horseshoes.MaximumCount : 0);
             int hairpinsUsed = 0;
 
             int prevSign = rng.NextBool() ? 1 : -1;
@@ -478,6 +994,218 @@ namespace TrackGeneration.Planning
                     plan.CountPattern(TrackPatternType.Hairpin);
                 }
                 Shuffle(corners, ref rng);
+            }
+
+            // Reserve required wallrides before the other special turn families
+            // claim corner demand. Previously wallrides ran last, so enabling a
+            // Dive Loop or Sidewinder minimum could consume every compatible corner
+            // and make otherwise healthy layouts fail before geometry was attempted.
+            int requiredWallridesAssigned = 0;
+            if (cfg.Wallrides.Enabled && cfg.Wallrides.MinimumCount > 0)
+            {
+                var wallrideCandidates = new List<CornerSlot>();
+                foreach (CornerSlot corner in corners)
+                    if (!corner.IsSpecial && !corner.IsHalfLoop)
+                        wallrideCandidates.Add(corner);
+                wallrideCandidates.Sort((a, b) =>
+                {
+                    bool aInWindow = a.Magnitude >= 60 && a.Magnitude <= 140;
+                    bool bInWindow = b.Magnitude >= 60 && b.Magnitude <= 140;
+                    if (aInWindow != bInWindow) return aInWindow ? -1 : 1;
+                    return Mathf.Abs(a.Magnitude - 90).CompareTo(
+                        Mathf.Abs(b.Magnitude - 90));
+                });
+
+                foreach (CornerSlot corner in wallrideCandidates)
+                {
+                    if (requiredWallridesAssigned >= cfg.Wallrides.MinimumCount) break;
+                    // Canonical heading closure can safely flip this token later,
+                    // but it remains a physically appropriate 90-degree wallride.
+                    corner.SignedAngle = corner.Sign * 90;
+                    corner.AllowHairpinMagnitude = false;
+                    corner.IsSpecial = true;
+                    corner.Realization = TrackPatternType.WallrideTurn;
+                    requiredWallridesAssigned++;
+                    plan.CountPattern(TrackPatternType.WallrideTurn);
+                }
+
+                if (requiredWallridesAssigned < cfg.Wallrides.MinimumCount)
+                {
+                    plan.Fail(GenerationFailureReason.RequiredFeatureMissing,
+                        $"Required {cfg.Wallrides.MinimumCount} wallride turns but only " +
+                        $"{requiredWallridesAssigned} unclaimed corner demands were available.");
+                    return corners;
+                }
+            }
+
+            // Definition-native reversals are first-class procedural realizations.
+            // Required counts claim the sharpest available corners; optional counts
+            // use their rule weight. They stay exact 180° demands during heading
+            // closure so the definition compiler receives a legal authored heading.
+            bool AssignDefinitionReversals(ResolvedFeatureRule rule,
+                TrackPatternType pattern, SemanticElementId semantic)
+            {
+                if (rule == null || !rule.Enabled || rule.MaximumCount <= 0) return true;
+
+                var eligible = new List<CornerSlot>();
+                foreach (var c in corners)
+                    if (!c.IsSpecial && !c.IsHalfLoop)
+                        eligible.Add(c);
+                eligible.Sort((a, b) => b.Magnitude.CompareTo(a.Magnitude));
+
+                int assigned = 0;
+                foreach (var c in eligible)
+                {
+                    if (assigned >= rule.MaximumCount) break;
+                    bool required = assigned < rule.MinimumCount;
+                    if (!required && rngs.Feature.NextFloat() >= Mathf.Clamp01(rule.OptionalWeight * 0.25f))
+                        continue;
+
+                    c.SignedAngle = c.Sign * 180;
+                    c.AllowHairpinMagnitude = true;
+                    c.IsSpecial = true;
+                    c.Realization = pattern;
+                    c.DefinitionRealization = semantic;
+                    assigned++;
+                    plan.CountPattern(pattern);
+                }
+
+                if (assigned >= rule.MinimumCount) return true;
+                plan.Fail(GenerationFailureReason.RequiredFeatureMissing,
+                    $"Required {rule.MinimumCount} {pattern} turns but only {assigned} reversal slots were available.");
+                return false;
+            }
+
+            if (!AssignDefinitionReversals(cfg.WideTurnarounds,
+                    TrackPatternType.WideTurnaround, SemanticElementId.WideTurnaround))
+                return corners;
+            if (!AssignDefinitionReversals(cfg.Horseshoes,
+                    TrackPatternType.Horseshoe, SemanticElementId.Horseshoe))
+                return corners;
+
+            bool AssignDefinitionCornerRule(ResolvedFeatureRule rule,
+                TrackPatternType pattern, SemanticElementId semantic)
+            {
+                int explicitMinimum = 0;
+                foreach (RequiredPatternEntry required in cfg.RequiredPatterns)
+                    if (required != null && required.Pattern == pattern)
+                        explicitMinimum = Mathf.Max(explicitMinimum, required.Count);
+
+                bool normalEnabled = rule != null && rule.Enabled;
+                int minimum = Mathf.Max(normalEnabled ? rule.MinimumCount : 0, explicitMinimum);
+                int maximum = Mathf.Max(normalEnabled ? rule.MaximumCount : 0, minimum);
+                if (maximum <= 0) return true;
+
+                if (!TrackFeatureDefinitionCatalog.TryGet(pattern, out TrackFeatureDefinition definition) ||
+                    !definition.Enabled || definition.SemanticElement != semantic ||
+                    (definition.Solver != FeatureDefinitionSolver.EasedTurnV1 &&
+                     definition.Solver != FeatureDefinitionSolver.RotationalSequenceV1))
+                {
+                    plan.Fail(GenerationFailureReason.RequiredFeatureMissing,
+                        $"{pattern} has no enabled turn-definition solver.");
+                    return false;
+                }
+
+                var eligible = new List<CornerSlot>();
+                foreach (CornerSlot corner in corners)
+                    if (!corner.IsSpecial && !corner.IsHalfLoop)
+                        eligible.Add(corner);
+                float preferred = definition.Turn.HeadingDegrees.Preferred;
+                eligible.Sort((a, b) =>
+                    Mathf.Abs(a.Magnitude - preferred).CompareTo(
+                        Mathf.Abs(b.Magnitude - preferred)));
+
+                int assigned = 0;
+                foreach (CornerSlot corner in eligible)
+                {
+                    if (assigned >= maximum) break;
+                    bool required = assigned < minimum;
+                    if (!required && (!normalEnabled ||
+                        rngs.Feature.NextFloat() >= Mathf.Clamp01(rule.OptionalWeight * 0.25f)))
+                        continue;
+
+                    int magnitude = Mathf.RoundToInt(Mathf.Clamp(preferred,
+                        definition.Turn.HeadingDegrees.Minimum,
+                        definition.Turn.HeadingDegrees.Maximum) / 5f) * 5;
+                    corner.SignedAngle = corner.Sign * magnitude;
+                    corner.AllowHairpinMagnitude = magnitude > 145;
+                    corner.IsSpecial = true;
+                    corner.Realization = pattern;
+                    corner.DefinitionRealization = semantic;
+                    assigned++;
+                    plan.CountPattern(pattern);
+                }
+
+                if (assigned >= minimum) return true;
+                plan.Fail(explicitMinimum > 0
+                        ? GenerationFailureReason.RequiredPatternMissing
+                        : GenerationFailureReason.RequiredFeatureMissing,
+                    $"Required {minimum} {pattern} turns but only {assigned} compatible corner slots were available.");
+                return false;
+            }
+
+            if (!AssignDefinitionCornerRule(cfg.Cutbacks,
+                    TrackPatternType.Cutback, SemanticElementId.Cutback))
+                return corners;
+            if (!AssignDefinitionCornerRule(cfg.DiveLoops,
+                    TrackPatternType.DiveLoop, SemanticElementId.DiveLoop))
+                return corners;
+            if (!AssignDefinitionCornerRule(cfg.Sidewinders,
+                    TrackPatternType.Sidewinder, SemanticElementId.Sidewinder))
+                return corners;
+
+            // Required definition-native turn patterns claim ordinary corner demand
+            // directly. They remain opt-in until a dedicated designer rule promotes
+            // them into the normal optional pool, preserving established seed layouts.
+            foreach (RequiredPatternEntry required in cfg.RequiredPatterns)
+            {
+                if (required == null || required.Count <= 0 ||
+                    required.Pattern == TrackPatternType.WideTurnaround ||
+                    required.Pattern == TrackPatternType.Horseshoe ||
+                    required.Pattern == TrackPatternType.Cutback ||
+                    required.Pattern == TrackPatternType.DiveLoop ||
+                    required.Pattern == TrackPatternType.Sidewinder)
+                    continue;
+                if (!FeaturePatternLibrary.IsCornerSlotPattern(required.Pattern) ||
+                    !TrackFeatureDefinitionCatalog.TryGet(
+                        required.Pattern, out TrackFeatureDefinition turnDefinition) ||
+                    !turnDefinition.Enabled ||
+                    (turnDefinition.Solver != FeatureDefinitionSolver.EasedTurnV1 &&
+                     turnDefinition.Solver != FeatureDefinitionSolver.RotationalSequenceV1))
+                    continue;
+
+                for (int occurrence = 0; occurrence < required.Count; occurrence++)
+                {
+                    CornerSlot selected = null;
+                    float bestDistance = float.PositiveInfinity;
+                    foreach (CornerSlot candidate in corners)
+                    {
+                        if (candidate.IsSpecial || candidate.IsHalfLoop) continue;
+                        float distance = Mathf.Abs(
+                            candidate.Magnitude - turnDefinition.Turn.HeadingDegrees.Preferred);
+                        if (distance >= bestDistance) continue;
+                        selected = candidate;
+                        bestDistance = distance;
+                    }
+
+                    if (selected == null)
+                    {
+                        plan.Fail(GenerationFailureReason.RequiredPatternMissing,
+                            $"Required pattern {required.Pattern} has no unclaimed corner slot.");
+                        return corners;
+                    }
+
+                    int magnitude = Mathf.RoundToInt(
+                        Mathf.Clamp(turnDefinition.Turn.HeadingDegrees.Preferred,
+                            turnDefinition.Turn.HeadingDegrees.Minimum,
+                            turnDefinition.Turn.HeadingDegrees.Maximum) / 5f) * 5;
+                    selected.SignedAngle = selected.Sign * magnitude;
+                    selected.AllowHairpinMagnitude = magnitude > 145;
+                    selected.IsSpecial = true;
+                    selected.Realization = required.Pattern;
+                    selected.DefinitionRealization = turnDefinition.SemanticElement;
+                    plan.CountPattern(required.Pattern);
+                }
             }
 
             // Required half-loop patterns become exact 180° vertical reversals.
@@ -578,10 +1306,9 @@ namespace TrackGeneration.Planning
                 return corners;
             }
 
-            // Wallride turns: required minimum first (most eligible corners by
-            // magnitude), then optional by weight up to the maximum. A wallride wants
-            // a committed 60–140° corner — hairpin reversals and gentle kinks read
-            // wrong on a wall.
+            // Required wallrides were reserved before competing turn families.
+            // Add only optional wallrides here, after heading closure has produced
+            // final compatible 90-degree tokens.
             if (cfg.Wallrides.Enabled && cfg.Wallrides.MaximumCount > 0)
             {
                 var eligible = new List<CornerSlot>();
@@ -590,12 +1317,12 @@ namespace TrackGeneration.Planning
                         eligible.Add(c);
                 eligible.Sort((a, b) => b.Magnitude.CompareTo(a.Magnitude));
 
-                int assigned = 0;
+                int assigned = requiredWallridesAssigned;
                 foreach (var c in eligible)
                 {
                     if (assigned >= cfg.Wallrides.MaximumCount) break;
-                    bool required = assigned < cfg.Wallrides.MinimumCount;
-                    if (!required && rngs.Feature.NextFloat() >= Mathf.Clamp01(cfg.Wallrides.OptionalWeight * 0.3f)) continue;
+                    if (rngs.Feature.NextFloat() >= Mathf.Clamp01(
+                            cfg.Wallrides.OptionalWeight * 0.3f)) continue;
                     c.IsSpecial = true;
                     c.Realization = TrackPatternType.WallrideTurn;
                     assigned++;
@@ -733,10 +1460,27 @@ namespace TrackGeneration.Planning
 
                 int idx = rng.NextInt(0, corners.Count);
                 var c = corners[idx];
-                if (c.IsHalfLoop) continue; // half-loops stay exactly 180°
+                if (c.IsHalfLoop || c.DefinitionRealization == SemanticElementId.WideTurnaround ||
+                    c.DefinitionRealization == SemanticElementId.Horseshoe) continue; // authored reversals stay exactly 180°
 
-                int minMag = c.IsSpecial && c.Realization == TrackPatternType.Hairpin ? 150 : 20;
+                int minMag = c.IsSpecial && (c.Realization == TrackPatternType.Hairpin ||
+                    c.DefinitionRealization == SemanticElementId.WideTurnaround ||
+                    c.DefinitionRealization == SemanticElementId.Horseshoe) ? 150 : 20;
                 int maxMag = c.AllowHairpinMagnitude ? 180 : 145; // balancing never mints extra hairpins
+                if (c.IsSpecial && c.Realization == TrackPatternType.WallrideTurn)
+                {
+                    minMag = 60;
+                    maxMag = 140;
+                }
+                if (c.DefinitionRealization != SemanticElementId.None &&
+                    TrackFeatureDefinitionCatalog.TryGet(
+                        c.DefinitionRealization, out TrackFeatureDefinition definition) &&
+                    definition.TopologyRole == TopologyRole.TurnRealization &&
+                    definition.Turn.HeadingDegrees.Maximum > 0f)
+                {
+                    minMag = Mathf.CeilToInt(definition.Turn.HeadingDegrees.Minimum);
+                    maxMag = Mathf.FloorToInt(definition.Turn.HeadingDegrees.Maximum);
+                }
 
                 int step = Mathf.Clamp(residual * c.Sign, -20, 20);
                 int newMag = Mathf.Clamp(c.Magnitude + step, minMag, maxMag);
@@ -747,7 +1491,9 @@ namespace TrackGeneration.Planning
                     int bestIdx = -1, bestErr = Mathf.Abs(residual);
                     for (int i = 0; i < corners.Count; i++)
                     {
-                        if (corners[i].IsHalfLoop) continue;
+                        if (corners[i].IsHalfLoop ||
+                            corners[i].DefinitionRealization == SemanticElementId.WideTurnaround ||
+                            corners[i].DefinitionRealization == SemanticElementId.Horseshoe) continue;
                         int err = Mathf.Abs(target - (sum - 2 * corners[i].SignedAngle));
                         if (err < bestErr) { bestErr = err; bestIdx = i; }
                     }
@@ -801,10 +1547,31 @@ namespace TrackGeneration.Planning
                     list.Add((-c.Sign * mag, cost + 4));   // flipping is allowed but costlier
                 }
 
-                if (c.IsHalfLoop || (c.IsSpecial && c.Realization == TrackPatternType.Hairpin))
+                if (c.DefinitionRealization != SemanticElementId.None &&
+                    TrackFeatureDefinitionCatalog.TryGet(
+                        c.DefinitionRealization, out TrackFeatureDefinition definition) &&
+                    definition.TopologyRole == TopologyRole.TurnRealization &&
+                    definition.Turn.HeadingDegrees.Maximum > 0f)
+                {
+                    for (int magnitudeUnits = 1; magnitudeUnits <= 4; magnitudeUnits++)
+                    {
+                        float degrees = magnitudeUnits * U;
+                        if (degrees < definition.Turn.HeadingDegrees.Minimum - 0.01f ||
+                            degrees > definition.Turn.HeadingDegrees.Maximum + 0.01f)
+                            continue;
+                        Add(magnitudeUnits);
+                    }
+                }
+                else if (c.IsHalfLoop || (c.IsSpecial && (c.Realization == TrackPatternType.Hairpin ||
+                    c.DefinitionRealization == SemanticElementId.WideTurnaround ||
+                    c.DefinitionRealization == SemanticElementId.Horseshoe)))
                 {
                     // Pinned reversal: exactly ±180, keep its drawn sign (no flip).
                     list.Add((c.Sign * 4, 0));
+                }
+                else if (c.IsSpecial && c.Realization == TrackPatternType.WallrideTurn)
+                {
+                    Add(2);                         // committed 90° wallride token
                 }
                 else if (c.IsSpecial)
                 {
@@ -878,7 +1645,8 @@ namespace TrackGeneration.Planning
             // both single and compound placements.
             int loopsUsed = 0, corksUsed = plan.ReservedCornerCorkscrews,
                 spiralsUsed = 0, jumpsUsed = 0, chicanesUsed = 0,
-                sCurvesUsed = 0, pipesUsed = 0;
+                sCurvesUsed = 0, pipesUsed = 0, camelbacksUsed = 0,
+                heartlineRollsUsed = 0, zeroGRollsUsed = 0;
 
             bool TryConsume(TrackPatternType t)
             {
@@ -887,6 +1655,20 @@ namespace TrackGeneration.Planning
                     case TrackPatternType.FullPipe:
                         if (!cfg.FullPipes.Enabled || pipesUsed >= cfg.FullPipes.MaximumCount) return false;
                         pipesUsed++; return true;
+                    case TrackPatternType.Camelback:
+                        // An explicit RequiredPattern remains authoritative even while
+                        // the normal random rule is switched off. When enabled, its max
+                        // is a hard cap shared by required and optional placements.
+                        if (cfg.Camelbacks.Enabled && camelbacksUsed >= cfg.Camelbacks.MaximumCount) return false;
+                        camelbacksUsed++; return true;
+                    case TrackPatternType.HeartlineRoll:
+                        if (cfg.HeartlineRolls.Enabled &&
+                            heartlineRollsUsed >= cfg.HeartlineRolls.MaximumCount) return false;
+                        heartlineRollsUsed++; return true;
+                    case TrackPatternType.ZeroGRoll:
+                        if (cfg.ZeroGRolls.Enabled &&
+                            zeroGRollsUsed >= cfg.ZeroGRolls.MaximumCount) return false;
+                        zeroGRollsUsed++; return true;
                     case TrackPatternType.FullLoop:
                         if (!cfg.Loops.Enabled || loopsUsed >= cfg.Loops.MaximumCount) return false;
                         loopsUsed++; return true;
@@ -974,6 +1756,12 @@ namespace TrackGeneration.Planning
             if (plan.Failed) return features;
             Require(cfg.FullPipes, TrackPatternType.FullPipe);
             if (plan.Failed) return features;
+            Require(cfg.Camelbacks, TrackPatternType.Camelback);
+            if (plan.Failed) return features;
+            Require(cfg.HeartlineRolls, TrackPatternType.HeartlineRoll);
+            if (plan.Failed) return features;
+            Require(cfg.ZeroGRolls, TrackPatternType.ZeroGRoll);
+            if (plan.Failed) return features;
             Require(cfg.Chicanes, TrackPatternType.Chicane);
             if (plan.Failed) return features;
             Require(cfg.SCurves, TrackPatternType.SCurve);
@@ -1006,8 +1794,43 @@ namespace TrackGeneration.Planning
                 if (cfg.Spirals.Enabled && spiralsUsed < cfg.Spirals.MaximumCount) pool.Add((TrackPatternType.Spiral, cfg.Spirals.OptionalWeight));
                 if (cfg.Jumps.Enabled && jumpsUsed < cfg.Jumps.MaximumCount) pool.Add((TrackPatternType.JumpGap, cfg.Jumps.OptionalWeight));
                 if (cfg.FullPipes.Enabled && pipesUsed < cfg.FullPipes.MaximumCount) pool.Add((TrackPatternType.FullPipe, cfg.FullPipes.OptionalWeight));
+                if (cfg.Camelbacks.Enabled && camelbacksUsed < cfg.Camelbacks.MaximumCount) pool.Add((TrackPatternType.Camelback, cfg.Camelbacks.OptionalWeight));
+                if (cfg.HeartlineRolls.Enabled && heartlineRollsUsed < cfg.HeartlineRolls.MaximumCount) pool.Add((TrackPatternType.HeartlineRoll, cfg.HeartlineRolls.OptionalWeight));
+                if (cfg.ZeroGRolls.Enabled && zeroGRollsUsed < cfg.ZeroGRolls.MaximumCount) pool.Add((TrackPatternType.ZeroGRoll, cfg.ZeroGRolls.OptionalWeight));
                 if (cfg.Chicanes.Enabled && chicanesUsed < cfg.Chicanes.MaximumCount) pool.Add((TrackPatternType.Chicane, cfg.Chicanes.OptionalWeight));
                 if (cfg.SCurves.Enabled && sCurvesUsed < cfg.SCurves.MaximumCount) pool.Add((TrackPatternType.SCurve, cfg.SCurves.OptionalWeight));
+
+                if (cfg.EnforceProceduralRhythm && pool.Count > 1)
+                {
+                    var familyUse = new Dictionary<TrackEncounterFamily, int>();
+                    for (int i = 0; i < features.Count; i++)
+                    {
+                        TrackEncounterFamily family = TrackRhythm.FamilyOf(features[i]);
+                        familyUse.TryGetValue(family, out int used);
+                        familyUse[family] = used + 1;
+                    }
+
+                    bool hasNonSCurveChoice = pool.Exists(option =>
+                        TrackRhythm.FamilyOf(option.type) != TrackEncounterFamily.SCurveFlow);
+                    familyUse.TryGetValue(TrackEncounterFamily.SCurveFlow, out int sFlowUsed);
+                    int otherUsed = features.Count - sFlowUsed;
+                    for (int i = pool.Count - 1; i >= 0; i--)
+                    {
+                        TrackEncounterFamily family = TrackRhythm.FamilyOf(pool[i].type);
+                        // When S-flow is already the dominant optional language, force
+                        // the next choice to another family if one is physically allowed.
+                        if (family == TrackEncounterFamily.SCurveFlow && hasNonSCurveChoice &&
+                            sFlowUsed > otherUsed)
+                        {
+                            pool.RemoveAt(i);
+                            continue;
+                        }
+
+                        familyUse.TryGetValue(family, out int used);
+                        float diversityWeight = 1f / (1f + used * 0.85f);
+                        pool[i] = (pool[i].type, pool[i].w * diversityWeight);
+                    }
+                }
 
                 if (pool.Count == 0) break;
 
@@ -1328,6 +2151,21 @@ namespace TrackGeneration.Planning
             return int.TryParse(warning.Substring(start, end - start), out int g) ? g : -1;
         }
 
+        /// <summary>
+        /// Structural gap roads are route-layout and closure controls. Feature fitting
+        /// may compact authored entry/recovery roads, but it must never shrink these
+        /// solver corridors or the generator loses separation and closure authority.
+        /// </summary>
+        public static float ResolveStructuralLeadLength(
+            ResolvedTrackGenerationConfig cfg,
+            float pacedT)
+        {
+            if (cfg == null) return MinAdjustableStraight;
+            return Mathf.Max(MinAdjustableStraight,
+                Mathf.Lerp(cfg.MinStraightLength, cfg.MaxStraightLength,
+                    Mathf.Clamp01(pacedT)));
+        }
+
         private void EmitDefinitions(ResolvedTrackGenerationConfig cfg, TopologyPlan plan, List<CornerSlot> corners,
             Dictionary<int, TrackPatternType> featureByGap, int closureGaps, PlanRandomStreams rngs)
         {
@@ -1371,7 +2209,7 @@ namespace TrackGeneration.Planning
                 // Pacing: straights alternate short/long more strongly with higher variation.
                 float wave = Mathf.PingPong(gap * 0.618f, 1f);
                 float pacedT = Mathf.Lerp(rngs.Layout.NextFloat(), wave, cfg.PacingVariation * 0.7f);
-                float pacedLength = Mathf.Lerp(cfg.MinStraightLength, cfg.MaxStraightLength, pacedT);
+                float pacedLength = ResolveStructuralLeadLength(cfg, pacedT);
 
                 // ── Stage D (experimental, opt-in): drop the mandatory lead straight to
                 // a bare weld connector when a corkscrew flows out of the preceding
@@ -1390,16 +2228,19 @@ namespace TrackGeneration.Planning
                     droppedBefore = peekFeature;
                 }
 
-                // Every gap opens with an ADJUSTABLE plain straight (the closure solver's levers).
+                // Every gap retains its own adjustable structural corridor. A preceding
+                // feature recovery stays separate: it is authored riding space, while
+                // this road is layout pitch and a closure-solver degree of freedom.
                 var lead = SectionDefs.Straight(TrackMacroSectionType.Straight, pacedLength, width,
-                    droppedLead ? $"CorkscrewWeld_{gap:D2}" : $"Straight_{gap:D2}");
+                    droppedLead ? $"CorkscrewWeld_{gap:D2}" : $"Straight_{gap:D2}",
+                    fitRole: FeatureFitRole.StructuralConnector);
                 lead.IsClosure = inClosureReserve;
+                defs.Add(lead);
                 if (droppedLead)
                 {
                     lead.SemanticElement = Macro.SemanticElementId.ClosureTransfer;
                     plan.Warnings.Add($"[StageD] gap {gap}: lead straight dropped to weld connector before {droppedBefore} (capacity floor held)");
                 }
-                defs.Add(lead);
 
                 // Gap content: one feature pattern. Dual-quarter Road A is eligible;
                 // the alternate-road fit and validators decide whether the pair is safe.
@@ -1407,15 +2248,33 @@ namespace TrackGeneration.Planning
                 {
                     string patternId = $"{feature}_{patternCounter++}";
                     int defsBefore = defs.Count;
-                    if (!FeaturePatternLibrary.TryGet(feature, out var pattern) ||
-                        !pattern.TryPlan(cfg, patternId, ref rngs.Feature, defs))
+                    bool hasPattern = FeaturePatternLibrary.TryGet(feature, out var pattern);
+                    string planningFailure = "";
+                    bool patternPlanned;
+                    if (hasPattern && pattern is DefinitionNativePattern)
                     {
+                        patternPlanned = TrackFeatureDefinitionCompiler.TryPlanPattern(
+                            feature, cfg, patternId, ref rngs.Feature, defs,
+                            out planningFailure);
+                    }
+                    else
+                    {
+                        patternPlanned = hasPattern &&
+                                         pattern.TryPlan(cfg, patternId, ref rngs.Feature, defs);
+                    }
+                    if (!patternPlanned)
+                    {
+                        string detail = string.IsNullOrWhiteSpace(planningFailure)
+                            ? ""
+                            : $" {planningFailure}";
                         plan.Fail(GenerationFailureReason.RequiredPatternMissing,
-                            $"Pattern {feature} could not find a legal parameterization under the resolved config.");
+                            $"Pattern {feature} could not find a legal parameterization under the resolved config." +
+                            detail);
                         return;
                     }
                     // Stage A: authoritative identity, stamped at emission (no behavior change).
-                    FeaturePlanning.StampRange(defs, defsBefore, FeaturePlanning.ElementOf(feature));
+                    FeaturePlanning.StampRange(defs, defsBefore,
+                        FeaturePlanning.ElementOf(feature), cfg);
                     plan.CountPattern(feature);
                 }
 
@@ -1437,7 +2296,7 @@ namespace TrackGeneration.Planning
                         : (cornerSlot.Magnitude >= 150
                             ? SemanticElementId.Hairpin
                             : SemanticElementId.OrdinaryCurve);
-                FeaturePlanning.StampRange(defs, cornerDefsBefore, cornerElement);
+                FeaturePlanning.StampRange(defs, cornerDefsBefore, cornerElement, cfg);
 
                 StampFrom(firstDef, quarter);
             }
@@ -1466,7 +2325,8 @@ namespace TrackGeneration.Planning
 
             int before = defs.Count;
             defs.Add(SectionDefs.Straight(TrackMacroSectionType.Straight, cfg.DefaultApproachLength, catchWidth,
-                $"QuarterApproach_{q.Index}", locked: true));
+                $"QuarterApproach_{q.Index}", locked: true,
+                fitRole: FeatureFitRole.EntryWarmup));
             JumpGapPattern.EmitJumpRamp(in q.EntryJump, catchWidth, zoneId, "QuarterEntry_", defs);
             for (int i = before; i < defs.Count; i++) defs[i].QuarterIndex = prevQuarter;
 
@@ -1500,7 +2360,8 @@ namespace TrackGeneration.Planning
             defs[defs.Count - 1].PlanLateralOffset = -q.LaneSeparation * 0.5f;
             JumpGapPattern.EmitLandingRamp(in q.ExitJump, catchWidth, zoneId, "QuarterExitCatch_", defs);
             defs.Add(SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight, cfg.JumpRecoveryLength, cfg.RoadWidth,
-                "PostCatchRecovery", locked: true));
+                "PostCatchRecovery", locked: true,
+                fitRole: FeatureFitRole.ExitRecovery));
 
             for (int i = before; i < defs.Count; i++) defs[i].QuarterIndex = q.Index;
             q.LastDefIndex = defs.Count - 1;
@@ -1536,7 +2397,7 @@ namespace TrackGeneration.Planning
             }
         }
 
-        private void EmitCorner(ResolvedTrackGenerationConfig cfg, TopologyPlan plan, CornerSlot corner,
+        private static void EmitCorner(ResolvedTrackGenerationConfig cfg, TopologyPlan plan, CornerSlot corner,
             int patternCounter, bool inClosureReserve, ref Unity.Mathematics.Random rng)
         {
             var defs = plan.Defs;
@@ -1578,6 +2439,8 @@ namespace TrackGeneration.Planning
 
             TrackMacroSectionDefinition Corner(float mag, float radius, string name, bool hairpin = false)
             {
+                if (!hairpin)
+                    radius = SectionFrameBuilders.ClampOrdinaryCurveRadius(mag, radius);
                 return new TrackMacroSectionDefinition
                 {
                     SectionType = hairpin ? TrackMacroSectionType.BankedHairpin : TrackMacroSectionType.BankedCurve,
@@ -1594,6 +2457,20 @@ namespace TrackGeneration.Planning
                     IsClosure = inClosureReserve, // closure-reserve corners may flex across the full rulebook radius band
                     Contract = SectionConnectionContract.Level(sign * mag)
                 };
+            }
+
+            if (corner.DefinitionRealization != SemanticElementId.None)
+            {
+                string pid = $"{corner.DefinitionRealization}_{patternCounter}";
+                if (!TrackFeatureDefinitionCompiler.TryPlanTurn(
+                        corner.DefinitionRealization, cfg, sign * angle, pid, defs,
+                        out string definitionFailure))
+                {
+                    plan.Fail(GenerationFailureReason.RequiredPatternMissing,
+                        $"Definition-native turn {corner.DefinitionRealization} could not realize " +
+                        $"the requested {sign * angle:+0;-0} degree heading: {definitionFailure}");
+                }
+                return;
             }
 
             switch (corner.IsSpecial ? corner.Realization : TrackPatternType.SCurve /* marker for plain */)
@@ -1726,7 +2603,7 @@ namespace TrackGeneration.Planning
                 }
                 default:
                 {
-                    bool hairpin = angle >= 150;
+                    bool hairpin = !corner.ForceOrdinary && angle >= 150;
                     var def = Corner(angle, RadiusFor(angle, hairpin ? 0.85f : 1f),
                         $"{(hairpin ? "BankedHairpin" : "BankedCurve")}_{angle}deg_{dir}", hairpin);
                     defs.Add(def);
@@ -1736,6 +2613,199 @@ namespace TrackGeneration.Planning
                     break;
                 }
             }
+        }
+
+        /// <summary>
+        /// Builds one requested realization through the same authoritative emitter used by
+        /// normal generation, then measures its achieved geometry from the live slot entry.
+        /// Turn slots use <see cref="EmitCorner"/>; heading-neutral and direction-neutral
+        /// slots use <see cref="FeaturePatternLibrary"/>.
+        /// This is a deterministic, zero-scene-mutation candidate source for Track Editor V2.
+        /// Clearance, connector solving, driveability, and transactional application remain
+        /// separate gates; this method only proves what geometry the authoritative builder emits.
+        /// </summary>
+        public static FeaturePlanResult BuildReplacementCandidate(
+            ResolvedTrackGenerationConfig cfg,
+            TopologySlotRecord slot,
+            SemanticElementId realization,
+            in TrackConnectionFrame entry)
+        {
+            FeaturePlanResult Failed(string reason) => new FeaturePlanResult
+            {
+                Element = realization,
+                PatternId = slot?.TopologySlotId ?? "",
+                FailureReason = reason
+            };
+
+            if (cfg == null) return Failed("No resolved track configuration is available.");
+            if (slot == null || string.IsNullOrWhiteSpace(slot.TopologySlotId))
+                return Failed("The replacement candidate has no stable topology segment.");
+            if (slot.DemandType == TopologyRole.HeadingNeutral ||
+                slot.DemandType == TopologyRole.DirectionNeutralTransfer)
+                return BuildPatternReplacementCandidate(cfg, slot, realization, entry);
+            if (slot.DemandType != TopologyRole.TurnRealization)
+                return Failed($"{slot.DemandType} does not yet have an authoritative replacement builder.");
+
+            int signedAngle = Mathf.RoundToInt(slot.SignedHeadingDelta);
+            if (signedAngle == 0)
+                return Failed("A turn realization requires a non-zero heading demand.");
+
+            var corner = new CornerSlot { SignedAngle = signedAngle };
+            if (TrackFeatureDefinitionCatalog.TryGet(
+                    realization, out TrackFeatureDefinition authoredDefinition) &&
+                authoredDefinition.Enabled &&
+                authoredDefinition.TopologyRole == TopologyRole.TurnRealization)
+            {
+                corner.IsSpecial = true;
+                corner.DefinitionRealization = realization;
+            }
+            else switch (realization)
+            {
+                case SemanticElementId.OrdinaryCurve:
+                    corner.ForceOrdinary = true;
+                    break;
+                case SemanticElementId.DoubleApex:
+                    corner.IsSpecial = true;
+                    corner.Realization = TrackPatternType.DoubleApex;
+                    break;
+                case SemanticElementId.TighteningCorner:
+                    corner.IsSpecial = true;
+                    corner.Realization = TrackPatternType.TighteningCorner;
+                    break;
+                case SemanticElementId.OpeningCorner:
+                    corner.IsSpecial = true;
+                    corner.Realization = TrackPatternType.OpeningCorner;
+                    break;
+                case SemanticElementId.Hairpin:
+                    corner.IsSpecial = true;
+                    corner.Realization = TrackPatternType.Hairpin;
+                    break;
+                case SemanticElementId.SweeperIntoHairpin:
+                    corner.IsSpecial = true;
+                    corner.Realization = TrackPatternType.SweeperIntoHairpin;
+                    break;
+                case SemanticElementId.WallrideTurn:
+                    corner.IsSpecial = true;
+                    corner.Realization = TrackPatternType.WallrideTurn;
+                    break;
+                case SemanticElementId.DirectionalCorkscrew:
+                    corner.IsSpecial = true;
+                    corner.Realization = TrackPatternType.Corkscrew;
+                    break;
+                case SemanticElementId.Immelmann:
+                    corner.IsHalfLoop = true;
+                    corner.HalfLoopType = TrackPatternType.HalfLoopRollout;
+                    break;
+                case SemanticElementId.HalfLoopToCorkscrew:
+                    corner.IsHalfLoop = true;
+                    corner.HalfLoopType = TrackPatternType.HalfLoopToCorkscrew;
+                    break;
+                default:
+                    return Failed($"{realization} is not an authored turn realization in the current generator.");
+            }
+
+            var plan = new TopologyPlan();
+            uint seed = StableReplacementSeed(slot.TopologySlotId, realization);
+            var rng = new Unity.Mathematics.Random(seed);
+            int patternCounter = Mathf.Max(0, slot.CanonicalOrder);
+            EmitCorner(cfg, plan, corner, patternCounter, false, ref rng);
+            if (plan.Failed)
+                return Failed(string.IsNullOrWhiteSpace(plan.FailureMessage)
+                    ? $"{realization} could not produce legal corner geometry."
+                    : plan.FailureMessage);
+            if (plan.Defs.Count == 0)
+                return Failed($"{realization} produced no corner definitions.");
+
+            if (realization == SemanticElementId.DirectionalCorkscrew &&
+                !plan.Defs.Exists(definition => definition != null &&
+                    definition.SectionType == TrackMacroSectionType.RotationalEvent))
+                return Failed("Directional corkscrew safety rejected both handednesses for this configuration; " +
+                              "the normal generator would keep an ordinary curve here.");
+
+            FeaturePlanning.StampRange(plan.Defs, 0, realization, cfg);
+            FeaturePlanResult result = FeaturePlanning.ComputePlanResult(
+                plan.Defs, 0, plan.Defs.Count, entry, FrameBuildContext.From(cfg),
+                realization, $"replacement:{slot.TopologySlotId}:{realization}");
+            // At an exact reversal the final forward vector alone cannot encode
+            // whether the path arrived through +180° or -180°. This replacement
+            // boundary owns the signed topology demand, so use it to disambiguate
+            // only that mathematically identical endpoint.
+            if (!result.Failed &&
+                Mathf.Abs(Mathf.Abs(slot.SignedHeadingDelta) - 180f) <= 0.25f &&
+                Mathf.Abs(Mathf.Abs(result.HeadingContributionDeg) - 180f) <= 0.25f)
+            {
+                result.HeadingContributionDeg = Mathf.Sign(slot.SignedHeadingDelta) *
+                                                Mathf.Abs(result.HeadingContributionDeg);
+            }
+            return result;
+        }
+
+        private static FeaturePlanResult BuildPatternReplacementCandidate(
+            ResolvedTrackGenerationConfig cfg,
+            TopologySlotRecord slot,
+            SemanticElementId realization,
+            in TrackConnectionFrame entry)
+        {
+            FeaturePlanResult Failed(string reason) => new FeaturePlanResult
+            {
+                Element = realization,
+                PatternId = slot?.TopologySlotId ?? "",
+                FailureReason = reason
+            };
+
+            TrackPatternType patternType;
+            switch (realization)
+            {
+                case SemanticElementId.VerticalLoop: patternType = TrackPatternType.FullLoop; break;
+                case SemanticElementId.InlineCorkscrew: patternType = TrackPatternType.Corkscrew; break;
+                case SemanticElementId.DoubleCorkscrew: patternType = TrackPatternType.DoubleCorkscrew; break;
+                case SemanticElementId.Spiral: patternType = TrackPatternType.Spiral; break;
+                case SemanticElementId.LoopToCorkscrew: patternType = TrackPatternType.LoopToCorkscrew; break;
+                case SemanticElementId.SpiralToCorkscrew: patternType = TrackPatternType.SpiralToCorkscrew; break;
+                case SemanticElementId.JumpGap: patternType = TrackPatternType.JumpGap; break;
+                case SemanticElementId.JumpToBankedLanding: patternType = TrackPatternType.JumpToBankedLanding; break;
+                case SemanticElementId.FullPipe: patternType = TrackPatternType.FullPipe; break;
+                case SemanticElementId.SCurve: patternType = TrackPatternType.SCurve; break;
+                case SemanticElementId.Chicane: patternType = TrackPatternType.Chicane; break;
+                case SemanticElementId.AlternatingRadiusSequence:
+                    patternType = TrackPatternType.AlternatingRadiusSequence;
+                    break;
+                case SemanticElementId.Camelback: patternType = TrackPatternType.Camelback; break;
+                case SemanticElementId.HeartlineRoll: patternType = TrackPatternType.HeartlineRoll; break;
+                case SemanticElementId.ZeroGRoll: patternType = TrackPatternType.ZeroGRoll; break;
+                default:
+                    return Failed($"{realization} is not an authored feature-pattern realization in the current generator.");
+            }
+
+            if (!FeaturePatternLibrary.TryGet(patternType, out ITrackFeaturePattern pattern))
+                return Failed($"The authoritative {patternType} pattern is not registered.");
+
+            string patternId = $"replacement:{slot.TopologySlotId}:{realization}";
+            uint seed = StableReplacementSeed(slot.TopologySlotId, realization);
+            var rng = new Unity.Mathematics.Random(seed);
+            var definitions = new List<TrackMacroSectionDefinition>();
+            if (!pattern.TryPlan(cfg, patternId, ref rng, definitions) || definitions.Count == 0)
+                return Failed($"{realization} could not produce a legal parameterization under the resolved track settings.");
+
+            FeaturePlanning.StampRange(definitions, 0, realization, cfg);
+            return FeaturePlanning.ComputePlanResult(
+                definitions, 0, definitions.Count, entry, FrameBuildContext.From(cfg),
+                realization, patternId);
+        }
+
+        private static uint StableReplacementSeed(string slotId, SemanticElementId realization)
+        {
+            // FNV-1a is intentionally used instead of string.GetHashCode(), whose result may
+            // differ between runtimes. The same slot choice therefore builds identically on
+            // every client before its concrete parameters are written into the recipe.
+            uint hash = 2166136261u;
+            string text = (slotId ?? "") + "|" + (int)realization;
+            for (int i = 0; i < text.Length; i++)
+            {
+                hash ^= text[i];
+                hash *= 16777619u;
+            }
+            return hash == 0u ? 1u : hash;
         }
 
         /// <summary>
@@ -1791,7 +2861,7 @@ namespace TrackGeneration.Planning
             float initialGap = -1f;
             int straightCount = 0, curveCount = 0;
 
-            for (int round = 0; round <= 3; round++)
+            for (int round = 0; round <= MaxClosureRescueRounds; round++)
             {
                 var straightIdx = new List<int>();
                 var straightDirs = new List<Vector2>();
@@ -1845,7 +2915,7 @@ namespace TrackGeneration.Planning
                         // The solver may have re-grown straights past the cap while
                         // closing position — shrink back to budget and solve again
                         // instead of failing a positionally perfect lap.
-                        if (round < 3)
+                        if (round < MaxClosureRescueRounds)
                         {
                             if (!FitLengthBudget(cfg, plan, defs, straightIdx, cornerIdx, cornerBaseRadius))
                                 return;
@@ -1863,7 +2933,8 @@ namespace TrackGeneration.Planning
                 if (predictedGap.magnitude <= cfg.ClosurePositionTolerance && round < 3)
                     continue;
 
-                if (round == 3 || !TryInsertClosureSBend(cfg, defs, straightIdx, straightDirs, gap))
+                if (round == MaxClosureRescueRounds ||
+                    !TryInsertClosureSBend(cfg, defs, straightIdx, straightDirs, gap))
                 {
                     plan.Fail(GenerationFailureReason.ClosurePositionFailure,
                         $"2D closure residual {gap.magnitude:F1}m (initial {initialGap:F0}m) exceeds tolerance with {straightCount} straights + {curveCount} closure curves (S-bend rescue exhausted).");
@@ -2019,10 +3090,11 @@ namespace TrackGeneration.Planning
             {
                 var def = defs[cornerIdx[c]];
                 float lengthScale = def.SectionType == TrackMacroSectionType.SCurve ? 2f : 1f;
+                float minimumRadius = Mathf.Min(def.Radius,
+                    cfg.LegalCurveRadiusFloor);
                 cornerShrinkable += lengthScale *
                     (SectionFrameBuilders.EasedArcLength(def.TurnAngle, def.Radius) -
-                     SectionFrameBuilders.EasedArcLength(def.TurnAngle,
-                         Mathf.Min(def.Radius, cfg.MinCurveRadius)));
+                     SectionFrameBuilders.EasedArcLength(def.TurnAngle, minimumRadius));
             }
 
             // Feasibility is judged against the CEILING, not the cap: plans that can
@@ -2059,7 +3131,10 @@ namespace TrackGeneration.Planning
                 for (int c = 0; c < cornerIdx.Count; c++)
                 {
                     var def = defs[cornerIdx[c]];
-                    float newRadius = cfg.MinCurveRadius + (def.Radius - cfg.MinCurveRadius) * cornerScale;
+                    float minimumRadius = Mathf.Min(def.Radius,
+                        cfg.LegalCurveRadiusFloor);
+                    float newRadius = minimumRadius +
+                                      (def.Radius - minimumRadius) * cornerScale;
                     def.Radius = newRadius;
                     def.Length = (def.SectionType == TrackMacroSectionType.SCurve ? 2f : 1f) *
                                  SectionFrameBuilders.EasedArcLength(def.TurnAngle, newRadius);
@@ -2081,11 +3156,8 @@ namespace TrackGeneration.Planning
             List<int> straightIdx, List<Vector2> straightDirs,
             List<int> cornerIdx, List<Vector2> cornerDirs, List<float> cornerBaseRadius, Vector2 gap)
         {
-            float LenCap(TrackMacroSectionDefinition d) => d.RoadId == 1
-                ? cfg.SecondsToDistance(12f) // alternate roads span whole quarters — they need real reach
-                : d.IsClosure
-                    ? cfg.SecondsToDistance(8f)
-                    : cfg.MaxStraightLength * 1.5f;
+            float LenCap(TrackMacroSectionDefinition d) =>
+                SectionFrameBuilders.MaxStraightSectionLength;
 
             int nStraights = straightIdx.Count;
             int varCount = nStraights + cornerIdx.Count;
@@ -2116,19 +3188,43 @@ namespace TrackGeneration.Planning
             // survives); closure-reserve corners are TRUE closure curves and may sweep
             // the full rulebook radius band. Straights never shrink below their
             // connector-analysis minimum.
-            float MinOf(int k) => k < nStraights
-                ? Mathf.Max(MinAdjustableStraight, defs[straightIdx[k]].MinimumLength)
-                : defs[cornerIdx[k - nStraights]].IsClosure || defs[cornerIdx[k - nStraights]].RoadId == 1
-                    ? cfg.MinCurveRadius
-                    : Mathf.Max(cfg.MinCurveRadius, cornerBaseRadius[k - nStraights] * 0.6f);
+            float MaxOf(int k)
+            {
+                if (k < nStraights) return LenCap(defs[straightIdx[k]]);
 
-            float MaxOf(int k) => k < nStraights
-                ? LenCap(defs[straightIdx[k]])
-                : defs[cornerIdx[k - nStraights]].IsClosure || defs[cornerIdx[k - nStraights]].RoadId == 1
-                    ? (defs[cornerIdx[k - nStraights]].IsClosure
-                        ? cfg.MaxClosureCurveRadius
-                        : cfg.MaxCurveRadius)
-                    : Mathf.Min(cfg.MaxCurveRadius, cornerBaseRadius[k - nStraights] * 1.8f);
+                TrackMacroSectionDefinition definition = defs[cornerIdx[k - nStraights]];
+                float configuredMaximum = definition.IsClosure || definition.RoadId == 1
+                    ? (definition.IsClosure ? cfg.MaxClosureCurveRadius : cfg.MaxCurveRadius)
+                    : Mathf.Min(cfg.MaxCurveRadius,
+                        cornerBaseRadius[k - nStraights] * 1.8f);
+
+                if (definition.SectionType == TrackMacroSectionType.SCurve)
+                    return Mathf.Min(configuredMaximum,
+                        SectionFrameBuilders.MaximumRadiusForEasedLength(
+                            definition.TurnAngle, 2f,
+                            SectionFrameBuilders.MaxDesignerSCurveLength));
+                if (definition.SectionType == TrackMacroSectionType.BankedCurve)
+                    return Mathf.Min(configuredMaximum,
+                        SectionFrameBuilders.MaximumRadiusForEasedLength(
+                            definition.TurnAngle, 1f,
+                            SectionFrameBuilders.MaxOrdinaryCurveLength));
+                return configuredMaximum;
+            }
+
+            float MinOf(int k)
+            {
+                if (k < nStraights)
+                    return Mathf.Min(MaxOf(k),
+                        Mathf.Max(MinAdjustableStraight,
+                            defs[straightIdx[k]].MinimumLength));
+
+                TrackMacroSectionDefinition definition = defs[cornerIdx[k - nStraights]];
+                float requestedMinimum = definition.IsClosure || definition.RoadId == 1
+                    ? cfg.LegalCurveRadiusFloor
+                    : Mathf.Max(cfg.LegalCurveRadiusFloor,
+                        cornerBaseRadius[k - nStraights] * 0.6f);
+                return Mathf.Min(MaxOf(k), requestedMinimum);
+            }
 
             void Apply(int k, float newValue)
             {
@@ -2216,6 +3312,78 @@ namespace TrackGeneration.Planning
 
             return gap;
         }
+
+        /// <summary>
+        /// Track Editor-only measured closure refinement. The first candidate build is
+        /// the authority for plan-vs-built drift (notably a stamped rotational feature
+        /// entered from a non-level accepted pose). Ordinary straights/closure curves
+        /// absorb the measured planar residual, while ordinary/recovery road absorbs
+        /// the measured elevation residual. No feature body is warped and no closure
+        /// tolerance is changed; the caller rebuilds and validates the complete track.
+        /// </summary>
+        public static bool TryRefineAuthoringBuiltClosure(
+            ResolvedTrackGenerationConfig cfg,
+            TopologyPlan plan,
+            Vector3 builtClosureDelta,
+            out string summary)
+        {
+            summary = "";
+            if (cfg == null || plan?.Defs == null || !cfg.DesignerAuthoringMode)
+                return false;
+
+            // This pass is for accumulated reference-stamp drift, not a substitute for
+            // a missing closure solution. Large misses remain explicit failures.
+            const float maximumMeasuredRefinementMeters = 250f;
+            if (!IsFinite(builtClosureDelta) ||
+                builtClosureDelta.magnitude > maximumMeasuredRefinementMeters)
+                return false;
+
+            List<TrackMacroSectionDefinition> defs = plan.Defs;
+            var straightIdx = new List<int>();
+            var straightDirs = new List<Vector2>();
+            var cornerIdx = new List<int>();
+            var cornerDirs = new List<Vector2>();
+            var cornerBaseRadius = new List<float>();
+            CollectClosureVariables(defs, straightIdx, straightDirs,
+                cornerIdx, cornerDirs, cornerBaseRadius);
+
+            Vector2 currentPlanEnd = RewalkEndPos(defs);
+            Vector2 targetPlanEnd = currentPlanEnd -
+                                      new Vector2(builtClosureDelta.x,
+                                          builtClosureDelta.z);
+            Vector2 planarGap = targetPlanEnd - currentPlanEnd;
+            Vector2 planarResidual = planarGap;
+            if (planarGap.magnitude > 0.01f)
+            {
+                if (straightIdx.Count + cornerIdx.Count == 0) return false;
+                planarResidual = RunActiveSetSolve(cfg, defs,
+                    straightIdx, straightDirs, cornerIdx, cornerDirs,
+                    cornerBaseRadius, planarGap);
+            }
+
+            // RunActiveSetSolve updates the linear residual as it applies variables.
+            // A fresh exact walk protects this feedback path from stale derivatives.
+            float exactPlanarResidual = Vector2.Distance(
+                RewalkEndPos(defs), targetPlanEnd);
+            if (planarResidual.magnitude > 1f || exactPlanarResidual > 1f)
+                return false;
+
+            float verticalResidual = ApplyAuthoringElevationDeltaInRange(
+                cfg, defs, null, 0, defs.Count, -builtClosureDelta.y,
+                "AuthoringMeasuredWeld", out float verticalApplied);
+            if (Mathf.Abs(verticalResidual) > 0.5f) return false;
+
+            summary = $"Track Editor measured-weld refinement absorbed " +
+                      $"{new Vector2(builtClosureDelta.x, builtClosureDelta.z).magnitude:F1}m " +
+                      $"of plan-view drift and {Mathf.Abs(verticalApplied):F1}m of elevation drift " +
+                      "on legal ordinary/closure road before final validation.";
+            return true;
+        }
+
+        private static bool IsFinite(Vector3 value) =>
+            !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
+            !float.IsNaN(value.y) && !float.IsInfinity(value.y) &&
+            !float.IsNaN(value.z) && !float.IsInfinity(value.z);
 
         /// <summary>
         /// Inserts one analytic closure S-bend (two opposed eased arcs, net-zero heading)
@@ -2333,8 +3501,11 @@ namespace TrackGeneration.Planning
             float alpha = SectionFrameBuilders.QuantizeArcAngle(Mathf.Acos(1f - oneMinusCos) * Mathf.Rad2Deg);
 
             Vector2 unitOffset = SectionFrameBuilders.EasedSBendUnitOffset(alpha);
+            float radiusCeiling = Mathf.Min(cfg.MaxClosureCurveRadius,
+                SectionFrameBuilders.MaximumRadiusForEasedLength(alpha, 2f,
+                    SectionFrameBuilders.MaxDesignerSCurveLength));
             radius = Mathf.Clamp(Mathf.Abs(lateral) / Mathf.Max(unitOffset.y, 1e-4f),
-                cfg.MinCurveRadius, cfg.MaxClosureCurveRadius);
+                Mathf.Min(cfg.LegalCurveRadiusFloor, radiusCeiling), radiusCeiling);
 
             var hostDef = defs[straightIdx[host]];
             float forwardRun = radius * unitOffset.x;
@@ -2530,9 +3701,42 @@ namespace TrackGeneration.Planning
 
         // ═══════════════════════════ 6. Cheap 2D self-proximity ═══════════════════════════
 
-        /// <summary>Returns null when the plan-view walk is clear, else a description of the first collision.</summary>
-        private string Validate2DWalk(ResolvedTrackGenerationConfig cfg, TopologyPlan plan)
+        private sealed class PlanProximityCollision
         {
+            public int FirstOwner;
+            public int SecondOwner;
+            public float FirstHeight;
+            public float SecondHeight;
+        }
+
+        /// <summary>
+        /// The built validator exempts all sections stamped with the same non-empty
+        /// pattern identity. The cheap planner must use that exact ownership rule too:
+        /// an approach, feature and recovery are one authored feature, not unrelated
+        /// roads merely because they are represented by separate definitions.
+        /// </summary>
+        public static bool IsSameFeaturePatternProximity(
+            IReadOnlyList<TrackMacroSectionDefinition> definitions,
+            int firstOwner,
+            int secondOwner)
+        {
+            if (definitions == null || firstOwner < 0 || secondOwner < 0 ||
+                firstOwner >= definitions.Count || secondOwner >= definitions.Count)
+                return false;
+
+            TrackMacroSectionDefinition first = definitions[firstOwner];
+            TrackMacroSectionDefinition second = definitions[secondOwner];
+            return first != null && second != null &&
+                   !string.IsNullOrEmpty(first.PatternId) &&
+                   string.Equals(first.PatternId, second.PatternId,
+                       System.StringComparison.Ordinal);
+        }
+
+        /// <summary>Returns null when the plan-view walk is clear, else a description of the first collision.</summary>
+        private string Validate2DWalk(ResolvedTrackGenerationConfig cfg, TopologyPlan plan,
+            out PlanProximityCollision collisionDetails)
+        {
+            collisionDetails = null;
             var defs = plan.Defs;
             var pts = new List<Vector2>(1024);
             var arcs = new List<float>(1024);
@@ -2694,12 +3898,18 @@ namespace TrackGeneration.Planning
                               d.IsStraightFamily
                     ? d.ElevationChange
                     : 0f;
-                float bump = d.IsStraightFamily ? d.HillHeight : 0f;
+                float bump = d.HillHeight;
                 int emitted = pts.Count - firstSample;
                 for (int k = 0; k < emitted; k++)
                 {
                     float t = emitted > 1 ? (float)k / (emitted - 1) : 1f;
-                    heights.Add(fixedHeight + delta * t + bump * SectionFrameBuilders.Bump(t));
+                    // Elevated curve primitives use a C2 crest carrier so their
+                    // geometry returns to zero vertical curvature at the boundary.
+                    // Straight-family hills retain the established C1 hill profile.
+                    float bumpShape = d.IsStraightFamily
+                        ? SectionFrameBuilders.Bump(t)
+                        : SectionFrameBuilders.CrestBump(t);
+                    heights.Add(fixedHeight + delta * t + bump * bumpShape);
                     owners.Add(i);
                 }
                 fixedHeight += delta;
@@ -2708,12 +3918,13 @@ namespace TrackGeneration.Planning
             float totalArc = arc;
             if (totalArc < 1f || pts.Count < 8) return "degenerate walk";
 
-            // 5% wider than the built validator's corridor (cfg.UnrelatedCorridor —
-            // the SAME constant the validator rejects below): built geometry (easing,
-            // banking offsets, S-bend realization) drifts a couple of meters from this
-            // 2D model, and a plan that passes at the raw edge dies at build time —
-            // after paying for the full mesh.
-            float minClear = cfg.UnrelatedCorridor * 1.05f;
+            // Procedural generation keeps a small planning margin for built-geometry
+            // drift. A focused Track Editor rebuild instead gets the exact published
+            // rulebook corridor: its complete built candidate is validated immediately
+            // afterwards, so rejecting a 161 m separation against a 160 m rule here
+            // would be a false negative rather than an added safety check.
+            float minClear = cfg.UnrelatedCorridor *
+                             (cfg.DesignerAuthoringMode ? 1f : 1.05f);
             float minClearSq = minClear * minClear;
             float verticalOk = Mathf.Max(1f, cfg.VerticalClearance);
             const float alongWindow = 600f;
@@ -2728,6 +3939,12 @@ namespace TrackGeneration.Planning
                     if ((pts[i] - pts[j]).sqrMagnitude >= minClearSq) continue;
                     if (Mathf.Abs(heights[i] - heights[j]) >= verticalOk) continue;
 
+                    // Keep the cheap gate in lockstep with the final 3D validator.
+                    // This includes a feature's separately emitted approach/recovery
+                    // roads and the Track Editor's owned vertical recovery road.
+                    if (IsSameFeaturePatternProximity(defs, owners[i], owners[j]))
+                        continue;
+
                     // A vertical feature owns its self-proximity (loop apex fold, spiral
                     // coils, half-loop limbs) — its clearance contract is validated on
                     // the real 3D frames, where the 2D approximation cannot judge it.
@@ -2741,11 +3958,406 @@ namespace TrackGeneration.Planning
                             continue;
                     }
 
+                    collisionDetails = new PlanProximityCollision
+                    {
+                        FirstOwner = owners[i],
+                        SecondOwner = owners[j],
+                        FirstHeight = heights[i],
+                        SecondHeight = heights[j]
+                    };
                     return $"'{defs[owners[i]].DebugName}' (arc {arcs[i]:F0}m, h {heights[i]:F0}m) vs '{defs[owners[j]].DebugName}' (arc {arcs[j]:F0}m, h {heights[j]:F0}m) at {Mathf.Sqrt((pts[i] - pts[j]).sqrMagnitude):F0}m apart";
                 }
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Designer-only clearance repair. A complete feature pattern may be translated
+        /// vertically without moving either weld by adding equal and opposite elevation
+        /// to its own straight approach and recovery. Both carriers retain legal eased
+        /// grades and the final 3D validator still decides whether the result is safe.
+        /// </summary>
+        public static bool TryApplyAuthoringVerticalClearance(
+            ResolvedTrackGenerationConfig cfg,
+            List<TrackMacroSectionDefinition> definitions,
+            int firstOwner,
+            float firstHeight,
+            int secondOwner,
+            float secondHeight,
+            out string repairNote)
+        {
+            repairNote = "";
+            if (cfg == null || definitions == null || !cfg.DesignerAuthoringMode ||
+                firstOwner < 0 || secondOwner < 0 || firstOwner >= definitions.Count ||
+                secondOwner >= definitions.Count || firstOwner == secondOwner ||
+                IsSameFeaturePatternProximity(definitions, firstOwner, secondOwner))
+                return false;
+
+            bool TryOwner(int owner, float ownerHeight, int otherOwner, float otherHeight,
+                out string note)
+            {
+                note = "";
+                TrackMacroSectionDefinition feature = definitions[owner];
+                if (feature == null || string.IsNullOrEmpty(feature.PatternId) ||
+                    (feature.SectionType != TrackMacroSectionType.Spiral &&
+                     feature.SectionType != TrackMacroSectionType.Loop &&
+                     feature.SectionType != TrackMacroSectionType.HalfLoopTwist &&
+                     feature.SectionType != TrackMacroSectionType.RotationalEvent))
+                    return false;
+
+                int before = -1;
+                for (int i = owner - 1; i >= 0; i--)
+                {
+                    TrackMacroSectionDefinition candidate = definitions[i];
+                    if (candidate == null || !string.Equals(candidate.PatternId,
+                            feature.PatternId, System.StringComparison.Ordinal))
+                        break;
+                    if (candidate.IsStraightFamily && candidate.Length >= 150f &&
+                        !IsTrackEditorVerticalRecovery(candidate))
+                    {
+                        before = i;
+                        break;
+                    }
+                }
+
+                int after = -1;
+                for (int i = owner + 1; i < definitions.Count; i++)
+                {
+                    TrackMacroSectionDefinition candidate = definitions[i];
+                    if (candidate == null || !string.Equals(candidate.PatternId,
+                            feature.PatternId, System.StringComparison.Ordinal))
+                        break;
+                    if (candidate.IsStraightFamily && candidate.Length >= 150f &&
+                        !IsTrackEditorVerticalRecovery(candidate))
+                    {
+                        after = i;
+                        break;
+                    }
+                }
+
+                // The unrelated road must stay outside the translated feature block;
+                // otherwise both roads move together and no clearance is gained.
+                if (before < 0 || after < 0 ||
+                    (otherOwner > before && otherOwner <= after))
+                    return false;
+
+                TrackMacroSectionDefinition approach = definitions[before];
+                TrackMacroSectionDefinition recovery = definitions[after];
+                // The focused candidate is immediately checked against the complete
+                // built mesh. Use the exact published clearance here; the old extra
+                // 12 m planning pad could turn a solvable 37 m lift into an impossible
+                // 49 m lift and reject the designer edit before final validation.
+                float required = Mathf.Max(1f, cfg.VerticalClearance);
+                float currentDifference = ownerHeight - otherHeight;
+                float shiftUp = required - currentDifference;
+                float shiftDown = -required - currentDifference;
+                float firstShift = Mathf.Abs(shiftUp) <= Mathf.Abs(shiftDown)
+                    ? shiftUp : shiftDown;
+                float secondShift = firstShift == shiftUp ? shiftDown : shiftUp;
+
+                bool Fits(float shift)
+                {
+                    return AvailableAuthoringElevationDelta(cfg, approach, shift) + 0.01f >=
+                               Mathf.Abs(shift) &&
+                           AvailableAuthoringElevationDelta(cfg, recovery, -shift) + 0.01f >=
+                               Mathf.Abs(shift);
+                }
+
+                float applied = Fits(firstShift) ? firstShift :
+                    (Fits(secondShift) ? secondShift : 0f);
+                if (Mathf.Abs(applied) <= 0.01f) return false;
+
+                approach.ElevationChange += applied;
+                recovery.ElevationChange -= applied;
+                approach.DebugName += applied > 0f
+                    ? $"_AuthoringClearanceClimb{applied:F0}m"
+                    : $"_AuthoringClearanceDrop{-applied:F0}m";
+                recovery.DebugName += applied > 0f
+                    ? $"_AuthoringClearanceDrop{applied:F0}m"
+                    : $"_AuthoringClearanceClimb{-applied:F0}m";
+                note = $"Track Editor vertically separated {feature.DebugName} by " +
+                       $"{Mathf.Abs(applied):F1}m using its own approach and recovery roads.";
+                return true;
+            }
+
+            if (TryOwner(firstOwner, firstHeight, secondOwner, secondHeight,
+                    out repairNote))
+                return true;
+            return TryOwner(secondOwner, secondHeight, firstOwner, firstHeight,
+                out repairNote);
+        }
+
+        /// <summary>
+        /// Broader designer fallback for a real route-level crossing. When the two
+        /// colliding sections do not have enough capacity in one feature's own mouth,
+        /// distribute a climb/drop over the nearest ordinary straight roads before the
+        /// target and the inverse grade over straights after it. The unrelated section
+        /// stays outside the window, every carrier remains inside its eased-grade cap,
+        /// and the complete lap returns to exactly the same elevation.
+        /// </summary>
+        public static bool TryApplyAuthoringRouteClearance(
+            ResolvedTrackGenerationConfig cfg,
+            List<TrackMacroSectionDefinition> definitions,
+            int firstOwner,
+            float firstHeight,
+            int secondOwner,
+            float secondHeight,
+            out string repairNote)
+        {
+            repairNote = "";
+            if (cfg == null || definitions == null || !cfg.DesignerAuthoringMode ||
+                firstOwner < 0 || secondOwner < 0 || firstOwner >= definitions.Count ||
+                secondOwner >= definitions.Count || firstOwner == secondOwner ||
+                IsSameFeaturePatternProximity(definitions, firstOwner, secondOwner))
+                return false;
+
+            float Available(TrackMacroSectionDefinition carrier, float direction)
+            {
+                if (!IsAuthoringElevationCarrier(carrier) || carrier.Length < 200f)
+                    return 0f;
+                return AvailableAuthoringElevationDelta(cfg, carrier, direction);
+            }
+
+            bool TryShift(int owner, float ownerHeight, int otherOwner, float otherHeight,
+                float requestedShift, out string note)
+            {
+                note = "";
+                if (Mathf.Abs(requestedShift) <= 0.01f) return false;
+                TrackMacroSectionDefinition target = definitions[owner];
+                if (target == null || target.RoadId != 0) return false;
+
+                int beforeLimit = otherOwner < owner ? otherOwner + 1 : 0;
+                int afterLimit = otherOwner > owner ? otherOwner - 1 : definitions.Count - 1;
+                var before = new List<(int Index, float Capacity)>();
+                var after = new List<(int Index, float Capacity)>();
+                float beforeCapacity = 0f;
+                float afterCapacity = 0f;
+                float need = Mathf.Abs(requestedShift);
+
+                for (int i = owner - 1; i >= beforeLimit && beforeCapacity + 0.01f < need; i--)
+                {
+                    TrackMacroSectionDefinition carrier = definitions[i];
+                    if (carrier == null || carrier.RoadId != target.RoadId) continue;
+                    float capacity = Available(carrier, requestedShift);
+                    if (capacity <= 0.01f) continue;
+                    before.Add((i, capacity));
+                    beforeCapacity += capacity;
+                }
+                for (int i = owner + 1; i <= afterLimit && afterCapacity + 0.01f < need; i++)
+                {
+                    TrackMacroSectionDefinition carrier = definitions[i];
+                    if (carrier == null || carrier.RoadId != target.RoadId) continue;
+                    float capacity = Available(carrier, -requestedShift);
+                    if (capacity <= 0.01f) continue;
+                    after.Add((i, capacity));
+                    afterCapacity += capacity;
+                }
+                if (beforeCapacity + 0.01f < need || afterCapacity + 0.01f < need)
+                    return false;
+
+                void Apply(List<(int Index, float Capacity)> carriers,
+                    float totalCapacity, float totalDelta)
+                {
+                    float remaining = totalDelta;
+                    for (int i = 0; i < carriers.Count; i++)
+                    {
+                        float delta = i == carriers.Count - 1
+                            ? remaining
+                            : totalDelta * carriers[i].Capacity / totalCapacity;
+                        // Proportional allocation stays below each carrier's cap; the
+                        // final clamp only absorbs floating-point accumulation.
+                        float cap = carriers[i].Capacity;
+                        delta = Mathf.Clamp(delta, -cap, cap);
+                        TrackMacroSectionDefinition carrier = definitions[carriers[i].Index];
+                        carrier.ElevationChange += delta;
+                        carrier.DebugName += delta >= 0f
+                            ? $"_AuthoringWindowClimb{delta:F0}m"
+                            : $"_AuthoringWindowDrop{-delta:F0}m";
+                        remaining -= delta;
+                    }
+                }
+
+                Apply(before, beforeCapacity, requestedShift);
+                Apply(after, afterCapacity, -requestedShift);
+                note = $"Track Editor created a route-level vertical clearance window around " +
+                       $"{target.DebugName}: {Mathf.Abs(requestedShift):F1}m across " +
+                       $"{before.Count} entry and {after.Count} exit road sections; both lap welds stayed fixed.";
+                return true;
+            }
+
+            bool TryOwner(int owner, float ownerHeight, int otherOwner, float otherHeight,
+                out string note)
+            {
+                float required = Mathf.Max(1f, cfg.VerticalClearance);
+                float difference = ownerHeight - otherHeight;
+                float shiftUp = required - difference;
+                float shiftDown = -required - difference;
+                float firstShift = Mathf.Abs(shiftUp) <= Mathf.Abs(shiftDown)
+                    ? shiftUp : shiftDown;
+                float secondShift = firstShift == shiftUp ? shiftDown : shiftUp;
+                if (TryShift(owner, ownerHeight, otherOwner, otherHeight,
+                        firstShift, out note))
+                    return true;
+                return TryShift(owner, ownerHeight, otherOwner, otherHeight,
+                    secondShift, out note);
+            }
+
+            if (TryOwner(firstOwner, firstHeight, secondOwner, secondHeight,
+                    out repairNote))
+                return true;
+            return TryOwner(secondOwner, secondHeight, firstOwner, firstHeight,
+                out repairNote);
+        }
+
+        /// <summary>
+        /// Captures only the accepted route's vertical design. Geometry, length and
+        /// connector ownership remain the responsibility of the focused rebuild.
+        /// </summary>
+        public static IReadOnlyList<AuthoringElevationBaselineEntry>
+            CaptureAuthoringElevationBaseline(IReadOnlyList<GeneratedTrackSection> sections)
+        {
+            var result = new List<AuthoringElevationBaselineEntry>();
+            if (sections == null || sections.Count == 0) return result;
+
+            var definitions = new List<TrackMacroSectionDefinition>(sections.Count);
+            for (int i = 0; i < sections.Count; i++)
+                definitions.Add(sections[i]?.Definition);
+            List<string> keys = BuildAuthoringElevationMatchKeys(definitions);
+            int canonicalLapEnd = -1;
+            for (int i = definitions.Count - 1; i >= 0; i--)
+            {
+                if (definitions[i] == null || definitions[i].RoadId != 0) continue;
+                canonicalLapEnd = i;
+                break;
+            }
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                TrackMacroSectionDefinition definition = definitions[i];
+                if (definition == null || string.IsNullOrEmpty(keys[i])) continue;
+                GeneratedTrackSection section = sections[i];
+                result.Add(new AuthoringElevationBaselineEntry
+                {
+                    MatchKey = keys[i],
+                    ElevationChange = definition.ElevationChange,
+                    HillHeight = definition.HillHeight,
+                    StartElevation = section != null ? section.StartFrame.Position.y : 0f,
+                    EndElevation = section != null ? section.EndFrame.Position.y : 0f,
+                    RoadId = definition.RoadId,
+                    CanonicalLapEnd = i == canonicalLapEnd
+                });
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Restores vertical values only where a stable section identity survived the
+        /// edit. Replacement geometry and removed AOI members deliberately do not
+        /// match; the normal authoring recovery then balances their local difference.
+        /// </summary>
+        public static int RestoreAuthoringElevationBaseline(
+            IList<TrackMacroSectionDefinition> definitions,
+            IReadOnlyList<AuthoringElevationBaselineEntry> baseline)
+        {
+            if (definitions == null || definitions.Count == 0 ||
+                baseline == null || baseline.Count == 0)
+                return 0;
+
+            var byKey = new Dictionary<string, AuthoringElevationBaselineEntry>(
+                StringComparer.Ordinal);
+            for (int i = 0; i < baseline.Count; i++)
+            {
+                AuthoringElevationBaselineEntry entry = baseline[i];
+                if (entry == null || string.IsNullOrEmpty(entry.MatchKey)) continue;
+                byKey[entry.MatchKey] = entry;
+            }
+
+            List<string> keys = BuildAuthoringElevationMatchKeys(definitions);
+            var matches = new List<(int Index, AuthoringElevationBaselineEntry Entry)>();
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                TrackMacroSectionDefinition definition = definitions[i];
+                if (definition == null || !byKey.TryGetValue(keys[i], out var entry))
+                    continue;
+                matches.Add((i, entry));
+            }
+
+            // A partial cache from stale preview data must never flatten or hybridize a
+            // route. Focused replacements normally retain nearly the whole sequence;
+            // require at least half of the smaller stream before treating it as the
+            // authoritative accepted elevation plan.
+            int minimumMatches = Mathf.Max(2,
+                Mathf.CeilToInt(Mathf.Min(definitions.Count, baseline.Count) * 0.5f));
+            if (matches.Count < minimumMatches) return 0;
+
+            for (int i = 0; i < matches.Count; i++)
+            {
+                TrackMacroSectionDefinition definition = definitions[matches[i].Index];
+                definition.ElevationChange = matches[i].Entry.ElevationChange;
+                definition.HillHeight = matches[i].Entry.HillHeight;
+            }
+            return matches.Count;
+        }
+
+        private static List<string> BuildAuthoringElevationMatchKeys(
+            IList<TrackMacroSectionDefinition> definitions)
+        {
+            var keys = new List<string>(definitions?.Count ?? 0);
+            var occurrences = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (definitions == null) return keys;
+
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                TrackMacroSectionDefinition definition = definitions[i];
+                if (definition == null)
+                {
+                    keys.Add("");
+                    continue;
+                }
+
+                string stem;
+                if (!string.IsNullOrEmpty(definition.PatternId))
+                {
+                    stem = "pattern|" + definition.PatternId + "|" +
+                           definition.SectionType + "|" +
+                           NormalizeAuthoringElevationDebugName(definition.DebugName);
+                }
+                else if (!string.IsNullOrEmpty(definition.TopologySlotId))
+                {
+                    stem = "slot|" + definition.TopologySlotId + "|" +
+                           definition.SectionType + "|" +
+                           NormalizeAuthoringElevationDebugName(definition.DebugName);
+                }
+                else
+                {
+                    stem = "route|" + definition.QuarterIndex + "|" + definition.RoadId +
+                           "|" + NormalizeAuthoringElevationSectionType(definition.SectionType) +
+                           "|" + NormalizeAuthoringElevationDebugName(definition.DebugName);
+                }
+
+                occurrences.TryGetValue(stem, out int occurrence);
+                occurrences[stem] = occurrence + 1;
+                keys.Add(stem + "|#" + occurrence);
+            }
+            return keys;
+        }
+
+        private static TrackMacroSectionType NormalizeAuthoringElevationSectionType(
+            TrackMacroSectionType sectionType)
+        {
+            return sectionType == TrackMacroSectionType.BridgeVariant ||
+                   sectionType == TrackMacroSectionType.TunnelVariant
+                ? TrackMacroSectionType.Straight
+                : sectionType;
+        }
+
+        private static string NormalizeAuthoringElevationDebugName(string debugName)
+        {
+            string value = debugName ?? "";
+            int cut = value.IndexOf("_Authoring", StringComparison.Ordinal);
+            if (cut < 0) cut = value.IndexOf("_Climb", StringComparison.Ordinal);
+            if (cut < 0) cut = value.IndexOf("_Drop", StringComparison.Ordinal);
+            return cut >= 0 ? value.Substring(0, cut) : value;
         }
 
         // ═══════════════════════════ 7. Elevation plan ═══════════════════════════
@@ -2760,28 +4372,50 @@ namespace TrackGeneration.Planning
         {
             var defs = plan.Defs;
 
+            // Directly-constructed resolved configs are used by focused tooling and
+            // older tests. Preserve the historical Balanced constants when those
+            // callers have not passed through ResolvedTrackGenerationConfig.Resolve.
+            float preferredCarrierLength = cfg.ElevationPreferredCarrierLength > 0f
+                ? cfg.ElevationPreferredCarrierLength
+                : 100f;
+            float risingTargetMinimum = cfg.ElevationRisingTargetMaximum > 0f
+                ? cfg.ElevationRisingTargetMinimum
+                : 0.4f;
+            float risingTargetMaximum = cfg.ElevationRisingTargetMaximum > 0f
+                ? cfg.ElevationRisingTargetMaximum
+                : 1f;
+            float recoveryThreshold = cfg.ElevationRecoveryThreshold > 0f
+                ? cfg.ElevationRecoveryThreshold
+                : 0.5f;
+            float recoveryTargetFraction = cfg.ElevationRecoveryTargetFraction > 0f
+                ? cfg.ElevationRecoveryTargetFraction
+                : 0.4f;
+
             float fixedElevation = 0f;
             foreach (var d in defs)
             {
                 if (d.SectionType == TrackMacroSectionType.Spiral ||
                     d.SectionType == TrackMacroSectionType.HalfLoopTwist ||
-                    d.SectionType == TrackMacroSectionType.RotationalEvent)
+                    d.SectionType == TrackMacroSectionType.RotationalEvent ||
+                    IsTrackEditorVerticalRecovery(d))
                     fixedElevation += d.ElevationChange;
             }
             bool needCompensation = Mathf.Abs(fixedElevation) > 1f;
 
             if (cfg.TargetElevationAmplitude < 6f && !needCompensation) return;
 
-            bool AuthoredVerticalBoundary(TrackMacroSectionType type) =>
-                type == TrackMacroSectionType.JumpRamp ||
-                type == TrackMacroSectionType.AirGap ||
-                type == TrackMacroSectionType.LandingRamp ||
-                type == TrackMacroSectionType.Loop ||
-                type == TrackMacroSectionType.Corkscrew ||
-                type == TrackMacroSectionType.Spiral ||
-                type == TrackMacroSectionType.HalfLoopTwist ||
-                type == TrackMacroSectionType.FullPipe ||
-                type == TrackMacroSectionType.RotationalEvent;
+            bool AuthoredVerticalBoundary(TrackMacroSectionDefinition definition) =>
+                definition != null &&
+                (Mathf.Abs(definition.HillHeight) > 0.001f ||
+                 definition.SectionType == TrackMacroSectionType.JumpRamp ||
+                 definition.SectionType == TrackMacroSectionType.AirGap ||
+                 definition.SectionType == TrackMacroSectionType.LandingRamp ||
+                 definition.SectionType == TrackMacroSectionType.Loop ||
+                 definition.SectionType == TrackMacroSectionType.Corkscrew ||
+                 definition.SectionType == TrackMacroSectionType.Spiral ||
+                 definition.SectionType == TrackMacroSectionType.HalfLoopTwist ||
+                 definition.SectionType == TrackMacroSectionType.FullPipe ||
+                 definition.SectionType == TrackMacroSectionType.RotationalEvent);
 
             bool NearAuthoredVerticalBoundary(int index)
             {
@@ -2794,7 +4428,7 @@ namespace TrackGeneration.Planning
                     if (offset == 0) continue;
                     int neighbor = index + offset;
                     if (neighbor < 0 || neighbor >= defs.Count) continue;
-                    if (AuthoredVerticalBoundary(defs[neighbor].SectionType)) return true;
+                    if (AuthoredVerticalBoundary(defs[neighbor])) return true;
                 }
                 return false;
             }
@@ -2809,7 +4443,13 @@ namespace TrackGeneration.Planning
                                 d.SectionType == TrackMacroSectionType.WideStraight ||
                                 d.SectionType == TrackMacroSectionType.BoostStraight)
                                && !d.LockLength && d.Length >= 100f;
-                carrier &= !NearAuthoredVerticalBoundary(i);
+                // Structural connectors now have independent compact entry/recovery
+                // roads between them and an authored feature mouth. They are therefore
+                // safe elevation carriers even when the old +/-2 definition guard sees
+                // a nearby loop, jump, corkscrew or spiral. Keeping them excluded left
+                // most dense-feature layouts with no legal way to close their altitude.
+                carrier &= d.FeatureFitRole == FeatureFitRole.StructuralConnector ||
+                           !NearAuthoredVerticalBoundary(i);
                 if (carrier) eligible.Add(i);
             }
 
@@ -2818,7 +4458,9 @@ namespace TrackGeneration.Planning
                 for (int i = 0; i < defs.Count; i++)
                 {
                     var d = defs[i];
-                    if (d.SectionType == TrackMacroSectionType.RecoveryStraight && d.Length >= 150f && !eligible.Contains(i))
+                    if (d.SectionType == TrackMacroSectionType.RecoveryStraight &&
+                        !IsTrackEditorVerticalRecovery(d) &&
+                        d.Length >= 150f && !eligible.Contains(i))
                         eligible.Add(i);
                 }
                 eligible.Sort();
@@ -2830,6 +4472,19 @@ namespace TrackGeneration.Planning
                     plan.Fail(GenerationFailureReason.ClosureElevationFailure,
                         $"Spirals/half-loops carry {fixedElevation:F0}m of net elevation but no straights can pay it back.");
                 return;
+            }
+
+            // Profiles may prefer longer, more readable elevation carriers. This is a
+            // preference rather than a new rejection rule: if the route does not offer
+            // enough long straights, retain the original eligible set and stay valid.
+            if (preferredCarrierLength > 100f)
+            {
+                var preferred = new List<int>();
+                foreach (int idx in eligible)
+                    if (defs[idx].Length >= preferredCarrierLength)
+                        preferred.Add(idx);
+                if (preferred.Count >= 2)
+                    eligible = preferred;
             }
 
             // ── Major climbs/drops ──
@@ -2853,7 +4508,7 @@ namespace TrackGeneration.Planning
                 // allowing 300-450 m rises in ~800 m. Reserve four lengths of shaping
                 // room so planned elevation reaches the builder legally and gradually.
                 float Capacity(int idx, bool up) =>
-                    defs[idx].Length * Mathf.Tan((up ? cfg.MaxClimbAngle : cfg.MaxDropAngle) * Mathf.Deg2Rad) / 4f;
+                    AuthoringElevationMagnitudeLimit(cfg, defs[idx], up);
 
                 var order = new List<int>();
                 foreach (int idx in eligible) if (majorSet.Contains(idx)) order.Add(idx);
@@ -2874,9 +4529,9 @@ namespace TrackGeneration.Planning
                     }
                     else
                     {
-                        float target = level < (lo + hi) * 0.5f
-                            ? rng.NextFloat(0.4f, 1f) * hi
-                            : rng.NextFloat(lo, level * 0.4f);
+                        float target = level < Mathf.Lerp(lo, hi, recoveryThreshold)
+                            ? rng.NextFloat(risingTargetMinimum, risingTargetMaximum) * hi
+                            : rng.NextFloat(lo, level * recoveryTargetFraction);
                         delta = target - level;
                     }
 
@@ -2895,6 +4550,31 @@ namespace TrackGeneration.Planning
                         deltas[k] += take;
                         level += take;
                     }
+                }
+
+                // Designer-authored replacements may consume or shorten one of the
+                // ordinary carriers that balanced the accepted track. Recovery
+                // straights already have level boundary contracts and eased profiles,
+                // so unused recoveries are the safest final place to distribute a
+                // small residual without weakening the slope limits or changing a
+                // feature's internal geometry.
+                if (cfg.DesignerAuthoringMode && Mathf.Abs(level) > 0.25f)
+                {
+                    float beforeRecovery = level;
+                    level = ApplyAuthoringElevationRecovery(
+                        cfg, defs, majorSet, level);
+                    if (Mathf.Abs(level) + 0.01f < Mathf.Abs(beforeRecovery))
+                        plan.Warnings.Add(
+                            $"Track Editor distributed {Mathf.Abs(beforeRecovery - level):F1}m of elevation recovery across safe recovery straights.");
+                }
+                else if (Mathf.Abs(level) > 0.25f)
+                {
+                    float beforeRecovery = level;
+                    level = ApplyProceduralElevationRecovery(
+                        cfg, defs, majorSet, level);
+                    if (Mathf.Abs(level) + 0.01f < Mathf.Abs(beforeRecovery))
+                        plan.Warnings.Add(
+                            $"Elevation closure distributed {Mathf.Abs(beforeRecovery - level):F1}m across unused structural corridors.");
                 }
                 if (Mathf.Abs(level) > 0.5f)
                 {
@@ -2980,6 +4660,582 @@ namespace TrackGeneration.Planning
 
             if (!plan.Failed)
                 IntegrateFeatureRecoveries(cfg, plan);
+        }
+
+        private const string TrackEditorVerticalRecoveryPrefix = "TrackEditorVerticalRecovery";
+
+        private static bool IsAuthoringElevationCarrier(
+            TrackMacroSectionDefinition definition)
+        {
+            if (definition == null || definition.RoadId != 0 ||
+                Mathf.Abs(definition.HillHeight) > 0.001f)
+                return false;
+            switch (definition.SectionType)
+            {
+                case TrackMacroSectionType.Straight:
+                case TrackMacroSectionType.WideStraight:
+                case TrackMacroSectionType.BoostStraight:
+                case TrackMacroSectionType.RecoveryStraight:
+                case TrackMacroSectionType.BankedCurve:
+                case TrackMacroSectionType.BankedHairpin:
+                case TrackMacroSectionType.SCurve:
+                case TrackMacroSectionType.Chicane:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsTrackEditorVerticalRecovery(
+            TrackMacroSectionDefinition definition) =>
+            definition != null &&
+            definition.SectionType == TrackMacroSectionType.RecoveryStraight &&
+            !string.IsNullOrEmpty(definition.DebugName) &&
+                definition.DebugName.StartsWith(TrackEditorVerticalRecoveryPrefix,
+                    System.StringComparison.Ordinal);
+
+        /// <summary>
+        /// Conservative elevation envelope for a level-to-level Smooth01 road carrier.
+        /// Besides grade, this owns the same high-speed vertical-curvature and curvature-
+        /// rate limits enforced by the final frame validator. Keeping one shared envelope
+        /// prevents a clearance/elevation rescue from fixing topology and then failing the
+        /// finished mesh on a transition it just introduced.
+        /// </summary>
+        private static float AuthoringElevationMagnitudeLimit(
+            ResolvedTrackGenerationConfig cfg,
+            TrackMacroSectionDefinition definition,
+            bool climb)
+        {
+            if (cfg == null || definition == null || definition.Length <= 0f ||
+                Mathf.Abs(definition.HillHeight) > 0.001f)
+                return 0f;
+
+            float length = definition.Length;
+            float angle = climb ? cfg.MaxClimbAngle : cfg.MaxDropAngle;
+            float limit = length * Mathf.Tan(Mathf.Max(0.1f, angle) * Mathf.Deg2Rad) / 4f;
+
+            if (cfg.MaxCurvatureInducedG > 0f && cfg.Gravity > 0f && cfg.DesignSpeedMps > 0f)
+            {
+                float maxCurvature = cfg.MaxCurvatureInducedG * Mathf.Max(0.1f, cfg.Gravity) /
+                                     Mathf.Max(1f, cfg.DesignSpeedMps * cfg.DesignSpeedMps);
+                // Smooth01's analytic peak is 6*delta/L^2. Eight leaves room for
+                // discrete rings and the incoming weld's existing curvature.
+                limit = Mathf.Min(limit, maxCurvature * length * length / 8f);
+            }
+            if (cfg.MaxVerticalCurvatureRate > 0f)
+            {
+                // The analytic rate scale is 12*delta/L^3. Eighteen preserves the
+                // validator's margin at coarse mesh densities.
+                limit = Mathf.Min(limit, cfg.MaxVerticalCurvatureRate * length * length * length / 18f);
+            }
+            return Mathf.Max(0f, limit);
+        }
+
+        private static float AvailableAuthoringElevationDelta(
+            ResolvedTrackGenerationConfig cfg,
+            TrackMacroSectionDefinition definition,
+            float requestedDirection)
+        {
+            if (definition == null) return 0f;
+            if (requestedDirection >= 0f)
+                return Mathf.Max(0f,
+                    AuthoringElevationMagnitudeLimit(cfg, definition, climb: true) -
+                    definition.ElevationChange);
+            return Mathf.Max(0f,
+                definition.ElevationChange +
+                AuthoringElevationMagnitudeLimit(cfg, definition, climb: false));
+        }
+
+        /// <summary>
+        /// Gives a designer-authored vertical replacement its own legal return-to-grade
+        /// road before closure is solved. The road is locked because its length is the
+        /// conservative eased-slope requirement, not optional procedural padding.
+        /// Returns false when the candidate is already vertically self-contained.
+        /// </summary>
+        public static bool EnsureAuthoringVerticalRecovery(
+            ResolvedTrackGenerationConfig cfg,
+            List<TrackMacroSectionDefinition> definitions,
+            out float recoveryLength,
+            out float recoveryElevation)
+        {
+            recoveryLength = 0f;
+            recoveryElevation = 0f;
+            if (cfg == null || definitions == null || definitions.Count == 0)
+                return false;
+
+            float netElevation = 0f;
+            string patternId = "";
+            float width = Mathf.Max(1f, cfg.RoadWidth);
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                TrackMacroSectionDefinition definition = definitions[i];
+                if (definition == null) continue;
+                netElevation += definition.ElevationChange;
+                width = Mathf.Max(1f, definition.Width);
+                if (string.IsNullOrEmpty(patternId) &&
+                    !string.IsNullOrEmpty(definition.PatternId))
+                    patternId = definition.PatternId;
+            }
+            if (Mathf.Abs(netElevation) <= 0.5f) return false;
+
+            bool needsDrop = netElevation > 0f;
+            float legalAngle = needsDrop ? cfg.MaxDropAngle : cfg.MaxClimbAngle;
+            float tangent = Mathf.Tan(Mathf.Max(0.1f, legalAngle) * Mathf.Deg2Rad);
+            // The elevation builder uses four shaping lengths for a level-to-level
+            // eased grade. Five percent headroom prevents an exact-limit float fit.
+            float elevationMagnitude = Mathf.Abs(netElevation);
+            float requiredForSlope = elevationMagnitude * 4f /
+                                     Mathf.Max(0.001f, tangent);
+            float requiredForCurvature = 0f;
+            if (cfg.MaxCurvatureInducedG > 0f && cfg.Gravity > 0f && cfg.DesignSpeedMps > 0f)
+            {
+                float maxCurvature = cfg.MaxCurvatureInducedG * Mathf.Max(0.1f, cfg.Gravity) /
+                                     Mathf.Max(1f, cfg.DesignSpeedMps * cfg.DesignSpeedMps);
+                requiredForCurvature = Mathf.Sqrt(8f * elevationMagnitude /
+                                                   Mathf.Max(0.0000001f, maxCurvature));
+            }
+            float requiredForCurvatureRate = cfg.MaxVerticalCurvatureRate > 0f
+                ? Mathf.Pow(18f * elevationMagnitude / cfg.MaxVerticalCurvatureRate, 1f / 3f)
+                : 0f;
+            recoveryLength = Mathf.Max(cfg.DefaultRecoveryLength,
+                Mathf.Max(requiredForSlope,
+                    Mathf.Max(requiredForCurvature, requiredForCurvatureRate)) * 1.05f);
+            recoveryElevation = -netElevation;
+
+            TrackMacroSectionDefinition recovery = SectionDefs.Straight(
+                TrackMacroSectionType.RecoveryStraight, recoveryLength, width,
+                $"{TrackEditorVerticalRecoveryPrefix}_" +
+                $"{(needsDrop ? "Drop" : "Climb")}{Mathf.Abs(netElevation):F0}m",
+                locked: true, patternId: patternId,
+                fitRole: FeatureFitRole.VerticalRecovery);
+            recovery.ElevationChange = recoveryElevation;
+            definitions.Add(recovery);
+            return true;
+        }
+
+        /// <summary>
+        /// Balances the complete canonical definition stream after a focused Area of
+        /// Impact edit. Prefer reducing an existing elevation carrier before adding
+        /// new grade, then use the longest remaining ordinary roads. The same
+        /// curvature/rate-aware capacity envelope used by authoring recovery remains
+        /// authoritative. Returns the unassigned residual.
+        /// </summary>
+        public static float ReconcileAuthoringNetElevation(
+            ResolvedTrackGenerationConfig cfg,
+            List<TrackMacroSectionDefinition> definitions,
+            out float appliedElevation)
+        {
+            appliedElevation = 0f;
+            if (cfg == null || definitions == null || !cfg.DesignerAuthoringMode)
+                return 0f;
+
+            float residual = 0f;
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                TrackMacroSectionDefinition definition = definitions[i];
+                if (definition != null && definition.RoadId == 0)
+                    residual += definition.ElevationChange;
+            }
+            if (Mathf.Abs(residual) <= 0.25f) return residual;
+
+            var carriers = new List<int>();
+            for (int i = 0; i < definitions.Count; i++)
+                if (IsAuthoringElevationCarrier(definitions[i]) &&
+                    definitions[i].Length >= 150f)
+                    carriers.Add(i);
+
+            carriers.Sort((a, b) =>
+            {
+                TrackMacroSectionDefinition da = definitions[a];
+                TrackMacroSectionDefinition db = definitions[b];
+                bool aReducesExisting = Mathf.Sign(da.ElevationChange) == Mathf.Sign(residual) &&
+                                        Mathf.Abs(da.ElevationChange) > 0.01f;
+                bool bReducesExisting = Mathf.Sign(db.ElevationChange) == Mathf.Sign(residual) &&
+                                        Mathf.Abs(db.ElevationChange) > 0.01f;
+                if (aReducesExisting != bReducesExisting)
+                    return aReducesExisting ? -1 : 1;
+                int priority = AuthoringCarrierPriority(da).CompareTo(
+                    AuthoringCarrierPriority(db));
+                if (priority != 0) return priority;
+                return db.Length.CompareTo(da.Length);
+            });
+
+            for (int i = 0; i < carriers.Count && Mathf.Abs(residual) > 0.25f; i++)
+            {
+                TrackMacroSectionDefinition carrier = definitions[carriers[i]];
+                float requested = -residual;
+                float capacity = AvailableAuthoringElevationDelta(cfg, carrier, requested);
+                float delta = Mathf.Sign(requested) *
+                              Mathf.Min(Mathf.Abs(requested), capacity);
+                if (Mathf.Abs(delta) <= 0.001f) continue;
+
+                carrier.ElevationChange += delta;
+                SectionConnectionContract contract = carrier.Contract;
+                contract.ElevationDelta = carrier.ElevationChange;
+                carrier.Contract = contract;
+                carrier.DebugName += delta > 0f
+                    ? $"_AuthoringLapBalanceClimb{delta:F0}m"
+                    : $"_AuthoringLapBalanceDrop{-delta:F0}m";
+                residual += delta;
+                appliedElevation += delta;
+            }
+
+            return residual;
+        }
+
+        /// <summary>
+        /// Measures the canonical road with the same section builders used by the
+        /// candidate. This catches real rotational/ballistic displacement that cannot
+        /// be inferred safely by summing Definition.ElevationChange.
+        /// </summary>
+        public static float MeasureCanonicalBuiltElevation(
+            ResolvedTrackGenerationConfig cfg,
+            IList<TrackMacroSectionDefinition> definitions)
+        {
+            if (!TryMeasureCanonicalBuiltElevations(cfg, definitions,
+                    out _, out float finalElevation))
+                return float.NaN;
+            return finalElevation;
+        }
+
+        private static bool TryMeasureCanonicalBuiltElevations(
+            ResolvedTrackGenerationConfig cfg,
+            IList<TrackMacroSectionDefinition> definitions,
+            out float[] startElevations,
+            out float finalElevation)
+        {
+            startElevations = new float[definitions?.Count ?? 0];
+            for (int i = 0; i < startElevations.Length; i++)
+                startElevations[i] = float.NaN;
+            finalElevation = 0f;
+            if (cfg == null || definitions == null) return false;
+
+            TrackConnectionFrame frame = TrackConnectionFrame.Origin(cfg.RoadWidth);
+            FrameBuildContext context = FrameBuildContext.From(cfg);
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                TrackMacroSectionDefinition definition = definitions[i];
+                if (definition == null || definition.RoadId != 0) continue;
+                startElevations[i] = frame.Position.y;
+                if (definition.SectionType == TrackMacroSectionType.AirGap)
+                {
+                    frame = SectionFrameBuilders.AirGapLanding(frame, definition);
+                    continue;
+                }
+
+                TrackConnectionFrame[] frames = SectionFrameBuilders.BuildSectionFrames(
+                    frame, definition, context);
+                if (frames == null || frames.Length == 0) return false;
+                frame = frames[frames.Length - 1];
+            }
+            finalElevation = frame.Position.y;
+            return true;
+        }
+
+        private static float ApplyAuthoringElevationDeltaInRange(
+            ResolvedTrackGenerationConfig cfg,
+            List<TrackMacroSectionDefinition> definitions,
+            bool[] protectedDefinitions,
+            int fromInclusive,
+            int toExclusive,
+            float requestedDelta,
+            string debugTag,
+            out float appliedDelta)
+        {
+            appliedDelta = 0f;
+            float residual = requestedDelta;
+            var carriers = new List<int>();
+            int from = Mathf.Clamp(fromInclusive, 0, definitions.Count);
+            int to = Mathf.Clamp(toExclusive, from, definitions.Count);
+            for (int i = from; i < to; i++)
+            {
+                if (protectedDefinitions != null && i < protectedDefinitions.Length &&
+                    protectedDefinitions[i])
+                    continue;
+                TrackMacroSectionDefinition definition = definitions[i];
+                if (IsAuthoringElevationCarrier(definition) && definition.Length >= 150f)
+                    carriers.Add(i);
+            }
+            carriers.Sort((a, b) =>
+            {
+                int priority = AuthoringCarrierPriority(definitions[a]).CompareTo(
+                    AuthoringCarrierPriority(definitions[b]));
+                return priority != 0
+                    ? priority
+                    : definitions[b].Length.CompareTo(definitions[a].Length);
+            });
+
+            for (int i = 0; i < carriers.Count && Mathf.Abs(residual) > 0.25f; i++)
+            {
+                TrackMacroSectionDefinition carrier = definitions[carriers[i]];
+                float capacity = AvailableAuthoringElevationDelta(cfg, carrier, residual);
+                float delta = Mathf.Sign(residual) *
+                              Mathf.Min(Mathf.Abs(residual), capacity);
+                if (Mathf.Abs(delta) <= 0.001f) continue;
+                carrier.ElevationChange += delta;
+                SectionConnectionContract contract = carrier.Contract;
+                contract.ElevationDelta = carrier.ElevationChange;
+                carrier.Contract = contract;
+                carrier.DebugName += delta > 0f
+                    ? $"_{debugTag}Climb{delta:F0}m"
+                    : $"_{debugTag}Drop{-delta:F0}m";
+                residual -= delta;
+                appliedDelta += delta;
+            }
+            return residual;
+        }
+
+        private static int AuthoringCarrierPriority(TrackMacroSectionDefinition definition)
+        {
+            if (definition == null) return int.MaxValue;
+            switch (definition.SectionType)
+            {
+                case TrackMacroSectionType.RecoveryStraight: return 0;
+                case TrackMacroSectionType.Straight:
+                case TrackMacroSectionType.WideStraight: return 1;
+                case TrackMacroSectionType.BoostStraight: return 2;
+                case TrackMacroSectionType.BankedCurve:
+                case TrackMacroSectionType.SCurve:
+                case TrackMacroSectionType.Chicane: return 3;
+                case TrackMacroSectionType.BankedHairpin: return 4;
+                default: return 5;
+            }
+        }
+
+        /// <summary>
+        /// Designer-first elevation reconciliation. Exact accepted altitude layers are
+        /// attempted first. When their protected local window has insufficient capacity,
+        /// the route remains continuous and the editor is allowed to redistribute legal
+        /// grade over ordinary/recovery road instead of rejecting the requested feature.
+        /// Final curvature, transition, clearance and closure validators remain unchanged.
+        /// </summary>
+        public static float ReconcileAuthoringElevationForEditor(
+            ResolvedTrackGenerationConfig cfg,
+            List<TrackMacroSectionDefinition> definitions,
+            IReadOnlyList<AuthoringElevationBaselineEntry> baseline,
+            out float appliedElevation,
+            out bool relaxedAcceptedLayers)
+        {
+            float strictResidual = ReconcileAuthoringElevationAnchors(
+                cfg, definitions, baseline, out float strictApplied);
+            appliedElevation = strictApplied;
+            relaxedAcceptedLayers = Mathf.Abs(strictResidual) > 0.5f;
+            if (!relaxedAcceptedLayers) return strictResidual;
+
+            // Exact altitude layers are a preservation preference, not a driveability
+            // requirement. The rebuilt definition stream is already continuous; balance
+            // its measured lap endpoint using the broadest safe road capacity.
+            float flexibleResidual = ReconcileAuthoringBuiltElevation(
+                cfg, definitions, out float flexibleApplied);
+            appliedElevation += flexibleApplied;
+            return flexibleResidual;
+        }
+
+        /// <summary>
+        /// Preserves the accepted route's actual altitude layers outside the edited
+        /// window. Only definitions that no longer match the accepted route may carry
+        /// the reconnecting grade, so an AOI edit cannot silently move a liked feature.
+        /// Returns the first unassigned anchor error (or final lap weld error).
+        /// </summary>
+        public static float ReconcileAuthoringElevationAnchors(
+            ResolvedTrackGenerationConfig cfg,
+            List<TrackMacroSectionDefinition> definitions,
+            IReadOnlyList<AuthoringElevationBaselineEntry> baseline,
+            out float appliedElevation)
+        {
+            appliedElevation = 0f;
+            if (cfg == null || definitions == null || baseline == null ||
+                !cfg.DesignerAuthoringMode)
+                return 0f;
+
+            var byKey = new Dictionary<string, AuthoringElevationBaselineEntry>(
+                StringComparer.Ordinal);
+            float desiredLapEnd = 0f;
+            bool hasLapEnd = false;
+            for (int i = 0; i < baseline.Count; i++)
+            {
+                AuthoringElevationBaselineEntry entry = baseline[i];
+                if (entry == null || string.IsNullOrEmpty(entry.MatchKey)) continue;
+                byKey[entry.MatchKey] = entry;
+                if (entry.CanonicalLapEnd)
+                {
+                    desiredLapEnd = entry.EndElevation;
+                    hasLapEnd = true;
+                }
+            }
+
+            List<string> keys = BuildAuthoringElevationMatchKeys(definitions);
+            var anchors = new List<(int Index, AuthoringElevationBaselineEntry Entry)>();
+            var protectedDefinitions = new bool[definitions.Count];
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                if (!byKey.TryGetValue(keys[i], out var entry)) continue;
+                protectedDefinitions[i] = true;
+                if (definitions[i] != null && definitions[i].RoadId == 0 && entry.RoadId == 0)
+                    anchors.Add((i, entry));
+            }
+            if (anchors.Count == 0) return 0f;
+
+            int previousAnchor = -1;
+            for (int i = 0; i < anchors.Count; i++)
+            {
+                if (!TryMeasureCanonicalBuiltElevations(cfg, definitions,
+                        out float[] starts, out _))
+                    return float.PositiveInfinity;
+                int index = anchors[i].Index;
+                float error = anchors[i].Entry.StartElevation - starts[index];
+                if (Mathf.Abs(error) > 0.25f)
+                {
+                    float residual = ApplyAuthoringElevationDeltaInRange(
+                        cfg, definitions, protectedDefinitions, previousAnchor + 1, index,
+                        error, "AuthoringAnchor", out float applied);
+                    appliedElevation += applied;
+                    if (Mathf.Abs(residual) > 0.5f) return residual;
+                }
+                previousAnchor = index;
+            }
+
+            if (!TryMeasureCanonicalBuiltElevations(cfg, definitions,
+                    out _, out float lapEnd))
+                return float.PositiveInfinity;
+            float lapError = (hasLapEnd ? desiredLapEnd : 0f) - lapEnd;
+            if (Mathf.Abs(lapError) <= 0.25f) return lapError;
+            float lapResidual = ApplyAuthoringElevationDeltaInRange(
+                cfg, definitions, protectedDefinitions, previousAnchor + 1,
+                definitions.Count, lapError, "AuthoringWeld", out float lapApplied);
+            appliedElevation += lapApplied;
+            if (Mathf.Abs(lapResidual) > 0.5f) return lapResidual;
+            return MeasureCanonicalBuiltElevation(cfg, definitions) -
+                   (hasLapEnd ? desiredLapEnd : 0f);
+        }
+
+        /// <summary>
+        /// Fallback for an authoring rebuild without an accepted altitude baseline.
+        /// Reconciles the true frame-builder endpoint on any remaining legal carriers.
+        /// </summary>
+        public static float ReconcileAuthoringBuiltElevation(
+            ResolvedTrackGenerationConfig cfg,
+            List<TrackMacroSectionDefinition> definitions,
+            out float appliedElevation)
+        {
+            appliedElevation = 0f;
+            if (cfg == null || definitions == null || !cfg.DesignerAuthoringMode)
+                return 0f;
+            float built = MeasureCanonicalBuiltElevation(cfg, definitions);
+            if (float.IsNaN(built) || float.IsInfinity(built)) return built;
+            float residual = ApplyAuthoringElevationDeltaInRange(
+                cfg, definitions, null, 0, definitions.Count, -built,
+                "AuthoringBuiltBalance", out float applied);
+            appliedElevation = applied;
+            if (Mathf.Abs(residual) > 0.5f) return -residual;
+            return MeasureCanonicalBuiltElevation(cfg, definitions);
+        }
+
+        /// <summary>
+        /// Pays back a focused Track Editor edit's remaining vertical displacement on
+        /// unused recovery straights. Every carrier retains the same conservative eased
+        /// slope capacity as an ordinary major climb/drop and remains level at its welds.
+        /// Returns the residual that could not be assigned.
+        /// </summary>
+        public static float ApplyAuthoringElevationRecovery(
+            ResolvedTrackGenerationConfig cfg,
+            List<TrackMacroSectionDefinition> definitions,
+            HashSet<int> occupiedCarriers,
+            float residual)
+        {
+            if (cfg == null || definitions == null || Mathf.Abs(residual) <= 0.25f)
+                return residual;
+
+            var recoveries = new List<int>();
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                TrackMacroSectionDefinition definition = definitions[i];
+                if (definition == null ||
+                    definition.SectionType != TrackMacroSectionType.RecoveryStraight ||
+                    IsTrackEditorVerticalRecovery(definition) ||
+                    definition.Length < 150f ||
+                    (occupiedCarriers != null && occupiedCarriers.Contains(i)))
+                    continue;
+                recoveries.Add(i);
+            }
+            recoveries.Sort((a, b) => definitions[b].Length.CompareTo(definitions[a].Length));
+
+            for (int i = 0; i < recoveries.Count && Mathf.Abs(residual) > 0.25f; i++)
+            {
+                int index = recoveries[i];
+                TrackMacroSectionDefinition definition = definitions[index];
+                float requested = -residual;
+                float capacity = AvailableAuthoringElevationDelta(cfg, definition, requested);
+                float delta = Mathf.Sign(requested) *
+                              Mathf.Min(Mathf.Abs(requested), capacity);
+                if (Mathf.Abs(delta) <= 0.001f) continue;
+
+                definition.ElevationChange += delta;
+                definition.DebugName += delta > 0f
+                    ? $"_AuthoringClimb{delta:F0}m"
+                    : $"_AuthoringDrop{-delta:F0}m";
+                occupiedCarriers?.Add(index);
+                residual += delta;
+            }
+
+            return residual;
+        }
+
+        /// <summary>
+        /// Uses unused route-layout straights as a final, legally eased altitude
+        /// payback. These corridors are independent of feature entry/recovery roads,
+        /// so this restores closure capacity without lengthening or deforming a feature.
+        /// The same conservative grade/curvature envelope used by Track Editor recovery
+        /// applies here; any residual beyond that capacity still fails normally.
+        /// </summary>
+        public static float ApplyProceduralElevationRecovery(
+            ResolvedTrackGenerationConfig cfg,
+            List<TrackMacroSectionDefinition> definitions,
+            HashSet<int> occupiedCarriers,
+            float residual)
+        {
+            if (cfg == null || definitions == null || Mathf.Abs(residual) <= 0.25f)
+                return residual;
+
+            var corridors = new List<int>();
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                TrackMacroSectionDefinition definition = definitions[i];
+                if (definition == null || definition.LockLength ||
+                    definition.FeatureFitRole != FeatureFitRole.StructuralConnector ||
+                    definition.Length < 100f ||
+                    (occupiedCarriers != null && occupiedCarriers.Contains(i)))
+                    continue;
+                switch (definition.SectionType)
+                {
+                    case TrackMacroSectionType.Straight:
+                    case TrackMacroSectionType.WideStraight:
+                    case TrackMacroSectionType.BoostStraight:
+                        corridors.Add(i);
+                        break;
+                }
+            }
+            corridors.Sort((a, b) => definitions[b].Length.CompareTo(definitions[a].Length));
+
+            for (int i = 0; i < corridors.Count && Mathf.Abs(residual) > 0.25f; i++)
+            {
+                int index = corridors[i];
+                TrackMacroSectionDefinition definition = definitions[index];
+                float requested = -residual;
+                float capacity = AvailableAuthoringElevationDelta(cfg, definition, requested);
+                float delta = Mathf.Sign(requested) *
+                              Mathf.Min(Mathf.Abs(requested), capacity);
+                if (Mathf.Abs(delta) <= 0.001f) continue;
+
+                definition.ElevationChange += delta;
+                definition.DebugName += delta > 0f
+                    ? $"_ClosureClimb{delta:F0}m"
+                    : $"_ClosureDrop{-delta:F0}m";
+                occupiedCarriers?.Add(index);
+                residual += delta;
+            }
+
+            return residual;
         }
 
         /// <summary>
@@ -3099,6 +5355,66 @@ namespace TrackGeneration.Planning
             contract.ElevationDelta = targetDelta;
             corkscrew.Contract = contract;
             return true;
+        }
+
+        /// <summary>
+        /// Picks feature gaps with a farthest-point pass, then returns them in travel
+        /// order so the rhythm-arranged feature sequence is preserved. The closure
+        /// reserve participates in circular distance even though it cannot host content.
+        /// This spreads required encounters before optional randomness can cluster them.
+        /// </summary>
+        private static List<int> SelectRhythmicFeatureGaps(
+            int usableGaps,
+            int totalGaps,
+            int requested,
+            TopologyPlan plan,
+            ref Unity.Mathematics.Random rng)
+        {
+            var available = new List<int>(Mathf.Max(0, usableGaps));
+            for (int gap = 0; gap < usableGaps; gap++) available.Add(gap);
+            Shuffle(available, ref rng); // deterministic tie-breaking and seed variety
+
+            var selected = new List<int>(Mathf.Min(requested, usableGaps));
+            var quarterUse = new int[4];
+            int QuarterOf(int gap)
+            {
+                if (plan?.Quarters != null)
+                    for (int i = 0; i < plan.Quarters.Count; i++)
+                        if (gap >= plan.Quarters[i].GapStart && gap < plan.Quarters[i].GapEnd)
+                            return Mathf.Clamp(plan.Quarters[i].Index, 0, 3);
+                return Mathf.Clamp(Mathf.FloorToInt(gap / (float)Mathf.Max(1, totalGaps) * 4f), 0, 3);
+            }
+
+            while (selected.Count < requested && available.Count > 0)
+            {
+                int bestListIndex = 0;
+                float bestScore = float.NegativeInfinity;
+                for (int i = 0; i < available.Count; i++)
+                {
+                    int gap = available[i];
+                    int minimumDistance = totalGaps;
+                    for (int p = 0; p < selected.Count; p++)
+                    {
+                        int direct = Mathf.Abs(gap - selected[p]);
+                        int circular = Mathf.Max(0, totalGaps - direct);
+                        minimumDistance = Mathf.Min(minimumDistance, Mathf.Min(direct, circular));
+                    }
+
+                    int quarter = QuarterOf(gap);
+                    float score = minimumDistance * 100f - quarterUse[quarter] * 35f;
+                    if (score <= bestScore) continue;
+                    bestScore = score;
+                    bestListIndex = i;
+                }
+
+                int chosen = available[bestListIndex];
+                selected.Add(chosen);
+                quarterUse[QuarterOf(chosen)]++;
+                available.RemoveAt(bestListIndex);
+            }
+
+            selected.Sort();
+            return selected;
         }
 
         private static void Shuffle<T>(List<T> list, ref Unity.Mathematics.Random rng)

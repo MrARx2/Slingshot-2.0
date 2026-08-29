@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using TrackGeneration.Design;
 using TrackGeneration.Macro;
 
 namespace TrackGeneration.Planning
@@ -31,7 +32,8 @@ namespace TrackGeneration.Planning
         GenerationTimeBudgetExceeded,
         FeatureEnvelopeCollision,
         RaceCourseBuildFailure,
-        MeshBuildFailure
+        MeshBuildFailure,
+        RecipeCompatibilityFailure
     }
 
     /// <summary>
@@ -88,6 +90,13 @@ namespace TrackGeneration.Planning
         public float MaxFacetAngleObserved;
         public int TotalRings;
         public float SelectedCandidateScore;
+        public int EncounterCount;
+        public int DistinctEncounterFamilies;
+        public int LongestEncounterFamilyStreak;
+        public int LongestSCurveFamilyStreak;
+        public int MaxSCurveFamilyInWindow;
+        public int RhythmViolationCount;
+        public float RhythmScore;
 
         public float ElevationRange => MaxElevation - MinElevation;
     }
@@ -164,6 +173,24 @@ namespace TrackGeneration.Planning
         public int AttemptsEvaluated;
         public int ValidCandidateCount;
         public float SelectedCandidateScore;
+        [Range(0, 100)] public int TrackRating;
+        public string RhythmSummary = "";
+        public List<string> EncounterTimelines = new List<string>();
+
+        [Tooltip("Total wall-clock time spent across every pipeline pass used by this generation request.")]
+        public float GenerationDurationSeconds;
+
+        [Tooltip("Number of strict, relaxed, or template pipeline passes attempted for this request.")]
+        public int PipelinePassCount = 1;
+
+        [Tooltip("The pass that produced the accepted result, or 'No accepted pass' when generation failed.")]
+        public string AcceptedPass = "Strict";
+
+        [Tooltip("Zero-based generation attempt that produced the accepted candidate. -1 when no candidate was accepted.")]
+        public int SelectedAttemptIndex = -1;
+
+        [Tooltip("Zero-based position of the accepted candidate in the valid-candidate list. -1 when no candidate was accepted.")]
+        public int SelectedCandidateIndex = -1;
 
         [Tooltip("Closure angle relief (§7): whether the flag was on this run, how many candidates invoked it, and how many it closed to tolerance. 0/0 with the flag on means no candidate reached the closure solve with ≥2 eligible plain corners.")]
         public bool AngleReliefEnabled;
@@ -204,6 +231,18 @@ namespace TrackGeneration.Planning
         [Tooltip("Stage C: per-boundary transition classification (DirectWeld / AdaptiveBlend / ExplicitRecovery / Rejected) with per-channel blend demands. Reporting only — no geometry changes.")]
         public List<string> TransitionRecords = new List<string>();
 
+        [Tooltip("Structured Stage C boundary decisions used by the V2 connector shadow audit. Reporting only — no geometry changes.")]
+        public List<TransitionDecision> TransitionDecisions = new List<TransitionDecision>();
+
+        [Tooltip("Stage 2 read-only comparison between semantic boundary requirements and current connector authority.")]
+        public List<ConnectorShadowRecord> ConnectorShadowRecords = new List<ConnectorShadowRecord>();
+
+        [Tooltip("Compact parity totals for the Stage 2 connector shadow audit.")]
+        public ConnectorShadowSummary ConnectorShadowSummary = new ConnectorShadowSummary();
+
+        [Tooltip("V2 stable topology-demand identities for the selected candidate. Reporting only until interactive replacement is enabled.")]
+        public List<TopologySlotRecord> TopologySlots = new List<TopologySlotRecord>();
+
         [Tooltip("Per-dual-quarter route time estimates for each craft archetype.")]
         public List<QuarterRouteBalance> QuarterBalance = new List<QuarterRouteBalance>();
 
@@ -216,6 +255,8 @@ namespace TrackGeneration.Planning
         public const int MaxStoredFailures = 300;
 
         [SerializeField] private List<FailureReasonCount> failureCounts = new List<FailureReasonCount>();
+        [SerializeField] private List<GenerationAttemptFailure> representativeFailures =
+            new List<GenerationAttemptFailure>();
 
         [Serializable]
         public class FailureReasonCount
@@ -227,7 +268,7 @@ namespace TrackGeneration.Planning
         public void AddFailure(int attempt, GenerationFailureReason reason, string subject, string message,
             float requested = 0f, float achieved = 0f, Vector3 position = default, string quarterOrRoad = "")
         {
-            Failures.Add(new GenerationAttemptFailure
+            var failure = new GenerationAttemptFailure
             {
                 AttemptIndex = attempt,
                 Reason = reason,
@@ -237,7 +278,9 @@ namespace TrackGeneration.Planning
                 AchievedValue = achieved,
                 Position = position,
                 QuarterOrRoad = quarterOrRoad
-            });
+            };
+            Failures.Add(failure);
+            RememberRepresentative(failure);
             if (Failures.Count > MaxStoredFailures)
                 Failures.RemoveAt(0); // keep the most recent entries
 
@@ -262,6 +305,13 @@ namespace TrackGeneration.Planning
             EnsureFailureCounts();
             foreach (var entry in earlier.FailureCountsByReason())
                 AddFailureCount(entry.reason, entry.count);
+
+            foreach (var entry in earlier.FailureCountsByReason())
+            {
+                if (RepresentativeFailure(entry.reason) != null) continue;
+                GenerationAttemptFailure representative = earlier.RepresentativeFailure(entry.reason);
+                if (representative != null) RememberRepresentative(representative);
+            }
 
             int available = Mathf.Max(0, MaxStoredFailures - Failures.Count);
             int take = Mathf.Min(available, earlier.Failures.Count);
@@ -301,6 +351,43 @@ namespace TrackGeneration.Planning
                 return;
             }
             failureCounts.Add(new FailureReasonCount { Reason = reason, Count = count });
+        }
+
+        private void RememberRepresentative(GenerationAttemptFailure failure)
+        {
+            if (failure == null) return;
+            representativeFailures ??= new List<GenerationAttemptFailure>();
+            int existing = representativeFailures.FindIndex(item =>
+                item != null && item.Reason == failure.Reason);
+            if (existing >= 0) representativeFailures[existing] = failure;
+            else representativeFailures.Add(failure);
+        }
+
+        /// <summary>
+        /// Returns a retained detail row for a failure reason even when the bounded
+        /// chronological tail has discarded every occurrence of that rare reason.
+        /// </summary>
+        public GenerationAttemptFailure RepresentativeFailure(GenerationFailureReason reason)
+        {
+            if (representativeFailures != null)
+            {
+                for (int i = representativeFailures.Count - 1; i >= 0; i--)
+                {
+                    GenerationAttemptFailure failure = representativeFailures[i];
+                    if (failure != null && failure.Reason == reason) return failure;
+                }
+            }
+
+            // Compatibility for reports serialized before representative rows existed.
+            if (Failures != null)
+            {
+                for (int i = Failures.Count - 1; i >= 0; i--)
+                {
+                    GenerationAttemptFailure failure = Failures[i];
+                    if (failure != null && failure.Reason == reason) return failure;
+                }
+            }
+            return null;
         }
 
         /// <summary>Exact failure counts grouped by reason, most frequent first (unaffected by the detail cap).</summary>
@@ -381,8 +468,16 @@ namespace TrackGeneration.Planning
         public int RequestedSeed;
         public int AttemptsEvaluated;
         public int ValidCandidateCount;
+        public int SelectedAttemptIndex = -1;
+        public int SelectedCandidateIndex = -1;
 
         public GeneratedTrackLayout Layout;
+        /// <summary>
+        /// Sanitized settings that actually produced the accepted candidate. This can
+        /// differ from the requested settings when an explicit failure policy performs
+        /// a relaxed or simple-template recovery pass.
+        /// </summary>
+        public TrackDesignerSettings EffectiveDesignerSettings;
         public TrackGenerationMetrics Metrics => Layout?.Metrics;
         public TrackGenerationReport Report = new TrackGenerationReport();
     }

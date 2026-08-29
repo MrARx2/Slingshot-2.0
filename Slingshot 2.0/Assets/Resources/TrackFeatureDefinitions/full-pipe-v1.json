@@ -1,0 +1,29 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.full-pipe",
+  "DefinitionVersion": 1,
+  "DisplayName": "Full Pipe",
+  "Family": "Road Shape",
+  "Enabled": true,
+  "SemanticElement": 30,
+  "HasPatternType": true,
+  "PatternType": 18,
+  "TopologyRole": 0,
+  "Solver": 0,
+  "SpeedIntent": 2,
+  "RiskLevel": 2,
+  "RequiresRecoveryAfter": true,
+  "EmitsOwnApproach": true,
+  "EmitsOwnRecovery": true,
+  "Length": { "Minimum": 900.0, "Preferred": 2200.0, "Maximum": 4200.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryLength": { "Minimum": 180.0, "Preferred": 360.0, "Maximum": 900.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "RecoveryLength": { "Minimum": 180.0, "Preferred": 360.0, "Maximum": 900.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "EntryContract": { "Orientation": 0, "RequiresUprightEntry": true, "MaximumBankDegrees": 5.0, "MaximumPitchDegrees": 15.0, "MaximumHorizontalCurvature": 0.0008333333, "MaximumRollRateDegreesPerMeter": 0.03, "AcceptsCurvedEntry": true },
+  "ExitContract": { "Orientation": 0 },
+  "Primitives": [
+    { "PrimitiveId": "pipe-close", "DisplayName": "Pipe Close", "PrimitiveType": 10, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.2, "RadiusSource": 0, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "closed-pipe", "DisplayName": "Closed Pipe", "PrimitiveType": 11, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.6, "RadiusSource": 0, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false },
+    { "PrimitiveId": "pipe-open", "DisplayName": "Pipe Open", "PrimitiveType": 10, "EntryOrientation": 0, "ExitOrientation": 0, "LengthFraction": 0.2, "RadiusSource": 0, "ContinueCurvature": true, "ContinueRollRate": true, "AllowGenericConnectorBefore": false }
+  ],
+  "MinimumClearanceMeters": 45.0
+}

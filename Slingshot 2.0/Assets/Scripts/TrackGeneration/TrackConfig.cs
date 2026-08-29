@@ -279,9 +279,9 @@ namespace TrackGeneration.Core
         [SerializeField] private float minSpiralRadius = 120f;
         [SerializeField] private float maxSpiralRadius = 700f;
 
-        [Tooltip("Full revolutions a spiral may make.")]
+        [Tooltip("Complete helix revolutions a spiral may make. Spirals are intentionally capped at two storeys.")]
         [SerializeField] private int minSpiralRevolutions = 1;
-        [SerializeField] private int maxSpiralRevolutions = 3;
+        [SerializeField] private int maxSpiralRevolutions = 2;
 
         [Tooltip("Climb (or descent) per revolution (meters).")]
         [SerializeField] private float minSpiralClimbPerRevolution = 35f;
@@ -742,8 +742,11 @@ namespace TrackGeneration.Core
             maxDualQuartersPerTrack = Mathf.Clamp(maxDualQuartersPerTrack, 0, 4);
             minLaneSeparation = Mathf.Max(8f, minLaneSeparation);
             maxLaneSeparation = Mathf.Max(minLaneSeparation, maxLaneSeparation);
-            minSpiralRevolutions = Mathf.Max(1, minSpiralRevolutions);
-            maxSpiralRevolutions = Mathf.Clamp(maxSpiralRevolutions, minSpiralRevolutions, 6);
+            // A taller helix becomes visually repetitive, expensive to fit and absorbs
+            // too much of the lap's elevation budget. This is a project-wide structural
+            // rule, not merely a preset preference, so old serialized values are capped.
+            minSpiralRevolutions = Mathf.Clamp(minSpiralRevolutions, 1, 2);
+            maxSpiralRevolutions = Mathf.Clamp(maxSpiralRevolutions, minSpiralRevolutions, 2);
             maxRingsPerMacroSection = Mathf.Max(32, maxRingsPerMacroSection);
             maxTotalTrackRings = Mathf.Max(maxRingsPerMacroSection, maxTotalTrackRings);
             minHalfPipeProfileResolution = Mathf.Clamp(minHalfPipeProfileResolution, 3, 96);

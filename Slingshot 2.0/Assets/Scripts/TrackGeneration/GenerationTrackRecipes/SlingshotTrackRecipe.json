@@ -1,0 +1,432 @@
+{
+    "SchemaVersion": 1,
+    "AlgorithmVersion": "slingshot-trackgen-v2-dev1",
+    "FeatureCatalogVersion": "semantic-catalog-v1",
+    "FeatureDefinitions": [
+        {
+            "StableId": "slingshot.horseshoe",
+            "DefinitionVersion": 1,
+            "ContentHash": "76034a5e4d1be285855802c574cffc44ee822212dd3ed8e4f44ead222c583c1b"
+        },
+        {
+            "StableId": "slingshot.inline-corkscrew",
+            "DefinitionVersion": 1,
+            "ContentHash": "bef215d53f481d8bfc7a2f536e7e895f91813923993d574abf5af21e83be91e5"
+        },
+        {
+            "StableId": "slingshot.spiral",
+            "DefinitionVersion": 1,
+            "ContentHash": "31da3ebfa865484270150d52faa3357da6ddd9c00c6cdc198ac2816b4ec67e1c"
+        },
+        {
+            "StableId": "slingshot.vertical-loop",
+            "DefinitionVersion": 1,
+            "ContentHash": "9376e98667bf96a70df3fae419f460ecbffd0f3f402e57b291bf50951987e455"
+        },
+        {
+            "StableId": "slingshot.wide-turnaround",
+            "DefinitionVersion": 1,
+            "ContentHash": "0b08a42cee9c9fdf3fcd612524505b97ec8cc1f6f2e868481f765f9d2b931fd1"
+        }
+    ],
+    "BaseSeed": 809405242,
+    "SeedDisplayName": "Seed_809405242",
+    "SeedStreams": {
+        "LayoutSeed": 528635384,
+        "FeatureSeed": 1437152950,
+        "ElevationSeed": 1096520669,
+        "QuarterSeed": -1227202964,
+        "SurfaceSeed": 563128429,
+        "VisualSeed": 822141454,
+        "PresetResolutionSeed": 1906818809
+    },
+    "DesignerSettingsJson": "{\"AppliedPresetName\":\"Rollercoaster\",\"ModifiedSincePreset\":true,\"appliedPresetSnapshotJson\":\"\",\"Scale\":{\"DesignSpeedKph\":1300.0,\"TargetLapTimeSeconds\":75.0,\"MaxTrackLengthMeters\":60000.0,\"PacingVariation\":0.20000000298023225},\"Layout\":{\"MinTurnCount\":8,\"MaxTurnCount\":9,\"DirectionPattern\":0,\"MinStraightSeconds\":0.800000011920929,\"MaxStraightSeconds\":3.0,\"CornerSequenceChance\":0.0},\"Corners\":{\"MinCurveRadius\":550.0,\"MaxCurveRadius\":1800.0,\"TurnWeights\":{\"GentleBend\":1.5,\"Sweeper\":3.0,\"StandardCorner\":3.0,\"SharpCorner\":1.0,\"Hairpin\":0.20000000298023225},\"BankingStrength\":0.949999988079071,\"MaxBankAngle\":80.0,\"FloorTiltStrength\":0.20000000298023225},\"Road\":{\"FlatCenterWidth\":48.0,\"WallHeight\":26.0,\"WallCurve\":1.0,\"RoadScale\":1.0,\"SafetyLipHeight\":1.0,\"ProfileResolution\":32,\"ColliderProfileResolution\":40,\"DynamicTurnRounding\":false,\"TurnRoundingStrength\":0.8500000238418579,\"MinimumTurnCenterFlatRatio\":0.05000000074505806,\"OutsideCatchWall\":true,\"CatchWallStrength\":0.6000000238418579,\"MaxOverhangAngle\":18.0,\"OverhangRadius\":10.0,\"CatchWallMinimumDemand\":0.3499999940395355},\"Transitions\":{\"GenericTransitionSeconds\":1.2000000476837159,\"BankTransitionSeconds\":1.399999976158142,\"PitchTransitionSeconds\":1.600000023841858,\"RollTransitionSeconds\":1.7999999523162842,\"WidthTransitionSeconds\":0.8999999761581421,\"CrossSectionTransitionSeconds\":1.0,\"BlendCurve\":2,\"MinimumConnectorSeconds\":0.4000000059604645,\"ConnectorInheritanceStrength\":1.0,\"SameDirectionBridgeSeconds\":2.200000047683716,\"MinimumBankReversalSeconds\":0.8999999761581421,\"AllowConnectorExpansion\":true,\"AllowConnectorAbsorption\":true,\"FeatureFitScale\":0.5,\"DefaultApproachSeconds\":2.0,\"DefaultRecoverySeconds\":1.5,\"DangerousSpacingSeconds\":1.7999999523162842,\"VisualPreviewSeconds\":2.200000047683716},\"Elevation\":{\"Profile\":2,\"TargetElevationAmplitude\":300.0,\"MinMajorElevationSections\":5,\"MaxMajorElevationSections\":5,\"MaxClimbAngle\":34.0,\"MaxDropAngle\":36.0,\"MaxCurvatureInducedG\":15.0,\"MaxVerticalCurvatureRate\":0.000019999999494757503,\"Crests\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Bridges\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Underpasses\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"GroundLevelPolicy\":1},\"Features\":{\"Jumps\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":1.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"TargetJumpApexHeight\":100.0,\"JumpLipEmphasis\":0.699999988079071,\"JumpCaptureSpeedVariation\":0.05999999865889549,\"Loops\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":1.5,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Corkscrews\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":1.5,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Spirals\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":1.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"HalfLoops\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"FullPipes\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Wallrides\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":0.699999988079071,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"MinFullPipeSeconds\":5.0,\"MaxFullPipeSeconds\":9.0,\"FullPipeRadiusScale\":1.100000023841858,\"PipeTransitionSeconds\":1.2000000476837159,\"Chicanes\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"SCurves\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"ProceduralRhythmSettingsVersion\":1,\"EnforceProceduralRhythm\":true,\"MaxConsecutiveSCurveEncounters\":1,\"SCurveDiversityWindow\":5,\"MaxSCurveEncountersPerWindow\":2,\"SameFamilyCooldownEncounters\":1,\"Hairpins\":{\"Enabled\":true,\"MinimumCount\":1,\"MaximumCount\":1,\"OptionalWeight\":0.20000000298023225,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"WideTurnarounds\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"Horseshoes\":{\"Enabled\":true,\"MinimumCount\":0,\"MaximumCount\":0,\"OptionalWeight\":0.0,\"MinimumSpacingOverrideSeconds\":-1.0,\"AllowInCompoundPatterns\":true},\"MinFeatureGroups\":4,\"MaxFeatureGroups\":4,\"CompoundFeatureChance\":0.0,\"MaxCompoundElements\":3,\"RequiredPatterns\":[]},\"Quarters\":{\"MinimumDualQuarterCount\":0,\"MaximumDualQuarterCount\":0,\"QuarterTypeOverrides\":[0,0,0,0],\"PreventAdjacentDualQuarters\":false,\"AllowQ1Dual\":false,\"AllowQ4Dual\":true,\"ChoiceType\":1,\"LaneSeparationMeters\":24.0,\"CatchWidthScale\":1.7000000476837159,\"DualRoadWidthScale\":1.0,\"RoadLengthTolerance\":0.20000000298023225,\"NeutralTimeTolerancePercent\":4.0,\"RequireArchetypeDifferentiation\":true,\"BalancePolicy\":0},\"Generation\":{\"MaxAttempts\":300,\"SelectionMode\":0,\"CandidatesToScore\":4,\"FailurePolicy\":2,\"ClosureReserveFraction\":0.20000000298023225,\"ConsistentTextureTopology\":true,\"TextureTopologyMetersPerRing\":1.0,\"MetersPerRing\":1.5,\"MaxFacetAngleDegrees\":0.5,\"TargetTotalRings\":20000,\"DynamicFeatureAdjacency\":true,\"UseCanonicalTurns\":true,\"ClosureAngleRelief\":false,\"RobustDualQuarterFit\":false,\"DirectionalCorkscrews\":true,\"SmoothCorkscrewFloor\":true},\"Visual\":{\"CenterGuideEnabled\":true,\"CenterGuideColor\":{\"r\":0.550000011920929,\"g\":0.949999988079071,\"b\":1.0,\"a\":1.0},\"CenterGuideWidth\":0.3499999940395355,\"CenterGuideEmission\":1.2000000476837159,\"LaneEdgePosition\":1.0,\"LaneMergeFraction\":0.7799999713897705,\"LaneSplitFraction\":0.8999999761581421,\"WallMarkersEnabled\":true,\"WallMarkerColor\":{\"r\":0.550000011920929,\"g\":0.949999988079071,\"b\":1.0,\"a\":1.0},\"WallMarkerWidth\":0.800000011920929,\"WallMarkerSpacingMeters\":48.0,\"MarkerFadeDistance\":800.0}}",
+    "RulebookSchemaVersion": 2,
+    "RulebookHash": "6ff36ff9998547ad5618a74507db00ffd15f3ca0a4c817bb6816c9bfeb6a5f1e",
+    "AppliedPresetName": "Rollercoaster",
+    "SettingsLocks": {
+        "ScaleAndSpeed": false,
+        "Layout": false,
+        "Corners": false,
+        "RoadShape": false,
+        "Transitions": false,
+        "Elevation": false,
+        "Features": false,
+        "Quarters": false,
+        "GenerationBehavior": false,
+        "Visual": false
+    },
+    "LayoutLockMode": 0,
+    "Origin": {
+        "Position": {
+            "x": 9386.6796875,
+            "y": -0.0002099999983329326,
+            "z": 12094.2919921875
+        },
+        "Rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 1.0
+        },
+        "Scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        }
+    },
+    "SelectionMode": 0,
+    "MaximumAttempts": 300,
+    "CandidatesToScore": 4,
+    "BaseRecipeHash": "67201450ddf7c1ab559fcab7f9ddc25d790ab4b8a304ac14651249b494317fbd",
+    "RecipeRevision": 1,
+    "TopologySlotOverrides": [
+        {
+            "TopologySlotId": "slot-q1-r0-turn-007-n090",
+            "CanonicalOrder": 7,
+            "StructuralAnchor": "0|0|1|-90|1|7",
+            "OriginalRealization": 1,
+            "RequestedRealization": 3,
+            "RebuildCurrentRealization": false,
+            "LockRealization": true,
+            "LockParameters": false,
+            "MaximumReplanScope": 1,
+            "Parameters": [],
+            "ImpactBackwardFeatures": 0,
+            "ImpactForwardFeatures": 0,
+            "AllowFeatureOverrides": false,
+            "ImpactMembers": []
+        }
+    ],
+    "DesignerAuthoredVariant": true,
+    "AuthoringBaselineAttemptIndex": 37,
+    "AuthoringBaselineLapLengthMeters": 29801.087890625,
+    "AuthoringElevationBaseline": [
+        {
+            "MatchKey": "pattern|Corkscrew_6|RotationalEvent|Corkscrew_4u_L_H1R198_H2R241_Orbit34|#0",
+            "ElevationChange": -34.424407958984378,
+            "HillHeight": 0.0,
+            "StartElevation": 11.172344207763672,
+            "EndElevation": -23.252138137817384,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|FullLoop_1|RotationalEvent|Loop_4u_H1R569_H2R550|#0",
+            "ElevationChange": 12.697742462158204,
+            "HillHeight": 0.0,
+            "StartElevation": 8.82103157043457,
+            "EndElevation": 21.518726348876954,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|Hairpin_9|BankedHairpin|Hairpin_180deg_Left|#0",
+            "ElevationChange": -0.0000858306884765625,
+            "HillHeight": 0.0,
+            "StartElevation": 17.16939926147461,
+            "EndElevation": 17.169313430786134,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|Hairpin_9|RecoveryStraight|RecoveryStraight|#0",
+            "ElevationChange": -10.346485137939454,
+            "HillHeight": 0.0,
+            "StartElevation": 17.169313430786134,
+            "EndElevation": 6.822853088378906,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|JumpGap_4|AirGap|AirGap_1918m_Apex95m|#0",
+            "ElevationChange": 86.17029571533203,
+            "HillHeight": 0.0,
+            "StartElevation": 69.23419952392578,
+            "EndElevation": 155.4044952392578,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|JumpGap_4|BoostStraight|JumpApproach|#0",
+            "ElevationChange": 0.0,
+            "HillHeight": 0.0,
+            "StartElevation": 21.518888473510743,
+            "EndElevation": 21.518888473510743,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|JumpGap_4|JumpRamp|JumpRamp_H48m_7.3deg|#0",
+            "ElevationChange": 47.71536636352539,
+            "HillHeight": 0.0,
+            "StartElevation": 21.518888473510743,
+            "EndElevation": 69.23419952392578,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|JumpGap_4|LandingRamp|LandingRamp_H134m|#0",
+            "ElevationChange": -133.8856658935547,
+            "HillHeight": 0.0,
+            "StartElevation": 155.4044952392578,
+            "EndElevation": 21.51887321472168,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|JumpGap_4|RecoveryStraight|RecoveryStraight|#0",
+            "ElevationChange": -10.346485137939454,
+            "HillHeight": 0.0,
+            "StartElevation": 21.51887321472168,
+            "EndElevation": 11.172338485717774,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|Spiral_8|RecoveryStraight|RecoveryStraight|#0",
+            "ElevationChange": -1.1399650573730469,
+            "HillHeight": 0.0,
+            "StartElevation": 18.309364318847658,
+            "EndElevation": 17.16939926147461,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|Spiral_8|Spiral|Spiral_1.5story_1rev_Up_Left|#0",
+            "ElevationChange": 172.5,
+            "HillHeight": 0.0,
+            "StartElevation": -154.19061279296876,
+            "EndElevation": 18.309364318847658,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|Spiral_8|Straight|SpiralApproach|#0",
+            "ElevationChange": -4.92718505859375,
+            "HillHeight": 0.0,
+            "StartElevation": -149.263427734375,
+            "EndElevation": -154.19061279296876,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|Wallride_2|RecoveryStraight|RecoveryStraight|#0",
+            "ElevationChange": 0.0,
+            "HillHeight": 0.0,
+            "StartElevation": 21.518888473510743,
+            "EndElevation": 21.518888473510743,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|Wallride_2|WallrideTurn|Wallride_90deg_Left|#0",
+            "ElevationChange": 0.0,
+            "HillHeight": 0.0,
+            "StartElevation": 21.518726348876954,
+            "EndElevation": 21.518888473510743,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|track-editor:slot-q1-r0-turn-006-n090:DoubleApex|BankedCurve|DoubleApexIn_45deg_Left|#0",
+            "ElevationChange": 0.0,
+            "HillHeight": 0.0,
+            "StartElevation": 21.518888473510743,
+            "EndElevation": 21.518888473510743,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|track-editor:slot-q1-r0-turn-006-n090:DoubleApex|BankedCurve|DoubleApexOut_45deg_Left|#0",
+            "ElevationChange": 0.0,
+            "HillHeight": 0.0,
+            "StartElevation": 21.518888473510743,
+            "EndElevation": 21.518888473510743,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "pattern|track-editor:slot-q1-r0-turn-006-n090:DoubleApex|Straight|ApexLink|#0",
+            "ElevationChange": 0.0,
+            "HillHeight": 0.0,
+            "StartElevation": 21.518888473510743,
+            "EndElevation": 21.518888473510743,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "route|0|0|Straight|Straight_00|#0",
+            "ElevationChange": 0.00030016168602742255,
+            "HillHeight": 0.0,
+            "StartElevation": 0.0,
+            "EndElevation": 0.00030016168602742255,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "route|0|0|Straight|Straight_01|#0",
+            "ElevationChange": 2.0934720039367677,
+            "HillHeight": 0.0,
+            "StartElevation": 1.5497790575027466,
+            "EndElevation": 3.6432511806488039,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "route|0|0|Straight|Straight_02|#0",
+            "ElevationChange": 0.0,
+            "HillHeight": 0.0,
+            "StartElevation": 21.518888473510743,
+            "EndElevation": 21.518888473510743,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "route|1|0|Straight|CorkscrewWeld_04|#0",
+            "ElevationChange": 9.5367431640625e-7,
+            "HillHeight": 0.0,
+            "StartElevation": 11.172343254089356,
+            "EndElevation": 11.172344207763672,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "route|1|0|Straight|Straight_03|#0",
+            "ElevationChange": 0.0,
+            "HillHeight": 0.0,
+            "StartElevation": 21.518888473510743,
+            "EndElevation": 21.518888473510743,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "route|2|0|Straight|Straight_05|#0",
+            "ElevationChange": -11.974449157714844,
+            "HillHeight": 0.0,
+            "StartElevation": -27.585983276367189,
+            "EndElevation": -39.56043243408203,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "route|2|0|Straight|Straight_06|#0",
+            "ElevationChange": -0.0011816024780273438,
+            "HillHeight": 0.0,
+            "StartElevation": 6.822853088378906,
+            "EndElevation": 6.821671485900879,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "route|3|0|Straight|Straight_07|#0",
+            "ElevationChange": -2.7853221893310549,
+            "HillHeight": 0.0,
+            "StartElevation": 4.717734336853027,
+            "EndElevation": 1.9324121475219727,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "slot|slot-q1-r0-transfer-000-z000|SCurve|ClosureSBend_57deg|#0",
+            "ElevationChange": 0.15225081145763398,
+            "HillHeight": 0.0,
+            "StartElevation": 0.00030016168602742255,
+            "EndElevation": 0.15255098044872285,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "slot|slot-q1-r0-transfer-002-z000|SCurve|ClosureSBend_57deg|#0",
+            "ElevationChange": 2.0934813022613527,
+            "HillHeight": 0.0,
+            "StartElevation": 3.6432511806488039,
+            "EndElevation": 5.736732482910156,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "slot|slot-q1-r0-transfer-003-z000|SCurve|ClosureSBend_57deg|#0",
+            "ElevationChange": 2.0932693481445314,
+            "HillHeight": 0.0,
+            "StartElevation": 5.736732482910156,
+            "EndElevation": 7.8300018310546879,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "slot|slot-q1-r0-transfer-004-z000|SCurve|ClosureSBend_57deg|#0",
+            "ElevationChange": 0.9910297393798828,
+            "HillHeight": 0.0,
+            "StartElevation": 7.8300018310546879,
+            "EndElevation": 8.82103157043457,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "slot|slot-q1-r0-turn-001-p045|BankedCurve|BankedCurve_45deg_Right|#0",
+            "ElevationChange": 1.3972281217575074,
+            "HillHeight": 0.0,
+            "StartElevation": 0.15255098044872285,
+            "EndElevation": 1.5497790575027466,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "slot|slot-q2-r0-turn-001-p045|BankedCurve|BankedCurve_45deg_Right|#0",
+            "ElevationChange": 0.00000476837158203125,
+            "HillHeight": 0.0,
+            "StartElevation": 11.172338485717774,
+            "EndElevation": 11.172343254089356,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "slot|slot-q2-r0-turn-003-n090|BankedCurve|BankedCurve_90deg_Left|#0",
+            "ElevationChange": -4.333845138549805,
+            "HillHeight": 0.0,
+            "StartElevation": -23.252138137817384,
+            "EndElevation": -27.585983276367189,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "slot|slot-q3-r0-transfer-000-z000|SCurve|ClosureSBend_51deg|#0",
+            "ElevationChange": -55.48997497558594,
+            "HillHeight": 0.0,
+            "StartElevation": -39.56043243408203,
+            "EndElevation": -95.05040740966797,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "slot|slot-q3-r0-transfer-001-z000|SCurve|ClosureSBend_57deg|#0",
+            "ElevationChange": -54.21302032470703,
+            "HillHeight": 0.0,
+            "StartElevation": -95.05040740966797,
+            "EndElevation": -149.263427734375,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "slot|slot-q3-r0-turn-004-p090|BankedCurve|BankedCurve_90deg_Right|#0",
+            "ElevationChange": -2.1039371490478517,
+            "HillHeight": 0.0,
+            "StartElevation": 6.821671485900879,
+            "EndElevation": 4.717734336853027,
+            "RoadId": 0,
+            "CanonicalLapEnd": false
+        },
+        {
+            "MatchKey": "slot|slot-q4-r0-turn-000-n090|BankedCurve|BankedCurve_90deg_Left|#0",
+            "ElevationChange": -1.9324121475219727,
+            "HillHeight": 0.0,
+            "StartElevation": 1.9324121475219727,
+            "EndElevation": 0.0,
+            "RoadId": 0,
+            "CanonicalLapEnd": true
+        }
+    ],
+    "ExpectedLayoutHash": "b1f14ad02c6ca473cfaaa6c35eedc26c020aefda04893c4d928cf2cf96ba5f90",
+    "RecipeHash": "d4aeddbb456a57961225b9823b99d52acee53d7a26d8a87df9eaf1c9bb3743d0"
+}

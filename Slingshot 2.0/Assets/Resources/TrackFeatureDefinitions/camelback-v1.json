@@ -1,0 +1,86 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.camelback",
+  "DefinitionVersion": 1,
+  "DisplayName": "Camelback",
+  "Family": "Elevation",
+  "Enabled": true,
+  "SemanticElement": 60,
+  "HasPatternType": true,
+  "PatternType": 22,
+  "TopologyRole": 0,
+  "Solver": 5,
+  "SpeedIntent": 1,
+  "RiskLevel": 1,
+  "RequiresRecoveryAfter": false,
+  "EmitsOwnApproach": false,
+  "EmitsOwnRecovery": false,
+  "Length": {
+    "Minimum": 650.0,
+    "Preferred": 820.0,
+    "Maximum": 1000.0,
+    "Resolution": 2,
+    "MayAutoExpand": false,
+    "ScaleWithDesignSpeed": false,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "EntryLength": {
+    "Minimum": 60.0,
+    "Preferred": 120.0,
+    "Maximum": 220.0,
+    "Resolution": 0,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "RecoveryLength": {
+    "Minimum": 60.0,
+    "Preferred": 120.0,
+    "Maximum": 220.0,
+    "Resolution": 0,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "EntryContract": {
+    "Orientation": 0,
+    "RequiresUprightEntry": false,
+    "MaximumBankDegrees": 18.0,
+    "MaximumPitchDegrees": 16.0,
+    "MaximumHorizontalCurvature": 0.00125,
+    "MaximumRollRateDegreesPerMeter": 0.05,
+    "AcceptsCurvedEntry": true
+  },
+  "ExitContract": {
+    "Orientation": 0,
+    "HeadingChangeDegrees": 0.0,
+    "PitchChangeDegrees": 0.0,
+    "RollChangeDegrees": 0.0,
+    "ElevationChangeMeters": 0.0
+  },
+  "VerticalBump": {
+    "HeightMeters": {
+      "Minimum": 35.0,
+      "Preferred": 60.0,
+      "Maximum": 85.0
+    },
+    "LobeCount": 1,
+    "StartsWithDip": false,
+    "AlternateLobeSign": false
+  },
+  "Primitives": [
+    {
+      "PrimitiveId": "c2-crest",
+      "DisplayName": "C2 Crest Straight",
+      "PrimitiveType": 14,
+      "EntryOrientation": 0,
+      "ExitOrientation": 0,
+      "LengthFraction": 1.0,
+      "RadiusSource": 0,
+      "ContinueCurvature": true,
+      "ContinueRollRate": true,
+      "AllowGenericConnectorBefore": false
+    }
+  ],
+  "MinimumClearanceMeters": 35.0
+}

@@ -1,0 +1,101 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.inline-corkscrew",
+  "DefinitionVersion": 1,
+  "DisplayName": "Inline Corkscrew",
+  "Family": "Inversion",
+  "Enabled": true,
+  "SemanticElement": 21,
+  "HasPatternType": true,
+  "PatternType": 2,
+  "TopologyRole": 0,
+  "Solver": 2,
+  "SpeedIntent": 2,
+  "RiskLevel": 3,
+  "RequiresRecoveryAfter": false,
+  "EmitsOwnApproach": false,
+  "EmitsOwnRecovery": false,
+  "Length": {
+    "Minimum": 541.67,
+    "Preferred": 1895.83,
+    "Maximum": 3250.0,
+    "Resolution": 2,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "EntryLength": {
+    "Minimum": 722.22,
+    "Preferred": 1083.34,
+    "Maximum": 1444.44,
+    "Resolution": 0,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "RecoveryLength": {
+    "Minimum": 722.22,
+    "Preferred": 1083.34,
+    "Maximum": 1444.44,
+    "Resolution": 0,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "EntryContract": {
+    "Orientation": 0,
+    "RequiresUprightEntry": false,
+    "MaximumBankDegrees": 8.0,
+    "MaximumPitchDegrees": 12.0,
+    "MaximumHorizontalCurvature": 0.0008333333,
+    "MaximumRollRateDegreesPerMeter": 0.05,
+    "AcceptsCurvedEntry": true
+  },
+  "ExitContract": {
+    "Orientation": 0,
+    "HeadingChangeDegrees": 0.0,
+    "PitchChangeDegrees": 0.0,
+    "RollChangeDegrees": 360.0,
+    "ElevationChangeMeters": 0.0
+  },
+  "Corkscrew": {
+    "FirstHalfRadius": { "Minimum": 60.0, "Preferred": 275.0, "Maximum": 400.0 },
+    "SecondHalfRadius": { "Minimum": 60.0, "Preferred": 275.0, "Maximum": 400.0 },
+    "RoadRollUnits": 4,
+    "AllowedRoadRollUnits": [4, 8, 12],
+    "DegreesPerUnit": 90.0,
+    "PhaseSplit": { "Minimum": 0.4, "Preferred": 0.5, "Maximum": 0.6 },
+    "BarrelClearanceMultiplier": 2.5,
+    "TargetArrivalSpeedFraction": 0.55,
+    "MinimumInvertedContactLoadG": 0.5,
+    "MaximumPeakLoadG": 12.0,
+    "AutomaticHandedness": true
+  },
+  "Primitives": [
+    {
+      "PrimitiveId": "half-corkscrew-in",
+      "DisplayName": "Half Corkscrew In",
+      "PrimitiveType": 4,
+      "EntryOrientation": 0,
+      "ExitOrientation": 1,
+      "LengthFraction": 0.5,
+      "RadiusSource": 1,
+      "ContinueCurvature": true,
+      "ContinueRollRate": true,
+      "AllowGenericConnectorBefore": false
+    },
+    {
+      "PrimitiveId": "half-corkscrew-out",
+      "DisplayName": "Half Corkscrew Out",
+      "PrimitiveType": 4,
+      "EntryOrientation": 1,
+      "ExitOrientation": 0,
+      "LengthFraction": 0.5,
+      "RadiusSource": 2,
+      "ContinueCurvature": true,
+      "ContinueRollRate": true,
+      "AllowGenericConnectorBefore": false
+    }
+  ],
+  "MinimumClearanceMeters": 40.0
+}

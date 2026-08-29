@@ -65,6 +65,14 @@ namespace TrackGeneration.Design
             ScaleFeatureMaximum(s.Features.Corkscrews, maxFeatures);
             ScaleFeatureMaximum(s.Features.Spirals, maxFeatures);
             ScaleFeatureMaximum(s.Features.HalfLoops, maxFeatures);
+            ScaleFeatureMaximum(s.Features.Camelbacks, maxFeatures);
+            ScaleFeatureMaximum(s.Features.HeartlineRolls, maxFeatures);
+            ScaleFeatureMaximum(s.Features.ZeroGRolls, maxFeatures);
+            ScaleFeatureMaximum(s.Features.DiveLoops, maxFeatures);
+            ScaleFeatureMaximum(s.Features.Sidewinders, maxFeatures);
+            ScaleFeatureMaximum(s.Features.WideTurnarounds, maxFeatures);
+            ScaleFeatureMaximum(s.Features.Horseshoes, maxFeatures);
+            ScaleFeatureMaximum(s.Features.Cutbacks, maxFeatures);
 
             s.ModifiedSincePreset = true;
             s.Sanitize();
