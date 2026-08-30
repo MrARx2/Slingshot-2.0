@@ -1,7 +1,7 @@
 {
   "SchemaVersion": 1,
   "StableId": "slingshot.dive-loop",
-  "DefinitionVersion": 2,
+  "DefinitionVersion": 4,
   "DisplayName": "Dive Loop",
   "Family": "Moderate Inversion",
   "Enabled": true,
@@ -15,7 +15,7 @@
   "RequiresRecoveryAfter": true,
   "EmitsOwnApproach": false,
   "EmitsOwnRecovery": true,
-  "Length": { "Minimum": 1500.0, "Preferred": 2050.0, "Maximum": 2800.0, "Resolution": 3, "MayAutoExpand": false, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
+  "Length": { "Minimum": 1500.0, "Preferred": 2050.0, "Maximum": 3100.0, "Resolution": 3, "MayAutoExpand": false, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
   "EntryLength": { "Minimum": 150.0, "Preferred": 260.0, "Maximum": 450.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
   "RecoveryLength": { "Minimum": 180.0, "Preferred": 320.0, "Maximum": 550.0, "Resolution": 0, "MayAutoExpand": true, "ScaleWithDesignSpeed": true, "ReferenceSpeedMps": 361.1111 },
   "EntryContract": { "Orientation": 0, "RequiresUprightEntry": true, "MaximumBankDegrees": 8.0, "MaximumPitchDegrees": 10.0, "MaximumHorizontalCurvature": 0.0006666667, "MaximumRollRateDegreesPerMeter": 0.04, "AcceptsCurvedEntry": true },

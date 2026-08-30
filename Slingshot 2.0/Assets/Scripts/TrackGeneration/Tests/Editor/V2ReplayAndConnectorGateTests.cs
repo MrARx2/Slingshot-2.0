@@ -536,13 +536,28 @@ namespace TrackGeneration.Tests
             var owner = new GameObject("TrackEditorUndoFixture");
             try
             {
+                TrackGenerator generator = owner.AddComponent<TrackGenerator>();
                 TrackEditor editor = owner.AddComponent<TrackEditor>();
+                editor.Bind(generator);
+
+                SetPrivateField(generator, "lastAcceptedRecipe", new GenerationRecipeV1
+                {
+                    ExpectedLayoutHash = "accepted-layout-one"
+                });
 
                 editor.RememberLastAppliedEdit("recipe-one", "Curve to Wallride");
                 Assert.IsTrue(editor.CanUndoLastAppliedEdit);
                 Assert.AreEqual("recipe-one", editor.LastAppliedEditUndoRecipe);
 
+                SetPrivateField(generator, "lastAcceptedRecipe", new GenerationRecipeV1
+                {
+                    ExpectedLayoutHash = "fresh-generated-layout"
+                });
+                Assert.IsFalse(editor.CanUndoLastAppliedEdit,
+                    "History from a prior accepted layout must not appear on a freshly generated or loaded track.");
+
                 editor.RememberLastAppliedEdit("recipe-two", "Wallride to Corkscrew");
+                Assert.IsTrue(editor.CanUndoLastAppliedEdit);
                 Assert.AreEqual("recipe-two", editor.LastAppliedEditUndoRecipe);
                 Assert.AreEqual("Wallride to Corkscrew", editor.LastAppliedEditUndoLabel);
 
@@ -1795,6 +1810,7 @@ namespace TrackGeneration.Tests
 
             AssertStatus(results, SemanticElementId.Hairpin, TopologySlotCompatibilityStatus.Current);
             AssertStatus(results, SemanticElementId.WideTurnaround, TopologySlotCompatibilityStatus.PotentialFit);
+            AssertStatus(results, SemanticElementId.HalfHelixTurnaround, TopologySlotCompatibilityStatus.PotentialFit);
             AssertStatus(results, SemanticElementId.Immelmann, TopologySlotCompatibilityStatus.PotentialFit);
             AssertStatus(results, SemanticElementId.HalfLoopToCorkscrew, TopologySlotCompatibilityStatus.PotentialFit);
             AssertStatus(results, SemanticElementId.OrdinaryCurve, TopologySlotCompatibilityStatus.Blocked);
@@ -1820,6 +1836,7 @@ namespace TrackGeneration.Tests
             AssertStatus(results, SemanticElementId.AlternatingRadiusSequence, TopologySlotCompatibilityStatus.Blocked);
             AssertStatus(results, SemanticElementId.Hairpin, TopologySlotCompatibilityStatus.Blocked);
             AssertStatus(results, SemanticElementId.WideTurnaround, TopologySlotCompatibilityStatus.Blocked);
+            AssertStatus(results, SemanticElementId.HalfHelixTurnaround, TopologySlotCompatibilityStatus.Blocked);
             AssertStatus(results, SemanticElementId.VerticalLoop, TopologySlotCompatibilityStatus.Blocked);
         }
 
@@ -1927,6 +1944,48 @@ namespace TrackGeneration.Tests
                 StringAssert.Contains("Required at least 1 loops", missingLoop.Message);
             }
             finally { Object.DestroyImmediate(config); }
+        }
+
+        [Test]
+        public void TrackEditorAuthoredReplacement_IsNotRejectedByProceduralFeatureAmounts()
+        {
+            var definition = new TrackMacroSectionDefinition
+            {
+                SectionType = TrackMacroSectionType.BankedHairpin,
+                SemanticElement = SemanticElementId.WideTurnaround,
+                PatternId = "track-editor:slot-q3-r0-turn-002-n180:WideTurnaround"
+            };
+            var layout = new GeneratedTrackLayout();
+            layout.Sections.Add(new GeneratedTrackSection
+            {
+                Definition = definition,
+                PatternId = definition.PatternId
+            });
+            var resolved = new ResolvedTrackGenerationConfig
+            {
+                DesignerAuthoringMode = true,
+                Hairpins = new ResolvedFeatureRule
+                {
+                    Enabled = true,
+                    MinimumCount = 1,
+                    MaximumCount = 1
+                },
+                WideTurnarounds = new ResolvedFeatureRule
+                {
+                    Enabled = true,
+                    MinimumCount = 0,
+                    MaximumCount = 0
+                }
+            };
+            var issues = new List<ValidationIssue>();
+
+            TrackValidators.ValidateRequiredFeatures(
+                layout, new TopologyPlan(), resolved, issues);
+
+            Assert.IsFalse(issues.Exists(issue => issue.Subject == "hairpins"),
+                "A deliberate editor swap must not be forced to retain the procedural Hairpin minimum.");
+            Assert.IsFalse(issues.Exists(issue => issue.Subject == "wide turnarounds"),
+                "A deliberate editor swap must not be rejected by the procedural Wide Turnaround maximum.");
         }
 
         [Test]
@@ -2577,6 +2636,48 @@ namespace TrackGeneration.Tests
                 Assert.AreEqual("slingshot.horseshoe", core.FeatureDefinitionId);
                 Assert.AreEqual("elevated-banked-reversal", core.FeaturePrimitiveSequence);
                 Assert.IsTrue(horseshoe.Definitions.Exists(definition =>
+                    definition.SectionType == TrackMacroSectionType.RecoveryStraight));
+            }
+            finally { Object.DestroyImmediate(config); }
+        }
+
+        [Test]
+        public void TopologyCornerCandidate_HalfHelix_DescendsAndPreservesReversalDemand()
+        {
+            TrackConfig config = TrackGenerationTestUtil.CreateConfig();
+            try
+            {
+                ResolvedTrackGenerationConfig resolved = ResolvedTrackGenerationConfig.Resolve(
+                    config, TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Balanced));
+                var slot = new TopologySlotRecord
+                {
+                    TopologySlotId = "slot-q2-r0-turn-004-p180",
+                    CanonicalOrder = 6,
+                    DemandType = TopologyRole.TurnRealization,
+                    SignedHeadingDelta = 180f,
+                    OriginalRealization = SemanticElementId.Hairpin,
+                    CurrentRealization = SemanticElementId.Hairpin,
+                    LocalReplanPolicy = LocalReplanScope.OwnedConnectors
+                };
+
+                FeaturePlanResult halfHelix = TrackTopologyPlanner.BuildReplacementCandidate(
+                    resolved, slot, SemanticElementId.HalfHelixTurnaround,
+                    TrackConnectionFrame.Origin(resolved.RoadWidth));
+
+                Assert.IsFalse(halfHelix.Failed, halfHelix.FailureReason);
+                Assert.AreEqual(SemanticElementId.HalfHelixTurnaround, halfHelix.Element);
+                Assert.AreEqual(slot.SignedHeadingDelta,
+                    halfHelix.HeadingContributionDeg, 0.25f);
+                Assert.LessOrEqual(halfHelix.ElevationChange, -140f);
+                Assert.AreEqual(0f, halfHelix.ExitState.PitchAngle, 0.05f);
+
+                TrackMacroSectionDefinition core = halfHelix.Definitions.Find(definition =>
+                    definition.SemanticElement == SemanticElementId.HalfHelixTurnaround);
+                Assert.NotNull(core);
+                Assert.AreEqual(TrackMacroSectionType.Spiral, core.SectionType);
+                Assert.AreEqual("slingshot.half-helix-turnaround", core.FeatureDefinitionId);
+                Assert.AreEqual("descending-half-helix-reversal", core.FeaturePrimitiveSequence);
+                Assert.IsTrue(halfHelix.Definitions.Exists(definition =>
                     definition.SectionType == TrackMacroSectionType.RecoveryStraight));
             }
             finally { Object.DestroyImmediate(config); }

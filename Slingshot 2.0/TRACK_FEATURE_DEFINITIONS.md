@@ -6,9 +6,9 @@ while each definition owns the feature's identity, permitted ranges, contracts a
 
 ## Current coverage
 
-- 28/28 serialized designer pattern types have one definition asset.
+- 29/29 serialized designer pattern types have one definition asset.
 - Ordinary Curve and Directional Corkscrew have additional selectable semantic assets.
-- Total current catalog: 30 individual definitions.
+- Total current catalog: 31 individual definitions.
 
 The first additive V2 catalog wave is deliberately opt-in while it earns its stability gate:
 
@@ -24,6 +24,10 @@ The first additive V2 catalog wave is deliberately opt-in while it earns its sta
   recovery, sized from 1.5–2.8 km.
 - **Sidewinder** — a 90° moderate inversion that combines a vertical arc with a transported roll and
   owns its recovery, sized from 1.45–2.7 km.
+- **Half Helix Turnaround** — a definition-native 150–180° reversal that follows a genuine partial
+  helical centerline, climbs by an independently tweakable 60–130 m, and exits level at its new
+  elevation with owned recovery. It is separate from both the net-zero Horseshoe and full-revolution
+  Spiral families.
 
 Each feature now has an independent ON/MIN/MAX row in the normal Generator controls. These rows
 default to off, so established presets and seeds keep their current pacing; enabling a row admits

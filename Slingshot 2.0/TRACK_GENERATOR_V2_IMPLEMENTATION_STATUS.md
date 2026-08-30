@@ -123,10 +123,10 @@ Track Editor substitution, was restored.
 ## Individual Feature Definition migration (complete for the current catalog)
 
 - Every current serialized `TrackPatternType` now resolves to exactly one enabled, versioned JSON
-  asset under `Assets/Resources/TrackFeatureDefinitions`; the current coverage contract is **28/28**.
+  asset under `Assets/Resources/TrackFeatureDefinitions`; the current coverage contract is **29/29**.
 - Ordinary Curve and Directional Corkscrew also have individual semantic definition assets even
   though they are selectable realizations rather than standalone procedural pattern enums. The
-  runtime catalog therefore contains **30 individual assets** in total.
+  runtime catalog therefore contains **31 individual assets** in total.
 - Legacy builders retain their accepted geometry while their emitted sections are stamped with the
   exact definition stable ID, version, content hash, primitive sequence and entry/recovery budgets.
   Specialized definition-native solvers keep their own more precise stamps.
@@ -382,5 +382,17 @@ Track Editor substitution, was restored.
    broad stress tests out of the normal focused gate.
 4. V2.1b curvature-flow geometry remains behind its separate opt-in/yield gate because connector
    straights are closure-solver capacity, not merely visual clutter.
-5. Run the 81-test focused gate and manually validate one forward-only Area of Impact edit before
-   starting Half Helix Turnaround.
+5. Run the refreshed focused gate, enable **Half Helix Turnarounds** for a bounded seed sweep, and
+   visually validate both handed variants plus Hairpin → Half Helix Track Editor replacement.
+
+## Half Helix Turnaround implementation (2026-08-30)
+
+Half Helix Turnaround is now integrated as an additive, disabled-by-default feature. Its individual
+versioned definition owns heading, radius, bank, climb, entry window, recovery and primitive identity.
+The geometry is a genuine 150–180° partial helix with a smooth climb and a level exact exit at the new
+elevation; it is counted independently from full Spirals and protected from generic spiral-recovery
+rewrites. Procedural rule controls, required-pattern placement, rhythm classification, Track Editor
+compatibility/replacement, exact-recipe settings and reporting are wired. Focused tests cover catalog
+identity, both signed exits, climb/level-exit geometry, compatibility and replacement construction.
+Runtime and Editor assemblies compile; the remaining admission gate is the Unity focused suite plus
+one visual/high-speed driveability pass before enabling it in presets.

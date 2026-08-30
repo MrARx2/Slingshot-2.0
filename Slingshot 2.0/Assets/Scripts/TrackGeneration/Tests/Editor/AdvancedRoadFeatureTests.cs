@@ -83,14 +83,19 @@ namespace TrackGeneration.Tests
 
                 bool rightTurn = sec.Definition.TurnSign >= 0;
                 float peakBoost = 0f, peakRounding = 0f, peakOverhang = 0f;
+                float peakMorph = 0f;
+                float minimumInsideWall = float.MaxValue;
                 for (int i = 0; i < frames.Length; i++)
                 {
                     var f = frames[i];
                     float outsideMult = rightTurn ? f.LeftWallMultiplier : f.RightWallMultiplier;
+                    float insideMult = rightTurn ? f.RightWallMultiplier : f.LeftWallMultiplier;
                     float overhang = rightTurn ? f.LeftOverhang : f.RightOverhang;
                     peakBoost = Mathf.Max(peakBoost, outsideMult);
                     peakRounding = Mathf.Max(peakRounding, f.TurnRounding);
                     peakOverhang = Mathf.Max(peakOverhang, overhang);
+                    peakMorph = Mathf.Max(peakMorph, f.WallrideMorph);
+                    minimumInsideWall = Mathf.Min(minimumInsideWall, insideMult);
 
                     if (i > 0)
                     {
@@ -104,6 +109,10 @@ namespace TrackGeneration.Tests
                 Assert.Greater(peakBoost, 2.5f, "Wallride outside wall never reached primary-surface height.");
                 Assert.Greater(peakRounding, 0.95f, "Wallride center never fully rounded.");
                 Assert.Greater(peakOverhang, 0.9f, "Wallride outside wall never engaged the capture curl.");
+                Assert.Greater(peakMorph, 0.9f,
+                    "Wallride no longer folds the road onto its intended outer-wall surface.");
+                Assert.Less(minimumInsideWall, 0.1f,
+                    "Wallride no longer opens its inside edge as originally authored.");
 
                 // Weld boundaries are neutral (the migration happens inside the section).
                 Assert.Less(frames[0].TurnRounding, 0.01f);

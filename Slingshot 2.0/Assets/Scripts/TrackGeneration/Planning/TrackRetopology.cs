@@ -83,7 +83,8 @@ namespace TrackGeneration.Planning
                         break;
                 }
                 return ordinary && (Mathf.Abs(definition.HillHeight) < 0.001f ||
-                                    definition.SemanticElement == SemanticElementId.Horseshoe);
+                                    definition.SemanticElement == SemanticElementId.Horseshoe ||
+                                    definition.SemanticElement == SemanticElementId.HalfHelixTurnaround);
             }
 
             void RefreshRun(List<GeneratedTrackSection> run)
@@ -246,7 +247,7 @@ namespace TrackGeneration.Planning
             public int RawRequirement;
             public int Intervals;
             public string LimitingFactor = "base spacing";
-            public bool IsRollHeavy;   // corkscrew/barrel: wide floor rotates → protect its density
+            public bool IsRollHeavy;   // inversion roll: wide floor rotates → protect its density
 
             public SubdivisionRegionRecord ToRecord(int index)
             {
@@ -357,7 +358,7 @@ namespace TrackGeneration.Planning
                 totalLength += length;
                 totalSectionCount += seg.Count;
 
-                // A region whose road roll spans ≥120° is a barrel/corkscrew: its wide
+                // A region whose road roll spans ≥120° is an inversion roll: its wide
                 // floor rotates, so relaxing its facet launches the craft off the floor edge.
                 bool rollHeavy = rollMax > rollMin && (rollMax - rollMin) >= 120f;
 
@@ -399,7 +400,7 @@ namespace TrackGeneration.Planning
                                    && protectedRings <= budget * 0.85f;
                 if (protectRoll)
                 {
-                    // Keep barrel/corkscrew floors at their demanded density — relaxing THEM
+                    // Keep inversion floors at their demanded density — relaxing THEM
                     // is what turns a small facet into a multi-metre twist on the wide rolling
                     // floor (the felt launch). Absorb the overflow on the other regions.
                     // NOTE (known limitation): a "region" is a whole continuous road run, so

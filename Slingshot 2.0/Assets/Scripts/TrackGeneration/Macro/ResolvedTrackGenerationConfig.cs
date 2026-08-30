@@ -168,6 +168,7 @@ namespace TrackGeneration.Macro
         public ResolvedFeatureRule Hairpins;
         public ResolvedFeatureRule WideTurnarounds;
         public ResolvedFeatureRule Horseshoes;
+        public ResolvedFeatureRule HalfHelixTurnarounds;
         public ResolvedFeatureRule Cutbacks;
 
         // Procedural encounter rhythm. Track Editor exact overrides deliberately do
@@ -553,6 +554,8 @@ namespace TrackGeneration.Macro
             r.Hairpins = ResolvedFeatureRule.From(settings.Features.Hairpins, true, r.DesignSpeedMps, r.DangerousSpacingLength);
             r.WideTurnarounds = ResolvedFeatureRule.From(settings.Features.WideTurnarounds, true, r.DesignSpeedMps, r.DangerousSpacingLength);
             r.Horseshoes = ResolvedFeatureRule.From(settings.Features.Horseshoes, true, r.DesignSpeedMps, r.DangerousSpacingLength);
+            r.HalfHelixTurnarounds = ResolvedFeatureRule.From(settings.Features.HalfHelixTurnarounds,
+                true, r.DesignSpeedMps, r.DangerousSpacingLength);
             r.Cutbacks = ResolvedFeatureRule.From(settings.Features.Cutbacks, true,
                 r.DesignSpeedMps, r.DangerousSpacingLength);
             r.EnforceProceduralRhythm = settings.Features.EnforceProceduralRhythm;
@@ -967,6 +970,7 @@ namespace TrackGeneration.Macro
             AddRule(Hairpins, TrackPatternType.Hairpin);
             AddRule(WideTurnarounds, TrackPatternType.WideTurnaround);
             AddRule(Horseshoes, TrackPatternType.Horseshoe);
+            AddRule(HalfHelixTurnarounds, TrackPatternType.HalfHelixTurnaround);
             AddRule(Cutbacks, TrackPatternType.Cutback);
             AddRule(Chicanes, TrackPatternType.Chicane);
             AddRule(SCurves, TrackPatternType.SCurve);

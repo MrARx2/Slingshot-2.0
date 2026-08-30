@@ -312,7 +312,7 @@ namespace TrackGeneration.Planning
             result.Report.SubdivisionRegions.AddRange(best.Layout.SubdivisionRegions);
             result.Report.FeatureExitRecords.AddRange(best.Plan.FeatureExitRecords);
             result.Report.TopologySlots.AddRange(best.Plan.TopologySlots);
-            TrackRhythmSummary selectedRhythm = TrackRhythm.Analyze(best.Plan.TopologySlots, cfg);
+            TrackRhythmSummary selectedRhythm = TrackRhythm.AnalyzeBuiltLayout(best.Layout, cfg);
             result.Report.RhythmSummary = selectedRhythm.CompactDescription;
             result.Report.EncounterTimelines.AddRange(selectedRhythm.RouteTimelines);
 
@@ -355,6 +355,11 @@ namespace TrackGeneration.Planning
 
             foreach (var sec in layout.Sections)
             {
+                if (sec.Definition.SemanticElement == SemanticElementId.HalfHelixTurnaround)
+                {
+                    m.HalfHelixTurnaroundCount++;
+                }
+                else
                 switch (sec.Definition.SectionType)
                 {
                     case TrackMacroSectionType.Loop: m.LoopCount++; break;
@@ -423,7 +428,7 @@ namespace TrackGeneration.Planning
             m.MaxFacetAngleObserved = maxFacet;
             m.TotalRings = rings;
 
-            TrackRhythmSummary rhythm = TrackRhythm.Analyze(plan.TopologySlots, cfg);
+            TrackRhythmSummary rhythm = TrackRhythm.AnalyzeBuiltLayout(layout, cfg);
             m.EncounterCount = rhythm.EncounterCount;
             m.DistinctEncounterFamilies = rhythm.DistinctFamilies;
             m.LongestEncounterFamilyStreak = rhythm.LongestRepeatedFamilyStreak;
@@ -492,7 +497,8 @@ namespace TrackGeneration.Planning
             score -= Mathf.Min(6f, plan.Warnings.Count * 2f);
 
             // Feature richness toward the requested group window (up to -8).
-            int featureGroups = m.LoopCount + m.CorkscrewCount + m.SpiralCount + m.HalfLoopCount + m.JumpCount;
+            int featureGroups = m.LoopCount + m.CorkscrewCount + m.SpiralCount +
+                                m.HalfHelixTurnaroundCount + m.HalfLoopCount + m.JumpCount;
             if (featureGroups < cfg.MinFeatureGroups)
                 score -= (cfg.MinFeatureGroups - featureGroups) * 4f;
 

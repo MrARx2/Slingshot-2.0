@@ -478,6 +478,31 @@ namespace TrackGeneration.Planning
             heading += signedAngleDeg;
         }
 
+        /// <summary>
+        /// Advances the canonical 2D plan walk through a spiral-family section.
+        /// Complete spirals return to their entry heading and only contribute their
+        /// optional forward drift. A HalfHelixTurnaround is a partial circular helix,
+        /// so it also contributes the authored turn and its natural lateral footprint.
+        /// Keep this endpoint model paired with <see cref="BuildSpiral"/>.
+        /// </summary>
+        public static void ApplySpiral2D(ref Vector2 pos, ref float heading,
+            TrackMacroSectionDefinition definition)
+        {
+            if (definition == null) return;
+
+            Vector2 entryForward = HeadingToDir(heading);
+            if (definition.SemanticElement == SemanticElementId.HalfHelixTurnaround)
+            {
+                float signedAngle = Mathf.Abs(definition.TurnAngle) *
+                                    (definition.TurnSign != 0 ? definition.TurnSign : 1f);
+                ApplyArc2D(ref pos, ref heading, signedAngle,
+                    Mathf.Max(definition.Width, definition.Radius));
+            }
+
+            // BuildSpiral applies drift along the fixed entry axis, not the exit axis.
+            pos += entryForward * Mathf.Max(0f, definition.PlanHorizontalLength);
+        }
+
         // ─────────────────────────── Loop profile tables ───────────────────────────
 
         private static void EnsureLoopProfile()
@@ -1931,9 +1956,18 @@ namespace TrackGeneration.Planning
         /// <summary>Arc-length estimate for a spiral whose helix drifts forward while climbing.</summary>
         public static float EstimateDriftingSpiralLength(float radius, float turnAngleDegrees,
             float forwardDrift, float climb)
+            => EstimatePartialHelixLength(radius,
+                Mathf.Max(360f, Mathf.Abs(turnAngleDegrees)), forwardDrift, climb);
+
+        /// <summary>
+        /// Arc-length estimate for a level-ended partial or complete helix. Unlike the
+        /// legacy spiral contract, this permits a 150–180° Half Helix Turnaround.
+        /// </summary>
+        public static float EstimatePartialHelixLength(float radius, float turnAngleDegrees,
+            float forwardDrift, float climb)
         {
             const int steps = 256;
-            float totalAngleRad = Mathf.Max(360f, Mathf.Abs(turnAngleDegrees)) * Mathf.Deg2Rad;
+            float totalAngleRad = Mathf.Max(1f, Mathf.Abs(turnAngleDegrees)) * Mathf.Deg2Rad;
             float circularDerivative = Mathf.Max(1f, radius) * totalAngleRad;
             float length = 0f;
             for (int i = 0; i < steps; i++)
@@ -1960,7 +1994,10 @@ namespace TrackGeneration.Planning
         public static TrackConnectionFrame[] BuildSpiral(TrackConnectionFrame entry, TrackMacroSectionDefinition def,
             in FrameBuildContext ctx)
         {
-            float totalAngle = Mathf.Max(360f, def.TurnAngle);
+            bool partialHelix = def.SemanticElement == SemanticElementId.HalfHelixTurnaround;
+            float totalAngle = partialHelix
+                ? Mathf.Clamp(Mathf.Abs(def.TurnAngle), 1f, 359.999f)
+                : Mathf.Max(360f, Mathf.Abs(def.TurnAngle));
             float side = def.TurnSign != 0 ? def.TurnSign : 1f;
             float radius = Mathf.Max(def.Width, def.Radius);
             float arcLen = def.Length;
@@ -2012,11 +2049,14 @@ namespace TrackGeneration.Planning
                 };
             }
 
-            // Exact exit: forward-drifted and above/below the entry, level and unbanked.
+            // Exact exit: partial helices preserve their opposite-direction circular
+            // endpoint; complete spirals reduce to the historical start-axis exit.
             var last = frames[rings - 1];
-            last.Position = entry.Position + fwdH * forwardDrift + Vector3.up * climb;
-            last.Forward = fwdH;
-            last.Right = rightH;
+            Quaternion exitYaw = Quaternion.AngleAxis(side * totalAngle, Vector3.up);
+            last.Position = center + exitYaw * toStart +
+                            fwdH * forwardDrift + Vector3.up * climb;
+            last.Forward = (exitYaw * fwdH).normalized;
+            last.Right = (exitYaw * rightH).normalized;
             last.Up = Vector3.up;
             last.PitchAngle = 0f;
             last.BankAngle = 0f;

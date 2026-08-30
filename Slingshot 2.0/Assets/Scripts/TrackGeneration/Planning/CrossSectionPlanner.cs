@@ -8,11 +8,26 @@ namespace TrackGeneration.Planning
     /// Produces one canonical width/side-height sample at every physical ring. Changes
     /// are constrained by travelled distance in both directions, so a narrow curve or
     /// deep turn prepares its neighbours instead of creating a one-section wall wave.
-    /// Authored inversion/wallride/pipe samples remain hard anchors.
+    /// Authored inversion/wallride/pipe interiors remain hard anchors; their mouth
+    /// zones participate in the global blend so two protected features can meet
+    /// without forcing a one-ring wall-height step.
     /// </summary>
     public static class CrossSectionPlanner
     {
         private const float WeldToleranceSqr = 0.0025f;
+
+        private enum WallChannel
+        {
+            Width,
+            SideHeight,
+            LeftWallSuppression,
+            RightWallSuppression,
+            TurnRounding,
+            LeftOverhang,
+            RightOverhang,
+            PipeClosure,
+            WallrideMorph
+        }
 
         private sealed class Location
         {
@@ -106,6 +121,227 @@ namespace TrackGeneration.Planning
                     section.EndFrame = section.SubdivisionFrames[section.SubdivisionFrames.Length - 1];
                 }
             }
+        }
+
+        /// <summary>
+        /// Final C1 finishing pass for the actual ring grid consumed by both the render
+        /// mesh and collider. The canonical planner above guarantees matching values at
+        /// a weld (C0), but a protected feature can hold a constant authored wall while
+        /// its ordinary connector arrives with a non-zero slope. That is a legal weld
+        /// which still reads and drives as a dent.
+        ///
+        /// This pass keeps the shared ring and every authored feature core exact. It
+        /// changes only the ordinary road beside a protected feature; between two
+        /// ordinary sections it shares the correction across both sides. Corrections
+        /// taper to zero value and zero slope inside each section, so no new seam is
+        /// moved farther away. Open ends, air gaps and route forks are separate chains
+        /// and are intentionally untouched.
+        /// </summary>
+        public static void HarmonizeFinalWallJoins(List<GeneratedTrackSection> sections,
+            ResolvedTrackGenerationConfig cfg)
+        {
+            if (sections == null || sections.Count == 0 || cfg?.RoadProfile == null) return;
+
+            float configuredWindow = Mathf.Clamp(
+                Mathf.Max(cfg.WidthTransitionLength, cfg.CrossSectionTransitionLength) * 0.35f,
+                12f, 120f);
+
+            foreach (List<GeneratedTrackSection> chain in CollectChains(sections))
+            {
+                if (chain.Count < 2) continue;
+                bool closed = IsClosedChain(chain);
+                int joinCount = closed ? chain.Count : chain.Count - 1;
+
+                for (int i = 0; i < joinCount; i++)
+                {
+                    GeneratedTrackSection before = chain[i];
+                    GeneratedTrackSection after = chain[(i + 1) % chain.Count];
+                    if (!CanWeld(before, after)) continue;
+
+                    bool beforeProtected = IsProtected(before.Definition.SectionType);
+                    bool afterProtected = IsProtected(after.Definition.SectionType);
+
+                    // Retopology already emits a shared ring. Reconcile the scalar
+                    // copies defensively because a later feature finishing pass may
+                    // have touched only one serialized copy.
+                    ShareBoundaryWallContract(before, after, beforeProtected, afterProtected);
+
+                    float beforeLength = SectionArcLength(before);
+                    float afterLength = SectionArcLength(after);
+                    bool bothProtected = beforeProtected && afterProtected;
+                    // Protected-to-protected wall DEPTH already owns a deliberately
+                    // blendable mouth from the canonical pass. Finish that mouth, but
+                    // never touch the feature-specific width/fold/overhang channels.
+                    float sectionFraction = bothProtected ? 0.25f : 0.45f;
+                    float beforeWindow = Mathf.Min(configuredWindow, beforeLength * sectionFraction);
+                    float afterWindow = Mathf.Min(configuredWindow, afterLength * sectionFraction);
+
+                    foreach (WallChannel channel in System.Enum.GetValues(typeof(WallChannel)))
+                    {
+                        if (bothProtected && channel != WallChannel.SideHeight) continue;
+
+                        float slopeBefore = EndSlope(before, channel);
+                        float slopeAfter = StartSlope(after, channel);
+                        float sharedSlope = beforeProtected && !bothProtected
+                            ? slopeBefore
+                            : afterProtected && !bothProtected
+                                ? slopeAfter
+                                : 0.5f * (slopeBefore + slopeAfter);
+
+                        if ((!beforeProtected || bothProtected) && beforeWindow >= 2f)
+                            EaseSlopeAtEnd(before, channel, sharedSlope - slopeBefore, beforeWindow);
+                        if ((!afterProtected || bothProtected) && afterWindow >= 2f)
+                            EaseSlopeAtStart(after, channel, sharedSlope - slopeAfter, afterWindow);
+                    }
+                }
+
+                // Corrections from neighboring joins can overlap on a very short
+                // ordinary section. The 45% per-side window prevents those envelopes
+                // from crossing; refresh the public boundary copies once both ends are
+                // complete.
+                foreach (GeneratedTrackSection section in chain)
+                {
+                    TrackConnectionFrame[] frames = section.SubdivisionFrames;
+                    section.StartFrame = frames[0];
+                    section.EndFrame = frames[frames.Length - 1];
+                }
+            }
+        }
+
+        private static float SectionArcLength(GeneratedTrackSection section)
+        {
+            TrackConnectionFrame[] frames = section.SubdivisionFrames;
+            return Mathf.Max(0f, frames[frames.Length - 1].ArcLength - frames[0].ArcLength);
+        }
+
+        private static void ShareBoundaryWallContract(GeneratedTrackSection before,
+            GeneratedTrackSection after, bool beforeProtected, bool afterProtected)
+        {
+            TrackConnectionFrame[] left = before.SubdivisionFrames;
+            TrackConnectionFrame[] right = after.SubdivisionFrames;
+            int last = left.Length - 1;
+            TrackConnectionFrame a = left[last];
+            TrackConnectionFrame b = right[0];
+
+            foreach (WallChannel channel in System.Enum.GetValues(typeof(WallChannel)))
+            {
+                float value = afterProtected
+                    ? Get(b, channel)
+                    : beforeProtected
+                        ? Get(a, channel)
+                        : 0.5f * (Get(a, channel) + Get(b, channel));
+                a = Set(a, channel, value);
+                b = Set(b, channel, value);
+            }
+
+            left[last] = a;
+            right[0] = b;
+            before.EndFrame = a;
+            after.StartFrame = b;
+        }
+
+        private static float EndSlope(GeneratedTrackSection section, WallChannel channel)
+        {
+            TrackConnectionFrame[] frames = section.SubdivisionFrames;
+            int end = frames.Length - 1;
+            float ds = Mathf.Max(0.001f, frames[end].ArcLength - frames[end - 1].ArcLength);
+            return (Get(frames[end], channel) - Get(frames[end - 1], channel)) / ds;
+        }
+
+        private static float StartSlope(GeneratedTrackSection section, WallChannel channel)
+        {
+            TrackConnectionFrame[] frames = section.SubdivisionFrames;
+            float ds = Mathf.Max(0.001f, frames[1].ArcLength - frames[0].ArcLength);
+            return (Get(frames[1], channel) - Get(frames[0], channel)) / ds;
+        }
+
+        private static void EaseSlopeAtEnd(GeneratedTrackSection section, WallChannel channel,
+            float slopeCorrection, float window)
+        {
+            if (Mathf.Abs(slopeCorrection) < 1e-7f) return;
+            TrackConnectionFrame[] frames = section.SubdivisionFrames;
+            float boundary = frames[frames.Length - 1].ArcLength;
+
+            for (int i = frames.Length - 2; i >= 0; i--)
+            {
+                float distance = boundary - frames[i].ArcLength;
+                if (distance >= window) break;
+                float t = 1f - Mathf.Clamp01(distance / window); // far edge 0, weld 1
+                float hermite = t * t * (t - 1f);                // h11: value 0 at both ends
+                frames[i] = Set(frames[i], channel,
+                    Get(frames[i], channel) + hermite * slopeCorrection * window);
+            }
+        }
+
+        private static void EaseSlopeAtStart(GeneratedTrackSection section, WallChannel channel,
+            float slopeCorrection, float window)
+        {
+            if (Mathf.Abs(slopeCorrection) < 1e-7f) return;
+            TrackConnectionFrame[] frames = section.SubdivisionFrames;
+            float boundary = frames[0].ArcLength;
+
+            for (int i = 1; i < frames.Length; i++)
+            {
+                float distance = frames[i].ArcLength - boundary;
+                if (distance >= window) break;
+                float t = Mathf.Clamp01(distance / window);      // weld 0, far edge 1
+                float hermite = t * (t - 1f) * (t - 1f);         // h10: value 0 at both ends
+                frames[i] = Set(frames[i], channel,
+                    Get(frames[i], channel) + hermite * slopeCorrection * window);
+            }
+        }
+
+        private static float Get(in TrackConnectionFrame frame, WallChannel channel)
+        {
+            switch (channel)
+            {
+                case WallChannel.Width: return frame.Width;
+                case WallChannel.SideHeight: return frame.SideHeight;
+                case WallChannel.LeftWallSuppression: return frame.LeftWallSuppression;
+                case WallChannel.RightWallSuppression: return frame.RightWallSuppression;
+                case WallChannel.TurnRounding: return frame.TurnRounding;
+                case WallChannel.LeftOverhang: return frame.LeftOverhang;
+                case WallChannel.RightOverhang: return frame.RightOverhang;
+                case WallChannel.PipeClosure: return frame.PipeClosure;
+                case WallChannel.WallrideMorph: return frame.WallrideMorph;
+                default: return 0f;
+            }
+        }
+
+        private static TrackConnectionFrame Set(TrackConnectionFrame frame,
+            WallChannel channel, float value)
+        {
+            switch (channel)
+            {
+                case WallChannel.Width:
+                    frame.Width = Mathf.Max(1f, value);
+                    break;
+                case WallChannel.SideHeight:
+                    frame.SideHeight = Mathf.Max(0.1f, value);
+                    break;
+                case WallChannel.LeftWallSuppression:
+                    frame.LeftWallSuppression = Mathf.Clamp(value, -2f, 1f);
+                    break;
+                case WallChannel.RightWallSuppression:
+                    frame.RightWallSuppression = Mathf.Clamp(value, -2f, 1f);
+                    break;
+                case WallChannel.TurnRounding:
+                    frame.TurnRounding = Mathf.Clamp01(value);
+                    break;
+                case WallChannel.LeftOverhang:
+                    frame.LeftOverhang = Mathf.Clamp01(value);
+                    break;
+                case WallChannel.RightOverhang:
+                    frame.RightOverhang = Mathf.Clamp01(value);
+                    break;
+                case WallChannel.PipeClosure:
+                    frame.PipeClosure = Mathf.Clamp01(value);
+                    break;
+                case WallChannel.WallrideMorph:
+                    frame.WallrideMorph = Mathf.Clamp01(value);
+                    break;
+            }
+            return frame;
         }
 
         private static List<List<GeneratedTrackSection>> CollectChains(
@@ -213,15 +449,30 @@ namespace TrackGeneration.Planning
                 bool protectedShape = IsProtected(section.Definition.SectionType);
                 float multiplier = TargetMultiplier(chain, s);
                 float targetHeight = cfg.RoadProfile.SideHeight * multiplier;
+                TrackConnectionFrame[] sectionFrames = section.SubdivisionFrames;
+                float sectionStart = sectionFrames[0].ArcLength;
+                float sectionEnd = sectionFrames[sectionFrames.Length - 1].ArcLength;
+                float sectionLength = Mathf.Max(0f, sectionEnd - sectionStart);
+                float mouthLength = Mathf.Min(sectionLength * 0.25f,
+                    Mathf.Clamp(Mathf.Max(cfg.WidthTransitionLength,
+                        cfg.CrossSectionTransitionLength) * 0.35f, 12f, 120f));
 
                 // V2.1: an authored shape, or ordinary road asking for a distinct wall height,
                 // is a real destination. Everything else is pass-through (blended, not asserted).
-                bool heightAnchor = protectedShape ||
+                bool ordinaryHeightTarget = !protectedShape &&
                     Mathf.Abs(TrackCandidateBuilder.DepthMultiplier(section.Definition.SectionType) - 1f) > 0.001f;
 
                 for (int r = 0; r < section.SubdivisionFrames.Length; r++)
                 {
                     TrackConnectionFrame frame = section.SubdivisionFrames[r];
+                    float fromMouth = Mathf.Min(frame.ArcLength - sectionStart,
+                        sectionEnd - frame.ArcLength);
+                    // The feature body is exact. Its entry/exit quarter is a transition
+                    // mouth, not a separate wall-height destination; otherwise two
+                    // directly welded protected features can differ by their complete
+                    // depth step in one final ring.
+                    bool protectedCore = protectedShape && fromMouth >= mouthLength - 0.001f;
+                    bool heightAnchor = protectedCore || ordinaryHeightTarget;
                     bool duplicate = previous != null &&
                                      (previous.Position - frame.Position).sqrMagnitude <= WeldToleranceSqr;
                     Node node;
@@ -240,7 +491,7 @@ namespace TrackGeneration.Planning
                             DesiredWidth = frame.Width,
                             DesiredSideHeight = targetHeight,
                             WidthLocked = protectedShape,
-                            SideHeightLocked = protectedShape,
+                            SideHeightLocked = protectedCore,
                             HeightAnchor = heightAnchor
                         };
                         nodes.Add(node);
@@ -252,9 +503,14 @@ namespace TrackGeneration.Planning
                     if (heightAnchor) node.HeightAnchor = true;
                     if (protectedShape)
                     {
+                        // Structural feature width remains exact all the way through
+                        // the mouth. Only generic wall depth is allowed to blend.
                         node.DesiredWidth = frame.Width;
-                        node.DesiredSideHeight = targetHeight;
                         node.WidthLocked = true;
+                    }
+                    if (protectedCore)
+                    {
+                        node.DesiredSideHeight = targetHeight;
                         node.SideHeightLocked = true;
                     }
                 }

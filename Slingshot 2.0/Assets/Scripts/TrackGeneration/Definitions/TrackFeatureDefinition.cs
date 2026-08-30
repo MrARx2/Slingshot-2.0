@@ -86,7 +86,8 @@ namespace TrackGeneration.Definitions
         ElevatedEasedTurn = 12,
         SpiralHelix = 13,
         CrestStraight = 14,
-        DipStraight = 15
+        DipStraight = 15,
+        HalfHelixTurn = 16
     }
 
     public enum FeatureRadiusSource
@@ -264,6 +265,22 @@ namespace TrackGeneration.Definitions
         }
     }
 
+    /// <summary>
+    /// Signed vertical displacement for a partial helical reversal.
+    /// Positive values climb; negative values descend.
+    /// </summary>
+    [Serializable]
+    public sealed class HalfHelixDefinitionParameters
+    {
+        public FeatureScalarParameter ElevationChangeMeters = new FeatureScalarParameter();
+
+        public void Sanitize()
+        {
+            ElevationChangeMeters ??= new FeatureScalarParameter();
+            ElevationChangeMeters.Sanitize();
+        }
+    }
+
     /// <summary>One or more net-zero elevation lobes whose entry and exit remain level.</summary>
     [Serializable]
     public sealed class VerticalBumpDefinitionParameters
@@ -393,6 +410,7 @@ namespace TrackGeneration.Definitions
         public CorkscrewDefinitionParameters Corkscrew = new CorkscrewDefinitionParameters();
         public SpiralDefinitionParameters Spiral = new SpiralDefinitionParameters();
         public TurnDefinitionParameters Turn = new TurnDefinitionParameters();
+        public HalfHelixDefinitionParameters HalfHelix = new HalfHelixDefinitionParameters();
         public VerticalBumpDefinitionParameters VerticalBump = new VerticalBumpDefinitionParameters();
         public RotationalFeatureDefinitionParameters Rotational = new RotationalFeatureDefinitionParameters();
         public List<FeatureGeometryPrimitive> Primitives = new List<FeatureGeometryPrimitive>();
@@ -422,6 +440,7 @@ namespace TrackGeneration.Definitions
             Corkscrew ??= new CorkscrewDefinitionParameters();
             Spiral ??= new SpiralDefinitionParameters();
             Turn ??= new TurnDefinitionParameters();
+            HalfHelix ??= new HalfHelixDefinitionParameters();
             VerticalBump ??= new VerticalBumpDefinitionParameters();
             Rotational ??= new RotationalFeatureDefinitionParameters();
             Primitives ??= new List<FeatureGeometryPrimitive>();
@@ -432,6 +451,7 @@ namespace TrackGeneration.Definitions
             Corkscrew.Sanitize();
             Spiral.Sanitize();
             Turn.Sanitize();
+            HalfHelix.Sanitize();
             VerticalBump.Sanitize();
             Rotational.Sanitize();
             Primitives.RemoveAll(primitive => primitive == null);
@@ -542,12 +562,14 @@ namespace TrackGeneration.Definitions
                 (TopologyRole != TopologyRole.TurnRealization ||
                  Primitives.Count != 1 ||
                  (Primitives[0].PrimitiveType != FeatureGeometryPrimitiveType.EasedTurn &&
-                  Primitives[0].PrimitiveType != FeatureGeometryPrimitiveType.ElevatedEasedTurn) ||
+                  Primitives[0].PrimitiveType != FeatureGeometryPrimitiveType.ElevatedEasedTurn &&
+                  Primitives[0].PrimitiveType != FeatureGeometryPrimitiveType.HalfHelixTurn) ||
                  Turn.HeadingDegrees.Maximum < Turn.HeadingDegrees.Minimum ||
                  Turn.HeadingDegrees.Maximum <= 0f ||
                  Turn.RadiusMultiplier.Maximum <= 0f ||
                  (Turn.CoreSectionType != TrackMacroSectionType.BankedCurve &&
-                  Turn.CoreSectionType != TrackMacroSectionType.BankedHairpin)))
+                  Turn.CoreSectionType != TrackMacroSectionType.BankedHairpin &&
+                  Turn.CoreSectionType != TrackMacroSectionType.Spiral)))
             {
                 error = $"Definition '{StableId}' is not a complete single-EasedTurn recipe.";
                 return false;
@@ -557,6 +579,17 @@ namespace TrackGeneration.Definitions
                 Turn.CrestHeightMeters.Maximum <= 0f)
             {
                 error = $"Definition '{StableId}' uses ElevatedEasedTurn without a positive crest-height range.";
+                return false;
+            }
+            if (Solver == FeatureDefinitionSolver.EasedTurnV1 &&
+                 Primitives[0].PrimitiveType == FeatureGeometryPrimitiveType.HalfHelixTurn &&
+                (Turn.CoreSectionType != TrackMacroSectionType.Spiral ||
+                 HalfHelix.ElevationChangeMeters.Maximum >= -0.001f ||
+                 ExitContract.ElevationChangeMeters >= -0.001f ||
+                 Mathf.Abs(ExitContract.ElevationChangeMeters -
+                           HalfHelix.ElevationChangeMeters.Preferred) > 0.001f))
+            {
+                error = $"Definition '{StableId}' uses HalfHelixTurn without a descending exit contract.";
                 return false;
             }
             if (Solver == FeatureDefinitionSolver.VerticalBumpV1 &&

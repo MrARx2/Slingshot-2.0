@@ -1,0 +1,88 @@
+{
+  "SchemaVersion": 1,
+  "StableId": "slingshot.half-helix-turnaround",
+  "DefinitionVersion": 2,
+  "DisplayName": "Half Helix Turnaround",
+  "Family": "Turnaround",
+  "Enabled": true,
+  "SemanticElement": 14,
+  "HasPatternType": true,
+  "PatternType": 30,
+  "TopologyRole": 1,
+  "Solver": 3,
+  "SpeedIntent": 1,
+  "RiskLevel": 2,
+  "RequiresRecoveryAfter": true,
+  "EmitsOwnApproach": false,
+  "EmitsOwnRecovery": true,
+  "Length": {
+    "Minimum": 1800.0,
+    "Preferred": 3200.0,
+    "Maximum": 7000.0,
+    "Resolution": 1,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": false,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "EntryLength": {
+    "Minimum": 300.0,
+    "Preferred": 500.0,
+    "Maximum": 1000.0,
+    "Resolution": 0,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "RecoveryLength": {
+    "Minimum": 300.0,
+    "Preferred": 500.0,
+    "Maximum": 1200.0,
+    "Resolution": 0,
+    "MayAutoExpand": true,
+    "ScaleWithDesignSpeed": true,
+    "ReferenceSpeedMps": 361.1111
+  },
+  "EntryContract": {
+    "Orientation": 0,
+    "RequiresUprightEntry": false,
+    "MaximumBankDegrees": 25.0,
+    "MaximumPitchDegrees": 15.0,
+    "MaximumHorizontalCurvature": 0.0016666667,
+    "MaximumRollRateDegreesPerMeter": 0.08,
+    "AcceptsCurvedEntry": true
+  },
+  "ExitContract": {
+    "Orientation": 0,
+    "HeadingChangeDegrees": 180.0,
+    "PitchChangeDegrees": 0.0,
+    "RollChangeDegrees": 0.0,
+    "ElevationChangeMeters": -180.0
+  },
+  "Turn": {
+    "HeadingDegrees": { "Minimum": 150.0, "Preferred": 180.0, "Maximum": 180.0 },
+    "RadiusMultiplier": { "Minimum": 1.50, "Preferred": 1.65, "Maximum": 1.80 },
+    "AbsoluteRadiusMeters": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 },
+    "CrestHeightMeters": { "Minimum": 0.0, "Preferred": 0.0, "Maximum": 0.0 },
+    "BankMultiplier": { "Minimum": 1.05, "Preferred": 1.15, "Maximum": 1.25 },
+    "CoreSectionType": 18,
+    "UseRecommendedBank": true
+  },
+  "HalfHelix": {
+    "ElevationChangeMeters": { "Minimum": -220.0, "Preferred": -180.0, "Maximum": -140.0 }
+  },
+  "Primitives": [
+    {
+      "PrimitiveId": "descending-half-helix-reversal",
+      "DisplayName": "Descending Half Helix Reversal",
+      "PrimitiveType": 16,
+      "EntryOrientation": 0,
+      "ExitOrientation": 0,
+      "LengthFraction": 1.0,
+      "RadiusSource": 3,
+      "ContinueCurvature": false,
+      "ContinueRollRate": false,
+      "AllowGenericConnectorBefore": false
+    }
+  ],
+  "MinimumClearanceMeters": 100.0
+}

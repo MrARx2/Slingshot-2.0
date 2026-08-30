@@ -187,7 +187,7 @@ namespace TrackGeneration.Tests
         }
 
         [Test]
-        public void CorkscrewBelly_IsMandatoryForEveryFullRollVariant()
+        public void InversionBelly_IsMandatoryForCorkscrewsAndAuthoredDriveabilityFeatures()
         {
             var cfg = new ResolvedTrackGenerationConfig
             {
@@ -252,18 +252,29 @@ namespace TrackGeneration.Tests
                 Phase(RotationalPhaseAxis.VerticalCenterline, 2, 400f),
                 Phase(RotationalPhaseAxis.RoadRoll, 6, 1000f));
             var legacy = Section(TrackMacroSectionType.Corkscrew);
+            var heartline = Section(TrackMacroSectionType.RotationalEvent,
+                Phase(RotationalPhaseAxis.RoadRoll, 4, 900f));
+            heartline.Definition.SemanticElement = SemanticElementId.HeartlineRoll;
+            var zeroG = Section(TrackMacroSectionType.RotationalEvent,
+                Phase(RotationalPhaseAxis.RoadRoll, 4, 1000f));
+            zeroG.Definition.SemanticElement = SemanticElementId.ZeroGRoll;
+            var diveLoop = Section(TrackMacroSectionType.RotationalEvent,
+                Phase(RotationalPhaseAxis.RoadRoll, 2, 450f),
+                Phase(RotationalPhaseAxis.VerticalCenterline, 2, 850f));
+            diveLoop.Definition.SemanticElement = SemanticElementId.DiveLoop;
             var immelmann = Section(TrackMacroSectionType.RotationalEvent,
                 Phase(RotationalPhaseAxis.VerticalCenterline, 2, 400f),
                 Phase(RotationalPhaseAxis.RoadRoll, 2, 500f));
+            immelmann.Definition.SemanticElement = SemanticElementId.Immelmann;
 
             var sections = new List<GeneratedTrackSection>
             {
                 inline, directional, doubled, loopToCorkscrew,
-                halfLoopToCorkscrew, legacy, immelmann
+                halfLoopToCorkscrew, legacy, heartline, zeroG, diveLoop, immelmann
             };
             MethodInfo apply = typeof(TrackCandidateBuilder).GetMethod(
-                "ApplyCorkscrewBelly", BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.NotNull(apply, "The finished-frame corkscrew belly pass is missing.");
+                "ApplyInversionBelly", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(apply, "The finished-frame inversion belly pass is missing.");
             apply.Invoke(null, new object[] { sections, cfg });
 
             void AssertBelly(GeneratedTrackSection section, string variant)
@@ -286,6 +297,12 @@ namespace TrackGeneration.Tests
             AssertBelly(loopToCorkscrew, "Loop-to-corkscrew");
             AssertBelly(halfLoopToCorkscrew, "Half-loop-to-corkscrew");
             AssertBelly(legacy, "Legacy corkscrew");
+            AssertBelly(heartline, "Heartline Roll");
+            AssertBelly(zeroG, "Zero-G Roll");
+            AssertBelly(diveLoop, "Dive Loop");
+
+            Assert.Greater(diveLoop.SubdivisionFrames[diveLoop.SubdivisionFrames.Length / 2].TurnRounding,
+                0.4f, "Dive Loop lost its belly at the roll-to-dive internal phase hand-off.");
 
             foreach (TrackConnectionFrame frame in immelmann.SubdivisionFrames)
                 Assert.AreEqual(0f, frame.TurnRounding, 0.0001f,

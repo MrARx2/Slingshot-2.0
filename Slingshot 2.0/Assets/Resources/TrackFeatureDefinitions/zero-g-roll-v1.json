@@ -1,7 +1,7 @@
 {
   "SchemaVersion": 1,
   "StableId": "slingshot.zero-g-roll",
-  "DefinitionVersion": 3,
+  "DefinitionVersion": 4,
   "DisplayName": "Zero-G Roll",
   "Family": "Transported Roll",
   "Enabled": true,

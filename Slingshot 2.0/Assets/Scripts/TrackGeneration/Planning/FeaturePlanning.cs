@@ -94,6 +94,7 @@ namespace TrackGeneration.Planning
             TrackPatternType.ZeroGRoll => SemanticElementId.ZeroGRoll,
             TrackPatternType.DiveLoop => SemanticElementId.DiveLoop,
             TrackPatternType.Sidewinder => SemanticElementId.Sidewinder,
+            TrackPatternType.HalfHelixTurnaround => SemanticElementId.HalfHelixTurnaround,
             _ => SemanticElementId.None
         };
 

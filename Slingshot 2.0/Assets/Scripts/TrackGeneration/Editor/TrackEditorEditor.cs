@@ -114,7 +114,6 @@ namespace TrackGeneration.Editor
                 return;
             }
 
-            DrawAcceptedEditUndo(trackEditor, generator);
             DrawBrowser(trackEditor, generator);
             DrawRequestedChanges(trackEditor, generator.EditableTopologySlots);
             serializedObject.ApplyModifiedProperties();
@@ -206,6 +205,7 @@ namespace TrackGeneration.Editor
 
                 if (!string.IsNullOrWhiteSpace(_recoveryMessage))
                     EditorGUILayout.HelpBox(_recoveryMessage, MessageType.Error);
+                DrawAcceptedEditUndo(trackEditor, generator);
                 return;
             }
 
@@ -364,13 +364,14 @@ namespace TrackGeneration.Editor
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         GUILayout.FlexibleSpace();
-                        if (GUILayout.Button(new GUIContent("Recenter",
-                                "Frame this section again if you moved the Scene camera."),
-                                EditorStyles.miniButton, GUILayout.Width(72f), GUILayout.Height(21f)))
+                        if (TrackUiActionFeedback.Button(this, "section.recenter", "Recenter",
+                                "Frame this section again if you moved the Scene camera.",
+                                EditorStyles.miniButton, "RECENTERING…",
+                                GUILayout.Width(72f), GUILayout.Height(21f)))
                             FocusSlot(generator, selected.TopologySlotId, owned);
-                        GUIContent clipboard = EditorGUIUtility.IconContent("Clipboard");
-                        clipboard.tooltip = "Copy the stable topology-slot ID.";
-                        if (GUILayout.Button(clipboard, GUILayout.Width(28f), GUILayout.Height(21f)))
+                        if (TrackUiActionFeedback.Button(this, "section.copy-id", "Copy ID",
+                                "Copy the stable topology-slot ID.", EditorStyles.miniButton,
+                                "COPYING…", GUILayout.Width(72f), GUILayout.Height(21f)))
                             GUIUtility.systemCopyBuffer = selected.TopologySlotId;
                     }
                 }
@@ -532,6 +533,11 @@ namespace TrackGeneration.Editor
                 }
             }
 
+            // Undo is the immediate counterpart to the last successful Apply/Regenerate
+            // action, so keep it next to those controls instead of separating it at the
+            // top of the inspector as unrelated global navigation.
+            DrawAcceptedEditUndo(trackEditor, generator);
+
             using (new EditorGUILayout.VerticalScope("HelpBox"))
             {
                 _showBlocked = EditorGUILayout.Foldout(_showBlocked,
@@ -659,11 +665,13 @@ namespace TrackGeneration.Editor
                                 ? "This feature may be removed by the rebuild."
                                 : $"Suggested replacements: {suggestions}"),
                         WrapStyle());
-                    if (GUILayout.Button(new GUIContent("EDIT",
+                    if (TrackUiActionFeedback.Button(this,
+                            "impact.edit|" + member.TopologySlotId, "EDIT",
                             string.IsNullOrEmpty(suggestions)
                                 ? "Select this feature before applying the current change."
-                                : $"Select this feature. Suggested alternatives: {suggestions}"),
-                            EditorStyles.miniButton, GUILayout.Width(44f), GUILayout.Height(20f)))
+                                : $"Select this feature. Suggested alternatives: {suggestions}",
+                            EditorStyles.miniButton, "EDITING…",
+                            GUILayout.Width(44f), GUILayout.Height(20f)))
                     {
                         Undo.RecordObject(trackEditor, "Edit Affected Track Feature");
                         trackEditor.SetImpactReach(0, 0);
@@ -817,7 +825,11 @@ namespace TrackGeneration.Editor
                                 : MutedTint;
                         Color buttonBackground = GUI.backgroundColor;
                         GUI.backgroundColor = actionTint;
-                        if (GUILayout.Button(button, EditorStyles.miniButton, GUILayout.Width(96f), GUILayout.Height(19f)))
+                        if (TrackUiActionFeedback.Button(this,
+                                "candidate.preview|" + result.Candidate, button, button,
+                                EditorStyles.miniButton,
+                                previewActive ? "HIDING…" : "PREVIEWING…",
+                                GUILayout.Width(96f), GUILayout.Height(19f)))
                         {
                             if (previewActive)
                             {
@@ -1229,7 +1241,10 @@ namespace TrackGeneration.Editor
                             ? $"{request.TopologySlotId}  →  {request.RequestedRealization}"
                             : $"⚠ {request.TopologySlotId}  →  {request.RequestedRealization} (stale)";
                         EditorGUILayout.LabelField(label, WrapStyle());
-                        if (exists && GUILayout.Button("SELECT", EditorStyles.miniButton, GUILayout.Width(54f)))
+                        if (exists && TrackUiActionFeedback.Button(this,
+                                "request.select|" + request.TopologySlotId, "SELECT",
+                                "Select this planned Track Editor change.",
+                                EditorStyles.miniButton, "SELECTING…", GUILayout.Width(54f)))
                         {
                             Undo.RecordObject(trackEditor, "Select Requested Topology Segment");
                             trackEditor.SelectSlot(request.TopologySlotId);
@@ -1253,7 +1268,8 @@ namespace TrackGeneration.Editor
                     }
                 }
 
-                if (GUILayout.Button("Clear Planned Changes", GUILayout.Height(22f)))
+                if (TrackUiActionFeedback.Button(this, "requests.clear", "Clear Planned Changes",
+                        "Discard all unapplied Track Editor requests.", "CLEARING…", GUILayout.Height(22f)))
                 {
                     Undo.RecordObject(trackEditor, "Clear Topology Replacement Requests");
                     trackEditor.ClearRequestedOverrides();
@@ -1905,7 +1921,7 @@ namespace TrackGeneration.Editor
             GUI.contentColor = previous;
         }
 
-        private static bool AccentButton(string label, string tooltip, Color tint,
+        private bool AccentButton(string label, string tooltip, Color tint,
             float height = 28f, bool bold = true)
         {
             Color previous = GUI.backgroundColor;
@@ -1915,7 +1931,8 @@ namespace TrackGeneration.Editor
                 fontStyle = bold ? FontStyle.Bold : FontStyle.Normal,
                 alignment = TextAnchor.MiddleCenter
             };
-            bool pressed = GUILayout.Button(new GUIContent(label, tooltip), style, GUILayout.Height(height));
+            bool pressed = TrackUiActionFeedback.Button(this, label + "|" + tooltip,
+                label, tooltip, style, options: GUILayout.Height(height));
             GUI.backgroundColor = previous;
             return pressed;
         }

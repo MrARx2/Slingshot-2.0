@@ -33,6 +33,7 @@ namespace TrackGeneration.Validation
         {
             var issues = new List<ValidationIssue>();
             ValidateRequiredFeatures(layout, plan, cfg, issues);
+            ValidateProceduralRhythm(layout, cfg, issues);
             ValidateFrameContinuity(layout, cfg, issues);
             ValidateRingQuality(layout, cfg, issues);
             ValidateRotationalEvents(layout, cfg, issues);
@@ -41,6 +42,53 @@ namespace TrackGeneration.Validation
             ValidateSelfIntersection(layout, cfg, issues);
             ValidateQuarters(layout, cfg, issues);
             return issues;
+        }
+
+        /// <summary>
+        /// Procedural tracks must obey the authored S-flow pacing contract on the
+        /// geometry that was actually built. Track Editor authoring is deliberately
+        /// exempt: creators can make and undo any local design they choose.
+        /// </summary>
+        public static void ValidateProceduralRhythm(
+            GeneratedTrackLayout layout,
+            ResolvedTrackGenerationConfig cfg,
+            List<ValidationIssue> issues)
+        {
+            if (layout == null || cfg == null || issues == null ||
+                !cfg.EnforceProceduralRhythm || cfg.DesignerAuthoringMode)
+                return;
+
+            TrackRhythmSummary rhythm = TrackRhythm.AnalyzeBuiltLayout(layout, cfg);
+            if (rhythm.LongestSCurveStreak > cfg.MaxConsecutiveSCurveEncounters)
+            {
+                issues.Add(new ValidationIssue
+                {
+                    Reason = GenerationFailureReason.ProceduralRhythmViolation,
+                    IsError = true,
+                    Validator = "ProceduralRhythm",
+                    Subject = "Consecutive S-flow",
+                    RequestedValue = cfg.MaxConsecutiveSCurveEncounters,
+                    AchievedValue = rhythm.LongestSCurveStreak,
+                    Message = $"Built route contains {rhythm.LongestSCurveStreak} consecutive S-flow encounters; " +
+                              $"the procedural maximum is {cfg.MaxConsecutiveSCurveEncounters}."
+                });
+            }
+
+            if (rhythm.MaxSCurvesInWindow > cfg.MaxSCurveEncountersPerWindow)
+            {
+                issues.Add(new ValidationIssue
+                {
+                    Reason = GenerationFailureReason.ProceduralRhythmViolation,
+                    IsError = true,
+                    Validator = "ProceduralRhythm",
+                    Subject = "Local S-flow concentration",
+                    RequestedValue = cfg.MaxSCurveEncountersPerWindow,
+                    AchievedValue = rhythm.MaxSCurvesInWindow,
+                    Message = $"Built route contains {rhythm.MaxSCurvesInWindow} S-flow encounters inside a " +
+                              $"{cfg.SCurveDiversityWindow}-encounter window; the procedural maximum is " +
+                              $"{cfg.MaxSCurveEncountersPerWindow}."
+                });
+            }
         }
 
         public static bool HasErrors(List<ValidationIssue> issues)
@@ -57,6 +105,7 @@ namespace TrackGeneration.Validation
             // Count what was ACTUALLY built (never trust the plan's bookkeeping alone).
             int loops = 0, corks = 0, spirals = 0, halfLoops = 0, jumps = 0, hairpins = 0, chicanes = 0, sCurves = 0;
             int fullPipes = 0, wallrides = 0, wideTurnarounds = 0, horseshoes = 0;
+            int halfHelixTurnarounds = 0;
             int camelbacks = 0;
             int cutbacks = 0;
             int heartlineRolls = 0, zeroGRolls = 0, diveLoops = 0, sidewinders = 0;
@@ -73,6 +122,11 @@ namespace TrackGeneration.Validation
                 if (sec.Definition.SemanticElement == SemanticElementId.Horseshoe)
                 {
                     horseshoes++;
+                    continue;
+                }
+                if (sec.Definition.SemanticElement == SemanticElementId.HalfHelixTurnaround)
+                {
+                    halfHelixTurnarounds++;
                     continue;
                 }
                 if (sec.Definition.SemanticElement == SemanticElementId.Camelback)
@@ -193,23 +247,33 @@ namespace TrackGeneration.Validation
                     });
             }
 
-            Check(cfg.Loops, loops, "loops");
-            Check(cfg.Corkscrews, corks, "corkscrews");
-            Check(cfg.Spirals, spirals, "spirals");
-            Check(cfg.Jumps, jumps, "jump groups");
-            Check(cfg.Hairpins, hairpins, "hairpins");
-            Check(cfg.Chicanes, chicanes, "chicanes");
-            Check(cfg.SCurves, sCurves, "S-curves");
-            Check(cfg.FullPipes, fullPipes, "full pipes");
-            Check(cfg.Camelbacks, camelbacks, "camelbacks");
-            Check(cfg.Wallrides, wallrides, "wallride turns");
-            Check(cfg.WideTurnarounds, wideTurnarounds, "wide turnarounds");
-            Check(cfg.Horseshoes, horseshoes, "horseshoes");
-            Check(cfg.Cutbacks, cutbacks, "cutbacks");
-            Check(cfg.HeartlineRolls, heartlineRolls, "heartline rolls");
-            Check(cfg.ZeroGRolls, zeroGRolls, "zero-g rolls");
-            Check(cfg.DiveLoops, diveLoops, "dive loops");
-            Check(cfg.Sidewinders, sidewinders, "sidewinders");
+            // Feature amounts describe procedural-generation intent. A deliberate
+            // Track Editor replacement is allowed to exchange one realization for
+            // another even when that makes the accepted variant differ from the
+            // generator's minimum/maximum mix (for example Hairpin 1 -> 0 and
+            // WideTurnaround 0 -> 1). Geometry and driveability validation remain
+            // authoritative below; only the procedural quota contract is exempt.
+            if (!cfg.DesignerAuthoringMode)
+            {
+                Check(cfg.Loops, loops, "loops");
+                Check(cfg.Corkscrews, corks, "corkscrews");
+                Check(cfg.Spirals, spirals, "spirals");
+                Check(cfg.Jumps, jumps, "jump groups");
+                Check(cfg.Hairpins, hairpins, "hairpins");
+                Check(cfg.Chicanes, chicanes, "chicanes");
+                Check(cfg.SCurves, sCurves, "S-curves");
+                Check(cfg.FullPipes, fullPipes, "full pipes");
+                Check(cfg.Camelbacks, camelbacks, "camelbacks");
+                Check(cfg.Wallrides, wallrides, "wallride turns");
+                Check(cfg.WideTurnarounds, wideTurnarounds, "wide turnarounds");
+                Check(cfg.Horseshoes, horseshoes, "horseshoes");
+                Check(cfg.HalfHelixTurnarounds, halfHelixTurnarounds, "half helix turnarounds");
+                Check(cfg.Cutbacks, cutbacks, "cutbacks");
+                Check(cfg.HeartlineRolls, heartlineRolls, "heartline rolls");
+                Check(cfg.ZeroGRolls, zeroGRolls, "zero-g rolls");
+                Check(cfg.DiveLoops, diveLoops, "dive loops");
+                Check(cfg.Sidewinders, sidewinders, "sidewinders");
+            }
 
             foreach (var p in cfg.RequiredPatterns)
             {

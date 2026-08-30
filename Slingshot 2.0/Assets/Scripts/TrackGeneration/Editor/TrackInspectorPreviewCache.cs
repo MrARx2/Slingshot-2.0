@@ -119,7 +119,7 @@ namespace TrackGeneration.Editor
                 if (metrics != null)
                 {
                     sb.AppendLine($"Estimated lap <b>{metrics.EstimatedNeutralLapTimeSeconds:F1}s</b>   Length <b>{metrics.LapLengthMeters / 1000f:F2} km</b>   Turns <b>{metrics.TurnCount}</b>");
-                    sb.AppendLine($"Loops {metrics.LoopCount}   Corkscrews {metrics.CorkscrewCount}   Spirals {metrics.SpiralCount}   Half-loops {metrics.HalfLoopCount}   Jumps {metrics.JumpCount}");
+                    sb.AppendLine($"Loops {metrics.LoopCount}   Corkscrews {metrics.CorkscrewCount}   Spirals {metrics.SpiralCount}   Half-helix {metrics.HalfHelixTurnaroundCount}   Half-loops {metrics.HalfLoopCount}   Jumps {metrics.JumpCount}");
                     sb.AppendLine($"Full pipes <b>{metrics.FullPipeCount}</b>   Wallrides <b>{metrics.WallrideCount}</b>   Dual quarters <b>{metrics.DualRoadQuarterCount}</b>   Compounds {metrics.CompoundPatternCount}");
                     sb.AppendLine($"Rings {metrics.TotalRings}   Max facet {metrics.MaxFacetAngleObserved:F2}°   Elevation {metrics.MinElevation:F0}..{metrics.MaxElevation:F0} m");
                 }

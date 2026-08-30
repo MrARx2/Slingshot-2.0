@@ -1,7 +1,7 @@
 {
   "SchemaVersion": 1,
   "StableId": "slingshot.heartline-roll",
-  "DefinitionVersion": 3,
+  "DefinitionVersion": 4,
   "DisplayName": "Heartline Roll",
   "Family": "Transported Roll",
   "Enabled": true,

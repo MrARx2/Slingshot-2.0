@@ -309,12 +309,18 @@ namespace TrackGeneration.Planning
             }
             TrackRetopology.RefreshVerticalMetrics(layout.Sections);
 
-            // Corkscrews always keep a shallow concave floor through their rolling
-            // body. This is deliberately independent of Dynamic Turn Rounding: that
-            // option controls ordinary-corner shaping, while the corkscrew belly is a
-            // driveability contract. A flat floor rotating at speed offers no lateral
-            // restoring surface and can throw the craft across the low edge.
-            ApplyCorkscrewBelly(layout.Sections, cfg);
+            // High-speed inversion rolls always keep a shallow concave floor through
+            // their authored body. This is deliberately independent of Dynamic Turn
+            // Rounding: that option controls ordinary-corner shaping, while the reverse
+            // belly is a driveability contract. A flat floor rotating at speed offers
+            // no lateral restoring surface and can throw the craft across the low edge.
+            ApplyInversionBelly(layout.Sections, cfg);
+
+            // The finished ring grid is the geometry consumed by BOTH render and
+            // collision meshes. Match wall-profile slope at every real section weld so
+            // a value-continuous join cannot survive as a visible/rideable dent. Open
+            // air-gap lips and route forks remain deliberate chain boundaries.
+            CrossSectionPlanner.HarmonizeFinalWallJoins(layout.Sections, cfg);
 
             foreach (var sec in layout.Sections)
             {
@@ -636,20 +642,24 @@ namespace TrackGeneration.Planning
 
         /// <summary>
         /// Stamps the mandatory shallow concave belly onto every complete corkscrew
-        /// roll, including inline, directional, double and compound variants.
+        /// roll, including inline, directional, double and compound variants, plus the
+        /// authored transported/moderate inversions whose driveability contract needs
+        /// that same supporting surface: Heartline Roll, Zero-G Roll and Dive Loop.
         ///
         /// Identification is geometry-based rather than name-based: any RoadRoll phase
         /// carrying at least one complete revolution is a corkscrew body. This also
-        /// covers future variants automatically, while excluding the 180-degree rollout
-        /// of a plain Immelmann. Legacy Corkscrew sections without phase data receive
-        /// the same treatment across their complete body.
+        /// covers future full-roll variants automatically. The three explicitly
+        /// supported authored inversions are identified by stable semantic identity, so
+        /// Dive Loop receives support despite owning only a 180-degree road-roll phase.
+        /// A plain Immelmann remains excluded. Legacy Corkscrew sections without phase
+        /// data receive the same treatment across their complete body.
         ///
         /// The weight eases from zero at the roll boundaries to 0.45 in the body. That
         /// retains a broad road floor while replacing the dead-flat center with enough
         /// inward curvature to guide a fast craft through every road orientation.
         /// Existing stronger turn rounding is preserved.
         /// </summary>
-        private static void ApplyCorkscrewBelly(List<GeneratedTrackSection> sections,
+        private static void ApplyInversionBelly(List<GeneratedTrackSection> sections,
             ResolvedTrackGenerationConfig cfg)
         {
             if (sections == null || cfg == null) return;
@@ -663,7 +673,7 @@ namespace TrackGeneration.Planning
                 bool changed = false;
                 for (int i = 0; i < frames.Length; i++)
                 {
-                    float weight = CorkscrewBellyWeight(sec, frames[i], cfg);
+                    float weight = InversionBellyWeight(sec, frames[i], cfg);
                     if (weight <= 0.0001f) continue;
 
                     TrackConnectionFrame frame = frames[i];
@@ -680,8 +690,8 @@ namespace TrackGeneration.Planning
             }
         }
 
-        /// <summary>0..1 engagement of the corkscrew belly at one finished ring.</summary>
-        private static float CorkscrewBellyWeight(GeneratedTrackSection sec,
+        /// <summary>0..1 engagement of the inversion belly at one finished ring.</summary>
+        private static float InversionBellyWeight(GeneratedTrackSection sec,
             in TrackConnectionFrame frame, ResolvedTrackGenerationConfig cfg)
         {
             TrackMacroSectionDefinition def = sec?.Definition;
@@ -690,6 +700,14 @@ namespace TrackGeneration.Planning
             float sectionStart = sec.StartFrame.ArcLength;
             float sectionLength = Mathf.Max(1f, sec.EndFrame.ArcLength - sectionStart);
             float localDistance = Mathf.Clamp(frame.ArcLength - sectionStart, 0f, sectionLength);
+
+            // These authored features are explicitly high-speed inversion surfaces.
+            // Hold the belly across the complete atomic core rather than allowing it to
+            // disappear at an internal phase boundary. This matters most for Dive Loop:
+            // its 180-degree road roll hands directly into a descending half-loop, and
+            // flattening the floor at that hand-off removes support at the worst moment.
+            if (RequiresAuthoredInversionBelly(def.SemanticElement))
+                return BellyWindowWeight(localDistance, 0f, sectionLength, cfg);
 
             // Old serialized tracks can still contain the dedicated legacy type with
             // no rotational phase manifest. Keep those driveable as well.
@@ -729,6 +747,13 @@ namespace TrackGeneration.Planning
             }
 
             return strongest;
+        }
+
+        private static bool RequiresAuthoredInversionBelly(SemanticElementId element)
+        {
+            return element == SemanticElementId.HeartlineRoll ||
+                   element == SemanticElementId.ZeroGRoll ||
+                   element == SemanticElementId.DiveLoop;
         }
 
         private static float BellyWindowWeight(float distance, float start, float end,

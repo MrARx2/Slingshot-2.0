@@ -33,7 +33,8 @@ namespace TrackGeneration.Planning
         FeatureEnvelopeCollision,
         RaceCourseBuildFailure,
         MeshBuildFailure,
-        RecipeCompatibilityFailure
+        RecipeCompatibilityFailure,
+        ProceduralRhythmViolation
     }
 
     /// <summary>
@@ -75,6 +76,7 @@ namespace TrackGeneration.Planning
         public int LoopCount;
         public int CorkscrewCount;
         public int SpiralCount;
+        public int HalfHelixTurnaroundCount;
         public int HalfLoopCount;
         public int JumpCount;
         public int HairpinCount;

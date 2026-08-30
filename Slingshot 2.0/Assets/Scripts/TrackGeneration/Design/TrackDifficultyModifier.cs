@@ -72,6 +72,7 @@ namespace TrackGeneration.Design
             ScaleFeatureMaximum(s.Features.Sidewinders, maxFeatures);
             ScaleFeatureMaximum(s.Features.WideTurnarounds, maxFeatures);
             ScaleFeatureMaximum(s.Features.Horseshoes, maxFeatures);
+            ScaleFeatureMaximum(s.Features.HalfHelixTurnarounds, maxFeatures);
             ScaleFeatureMaximum(s.Features.Cutbacks, maxFeatures);
 
             s.ModifiedSincePreset = true;

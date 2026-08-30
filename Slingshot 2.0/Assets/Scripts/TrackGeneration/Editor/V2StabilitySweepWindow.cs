@@ -109,7 +109,9 @@ namespace TrackGeneration.Editor
                 EditorGUI.BeginDisabledGroup(generator == null || generator.Config == null || generator.Designer == null);
                 Color oldColor = GUI.backgroundColor;
                 GUI.backgroundColor = new Color(0.18f, 0.60f, 0.64f);
-                if (GUILayout.Button("RUN BOUNDED AUDIT", GUILayout.Height(34f)))
+                if (TrackUiActionFeedback.Button(this, "stability.run", "RUN BOUNDED AUDIT",
+                        "Run the configured bounded TrackGenerator stability audit.", "AUDITING…",
+                        GUILayout.Height(34f)))
                     RunSweep();
                 GUI.backgroundColor = oldColor;
                 EditorGUI.EndDisabledGroup();
@@ -119,11 +121,13 @@ namespace TrackGeneration.Editor
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUI.BeginDisabledGroup(string.IsNullOrEmpty(latestReportPath) || !File.Exists(latestReportPath));
-                if (GUILayout.Button("Show Latest Report", GUILayout.Height(22f)))
+                if (TrackUiActionFeedback.Button(this, "stability.show-report", "Show Latest Report",
+                        "Reveal the latest stability report.", "OPENING…", GUILayout.Height(22f)))
                     EditorUtility.RevealInFinder(latestReportPath);
                 EditorGUI.EndDisabledGroup();
 
-                if (GUILayout.Button("Copy Results", GUILayout.Height(22f)))
+                if (TrackUiActionFeedback.Button(this, "stability.copy", "Copy Results",
+                        "Copy the stability results to the clipboard.", "COPYING…", GUILayout.Height(22f)))
                     EditorGUIUtility.systemCopyBuffer = resultsText ?? "";
             }
 

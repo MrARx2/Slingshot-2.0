@@ -77,6 +77,7 @@ namespace TrackGeneration.Design
             ScaleRule(s.Features.Hairpins, features);
             ScaleRule(s.Features.WideTurnarounds, features);
             ScaleRule(s.Features.Horseshoes, features);
+            ScaleRule(s.Features.HalfHelixTurnarounds, features);
             ScaleRule(s.Features.Cutbacks, features);
             // Explicit RequiredPatterns are deliberate designer demands — never scaled.
 
@@ -138,6 +139,7 @@ namespace TrackGeneration.Design
             ScaleRule(s.Features.Hairpins, 0.35f);
             ScaleRule(s.Features.WideTurnarounds, 0.35f);
             ScaleRule(s.Features.Horseshoes, 0.35f);
+            ScaleRule(s.Features.HalfHelixTurnarounds, 0.30f);
             ScaleRule(s.Features.Cutbacks, 0.35f);
             s.Features.Hairpins.MaximumCount = Mathf.Min(s.Features.Hairpins.MaximumCount, 2);
 

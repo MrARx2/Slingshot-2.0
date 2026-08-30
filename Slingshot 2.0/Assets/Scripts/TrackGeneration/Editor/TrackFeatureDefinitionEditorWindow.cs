@@ -67,11 +67,15 @@ namespace TrackGeneration.Editor
             GUILayout.FlexibleSpace();
             using (new EditorGUI.DisabledScope(validateAllQueued))
             {
-                if (GUILayout.Button(validateAllQueued ? "Validating…" : "Validate All",
-                        EditorStyles.toolbarButton, GUILayout.Width(82f)))
+                if (TrackUiActionFeedback.Button(this, "definitions.validate-all",
+                        validateAllQueued ? "Validating…" : "Validate All",
+                        "Validate every definition and smoke-build its geometry.",
+                        EditorStyles.toolbarButton, "Validating…", GUILayout.Width(82f)))
                     QueueValidateAll();
             }
-            if (GUILayout.Button("Refresh", EditorStyles.toolbarButton, GUILayout.Width(70f)))
+            if (TrackUiActionFeedback.Button(this, "definitions.refresh", "Refresh",
+                    "Reload definition JSON files from the project.",
+                    EditorStyles.toolbarButton, "Refreshing…", GUILayout.Width(70f)))
                 RefreshAssets(preserveSelection: true);
             EditorGUILayout.EndHorizontal();
 
@@ -115,14 +119,41 @@ namespace TrackGeneration.Editor
             serializedProxy.Update();
             SerializedProperty definition = serializedProxy.FindProperty("Definition");
             definitionScroll = EditorGUILayout.BeginScrollView(definitionScroll, GUI.skin.box);
-            EditorGUILayout.PropertyField(definition, GUIContent.none, includeChildren: true);
+            if (definition == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "The selected Feature Definition could not be displayed. Refresh the window after Unity finishes compiling.",
+                    MessageType.Error);
+            }
+            else
+            {
+                string displayName = string.IsNullOrWhiteSpace(proxy.Definition.DisplayName)
+                    ? displayNames[selectedIndex]
+                    : proxy.Definition.DisplayName;
+                EditorGUILayout.LabelField(displayName, EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(
+                    "Tune this feature's identity, occupied length, entry/exit contracts, geometry, " +
+                    "clearance, speed and risk settings. Save only intentional definition changes.",
+                    EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.Space(4f);
+
+                // The root property has no useful user-facing label. Unity therefore rendered
+                // only a nearly invisible collapsed triangle, making a valid loaded definition
+                // look like an empty panel. Keep the root expanded and show its children directly.
+                definition.isExpanded = true;
+                EditorGUILayout.PropertyField(definition, GUIContent.none, includeChildren: true);
+            }
             EditorGUILayout.EndScrollView();
             serializedProxy.ApplyModifiedProperties();
 
             EditorGUILayout.BeginHorizontal();
             GUI.enabled = proxy.Definition != null;
-            if (GUILayout.Button("VALIDATE", GUILayout.Height(28f))) ValidateSelected();
-            if (GUILayout.Button("SAVE DEFINITION", GUILayout.Height(28f))) SaveSelected();
+            if (TrackUiActionFeedback.Button(this, "definitions.validate-selected", "VALIDATE",
+                    "Validate the selected definition without saving it.", "VALIDATING…",
+                    GUILayout.Height(28f))) ValidateSelected();
+            if (TrackUiActionFeedback.Button(this, "definitions.save-selected", "SAVE DEFINITION",
+                    "Validate and save the selected definition JSON.", "SAVING…",
+                    GUILayout.Height(28f))) SaveSelected();
             GUI.enabled = true;
             EditorGUILayout.EndHorizontal();
 
@@ -174,7 +205,12 @@ namespace TrackGeneration.Editor
 
             if (proxy != null) DestroyImmediate(proxy);
             proxy = CreateInstance<DefinitionProxy>();
-            proxy.hideFlags = HideFlags.HideAndDontSave;
+            // HideAndDontSave also contains NotEditable, which makes every field in the
+            // SerializedObject appear disabled. This proxy must remain transient, but it
+            // is intentionally editable so designers can tune and save the JSON definition.
+            proxy.hideFlags = HideFlags.HideInHierarchy |
+                              HideFlags.DontSaveInEditor |
+                              HideFlags.DontSaveInBuild;
             proxy.Definition = loaded ?? new TrackFeatureDefinition();
             serializedProxy = new SerializedObject(proxy);
         }

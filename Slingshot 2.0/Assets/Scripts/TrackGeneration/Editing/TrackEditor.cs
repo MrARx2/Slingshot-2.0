@@ -48,13 +48,31 @@ namespace TrackGeneration
         [SerializeField, HideInInspector]
         private string lastAppliedEditUndoLabel = "";
 
+        // The recipe above restores the state before an edit. This hash identifies the
+        // accepted state after that edit. Undo is offered only while that exact result is
+        // still live, preventing history from an older/generated/loaded track appearing
+        // as though it belongs to the current design.
+        [SerializeField, HideInInspector]
+        private string lastAppliedEditResultLayoutHash = "";
+
         public TrackGenerator Generator => trackGenerator;
         public string SelectedTopologySlotId => selectedTopologySlotId;
         public SemanticElementId SelectedAlternative => selectedAlternative;
         public int ImpactBackwardFeatures => impactBackwardFeatures;
         public int ImpactForwardFeatures => impactForwardFeatures;
         public IReadOnlyList<TopologySlotOverride> RequestedOverrides => requestedOverrides;
-        public bool CanUndoLastAppliedEdit => !string.IsNullOrWhiteSpace(lastAppliedEditUndoRecipe);
+        public bool CanUndoLastAppliedEdit
+        {
+            get
+            {
+                string currentHash = trackGenerator?.LastAcceptedRecipe?.ExpectedLayoutHash;
+                return !string.IsNullOrWhiteSpace(lastAppliedEditUndoRecipe) &&
+                       !string.IsNullOrWhiteSpace(lastAppliedEditResultLayoutHash) &&
+                       !string.IsNullOrWhiteSpace(currentHash) &&
+                       string.Equals(lastAppliedEditResultLayoutHash, currentHash,
+                           StringComparison.Ordinal);
+            }
+        }
         public string LastAppliedEditUndoLabel => lastAppliedEditUndoLabel;
         public string LastAppliedEditUndoRecipe => lastAppliedEditUndoRecipe;
 
@@ -236,12 +254,15 @@ namespace TrackGeneration
             lastAppliedEditUndoLabel = string.IsNullOrWhiteSpace(label)
                 ? "Last accepted Track Editor change"
                 : label.Trim();
+            lastAppliedEditResultLayoutHash =
+                trackGenerator?.LastAcceptedRecipe?.ExpectedLayoutHash ?? "";
         }
 
         public void ClearLastAppliedEditUndo()
         {
             lastAppliedEditUndoRecipe = "";
             lastAppliedEditUndoLabel = "";
+            lastAppliedEditResultLayoutHash = "";
         }
 
         private void OnValidate()
@@ -256,6 +277,7 @@ namespace TrackGeneration
                 TrackEditorImpact.MaximumFeatureReach);
             lastAppliedEditUndoRecipe ??= "";
             lastAppliedEditUndoLabel ??= "";
+            lastAppliedEditResultLayoutHash ??= "";
             SortRequests();
         }
 

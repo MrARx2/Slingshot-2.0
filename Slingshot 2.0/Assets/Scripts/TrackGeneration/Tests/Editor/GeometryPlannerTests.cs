@@ -95,6 +95,120 @@ namespace TrackGeneration.Tests
         }
 
         [Test]
+        public void FinalWallJoinMatchesSlopeWithoutChangingProtectedFeatureCore()
+        {
+            var approach = MakeStraight(0, 0f, 100f, 0f, 0f);
+            var feature = MakeStraight(1, 100f, 200f, 0f, 0f);
+            feature.Definition.SectionType = TrackMacroSectionType.RotationalEvent;
+
+            for (int i = 0; i < approach.SubdivisionFrames.Length; i++)
+            {
+                TrackConnectionFrame frame = approach.SubdivisionFrames[i];
+                frame.SideHeight = Mathf.Lerp(20f, 30f,
+                    (float)i / (approach.SubdivisionFrames.Length - 1));
+                approach.SubdivisionFrames[i] = frame;
+            }
+            for (int i = 0; i < feature.SubdivisionFrames.Length; i++)
+            {
+                TrackConnectionFrame frame = feature.SubdivisionFrames[i];
+                frame.SideHeight = 30f;
+                feature.SubdivisionFrames[i] = frame;
+            }
+            approach.StartFrame = approach.SubdivisionFrames[0];
+            approach.EndFrame = approach.SubdivisionFrames[approach.SubdivisionFrames.Length - 1];
+            feature.StartFrame = feature.SubdivisionFrames[0];
+            feature.EndFrame = feature.SubdivisionFrames[feature.SubdivisionFrames.Length - 1];
+
+            float[] protectedBefore = new float[feature.SubdivisionFrames.Length];
+            for (int i = 0; i < protectedBefore.Length; i++)
+                protectedBefore[i] = feature.SubdivisionFrames[i].SideHeight;
+
+            float mismatchBefore = Mathf.Abs(EndSideHeightSlope(approach) - StartSideHeightSlope(feature));
+            CrossSectionPlanner.HarmonizeFinalWallJoins(
+                new List<GeneratedTrackSection> { approach, feature }, PlannerConfig());
+            float mismatchAfter = Mathf.Abs(EndSideHeightSlope(approach) - StartSideHeightSlope(feature));
+
+            Assert.Less(mismatchAfter, mismatchBefore * 0.4f,
+                "The ordinary approach still arrives at the feature with a visible wall-slope kink.");
+            Assert.AreEqual(approach.EndFrame.SideHeight, feature.StartFrame.SideHeight, 0.0001f,
+                "The wall copies no longer share one physical boundary value.");
+            for (int i = 0; i < protectedBefore.Length; i++)
+                Assert.AreEqual(protectedBefore[i], feature.SubdivisionFrames[i].SideHeight, 0.0001f,
+                    $"Protected feature core changed at ring {i}.");
+        }
+
+        [Test]
+        public void ProtectedFeatureMouthsBlendWhileTheirCoresKeepAuthoredDepth()
+        {
+            var spiral = MakeStraight(0, 0f, 200f, 0f, 0f);
+            var inversion = MakeStraight(1, 200f, 400f, 0f, 0f);
+            spiral.Definition.SectionType = TrackMacroSectionType.Spiral;
+            inversion.Definition.SectionType = TrackMacroSectionType.RotationalEvent;
+            var cfg = PlannerConfig();
+
+            CrossSectionPlanner.Apply(
+                new List<GeneratedTrackSection> { spiral, inversion }, cfg);
+            CrossSectionPlanner.HarmonizeFinalWallJoins(
+                new List<GeneratedTrackSection> { spiral, inversion }, cfg);
+
+            int spiralCore = spiral.SubdivisionFrames.Length / 2;
+            int inversionCore = inversion.SubdivisionFrames.Length / 2;
+            Assert.AreEqual(cfg.RoadProfile.SideHeight *
+                            TrackCandidateBuilder.DepthMultiplier(TrackMacroSectionType.Spiral),
+                spiral.SubdivisionFrames[spiralCore].SideHeight, 0.001f,
+                "Spiral core lost its authored containment depth.");
+            Assert.AreEqual(cfg.RoadProfile.SideHeight *
+                            TrackCandidateBuilder.DepthMultiplier(TrackMacroSectionType.RotationalEvent),
+                inversion.SubdivisionFrames[inversionCore].SideHeight, 0.001f,
+                "Inversion core lost its authored containment depth.");
+
+            Assert.AreEqual(spiral.EndFrame.SideHeight, inversion.StartFrame.SideHeight, 0.0001f);
+            Assert.Less(Mathf.Abs(EndSideHeightSlope(spiral) -
+                                  StartSideHeightSlope(inversion)), 0.01f,
+                "Directly welded protected features still form a wall-height kink at their mouths.");
+        }
+
+        [Test]
+        public void FinalWallJoinLeavesIntentionalOpenBoundaryUntouched()
+        {
+            var lip = MakeStraight(0, 0f, 100f, 0f, 0f);
+            var landing = MakeStraight(1, 100f, 200f, 0f, 0f);
+            lip.OpenEnd = true;
+            landing.OpenStart = true;
+
+            TrackConnectionFrame lipEnd = lip.SubdivisionFrames[lip.SubdivisionFrames.Length - 1];
+            lipEnd.SideHeight = 21f;
+            lip.SubdivisionFrames[lip.SubdivisionFrames.Length - 1] = lipEnd;
+            lip.EndFrame = lipEnd;
+            TrackConnectionFrame landingStart = landing.SubdivisionFrames[0];
+            landingStart.SideHeight = 33f;
+            landing.SubdivisionFrames[0] = landingStart;
+            landing.StartFrame = landingStart;
+
+            CrossSectionPlanner.HarmonizeFinalWallJoins(
+                new List<GeneratedTrackSection> { lip, landing }, PlannerConfig());
+
+            Assert.AreEqual(21f, lip.EndFrame.SideHeight, 0.0001f);
+            Assert.AreEqual(33f, landing.StartFrame.SideHeight, 0.0001f,
+                "An intentional air-gap/open-chain boundary was welded closed.");
+        }
+
+        private static float EndSideHeightSlope(GeneratedTrackSection section)
+        {
+            TrackConnectionFrame[] frames = section.SubdivisionFrames;
+            int end = frames.Length - 1;
+            return (frames[end].SideHeight - frames[end - 1].SideHeight) /
+                   (frames[end].ArcLength - frames[end - 1].ArcLength);
+        }
+
+        private static float StartSideHeightSlope(GeneratedTrackSection section)
+        {
+            TrackConnectionFrame[] frames = section.SubdivisionFrames;
+            return (frames[1].SideHeight - frames[0].SideHeight) /
+                   (frames[1].ArcLength - frames[0].ArcLength);
+        }
+
+        [Test]
         public void ObjectiveJumpReportsThreeSpeedCapture()
         {
             TrackConfig limits = TrackGenerationTestUtil.CreateConfig();

@@ -15,6 +15,98 @@ using TrackGeneration.Planning;
 namespace TrackGeneration.Editor
 {
     /// <summary>
+    /// Shared interaction state for TrackGenerator V2 command buttons. IMGUI commands are
+    /// often synchronous, so feedback remains visible briefly after the click and prevents
+    /// accidental double activation. Selection and navigation controls keep their own state.
+    /// </summary>
+    internal static class TrackUiActionFeedback
+    {
+        private const double FeedbackSeconds = 0.8d;
+
+        private sealed class State
+        {
+            public string Key = "";
+            public string Label = "";
+            public double Until;
+        }
+
+        private static readonly Dictionary<EntityId, State> States = new Dictionary<EntityId, State>();
+
+        public static bool Button(UnityEngine.Object owner, string key, string label,
+            string tooltip, GUIStyle style, string actionLabel = null,
+            params GUILayoutOption[] options)
+        {
+            EntityId ownerId = owner != null ? owner.GetEntityId() : default(EntityId);
+            double now = EditorApplication.timeSinceStartup;
+            bool active = States.TryGetValue(ownerId, out State state) &&
+                          state.Key == key && state.Until > now;
+            string visibleLabel = active ? state.Label : label;
+
+            bool pressed;
+            using (new EditorGUI.DisabledScope(active))
+                pressed = GUILayout.Button(new GUIContent(visibleLabel, tooltip),
+                    style ?? GUI.skin.button, options);
+
+            if (!pressed) return false;
+            States[ownerId] = new State
+            {
+                Key = key,
+                Label = string.IsNullOrWhiteSpace(actionLabel)
+                    ? DeriveActionLabel(label)
+                    : actionLabel,
+                Until = now + FeedbackSeconds
+            };
+            EditorApplication.delayCall += () =>
+            {
+                if (owner == null) return;
+                if (owner is UnityEditor.Editor editor) editor.Repaint();
+                else if (owner is EditorWindow window) window.Repaint();
+            };
+            return true;
+        }
+
+        public static bool Button(UnityEngine.Object owner, string key, string label,
+            string tooltip, string actionLabel = null, params GUILayoutOption[] options)
+            => Button(owner, key, label, tooltip, GUI.skin.button, actionLabel, options);
+
+        private static string DeriveActionLabel(string label)
+        {
+            string upper = (label ?? "").Trim().ToUpperInvariant();
+            if (upper.Contains("GENERATE") || upper.StartsWith("SAME SEED", System.StringComparison.Ordinal) ||
+                upper.Contains("NEW CONTENT") || upper.Contains("NEW SURFACE") ||
+                upper.EndsWith(" ONLY", System.StringComparison.Ordinal)) return "GENERATING…";
+            if (upper.Contains("REPLAY")) return "REPLAYING…";
+            if (upper.StartsWith("BUILD", System.StringComparison.Ordinal)) return "BUILDING…";
+            if (upper.StartsWith("APPLY", System.StringComparison.Ordinal)) return "APPLYING…";
+            if (upper.StartsWith("UNDO", System.StringComparison.Ordinal)) return "UNDOING…";
+            if (upper.StartsWith("RESTORE", System.StringComparison.Ordinal)) return "RESTORING…";
+            if (upper.StartsWith("VALIDATE", System.StringComparison.Ordinal)) return "VALIDATING…";
+            if (upper.StartsWith("SAVE", System.StringComparison.Ordinal)) return "SAVING…";
+            if (upper.StartsWith("LOAD", System.StringComparison.Ordinal)) return "LOADING…";
+            if (upper.StartsWith("OPEN", System.StringComparison.Ordinal)) return "OPENING…";
+            if (upper.StartsWith("CREATE", System.StringComparison.Ordinal)) return "CREATING…";
+            if (upper.StartsWith("FIND", System.StringComparison.Ordinal)) return "FINDING…";
+            if (upper.StartsWith("PREVIEW", System.StringComparison.Ordinal)) return "PREVIEWING…";
+            if (upper.StartsWith("RECENTER", System.StringComparison.Ordinal)) return "RECENTERING…";
+            if (upper.StartsWith("REFRESH", System.StringComparison.Ordinal)) return "REFRESHING…";
+            if (upper.StartsWith("COPY", System.StringComparison.Ordinal)) return "COPYING…";
+            if (upper.StartsWith("SELECT", System.StringComparison.Ordinal)) return "SELECTING…";
+            if (upper.StartsWith("REPAIR", System.StringComparison.Ordinal)) return "REPAIRING…";
+            if (upper.StartsWith("CLEAN", System.StringComparison.Ordinal) ||
+                upper.StartsWith("CLEAR", System.StringComparison.Ordinal)) return "CLEARING…";
+            if (upper.StartsWith("RESET", System.StringComparison.Ordinal)) return "RESETTING…";
+            if (upper.StartsWith("RANDOMIZE", System.StringComparison.Ordinal)) return "RANDOMIZING…";
+            if (upper.StartsWith("LOCK", System.StringComparison.Ordinal)) return "LOCKING…";
+            if (upper.StartsWith("UNLOCK", System.StringComparison.Ordinal)) return "UNLOCKING…";
+            if (upper.StartsWith("INVERT", System.StringComparison.Ordinal)) return "INVERTING…";
+            if (upper.StartsWith("EDIT", System.StringComparison.Ordinal)) return "EDITING…";
+            if (upper.StartsWith("KEEP", System.StringComparison.Ordinal)) return "KEEPING…";
+            if (upper.StartsWith("FOCUS", System.StringComparison.Ordinal)) return "FOCUSING…";
+            return "WORKING…";
+        }
+    }
+
+    /// <summary>
     /// Keeps the generated layout (not its heavy procedural meshes) across Unity's
     /// Play Mode backup restore. The backup correctly excludes DontSaveInEditor track
     /// objects; after Play, this recreates only that exact preview from the cached layout.
@@ -450,11 +542,13 @@ namespace TrackGeneration.Editor
 
         private bool _showTechnicalReport;
         private bool _showLocks;
-        private bool _showFeatureAmounts = true;
+        private bool _showFeatureAmounts;
         private bool _showAdvancedGeneration;
+        private bool _showRhythmTuning;
         private bool _showDiagnosticsAndMaintenance;
         private bool _showInspectorPerformance;
         private bool _showResolvedPreview;
+        private bool _showMeshStatistics;
         private static string _lastPresetApplication = "";
 
         // The inspector's ordinary job is to DRAW this cache. Settings resolution and
@@ -616,9 +710,16 @@ namespace TrackGeneration.Editor
             {
                 long epochBefore = _commandEpoch;
                 _headerWatch.Restart();
+                // Everyday workflow first. Large tuning and maintenance panels live
+                // below the accepted-track actions and stay collapsed until requested.
                 DrawTopToolbar(generator);
                 DrawReportCard(generator);
+                DrawExactRecipeCard(generator);
+                DrawTrackEditorCard(generator);
+                DrawFeatureAmountsCard(generator);
                 DrawLockPanel(generator);
+                DrawAdvancedGeneration(generator);
+                DrawDiagnosticsAndMaintenance(generator);
                 _headerWatch.Stop();
                 // A toolbar button may have run a synchronous generator command this pass;
                 // its seconds are the command, not repaint leakage — don't record or warn.
@@ -739,7 +840,8 @@ namespace TrackGeneration.Editor
                     var repairContent = new GUIContent(
                         "Create / Repair Default Set",
                         "Creates any missing persistent material assets and reconnects the role set. Existing material colors, emission, textures, and other authored tuning are preserved.");
-                    if (GUILayout.Button(repairContent, GUILayout.Height(22f)))
+                    if (TrackUiActionFeedback.Button(this, "materials.repair", repairContent.text,
+                            repairContent.tooltip, "REPAIRING…", GUILayout.Height(22f)))
                     {
                         Undo.RecordObject(generator, "Assign Track Material Set");
                         generator.MaterialSet = TrackMaterialGenerator.GenerateOrLoadMaterialSet();
@@ -748,7 +850,8 @@ namespace TrackGeneration.Editor
                     }
 
                     EditorGUI.BeginDisabledGroup(generator.MaterialSet == null);
-                    if (GUILayout.Button("Select Set", GUILayout.Height(22f)))
+                    if (TrackUiActionFeedback.Button(this, "materials.select", "Select Set",
+                            "Select the active Track Material Set asset.", "SELECTING…", GUILayout.Height(22f)))
                     {
                         Selection.activeObject = generator.MaterialSet;
                         EditorGUIUtility.PingObject(generator.MaterialSet);
@@ -848,18 +951,20 @@ namespace TrackGeneration.Editor
         private static GUIStyle _cardTitleStyle;
         private bool _exactReplayQueued;
         private bool _recipeIoQueued;
-        private bool _reportExportQueued;
 
-        // One restrained visual language for the whole tool. Structural UI uses
-        // cyan-teal; green, amber, and red are reserved for actual result states.
+        // One restrained visual language for the whole tool. Structural UI and
+        // non-blocking notices use cyan-teal; green and red are reserved for clear
+        // success and failure states.
         private static readonly Color ProfileAccent = new Color(0.48f, 0.51f, 0.53f, 1f);
         private static readonly Color FeatureAccent = new Color(0.34f, 0.58f, 0.62f, 1f);
+        private static readonly Color NoticeAccent = new Color(0.36f, 0.62f, 0.68f, 1f);
         private static readonly Color GenerationAccent = new Color(0.27f, 0.66f, 0.70f, 1f);
         private static readonly Color GenerationActionTint = new Color(0.22f, 0.50f, 0.57f, 1f);
         private static readonly Color RecipeAccent = new Color(0.66f, 0.55f, 0.79f, 1f);
         private static readonly Color ReplayActionTint = new Color(0.54f, 0.45f, 0.68f, 1f);
         private static readonly Color EditorAccent = new Color(0.55f, 0.41f, 0.76f, 1f);
         private static readonly Color EditorActionTint = new Color(0.40f, 0.30f, 0.58f, 1f);
+        private static readonly Color RatingBarBackground = new Color(0.15f, 0.13f, 0.18f, 1f);
 
         private static string GetDefaultRecipeDirectory()
         {
@@ -874,15 +979,6 @@ namespace TrackGeneration.Editor
                 Debug.LogWarning($"[TrackGenerator] Could not create the default recipe folder '{directory}': {exception.Message}");
                 return Application.dataPath;
             }
-        }
-
-        private static GUIContent CopyRecipeIcon()
-        {
-            const string tooltip = "Copy the complete exact recipe JSON for the last accepted track to the clipboard.";
-            GUIContent builtIn = EditorGUIUtility.IconContent("Clipboard");
-            return builtIn != null && builtIn.image != null
-                ? new GUIContent(builtIn.image, tooltip)
-                : new GUIContent("⧉", tooltip);
         }
 
         private static void SectionHeader(string title)
@@ -909,7 +1005,7 @@ namespace TrackGeneration.Editor
             fontSize = 12
         };
 
-        private static bool AccentButton(string label, string tooltip, Color tint,
+        private bool AccentButton(string label, string tooltip, Color tint,
             float height = 28f, bool bold = true)
         {
             Color previous = GUI.backgroundColor;
@@ -919,13 +1015,15 @@ namespace TrackGeneration.Editor
                 fontStyle = bold ? FontStyle.Bold : FontStyle.Normal,
                 alignment = TextAnchor.MiddleCenter
             };
-            bool pressed = GUILayout.Button(new GUIContent(label, tooltip), style, GUILayout.Height(height));
+            bool pressed = TrackUiActionFeedback.Button(this, label + "|" + tooltip,
+                label, tooltip, style, options: GUILayout.Height(height));
             GUI.backgroundColor = previous;
             return pressed;
         }
 
-        private static bool Btn(string label, string tooltip, float height = 22f)
-            => GUILayout.Button(new GUIContent(label, tooltip), GUILayout.Height(height));
+        private bool Btn(string label, string tooltip, float height = 22f)
+            => TrackUiActionFeedback.Button(this, label + "|" + tooltip,
+                label, tooltip, options: GUILayout.Height(height));
 
         /// <summary>Any command that regenerates or mutates settings invalidates the caches.</summary>
         private void AfterGeneratorCommand(TrackGenerator generator)
@@ -962,36 +1060,52 @@ namespace TrackGeneration.Editor
         private void DrawTopToolbar(TrackGenerator generator)
         {
             EditorGUILayout.Space(2);
+            DrawGeneratorStatusStrip(generator);
             DrawProfileCard(generator);
-            DrawFeatureAmountsCard(generator);
-            DrawFeatureDefinitionsCard();
             DrawGenerationCard(generator);
-            DrawExactRecipeCard(generator);
-            DrawTrackEditorCard(generator);
-            DrawAdvancedGeneration(generator);
-            DrawDiagnosticsAndMaintenance(generator);
         }
 
-        private static void DrawFeatureDefinitionsCard()
+        private static void DrawGeneratorStatusStrip(TrackGenerator generator)
         {
-            EditorGUILayout.Space(3f);
             using (new EditorGUILayout.VerticalScope("HelpBox"))
             {
-                bool complete = TrackFeatureDefinitionCatalog.TryValidateDesignerCoverage(
-                    out string summary, out List<TrackPatternType> missing);
-                CardHeader("FEATURE DEFINITIONS", summary, FeatureAccent);
-
-                if (!complete)
+                TrackGenerationReport report = generator.LastReport;
+                bool hasAcceptedTrack = generator.LastAcceptedRecipe != null && generator.TrackRoot != null;
+                Color accent;
+                string state;
+                string detail;
+                if (report == null)
                 {
-                    string details = TrackFeatureDefinitionCatalog.LoadErrors.Count > 0
-                        ? string.Join("\n", TrackFeatureDefinitionCatalog.LoadErrors)
-                        : "Missing individual assets: " + string.Join(", ", missing);
-                    EditorGUILayout.HelpBox(details, MessageType.Error);
+                    accent = GenerationAccent;
+                    state = "READY TO CREATE";
+                    detail = "Choose a profile, then generate your first track.";
+                }
+                else if (!report.Success)
+                {
+                    accent = new Color(0.86f, 0.34f, 0.32f, 1f);
+                    state = "LAST BUILD FAILED · PREVIOUS TRACK PRESERVED";
+                    detail = $"Seed {report.Seed} · inspect the result card before trying again.";
+                }
+                else
+                {
+                    accent = report.Warnings.Count > 0
+                        ? NoticeAccent
+                        : new Color(0.38f, 0.74f, 0.52f, 1f);
+                    state = hasAcceptedTrack ? "READY · TRACK ACCEPTED" : "ACCEPTED RECIPE · PREVIEW NOT LOADED";
+                    TrackRecipeRating rating = generator.DisplayedRecipeRating;
+                    string ratingText = rating != null && rating.IsRated ? $" · Rating {rating.Overall}/100" : "";
+                    string lengthText = generator.LastMetrics != null
+                        ? $" · {generator.LastMetrics.LapLengthMeters / 1000f:0.##} km"
+                        : "";
+                    detail = $"Seed {report.Seed}{lengthText}{ratingText}";
                 }
 
-                if (Btn("Open Feature Definitions",
-                        "Edit the versioned parameters and contracts for each individual feature asset.", 23f))
-                    EditorApplication.ExecuteMenuItem("Track/V2/Feature Definitions");
+                Rect accentLine = EditorGUILayout.GetControlRect(false, 3f);
+                EditorGUI.DrawRect(accentLine, accent);
+                EditorGUILayout.Space(2f);
+                EditorGUILayout.LabelField("TRACK GENERATOR V2", CardTitleStyle());
+                EditorGUILayout.LabelField(state, EditorStyles.miniBoldLabel);
+                EditorGUILayout.LabelField(detail, EditorStyles.wordWrappedMiniLabel);
             }
         }
 
@@ -1009,12 +1123,9 @@ namespace TrackGeneration.Editor
 
                 DrawProfilePopup("STYLE", ref _styleIndex, StyleOptions());
                 DrawVerticalProfilePopup(generator);
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    DrawProfilePopup("DIFFICULTY", ref _difficultyIndex, DifficultyOptions);
-                    GUILayout.Space(4f);
-                    DrawProfilePopup("SIZE", ref _sizeIndex, SizeOptions);
-                }
+                DrawProfilePopupPair(
+                    "DIFFICULTY", ref _difficultyIndex, DifficultyOptions,
+                    "SIZE", ref _sizeIndex, SizeOptions);
 
                 EditorGUILayout.Space(2f);
                 if (AccentButton("APPLY PROFILE",
@@ -1053,6 +1164,29 @@ namespace TrackGeneration.Editor
             }
         }
 
+        private static void DrawProfilePopupPair(
+            string leftLabel, ref int leftIndex, string[] leftOptions,
+            string rightLabel, ref int rightIndex, string[] rightOptions)
+        {
+            const float labelHeight = 15f;
+            const float popupHeight = 19f;
+            const float gap = 6f;
+            Rect row = EditorGUILayout.GetControlRect(false, labelHeight + popupHeight);
+            float columnWidth = Mathf.Max(40f, (row.width - gap) * 0.5f);
+
+            Rect leftLabelRect = new Rect(row.x, row.y, columnWidth, labelHeight);
+            Rect rightLabelRect = new Rect(row.x + columnWidth + gap, row.y,
+                columnWidth, labelHeight);
+            Rect leftPopupRect = new Rect(row.x, row.y + labelHeight, columnWidth, popupHeight);
+            Rect rightPopupRect = new Rect(row.x + columnWidth + gap, row.y + labelHeight,
+                columnWidth, popupHeight);
+
+            EditorGUI.LabelField(leftLabelRect, leftLabel, EditorStyles.miniBoldLabel);
+            EditorGUI.LabelField(rightLabelRect, rightLabel, EditorStyles.miniBoldLabel);
+            leftIndex = EditorGUI.Popup(leftPopupRect, leftIndex, leftOptions);
+            rightIndex = EditorGUI.Popup(rightPopupRect, rightIndex, rightOptions);
+        }
+
         private void DrawFeatureAmountsCard(TrackGenerator generator)
         {
             EditorGUILayout.Space(3);
@@ -1080,13 +1214,33 @@ namespace TrackGeneration.Editor
                     AccumulateFeatureCounts(features.Hairpins, ref required, ref maximum);
                     AccumulateFeatureCounts(features.WideTurnarounds, ref required, ref maximum);
                     AccumulateFeatureCounts(features.Horseshoes, ref required, ref maximum);
+                    AccumulateFeatureCounts(features.HalfHelixTurnarounds, ref required, ref maximum);
                     AccumulateFeatureCounts(features.Cutbacks, ref required, ref maximum);
                 }
 
-                CardHeader("FEATURE AMOUNTS",
-                    $"Guaranteed minimum {required} · combined cap {maximum}", FeatureAccent);
-                _showFeatureAmounts = EditorGUILayout.Foldout(_showFeatureAmounts,
-                    _showFeatureAmounts ? "Hide feature limits" : "Edit feature limits", true);
+                bool definitionsComplete = TrackFeatureDefinitionCatalog.TryValidateDesignerCoverage(
+                    out string definitionSummary, out List<TrackPatternType> missingDefinitions);
+                CardHeader("FEATURE CONTROL",
+                    $"Guaranteed minimum {required} · combined cap {maximum} · {definitionSummary}",
+                    FeatureAccent);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    _showFeatureAmounts = EditorGUILayout.Foldout(_showFeatureAmounts,
+                        _showFeatureAmounts ? "Hide feature limits" : "Edit feature limits", true);
+                    if (Btn("Definitions",
+                            "Open the individual versioned definition asset for every designer feature.", 20f))
+                        EditorApplication.ExecuteMenuItem("Track/V2/Feature Definitions");
+                }
+
+                if (!definitionsComplete)
+                {
+                    string details = TrackFeatureDefinitionCatalog.LoadErrors.Count > 0
+                        ? string.Join("\n", TrackFeatureDefinitionCatalog.LoadErrors)
+                        : "Missing individual assets: " + string.Join(", ", missingDefinitions);
+                    EditorGUILayout.HelpBox(details, MessageType.Error);
+                }
+
                 if (!_showFeatureAmounts)
                     return;
 
@@ -1127,29 +1281,8 @@ namespace TrackGeneration.Editor
                 DrawFeatureAmountRow(featureProperty, "Hairpins", "Hairpins");
                 DrawFeatureAmountRow(featureProperty, "WideTurnarounds", "Wide Turnarounds");
                 DrawFeatureAmountRow(featureProperty, "Horseshoes", "Horseshoes");
+                DrawFeatureAmountRow(featureProperty, "HalfHelixTurnarounds", "Half Helix Turnarounds");
                 DrawFeatureAmountRow(featureProperty, "Cutbacks", "Cutbacks");
-
-                EditorGUILayout.Space(5f);
-                EditorGUILayout.LabelField("PROCEDURAL RHYTHM", EditorStyles.miniBoldLabel);
-                SerializedProperty rhythmEnabled = featureProperty.FindPropertyRelative("EnforceProceduralRhythm");
-                EditorGUILayout.PropertyField(rhythmEnabled, new GUIContent("Balanced encounter spacing"));
-                if (rhythmEnabled != null && rhythmEnabled.boolValue)
-                {
-                    EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(
-                        featureProperty.FindPropertyRelative("MaxConsecutiveSCurveEncounters"),
-                        new GUIContent("Consecutive S-flow maximum"));
-                    EditorGUILayout.PropertyField(
-                        featureProperty.FindPropertyRelative("SCurveDiversityWindow"),
-                        new GUIContent("S-flow window"));
-                    EditorGUILayout.PropertyField(
-                        featureProperty.FindPropertyRelative("MaxSCurveEncountersPerWindow"),
-                        new GUIContent("S-flow maximum in window"));
-                    EditorGUILayout.PropertyField(
-                        featureProperty.FindPropertyRelative("SameFamilyCooldownEncounters"),
-                        new GUIContent("Other-family cooldown"));
-                    EditorGUI.indentLevel--;
-                }
 
                 if (EditorGUI.EndChangeCheck())
                 {
@@ -1205,7 +1338,7 @@ namespace TrackGeneration.Editor
             EditorGUILayout.Space(3);
             using (new EditorGUILayout.VerticalScope("HelpBox"))
             {
-                CardHeader("GENERATION", "Build a fresh route, replay this seed, or export its report.",
+                CardHeader("BUILD TRACK", "Generate a new route, repeat its seed, or validate the current setup.",
                     GenerationAccent);
                 if (AccentButton("GENERATE NEW TRACK",
                     "Creates a completely new track from a fresh master seed. The previous valid track is preserved if generation fails.",
@@ -1227,28 +1360,7 @@ namespace TrackGeneration.Editor
                         "Shows resolved rules and warnings without changing the track."))
                         _showResolvedPreview = true;
                 }
-
-                EditorGUILayout.Space(2f);
-                using (new EditorGUI.DisabledScope(_reportExportQueued))
-                {
-                    if (Btn(_reportExportQueued ? "Opening…" : "Export Debug Report",
-                        "Saves the complete diagnostic report for the current generated track.", 20f))
-                        QueueExportDebugReport(generator);
-                }
             }
-        }
-
-        private void QueueExportDebugReport(TrackGenerator generator)
-        {
-            if (_reportExportQueued || generator == null) return;
-            _reportExportQueued = true;
-            EditorApplication.delayCall += () =>
-            {
-                _reportExportQueued = false;
-                if (this == null || generator == null) return;
-                ExportDebugReport(generator);
-                Repaint();
-            };
         }
 
         private static void ExportDebugReport(TrackGenerator generator)
@@ -1268,11 +1380,12 @@ namespace TrackGeneration.Editor
             EditorGUILayout.Space(3);
             using (new EditorGUILayout.VerticalScope("HelpBox"))
             {
+                bool hasRecipe = generator.LastAcceptedRecipe != null;
                 string acceptedHash = generator.LastResultManifest?.CanonicalLayoutHash;
                 string identity = string.IsNullOrEmpty(acceptedHash)
                         ? "No accepted recipe yet"
                         : $"Layout ID · {acceptedHash.Substring(0, Mathf.Min(12, acceptedHash.Length))}…";
-                CardHeader("EXACT RECIPE", identity,
+                CardHeader("ACCEPTED TRACK", identity,
                     RecipeAccent);
 
                 TrackRecipeRating rating = generator.DisplayedRecipeRating;
@@ -1281,14 +1394,17 @@ namespace TrackGeneration.Editor
                     EditorGUILayout.LabelField($"TRACK RATING   {rating.Overall} / 100",
                         EditorStyles.boldLabel);
                     Rect barRect = GUILayoutUtility.GetRect(1f, 7f, GUILayout.ExpandWidth(true));
-                    EditorGUI.DrawRect(barRect, new Color(0.12f, 0.12f, 0.14f, 1f));
+                    EditorGUI.DrawRect(barRect, RatingBarBackground);
                     Rect fillRect = barRect;
                     fillRect.width *= rating.Overall / 100f;
-                    Color ratingColor = Color.Lerp(new Color(0.85f, 0.30f, 0.25f),
-                        new Color(0.20f, 0.78f, 0.62f), rating.Overall / 100f);
+                    Color ratingColor = Color.Lerp(RecipeAccent, GenerationAccent,
+                        rating.Overall / 100f);
                     EditorGUI.DrawRect(fillRect, ratingColor);
+                    float trackSizeKm = generator.LastMetrics != null
+                        ? generator.LastMetrics.LapLengthMeters / 1000f
+                        : 0f;
                     EditorGUILayout.LabelField(
-                        $"Flow {rating.Flow}   Variety {rating.Variety}   Request fit {rating.RequestFit}   Technical {rating.TechnicalQuality}",
+                        $"Flow {rating.Flow}   Variety {rating.Variety}   Technical {rating.TechnicalQuality}   Track Size: {trackSizeKm:0.##} km",
                         EditorStyles.centeredGreyMiniLabel);
                 }
                 else
@@ -1299,24 +1415,30 @@ namespace TrackGeneration.Editor
 
                 EditorGUILayout.Space(3f);
 
-                using (new EditorGUI.DisabledScope(_recipeIoQueued))
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button(CopyRecipeIcon(), GUILayout.Width(32f), GUILayout.Height(23f)))
+                    using (new EditorGUI.DisabledScope(_recipeIoQueued || !hasRecipe))
                     {
-                        GUIUtility.systemCopyBuffer = generator.ExportGenerationRecipe(preferLastAccepted: true);
-                        Debug.Log("[TrackGenerator] Copied exact Generation Recipe JSON to the clipboard.");
+                        if (Btn("Copy",
+                                "Copy the accepted exact Generation Recipe JSON to the clipboard.", 23f))
+                        {
+                            GUIUtility.systemCopyBuffer = generator.ExportGenerationRecipe(preferLastAccepted: true);
+                            Debug.Log("[TrackGenerator] Copied exact Generation Recipe JSON to the clipboard.");
+                        }
+                        if (Btn(_recipeIoQueued ? "Opening…" : "Save",
+                                "Save the accepted recipe as a portable JSON file.", 23f))
+                            QueueRecipeIo(generator, save: true);
                     }
-                    if (Btn(_recipeIoQueued ? "Opening…" : "Save",
-                            "Save the accepted recipe as a portable JSON file.", 23f))
-                        QueueRecipeIo(generator, save: true);
-                    if (Btn(_recipeIoQueued ? "Opening…" : "Load",
-                            "Load and validate a recipe JSON. Exact Replay remains a separate action.", 23f))
-                        QueueRecipeIo(generator, save: false);
+                    using (new EditorGUI.DisabledScope(_recipeIoQueued))
+                    {
+                        if (Btn(_recipeIoQueued ? "Opening…" : "Load",
+                                "Load and validate a recipe JSON. Exact Replay remains a separate action.", 23f))
+                            QueueRecipeIo(generator, save: false);
+                    }
                 }
 
                 EditorGUILayout.Space(3f);
-                using (new EditorGUI.DisabledScope(_exactReplayQueued))
+                using (new EditorGUI.DisabledScope(_exactReplayQueued || !hasRecipe))
                 {
                     if (AccentButton(_exactReplayQueued ? "REPLAYING…" : "EXACT REPLAY",
                             "Rebuilds the loaded or last accepted recipe and verifies its exact layout identity.",
@@ -1395,7 +1517,7 @@ namespace TrackGeneration.Editor
             }
         }
 
-        private static void DrawTrackEditorCard(TrackGenerator generator)
+        private void DrawTrackEditorCard(TrackGenerator generator)
         {
             EditorGUILayout.Space(3);
             using (new EditorGUILayout.VerticalScope("HelpBox"))
@@ -1438,6 +1560,8 @@ namespace TrackGeneration.Editor
                         EditorUtility.SetDirty(seedManager);
                     }
                 }
+
+                DrawRhythmTuning(generator);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -1492,6 +1616,51 @@ namespace TrackGeneration.Editor
                     if (Btn("Save Profile Asset",
                         "Saves the current design settings as a reusable project asset.", 20f))
                         SaveAsPresetAsset(generator.Designer);
+                }
+            }
+        }
+
+        private void DrawRhythmTuning(TrackGenerator generator)
+        {
+            EditorGUILayout.Space(3f);
+            _showRhythmTuning = EditorGUILayout.Foldout(_showRhythmTuning,
+                "Rhythm Tuning · balanced spacing always on", true);
+            if (!_showRhythmTuning) return;
+
+            SerializedProperty designerProperty = serializedObject.FindProperty("Designer");
+            SerializedProperty featureProperty = designerProperty?.FindPropertyRelative("Features");
+            if (featureProperty == null)
+            {
+                EditorGUILayout.HelpBox("Rhythm settings are unavailable until the designer is initialized.",
+                    MessageType.Info);
+                return;
+            }
+
+            using (new EditorGUILayout.VerticalScope("HelpBox"))
+            {
+                EditorGUILayout.LabelField(
+                    "These are generator-level pacing safeguards. Track Editor choices remain unrestricted.",
+                    EditorStyles.wordWrappedMiniLabel);
+                EditorGUI.BeginChangeCheck();
+                EditorGUILayout.PropertyField(
+                    featureProperty.FindPropertyRelative("MaxConsecutiveSCurveEncounters"),
+                    new GUIContent("Consecutive S-flow maximum"));
+                EditorGUILayout.PropertyField(
+                    featureProperty.FindPropertyRelative("SCurveDiversityWindow"),
+                    new GUIContent("S-flow window"));
+                EditorGUILayout.PropertyField(
+                    featureProperty.FindPropertyRelative("MaxSCurveEncountersPerWindow"),
+                    new GUIContent("S-flow maximum in window"));
+                EditorGUILayout.PropertyField(
+                    featureProperty.FindPropertyRelative("SameFamilyCooldownEncounters"),
+                    new GUIContent("Other-family cooldown"));
+                if (EditorGUI.EndChangeCheck())
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    generator.Designer.Features.Sanitize();
+                    generator.Designer.ModifiedSincePreset = true;
+                    EditorUtility.SetDirty(generator);
+                    _cache.MarkSettingsDirty();
                 }
             }
         }
@@ -1676,10 +1845,7 @@ namespace TrackGeneration.Editor
 
             EditorGUILayout.Space(4);
             if (!_cache.HasReport)
-            {
-                EditorGUILayout.HelpBox("No generation has run yet. Use the toolbar above.", MessageType.None);
                 return;
-            }
 
             EnsureReportStyles();
             var report = generator.LastReport;
@@ -1688,7 +1854,7 @@ namespace TrackGeneration.Editor
             {
                 Color accent = _cache.ReportSuccess
                     ? (report.Warnings.Count > 0
-                        ? new Color(0.86f, 0.64f, 0.28f, 1f)
+                        ? NoticeAccent
                         : new Color(0.38f, 0.74f, 0.52f, 1f))
                     : new Color(0.86f, 0.34f, 0.32f, 1f);
                 Rect accentLine = EditorGUILayout.GetControlRect(false, 4f);
@@ -1706,7 +1872,8 @@ namespace TrackGeneration.Editor
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Copy Summary", GUILayout.Width(105)))
+                    if (TrackUiActionFeedback.Button(this, "report.copy-summary", "Copy Summary",
+                            "Copy the complete generation summary.", "COPYING…", GUILayout.Width(105)))
                         EditorGUIUtility.systemCopyBuffer = FullReportText(report, generator.LastMetrics);
                     _showTechnicalReport = EditorGUILayout.Foldout(_showTechnicalReport, "Technical details", true);
                 }
@@ -1789,7 +1956,7 @@ namespace TrackGeneration.Editor
             if (metrics != null && report.Success)
             {
                 sb.AppendLine($"Estimated lap: {metrics.EstimatedNeutralLapTimeSeconds:F1}s   Length: {metrics.LapLengthMeters / 1000f:F2}km   Turns: {metrics.TurnCount}");
-                sb.AppendLine($"Loops {metrics.LoopCount} | Corkscrews {metrics.CorkscrewCount} | Spirals {metrics.SpiralCount} | Half-loops {metrics.HalfLoopCount} | Jumps {metrics.JumpCount}");
+                sb.AppendLine($"Loops {metrics.LoopCount} | Corkscrews {metrics.CorkscrewCount} | Spirals {metrics.SpiralCount} | Half-helix {metrics.HalfHelixTurnaroundCount} | Half-loops {metrics.HalfLoopCount} | Jumps {metrics.JumpCount}");
                 sb.AppendLine($"Full pipes {metrics.FullPipeCount} | Wallrides {metrics.WallrideCount} | Dual quarters {metrics.DualRoadQuarterCount}");
                 sb.AppendLine($"Rings {metrics.TotalRings} | Max facet {metrics.MaxFacetAngleObserved:F2}°");
             }
@@ -1869,19 +2036,19 @@ namespace TrackGeneration.Editor
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Lock All"))
+                    if (Btn("Lock All", "Lock every advanced regeneration group."))
                     {
                         Undo.RecordObject(generator, "Lock All");
                         locks.SetAll(true);
                         EditorUtility.SetDirty(generator);
                     }
-                    if (GUILayout.Button("Unlock All"))
+                    if (Btn("Unlock All", "Unlock every advanced regeneration group."))
                     {
                         Undo.RecordObject(generator, "Unlock All");
                         locks.SetAll(false);
                         EditorUtility.SetDirty(generator);
                     }
-                    if (GUILayout.Button("Invert"))
+                    if (Btn("Invert", "Invert every advanced regeneration lock."))
                     {
                         Undo.RecordObject(generator, "Invert Locks");
                         locks.Invert();
@@ -1890,7 +2057,7 @@ namespace TrackGeneration.Editor
                 }
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Lock Modified Groups"))
+                    if (Btn("Lock Modified Groups", "Lock groups that differ from their preset values."))
                     {
                         Undo.RecordObject(generator, "Lock Modified Groups");
                         var locked = PresetApplicator.LockModifiedGroups(generator.Designer, locks);
@@ -1899,7 +2066,7 @@ namespace TrackGeneration.Editor
                             : "No groups differ from the applied preset.";
                         EditorUtility.SetDirty(generator);
                     }
-                    if (GUILayout.Button("Reset Unlocked Groups"))
+                    if (Btn("Reset Unlocked Groups", "Reset unlocked groups to their preset values."))
                     {
                         Undo.RecordObject(generator, "Reset Unlocked Groups");
                         var result = PresetApplicator.ResetUnlockedGroups(generator.Designer, locks);
@@ -1949,10 +2116,14 @@ namespace TrackGeneration.Editor
             }
         }
 
-        private static void DrawPolyCount(TrackGenerator generator)
+        private void DrawPolyCount(TrackGenerator generator)
         {
-            GUILayout.Space(8);
-            EditorGUILayout.LabelField("Generated Track Mesh Statistics", EditorStyles.boldLabel);
+            GUILayout.Space(5);
+            _showMeshStatistics = EditorGUILayout.Foldout(_showMeshStatistics,
+                "Generated Mesh Statistics", true);
+            if (!_showMeshStatistics) return;
+
+            using (new EditorGUILayout.VerticalScope("HelpBox"))
             using (new EditorGUI.DisabledScope(true))
             {
                 EditorGUILayout.IntField("Meshes", generator.GeneratedMeshCount);

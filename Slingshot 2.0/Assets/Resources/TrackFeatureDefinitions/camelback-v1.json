@@ -1,7 +1,7 @@
 {
   "SchemaVersion": 1,
   "StableId": "slingshot.camelback",
-  "DefinitionVersion": 1,
+  "DefinitionVersion": 2,
   "DisplayName": "Camelback",
   "Family": "Elevation",
   "Enabled": true,
@@ -16,9 +16,9 @@
   "EmitsOwnApproach": false,
   "EmitsOwnRecovery": false,
   "Length": {
-    "Minimum": 650.0,
-    "Preferred": 820.0,
-    "Maximum": 1000.0,
+    "Minimum": 1400.0,
+    "Preferred": 1800.0,
+    "Maximum": 2200.0,
     "Resolution": 2,
     "MayAutoExpand": false,
     "ScaleWithDesignSpeed": false,
@@ -60,9 +60,9 @@
   },
   "VerticalBump": {
     "HeightMeters": {
-      "Minimum": 35.0,
-      "Preferred": 60.0,
-      "Maximum": 85.0
+      "Minimum": 90.0,
+      "Preferred": 130.0,
+      "Maximum": 180.0
     },
     "LobeCount": 1,
     "StartsWithDip": false,

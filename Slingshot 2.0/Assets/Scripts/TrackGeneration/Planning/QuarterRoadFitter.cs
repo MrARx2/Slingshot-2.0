@@ -748,7 +748,7 @@ namespace TrackGeneration.Planning
                     break;
                 }
                 case TrackMacroSectionType.Spiral:
-                    pos += fwd * d.PlanHorizontalLength;
+                    SectionFrameBuilders.ApplySpiral2D(ref pos, ref heading, d);
                     break;
                 case TrackMacroSectionType.HalfLoopTwist:
                 {

@@ -169,6 +169,33 @@ namespace TrackGeneration.Tests
         }
 
         [Test]
+        public void ElevationClosure_CanUseLockedRecoveryWithoutChangingItsLength()
+        {
+            var cfg = new ResolvedTrackGenerationConfig
+            {
+                DesignSpeedMps = 130f,
+                Gravity = 9.81f,
+                MaxClimbAngle = 34f,
+                MaxDropAngle = 36f,
+                MaxCurvatureInducedG = 15f,
+                MaxVerticalCurvatureRate = 0.00002f,
+                DefaultRecoveryLength = 200f
+            };
+            var recovery = SectionDefs.Straight(TrackMacroSectionType.RecoveryStraight,
+                600f, 92f, "FeatureRecovery", locked: true, patternId: "feature-0",
+                fitRole: FeatureFitRole.ExitRecovery);
+            var definitions = new List<TrackMacroSectionDefinition> { recovery };
+
+            float residual = TrackTopologyPlanner.ApplyProceduralElevationRecovery(
+                cfg, definitions, new HashSet<int>(), 2f);
+
+            Assert.AreEqual(0f, residual, 0.25f);
+            Assert.AreEqual(600f, recovery.Length, 0.001f,
+                "Elevation payback must never resize authored recovery geometry.");
+            Assert.Less(recovery.ElevationChange, 0f);
+        }
+
+        [Test]
         public void Catalog_ImplementedFeatures_AreValidVersionedDefinitions()
         {
             Assert.IsEmpty(TrackFeatureDefinitionCatalog.LoadErrors,
@@ -188,25 +215,35 @@ namespace TrackGeneration.Tests
                 TrackPatternType.WideTurnaround, out TrackFeatureDefinition proceduralWide));
             Assert.IsTrue(TrackFeatureDefinitionCatalog.TryGet(
                 TrackPatternType.Horseshoe, out TrackFeatureDefinition proceduralHorseshoe));
+            Assert.IsTrue(TrackFeatureDefinitionCatalog.TryGet(
+                SemanticElementId.HalfHelixTurnaround, out TrackFeatureDefinition halfHelix));
+            Assert.IsTrue(TrackFeatureDefinitionCatalog.TryGet(
+                TrackPatternType.HalfHelixTurnaround, out TrackFeatureDefinition proceduralHalfHelix));
 
             AssertDefinitionContract(loop);
             AssertDefinitionContract(corkscrew);
             AssertDefinitionContract(spiral);
             AssertDefinitionContract(wideTurnaround);
             AssertDefinitionContract(horseshoe);
+            AssertDefinitionContract(halfHelix);
             Assert.AreEqual("slingshot.vertical-loop", loop.StableId);
             Assert.AreEqual("slingshot.inline-corkscrew", corkscrew.StableId);
             Assert.AreEqual("slingshot.spiral", spiral.StableId);
             Assert.AreEqual("slingshot.wide-turnaround", wideTurnaround.StableId);
             Assert.AreEqual("slingshot.horseshoe", horseshoe.StableId);
+            Assert.AreEqual("slingshot.half-helix-turnaround", halfHelix.StableId);
             Assert.AreSame(wideTurnaround, proceduralWide,
                 "Wide Turnaround must resolve through the procedural pattern catalog, not only Track Editor semantics.");
             Assert.AreSame(horseshoe, proceduralHorseshoe,
                 "Horseshoe must resolve through the procedural pattern catalog, not only Track Editor semantics.");
+            Assert.AreSame(halfHelix, proceduralHalfHelix,
+                "Half Helix must resolve through the procedural pattern catalog, not only Track Editor semantics.");
             Assert.AreEqual(SemanticElementId.WideTurnaround,
                 FeaturePlanning.ElementOf(TrackPatternType.WideTurnaround));
             Assert.AreEqual(SemanticElementId.Horseshoe,
                 FeaturePlanning.ElementOf(TrackPatternType.Horseshoe));
+            Assert.AreEqual(SemanticElementId.HalfHelixTurnaround,
+                FeaturePlanning.ElementOf(TrackPatternType.HalfHelixTurnaround));
         }
 
         [Test]
@@ -345,6 +382,102 @@ namespace TrackGeneration.Tests
             Assert.AreEqual(definition.TopologyRole, capability.Role);
             Assert.AreEqual(definition.EntryContract.MaximumPitchDegrees,
                 capability.MaxEntryPitchDeg, 0.0001f);
+        }
+
+        [Test]
+        public void HalfHelixTurnaround_IsDefinitionNativeDescendingPartialHelix()
+        {
+            Assert.IsTrue(TrackFeatureDefinitionCatalog.TryGet(
+                SemanticElementId.HalfHelixTurnaround, out TrackFeatureDefinition definition));
+
+            Assert.AreEqual(FeatureDefinitionSolver.EasedTurnV1, definition.Solver);
+            Assert.AreEqual(TopologyRole.TurnRealization, definition.TopologyRole);
+            Assert.AreEqual(TrackMacroSectionType.Spiral, definition.Turn.CoreSectionType);
+            Assert.AreEqual(1, definition.Primitives.Count);
+            Assert.AreEqual(FeatureGeometryPrimitiveType.HalfHelixTurn,
+                definition.Primitives[0].PrimitiveType);
+            Assert.AreEqual(180f, definition.Turn.HeadingDegrees.Preferred, 0.001f);
+            Assert.AreEqual(2, definition.DefinitionVersion);
+            Assert.LessOrEqual(definition.HalfHelix.ElevationChangeMeters.Preferred, -140f);
+            Assert.AreEqual(definition.HalfHelix.ElevationChangeMeters.Preferred,
+                definition.ExitContract.ElevationChangeMeters, 0.001f);
+            Assert.IsTrue(definition.RequiresRecoveryAfter);
+            Assert.IsTrue(definition.EmitsOwnRecovery);
+
+            FeatureCapability capability = FeatureCapabilities.Get(
+                SemanticElementId.HalfHelixTurnaround);
+            Assert.NotNull(capability);
+            Assert.AreEqual(TopologyRole.TurnRealization, capability.Role);
+            Assert.AreEqual(definition.EntryContract.MaximumPitchDegrees,
+                capability.MaxEntryPitchDeg, 0.0001f);
+        }
+
+        [TestCase(180f)]
+        [TestCase(-180f)]
+        public void HalfHelixCompiler_ProducesExactDescendingLevelExit(float signedHeading)
+        {
+            TrackConfig config = TrackGenerationTestUtil.CreateConfig();
+            try
+            {
+                ResolvedTrackGenerationConfig resolved = ResolvedTrackGenerationConfig.Resolve(config,
+                    TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Balanced));
+                Assert.IsTrue(TrackFeatureDefinitionCatalog.TryGet(
+                    SemanticElementId.HalfHelixTurnaround, out TrackFeatureDefinition definition));
+
+                var output = new List<TrackMacroSectionDefinition>();
+                Assert.IsTrue(TrackFeatureDefinitionCompiler.TryPlanTurnDefinition(
+                    definition, resolved, signedHeading, "HalfHelixDefinitionTest",
+                    output, out string failure), failure);
+                Assert.AreEqual(2, output.Count);
+
+                TrackMacroSectionDefinition core = output[0];
+                Assert.AreEqual(TrackMacroSectionType.Spiral, core.SectionType);
+                Assert.AreEqual(SemanticElementId.HalfHelixTurnaround, core.SemanticElement);
+                Assert.AreEqual(Mathf.Abs(signedHeading), core.TurnAngle, 0.001f);
+                Assert.AreEqual(definition.HalfHelix.ElevationChangeMeters.Preferred,
+                    core.ElevationChange, 0.001f);
+                Assert.AreEqual("slingshot.half-helix-turnaround", core.FeatureDefinitionId);
+                Assert.AreEqual("descending-half-helix-reversal", core.FeaturePrimitiveSequence);
+                Assert.LessOrEqual(core.ElevationChange, -140f,
+                    "The turnaround entrance must sit meaningfully above its exit.");
+
+                FeaturePlanResult result = FeaturePlanning.ComputePlanResult(
+                    output, 0, output.Count,
+                    TrackConnectionFrame.Origin(resolved.RoadWidth),
+                    FrameBuildContext.From(resolved),
+                    SemanticElementId.HalfHelixTurnaround,
+                    "half-helix-definition-test");
+                Assert.IsFalse(result.Failed, result.FailureReason);
+                Assert.AreEqual(signedHeading, result.HeadingContributionDeg, 0.25f);
+                Assert.AreEqual(core.ElevationChange, result.ElevationChange, 0.05f);
+                Assert.AreEqual(0f, result.ExitState.PitchAngle, 0.05f);
+                Assert.AreEqual(0f, result.ExitState.BankAngle, 0.05f);
+
+                TrackConnectionFrame[] frames = SectionFrameBuilders.BuildSectionFrames(
+                    TrackConnectionFrame.Origin(resolved.RoadWidth), core,
+                    FrameBuildContext.From(resolved));
+                Assert.AreEqual(0f, frames[0].PitchAngle, 0.001f);
+                Assert.AreEqual(0f, frames[frames.Length - 1].PitchAngle, 0.001f);
+                Assert.AreEqual(core.ElevationChange,
+                    frames[frames.Length - 1].Position.y - frames[0].Position.y, 0.05f);
+                Assert.AreEqual(core.Length,
+                    frames[frames.Length - 1].ArcLength - frames[0].ArcLength, 0.001f);
+
+                Vector2 plannedPosition = Vector2.zero;
+                float plannedHeading = 0f;
+                SectionFrameBuilders.ApplySpiral2D(ref plannedPosition, ref plannedHeading, core);
+                TrackConnectionFrame exit = frames[frames.Length - 1];
+                Assert.AreEqual(exit.Position.x, plannedPosition.x, 0.05f,
+                    "The topology walk and built half-helix must share the same lateral endpoint.");
+                Assert.AreEqual(exit.Position.z, plannedPosition.y, 0.05f,
+                    "The topology walk and built half-helix must share the same forward endpoint.");
+                Assert.AreEqual(signedHeading, plannedHeading, 0.001f,
+                    "The topology walk must include the half-helix turnaround heading.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(config);
+            }
         }
 
         [Test]
@@ -785,7 +918,10 @@ namespace TrackGeneration.Tests
                     TrackPatternType.Camelback, out TrackFeatureDefinition definition));
                 Assert.AreEqual(SemanticElementId.Camelback, definition.SemanticElement);
                 Assert.AreEqual(FeatureDefinitionSolver.VerticalBumpV1, definition.Solver);
-                Assert.LessOrEqual(definition.Length.Maximum, 1000f);
+                Assert.GreaterOrEqual(definition.Length.Minimum, 1400f,
+                    "A Camelback must remain a major elevation encounter, not an ordinary road ripple.");
+                Assert.GreaterOrEqual(definition.Length.Maximum, 2000f);
+                Assert.GreaterOrEqual(definition.VerticalBump.HeightMeters.Minimum, 90f);
                 Assert.IsTrue(FeaturePatternLibrary.TryGet(
                     TrackPatternType.Camelback, out ITrackFeaturePattern pattern));
 
@@ -796,6 +932,9 @@ namespace TrackGeneration.Tests
                 Assert.AreEqual(TrackMacroSectionType.Straight, core.SectionType);
                 Assert.AreEqual(SemanticElementId.Camelback, core.SemanticElement);
                 Assert.AreEqual("slingshot.camelback", core.FeatureDefinitionId);
+                Assert.IsTrue(core.LockLength,
+                    "Closure solving must never compress definition-owned Camelback geometry.");
+                Assert.GreaterOrEqual(core.Length, definition.Length.Minimum);
                 Assert.GreaterOrEqual(core.HillHeight, definition.VerticalBump.HeightMeters.Minimum);
                 Assert.LessOrEqual(core.HillHeight, definition.VerticalBump.HeightMeters.Maximum);
 
@@ -885,6 +1024,44 @@ namespace TrackGeneration.Tests
         }
 
         [Test]
+        public void DiveLoopDefinition_AllDeterministicAuthoredSamplesFitItsLengthContract()
+        {
+            TrackConfig config = TrackGenerationTestUtil.CreateConfig();
+            try
+            {
+                TrackDesignerSettings settings =
+                    TrackGenerationTestUtil.FastSettings(TrackStylePresetLibrary.Balanced);
+                settings.Scale.DesignSpeedKph = 1300f;
+                ResolvedTrackGenerationConfig resolved =
+                    ResolvedTrackGenerationConfig.Resolve(config, settings);
+
+                Assert.IsTrue(TrackFeatureDefinitionCatalog.TryGet(
+                    TrackPatternType.DiveLoop, out TrackFeatureDefinition definition));
+
+                for (int sample = 0; sample < 128; sample++)
+                {
+                    foreach (float heading in new[] { -180f, 180f })
+                    {
+                        var output = new List<TrackMacroSectionDefinition>();
+                        string patternId = $"DiveLoopContract_{sample}_{heading:+0;-0}";
+                        Assert.IsTrue(TrackFeatureDefinitionCompiler.TryPlanTurnDefinition(
+                                definition, resolved, heading, patternId, output,
+                                out string failure),
+                            $"Sample {sample}, heading {heading:+0;-0}: {failure}");
+
+                        TrackMacroSectionDefinition core = output.Single(section =>
+                            section.SectionType == TrackMacroSectionType.RotationalEvent);
+                        Assert.LessOrEqual(core.Length, definition.Length.Maximum + 0.5f);
+                    }
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(config);
+            }
+        }
+
+        [Test]
         public void RotationalCatalogWave_CompilesCompactStampedExitExactFeatures()
         {
             TrackConfig config = TrackGenerationTestUtil.CreateConfig();
@@ -954,6 +1131,13 @@ namespace TrackGeneration.Tests
                             TrackConnectionFrame.Origin(resolved.RoadWidth), core,
                             FrameBuildContext.From(resolved));
                         Assert.Greater(frames.Length, 2);
+                        TrackConnectionFrame exit = frames[frames.Length - 1];
+                        Assert.AreEqual(core.PlanHorizontalLength, exit.Position.z, 0.1f,
+                            $"{item.Item1} must stamp the final corrected forward footprint.");
+                        Assert.AreEqual(core.PlanLateralOffset, exit.Position.x, 0.1f,
+                            $"{item.Item1} must stamp the final corrected lateral footprint.");
+                        Assert.AreEqual(core.ElevationChange, exit.Position.y, 0.1f,
+                            $"{item.Item1} must stamp the final corrected elevation footprint.");
                         float authoredCoreRollRate =
                             definition.Rotational.MaximumCoreRollRateDegreesPerSecond /
                             resolved.DesignSpeedMps;

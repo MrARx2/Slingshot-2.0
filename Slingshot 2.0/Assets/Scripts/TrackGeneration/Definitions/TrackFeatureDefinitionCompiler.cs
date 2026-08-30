@@ -445,6 +445,13 @@ namespace TrackGeneration.Definitions
                 if (Mathf.Abs(headingError) <= 0.1f) break;
                 headingPhase.HorizontalTurnDegrees += headingError;
             }
+
+            // The final correction above mutates the phase after the stamp measured in
+            // that iteration.  Always stamp once more from the finished phase list.
+            // Without this, the planner could close against the previous footprint while
+            // the runtime builder used the corrected one (most visible on Sidewinder and
+            // Dive Loop variants as kilometre-scale closure drift).
+            SectionFrameBuilders.StampRotationalEventPlan(core, cfg);
             if (core.Length > lengthMaximum + 0.5f ||
                 Mathf.Abs(Mathf.DeltaAngle(core.TurnAngle, targetHeading)) > 1f)
             {
@@ -564,6 +571,10 @@ namespace TrackGeneration.Definitions
                 SpeedIntent = definition.SpeedIntent,
                 RiskLevel = definition.RiskLevel,
                 RequiresRecoveryAfter = definition.RequiresRecoveryAfter,
+                // Definition-native elevation encounters own their complete footprint.
+                // Leaving this false lets the generic closure solver compress a
+                // Camelback into an ordinary-road ripple after its geometry preflight.
+                LockLength = true,
                 PatternId = patternId,
                 DebugName = $"{debugStem}_{requestedHeight:F0}m",
                 Contract = SectionConnectionContract.Level(0f),
@@ -745,10 +756,14 @@ namespace TrackGeneration.Definitions
             if (definition.Turn.CoreSectionType == TrackMacroSectionType.BankedCurve)
                 radius = SectionFrameBuilders.ClampOrdinaryCurveRadius(magnitude, radius);
 
-            bool elevated = definition.Primitives[0].PrimitiveType ==
-                            FeatureGeometryPrimitiveType.ElevatedEasedTurn;
+            FeatureGeometryPrimitiveType turnPrimitive = definition.Primitives[0].PrimitiveType;
+            bool elevated = turnPrimitive == FeatureGeometryPrimitiveType.ElevatedEasedTurn;
+            bool halfHelix = turnPrimitive == FeatureGeometryPrimitiveType.HalfHelixTurn;
             float crestHeight = elevated
                 ? definition.Turn.CrestHeightMeters.Preferred
+                : 0f;
+            float helixClimb = halfHelix
+                ? definition.HalfHelix.ElevationChangeMeters.Preferred
                 : 0f;
             float bankMultiplier = definition.Turn.BankMultiplier.Preferred > 0.001f
                 ? definition.Turn.BankMultiplier.Preferred
@@ -766,21 +781,34 @@ namespace TrackGeneration.Definitions
             var core = new TrackMacroSectionDefinition
             {
                 SectionType = definition.Turn.CoreSectionType,
-                Length = elevated
-                    ? SectionFrameBuilders.ElevatedEasedArcLength(magnitude, radius, crestHeight)
-                    : SectionFrameBuilders.EasedArcLength(magnitude, radius),
+                Length = halfHelix
+                    ? SectionFrameBuilders.EstimatePartialHelixLength(
+                        radius, magnitude, 0f, helixClimb)
+                    : elevated
+                        ? SectionFrameBuilders.ElevatedEasedArcLength(magnitude, radius, crestHeight)
+                        : SectionFrameBuilders.EasedArcLength(magnitude, radius),
                 Width = cfg.RoadWidth,
                 Direction = direction,
                 TurnAngle = magnitude,
                 Radius = radius,
                 BankingAngle = Mathf.Min(recommendedBank * bankMultiplier, cfg.MaxBankAngle),
                 HillHeight = crestHeight,
+                ElevationChange = helixClimb,
                 SpeedIntent = definition.SpeedIntent,
                 RiskLevel = definition.RiskLevel,
                 RequiresRecoveryAfter = definition.RequiresRecoveryAfter,
                 PatternId = patternId,
                 DebugName = $"{debugStem}_{magnitude:F0}deg_{direction}",
-                Contract = SectionConnectionContract.Level(signedHeadingDegrees)
+                Contract = halfHelix
+                    ? new SectionConnectionContract
+                    {
+                        RequiredEntryOrientation = definition.EntryContract.Orientation,
+                        ExitOrientation = definition.ExitContract.Orientation,
+                        HeadingDeltaDegrees = signedHeadingDegrees,
+                        ElevationDelta = helixClimb,
+                        ClosureCompatible = false
+                    }
+                    : SectionConnectionContract.Level(signedHeadingDegrees)
             };
             output.Add(core);
 

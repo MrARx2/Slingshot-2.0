@@ -949,11 +949,22 @@ namespace TrackGeneration.Planning
 
             // Reversal realizations share the 150–180° corner-demand pool. The turn
             // family only creates as many reversal-capable slots as the enabled
-            // Hairpin/Wide Turnaround/Horseshoe rules can consume.
+            // Hairpin/Wide Turnaround/Horseshoe/Half Helix rules can consume.
+            int ReversalBudget(ResolvedFeatureRule rule, TrackPatternType pattern)
+            {
+                int explicitCount = 0;
+                foreach (RequiredPatternEntry required in cfg.RequiredPatterns)
+                    if (required != null && required.Pattern == pattern)
+                        explicitCount = Mathf.Max(explicitCount, required.Count);
+                int configured = rule != null && rule.Enabled ? rule.MaximumCount : 0;
+                return Mathf.Max(configured, explicitCount);
+            }
+
             int hairpinBudget =
-                (cfg.Hairpins.Enabled ? cfg.Hairpins.MaximumCount : 0) +
-                (cfg.WideTurnarounds.Enabled ? cfg.WideTurnarounds.MaximumCount : 0) +
-                (cfg.Horseshoes.Enabled ? cfg.Horseshoes.MaximumCount : 0);
+                ReversalBudget(cfg.Hairpins, TrackPatternType.Hairpin) +
+                ReversalBudget(cfg.WideTurnarounds, TrackPatternType.WideTurnaround) +
+                ReversalBudget(cfg.Horseshoes, TrackPatternType.Horseshoe) +
+                ReversalBudget(cfg.HalfHelixTurnarounds, TrackPatternType.HalfHelixTurnaround);
             int hairpinsUsed = 0;
 
             int prevSign = rng.NextBool() ? 1 : -1;
@@ -1045,7 +1056,15 @@ namespace TrackGeneration.Planning
             bool AssignDefinitionReversals(ResolvedFeatureRule rule,
                 TrackPatternType pattern, SemanticElementId semantic)
             {
-                if (rule == null || !rule.Enabled || rule.MaximumCount <= 0) return true;
+                int explicitMinimum = 0;
+                foreach (RequiredPatternEntry required in cfg.RequiredPatterns)
+                    if (required != null && required.Pattern == pattern)
+                        explicitMinimum = Mathf.Max(explicitMinimum, required.Count);
+
+                bool normalEnabled = rule != null && rule.Enabled;
+                int minimum = Mathf.Max(normalEnabled ? rule.MinimumCount : 0, explicitMinimum);
+                int maximum = Mathf.Max(normalEnabled ? rule.MaximumCount : 0, minimum);
+                if (maximum <= 0) return true;
 
                 var eligible = new List<CornerSlot>();
                 foreach (var c in corners)
@@ -1056,9 +1075,10 @@ namespace TrackGeneration.Planning
                 int assigned = 0;
                 foreach (var c in eligible)
                 {
-                    if (assigned >= rule.MaximumCount) break;
-                    bool required = assigned < rule.MinimumCount;
-                    if (!required && rngs.Feature.NextFloat() >= Mathf.Clamp01(rule.OptionalWeight * 0.25f))
+                    if (assigned >= maximum) break;
+                    bool required = assigned < minimum;
+                    if (!required && (!normalEnabled ||
+                        rngs.Feature.NextFloat() >= Mathf.Clamp01(rule.OptionalWeight * 0.25f)))
                         continue;
 
                     c.SignedAngle = c.Sign * 180;
@@ -1070,9 +1090,11 @@ namespace TrackGeneration.Planning
                     plan.CountPattern(pattern);
                 }
 
-                if (assigned >= rule.MinimumCount) return true;
-                plan.Fail(GenerationFailureReason.RequiredFeatureMissing,
-                    $"Required {rule.MinimumCount} {pattern} turns but only {assigned} reversal slots were available.");
+                if (assigned >= minimum) return true;
+                plan.Fail(explicitMinimum > 0
+                        ? GenerationFailureReason.RequiredPatternMissing
+                        : GenerationFailureReason.RequiredFeatureMissing,
+                    $"Required {minimum} {pattern} turns but only {assigned} reversal slots were available.");
                 return false;
             }
 
@@ -1081,6 +1103,9 @@ namespace TrackGeneration.Planning
                 return corners;
             if (!AssignDefinitionReversals(cfg.Horseshoes,
                     TrackPatternType.Horseshoe, SemanticElementId.Horseshoe))
+                return corners;
+            if (!AssignDefinitionReversals(cfg.HalfHelixTurnarounds,
+                    TrackPatternType.HalfHelixTurnaround, SemanticElementId.HalfHelixTurnaround))
                 return corners;
 
             bool AssignDefinitionCornerRule(ResolvedFeatureRule rule,
@@ -1162,6 +1187,7 @@ namespace TrackGeneration.Planning
                 if (required == null || required.Count <= 0 ||
                     required.Pattern == TrackPatternType.WideTurnaround ||
                     required.Pattern == TrackPatternType.Horseshoe ||
+                    required.Pattern == TrackPatternType.HalfHelixTurnaround ||
                     required.Pattern == TrackPatternType.Cutback ||
                     required.Pattern == TrackPatternType.DiveLoop ||
                     required.Pattern == TrackPatternType.Sidewinder)
@@ -1461,11 +1487,13 @@ namespace TrackGeneration.Planning
                 int idx = rng.NextInt(0, corners.Count);
                 var c = corners[idx];
                 if (c.IsHalfLoop || c.DefinitionRealization == SemanticElementId.WideTurnaround ||
-                    c.DefinitionRealization == SemanticElementId.Horseshoe) continue; // authored reversals stay exactly 180°
+                    c.DefinitionRealization == SemanticElementId.Horseshoe ||
+                    c.DefinitionRealization == SemanticElementId.HalfHelixTurnaround) continue; // authored reversals stay exactly 180°
 
                 int minMag = c.IsSpecial && (c.Realization == TrackPatternType.Hairpin ||
                     c.DefinitionRealization == SemanticElementId.WideTurnaround ||
-                    c.DefinitionRealization == SemanticElementId.Horseshoe) ? 150 : 20;
+                    c.DefinitionRealization == SemanticElementId.Horseshoe ||
+                    c.DefinitionRealization == SemanticElementId.HalfHelixTurnaround) ? 150 : 20;
                 int maxMag = c.AllowHairpinMagnitude ? 180 : 145; // balancing never mints extra hairpins
                 if (c.IsSpecial && c.Realization == TrackPatternType.WallrideTurn)
                 {
@@ -1493,7 +1521,8 @@ namespace TrackGeneration.Planning
                     {
                         if (corners[i].IsHalfLoop ||
                             corners[i].DefinitionRealization == SemanticElementId.WideTurnaround ||
-                            corners[i].DefinitionRealization == SemanticElementId.Horseshoe) continue;
+                            corners[i].DefinitionRealization == SemanticElementId.Horseshoe ||
+                            corners[i].DefinitionRealization == SemanticElementId.HalfHelixTurnaround) continue;
                         int err = Mathf.Abs(target - (sum - 2 * corners[i].SignedAngle));
                         if (err < bestErr) { bestErr = err; bestIdx = i; }
                     }
@@ -1564,7 +1593,8 @@ namespace TrackGeneration.Planning
                 }
                 else if (c.IsHalfLoop || (c.IsSpecial && (c.Realization == TrackPatternType.Hairpin ||
                     c.DefinitionRealization == SemanticElementId.WideTurnaround ||
-                    c.DefinitionRealization == SemanticElementId.Horseshoe)))
+                    c.DefinitionRealization == SemanticElementId.Horseshoe ||
+                    c.DefinitionRealization == SemanticElementId.HalfHelixTurnaround)))
                 {
                     // Pinned reversal: exactly ±180, keep its drawn sign (no flip).
                     list.Add((c.Sign * 4, 0));
@@ -2760,6 +2790,9 @@ namespace TrackGeneration.Planning
                 case SemanticElementId.InlineCorkscrew: patternType = TrackPatternType.Corkscrew; break;
                 case SemanticElementId.DoubleCorkscrew: patternType = TrackPatternType.DoubleCorkscrew; break;
                 case SemanticElementId.Spiral: patternType = TrackPatternType.Spiral; break;
+                case SemanticElementId.HalfHelixTurnaround:
+                    patternType = TrackPatternType.HalfHelixTurnaround;
+                    break;
                 case SemanticElementId.LoopToCorkscrew: patternType = TrackPatternType.LoopToCorkscrew; break;
                 case SemanticElementId.SpiralToCorkscrew: patternType = TrackPatternType.SpiralToCorkscrew; break;
                 case SemanticElementId.JumpGap: patternType = TrackPatternType.JumpGap; break;
@@ -2967,7 +3000,7 @@ namespace TrackGeneration.Planning
                         break;
                     }
                     case TrackMacroSectionType.Spiral:
-                        pos += fwd * d.PlanHorizontalLength;
+                        SectionFrameBuilders.ApplySpiral2D(ref pos, ref heading, d);
                         break;
                     case TrackMacroSectionType.HalfLoopTwist:
                     {
@@ -3557,7 +3590,7 @@ namespace TrackGeneration.Planning
                         break;
                     }
                     case TrackMacroSectionType.Spiral:
-                        pos += fwd * d.PlanHorizontalLength;
+                        SectionFrameBuilders.ApplySpiral2D(ref pos, ref heading, d);
                         break;
                     case TrackMacroSectionType.HalfLoopTwist:
                     {
@@ -3747,7 +3780,11 @@ namespace TrackGeneration.Planning
             float heading = 0f;
             float arc = 0f;
             float fixedHeight = 0f;
-            const float step = 50f;
+            // Normal generation uses a cheap broad planning sample because it can try
+            // another candidate. Track Editor has one exact accepted-route attempt and
+            // the final validator samples every 8 m; use the same density here so a
+            // narrow unsafe interval is repaired before expensive geometry is built.
+            float step = cfg.DesignerAuthoringMode ? 8f : 50f;
 
             void Emit(Vector2 p, float a) { pts.Add(p); arcs.Add(a); }
 
@@ -3929,10 +3966,41 @@ namespace TrackGeneration.Planning
             float verticalOk = Mathf.Max(1f, cfg.VerticalClearance);
             const float alongWindow = 600f;
 
+            // The editor's 8 m sampling would make a full O(n²) pair walk needlessly
+            // expensive on a 30-40 km lap. Use the same deterministic XZ broad phase as
+            // final validation, then preserve the old ascending pair order inside the
+            // nearby buckets so repair selection remains stable.
+            float cellSize = Mathf.Max(1f, minClear);
+            long CellKey(int cellX, int cellY) =>
+                ((long)cellX << 32) ^ (uint)cellY;
+            var grid = new Dictionary<long, List<int>>();
             for (int i = 0; i < pts.Count; i++)
             {
-                for (int j = i + 1; j < pts.Count; j++)
+                int cellX = Mathf.FloorToInt(pts[i].x / cellSize);
+                int cellY = Mathf.FloorToInt(pts[i].y / cellSize);
+                long key = CellKey(cellX, cellY);
+                if (!grid.TryGetValue(key, out List<int> bucket))
+                    grid[key] = bucket = new List<int>();
+                bucket.Add(i);
+            }
+
+            var nearby = new List<int>();
+            for (int i = 0; i < pts.Count; i++)
+            {
+                nearby.Clear();
+                int cellX = Mathf.FloorToInt(pts[i].x / cellSize);
+                int cellY = Mathf.FloorToInt(pts[i].y / cellSize);
+                for (int offsetX = -1; offsetX <= 1; offsetX++)
+                for (int offsetY = -1; offsetY <= 1; offsetY++)
+                    if (grid.TryGetValue(CellKey(cellX + offsetX, cellY + offsetY),
+                            out List<int> bucket))
+                        nearby.AddRange(bucket);
+                nearby.Sort();
+
+                for (int candidateIndex = 0; candidateIndex < nearby.Count; candidateIndex++)
                 {
+                    int j = nearby[candidateIndex];
+                    if (j <= i) continue;
                     float along = Mathf.Abs(arcs[j] - arcs[i]);
                     along = Mathf.Min(along, totalArc - along);
                     if (along < alongWindow) continue;
@@ -4574,7 +4642,7 @@ namespace TrackGeneration.Planning
                         cfg, defs, majorSet, level);
                     if (Mathf.Abs(level) + 0.01f < Mathf.Abs(beforeRecovery))
                         plan.Warnings.Add(
-                            $"Elevation closure distributed {Mathf.Abs(beforeRecovery - level):F1}m across unused structural corridors.");
+                            $"Elevation closure distributed {Mathf.Abs(beforeRecovery - level):F1}m across unused safe route roads.");
                 }
                 if (Mathf.Abs(level) > 0.5f)
                 {
@@ -5182,9 +5250,10 @@ namespace TrackGeneration.Planning
         }
 
         /// <summary>
-        /// Uses unused route-layout straights as a final, legally eased altitude
-        /// payback. These corridors are independent of feature entry/recovery roads,
-        /// so this restores closure capacity without lengthening or deforming a feature.
+        /// Uses unused level-welded route roads as a final, legally eased altitude
+        /// payback. Structural connectors are preferred, then ordinary/recovery roads;
+        /// authored feature warmups and dedicated editor recoveries remain untouched.
+        /// This restores closure capacity without lengthening or deforming a feature.
         /// The same conservative grade/curvature envelope used by Track Editor recovery
         /// applies here; any residual beyond that capacity still fails normally.
         /// </summary>
@@ -5201,8 +5270,15 @@ namespace TrackGeneration.Planning
             for (int i = 0; i < definitions.Count; i++)
             {
                 TrackMacroSectionDefinition definition = definitions[i];
-                if (definition == null || definition.LockLength ||
-                    definition.FeatureFitRole != FeatureFitRole.StructuralConnector ||
+                bool safeRole = definition != null &&
+                    (definition.FeatureFitRole == FeatureFitRole.None ||
+                     definition.FeatureFitRole == FeatureFitRole.StructuralConnector ||
+                     definition.FeatureFitRole == FeatureFitRole.ExitRecovery ||
+                     definition.FeatureFitRole == FeatureFitRole.SharedCorridor);
+                if (definition == null || definition.RoadId != 0 ||
+                    !safeRole ||
+                    Mathf.Abs(definition.HillHeight) > 0.001f ||
+                    IsTrackEditorVerticalRecovery(definition) ||
                     definition.Length < 100f ||
                     (occupiedCarriers != null && occupiedCarriers.Contains(i)))
                     continue;
@@ -5211,11 +5287,18 @@ namespace TrackGeneration.Planning
                     case TrackMacroSectionType.Straight:
                     case TrackMacroSectionType.WideStraight:
                     case TrackMacroSectionType.BoostStraight:
+                    case TrackMacroSectionType.RecoveryStraight:
                         corridors.Add(i);
                         break;
                 }
             }
-            corridors.Sort((a, b) => definitions[b].Length.CompareTo(definitions[a].Length));
+            corridors.Sort((a, b) =>
+            {
+                bool aStructural = definitions[a].FeatureFitRole == FeatureFitRole.StructuralConnector;
+                bool bStructural = definitions[b].FeatureFitRole == FeatureFitRole.StructuralConnector;
+                if (aStructural != bStructural) return aStructural ? -1 : 1;
+                return definitions[b].Length.CompareTo(definitions[a].Length);
+            });
 
             for (int i = 0; i < corridors.Count && Mathf.Abs(residual) > 0.25f; i++)
             {
@@ -5258,7 +5341,8 @@ namespace TrackGeneration.Planning
                     feature.PatternId != recovery.PatternId)
                     continue;
 
-                bool absorbed = feature.SectionType == TrackMacroSectionType.Spiral
+                bool absorbed = feature.SectionType == TrackMacroSectionType.Spiral &&
+                                feature.SemanticElement != SemanticElementId.HalfHelixTurnaround
                     ? TryIntegrateSpiralRecovery(cfg, feature, recovery)
                     : feature.SectionType == TrackMacroSectionType.Corkscrew &&
                       TryIntegrateCorkscrewRecovery(cfg, feature, recovery);

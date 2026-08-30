@@ -27,6 +27,9 @@ namespace TrackGeneration.Macro
         WideTurnaround = 8,
         Horseshoe = 9,
 
+        // Definition-native climbing reversal. Value 14 is append-only and was unused.
+        HalfHelixTurnaround = 14,
+
         // ── Transfers ──
         SCurve = 10,
         Chicane = 11,

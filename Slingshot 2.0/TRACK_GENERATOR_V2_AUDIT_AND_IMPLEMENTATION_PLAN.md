@@ -912,6 +912,17 @@ definition/build length agreement and explicit failure diagnostics. Unity refres
 49-case gate plus one visual Track Editor application remain the checkpoint before Half Helix
 Turnaround.
 
+**Implementation checkpoint (2026-08-30):** Half Helix Turnaround is implemented as the third
+definition-native reversal and remains disabled by default. A dedicated `HalfHelixTurn` primitive
+builds a genuine partial helical centerline rather than disguising an elevated ordinary turn or
+truncating the heading-neutral Spiral. Its asset exposes an independent 60–130 m climb range alongside
+heading, radius, banking, entry and recovery contracts. The compiler produces an exact signed reversal,
+smooth climb and level exit at the new elevation; final metrics/count validation distinguish it from a
+full Spiral, and recovery integration cannot rewrite it into a different revolution count. Procedural
+allocation, rule controls, recipe migration, rhythm, Track Editor compatibility and focused signed-exit
+and replacement tests are integrated. Runtime and Editor assemblies compile; the Unity focused gate,
+bounded feature-required sweep and visual high-speed pass remain before preset admission.
+
 All four target the user's 180-degree example and exercise footprint, banking, elevation, and speed constraints without immediately requiring the most complex compound inversions.
 
 Exit gate:

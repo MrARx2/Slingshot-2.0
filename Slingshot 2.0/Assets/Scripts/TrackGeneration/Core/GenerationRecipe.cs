@@ -76,7 +76,7 @@ namespace TrackGeneration.Core
             flow = Mathf.Clamp(flow, 0f, 100f);
 
             int fallbackEncounterCount = metrics.LoopCount + metrics.CorkscrewCount +
-                                         metrics.SpiralCount + metrics.HalfLoopCount +
+                                         metrics.SpiralCount + metrics.HalfHelixTurnaroundCount + metrics.HalfLoopCount +
                                          metrics.JumpCount + metrics.HairpinCount +
                                          metrics.ChicaneCount + metrics.SCurveCount +
                                          metrics.FullPipeCount + metrics.WallrideCount;
@@ -87,6 +87,7 @@ namespace TrackGeneration.Core
                 distinctFamilies += metrics.LoopCount > 0 ? 1 : 0;
                 distinctFamilies += metrics.CorkscrewCount > 0 ? 1 : 0;
                 distinctFamilies += metrics.SpiralCount > 0 ? 1 : 0;
+                distinctFamilies += metrics.HalfHelixTurnaroundCount > 0 ? 1 : 0;
                 distinctFamilies += metrics.HalfLoopCount > 0 ? 1 : 0;
                 distinctFamilies += metrics.JumpCount > 0 ? 1 : 0;
                 distinctFamilies += metrics.HairpinCount > 0 ? 1 : 0;
@@ -276,7 +277,10 @@ namespace TrackGeneration.Core
     public sealed class GenerationRecipeV1
     {
         public const int CurrentSchemaVersion = 1;
-        public const string CurrentAlgorithmVersion = "slingshot-trackgen-v2-dev1";
+        // Increment whenever deterministic planning/build semantics change. Recipes
+        // created by a different algorithm must never pretend to be exact-compatible
+        // and then fail only after an expensive replay with a layout-hash mismatch.
+        public const string CurrentAlgorithmVersion = "slingshot-trackgen-v2-dev4";
         public const string CurrentFeatureCatalogVersion = "semantic-catalog-v1";
 
         public int SchemaVersion = CurrentSchemaVersion;

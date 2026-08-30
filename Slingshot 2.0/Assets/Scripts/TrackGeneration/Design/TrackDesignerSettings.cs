@@ -124,7 +124,10 @@ namespace TrackGeneration.Design
         HeartlineRoll = 26,
         ZeroGRoll = 27,
         DiveLoop = 28,
-        Sidewinder = 29
+        Sidewinder = 29,
+
+        // Definition-native climbing reversal. Append-only for recipe compatibility.
+        HalfHelixTurnaround = 30
     }
 
     /// <summary>One required pattern request: this pattern must appear exactly/at least Count times.</summary>
@@ -566,7 +569,7 @@ namespace TrackGeneration.Design
         [Range(1, 3)] public int MaxConsecutiveSCurveEncounters = 1;
 
         [Tooltip("Number of feature encounters used to measure local S-curve concentration.")]
-        [Range(3, 8)] public int SCurveDiversityWindow = 5;
+        [Range(3, 8)] public int SCurveDiversityWindow = 3;
 
         [Tooltip("Maximum S-curve-family encounters allowed inside the diversity window.")]
         [Range(1, 4)] public int MaxSCurveEncountersPerWindow = 2;
@@ -582,6 +585,9 @@ namespace TrackGeneration.Design
 
         [Tooltip("Elevated, banked 150–180° reversals compiled from the Horseshoe feature definition.")]
         public TrackFeatureRule Horseshoes = new TrackFeatureRule(true, 0, 1, 0.25f);
+
+        [Tooltip("Climbing 150–180° half-helix reversals with a level exit at a new elevation.")]
+        public TrackFeatureRule HalfHelixTurnarounds = new TrackFeatureRule(false, 0, 1, 0.20f);
 
         [Tooltip("Compact 120–150° direction reversals compiled from the Cutback feature definition.")]
         public TrackFeatureRule Cutbacks = new TrackFeatureRule(false, 0, 1, 0.35f);
@@ -605,12 +611,12 @@ namespace TrackGeneration.Design
         public void Sanitize()
         {
             // Existing scenes predate these fields. Migrate them to the intended
-            // playable defaults once, while preserving an explicit later opt-out.
+            // playable defaults once.
             if (ProceduralRhythmSettingsVersion < 1)
             {
                 EnforceProceduralRhythm = true;
                 MaxConsecutiveSCurveEncounters = 1;
-                SCurveDiversityWindow = 5;
+                SCurveDiversityWindow = 3;
                 MaxSCurveEncountersPerWindow = 2;
                 SameFamilyCooldownEncounters = 1;
                 ProceduralRhythmSettingsVersion = 1;
@@ -638,6 +644,14 @@ namespace TrackGeneration.Design
                 ProceduralRhythmSettingsVersion = 3;
             }
 
+            // Version 4 adds the Half Helix Turnaround as an explicit opt-in. Existing
+            // scenes and recipes retain their previous procedural content.
+            if (ProceduralRhythmSettingsVersion < 4)
+            {
+                HalfHelixTurnarounds = new TrackFeatureRule(false, 0, 1, 0.20f);
+                ProceduralRhythmSettingsVersion = 4;
+            }
+
             (Jumps ??= new TrackFeatureRule()).Sanitize();
             (Loops ??= new TrackFeatureRule()).Sanitize();
             (Corkscrews ??= new TrackFeatureRule()).Sanitize();
@@ -655,6 +669,7 @@ namespace TrackGeneration.Design
             (Hairpins ??= new TrackFeatureRule()).Sanitize();
             (WideTurnarounds ??= new TrackFeatureRule()).Sanitize();
             (Horseshoes ??= new TrackFeatureRule()).Sanitize();
+            (HalfHelixTurnarounds ??= new TrackFeatureRule(false, 0, 1, 0.20f)).Sanitize();
             (Cutbacks ??= new TrackFeatureRule(false, 0, 1, 0.35f)).Sanitize();
             if (TargetJumpApexHeight <= 0f) TargetJumpApexHeight = 45f;
             TargetJumpApexHeight = Mathf.Clamp(TargetJumpApexHeight, 1f, 500f);
@@ -668,6 +683,10 @@ namespace TrackGeneration.Design
             MaxFeatureGroups = Mathf.Max(MinFeatureGroups, MaxFeatureGroups);
             CompoundFeatureChance = Mathf.Clamp01(CompoundFeatureChance);
             MaxCompoundElements = Mathf.Clamp(MaxCompoundElements, 1, 4);
+            // Procedural generation always uses balanced encounter spacing. These
+            // safeguards are authoring invariants; Track Editor replacements remain
+            // intentionally unrestricted.
+            EnforceProceduralRhythm = true;
             MaxConsecutiveSCurveEncounters = Mathf.Clamp(MaxConsecutiveSCurveEncounters, 1, 3);
             SCurveDiversityWindow = Mathf.Clamp(SCurveDiversityWindow, 3, 8);
             MaxSCurveEncountersPerWindow = Mathf.Clamp(
@@ -915,7 +934,7 @@ namespace TrackGeneration.Design
         [Tooltip("EXPERIMENTAL (Stage F pilot). When on, at most one gentle-to-medium corner per lap is realized as a DIRECTIONAL CORKSCREW — a barrel roll whose axis also turns by the corner's own angle (its stamped plan-view heading equals the corner, so lap closure is preserved by construction). Barrels are long, so expect a few more length-budget failures. Off = corners are ordinary curves exactly as before. VERIFY IN PLAY: confirm the craft stays in through the turning+inverting barrel.")]
         public bool DirectionalCorkscrews = false;
 
-        [Tooltip("EXPERIMENTAL. When on, barrel/corkscrew regions (road roll ≥120°) are exempt from the global ring-budget relaxation, so their WIDE ROLLING FLOOR keeps its facet-target density instead of coarsening to a multi-metre twist that launches the craft off the floor edge at speed. Straights/level regions absorb the budget instead. Changes ring DENSITY only — never road width, path, walls, or corkscrew proportions. Off = current behavior exactly.")]
+        [Tooltip("EXPERIMENTAL. When on, inversion-roll regions (corkscrews, Heartline Rolls, Zero-G Rolls, Dive Loops, and any road roll ≥120°) are exempt from the global ring-budget relaxation, so their WIDE ROLLING FLOOR keeps its facet-target density instead of coarsening to a multi-metre twist that launches the craft off the floor edge at speed. Straights/level regions absorb the budget instead. Changes ring DENSITY only — never road width, path, walls, or feature proportions. The serialized name is retained for recipe compatibility.")]
         public bool SmoothCorkscrewFloor = false;
 
         public void Sanitize()

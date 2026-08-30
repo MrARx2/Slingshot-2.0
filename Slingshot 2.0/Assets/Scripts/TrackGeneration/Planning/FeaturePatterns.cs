@@ -1563,6 +1563,7 @@ namespace TrackGeneration.Planning
             TrackPatternType.WallrideTurn => true,
             TrackPatternType.WideTurnaround => true,
             TrackPatternType.Horseshoe => true,
+            TrackPatternType.HalfHelixTurnaround => true,
             TrackPatternType.Cutback => true,
             TrackPatternType.DiveLoop => true,
             TrackPatternType.Sidewinder => true,

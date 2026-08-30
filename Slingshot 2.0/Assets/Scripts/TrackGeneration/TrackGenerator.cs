@@ -1445,6 +1445,7 @@ namespace TrackGeneration
             RelaxRule("Features.Hairpins", s.Features.Hairpins);
             RelaxRule("Features.WideTurnarounds", s.Features.WideTurnarounds);
             RelaxRule("Features.Horseshoes", s.Features.Horseshoes);
+            RelaxRule("Features.HalfHelixTurnarounds", s.Features.HalfHelixTurnarounds);
             RelaxRule("Features.Cutbacks", s.Features.Cutbacks);
             RelaxRule("Elevation.Crests", s.Elevation.Crests);
             RelaxRule("Elevation.Bridges", s.Elevation.Bridges);
@@ -1490,6 +1491,7 @@ namespace TrackGeneration
             t.Features.Hairpins = new TrackFeatureRule(false, 0, 0, 0f);
             t.Features.WideTurnarounds = new TrackFeatureRule(false, 0, 0, 0f);
             t.Features.Horseshoes = new TrackFeatureRule(false, 0, 0, 0f);
+            t.Features.HalfHelixTurnarounds = new TrackFeatureRule(false, 0, 0, 0f);
             t.Features.Cutbacks = new TrackFeatureRule(false, 0, 0, 0f);
             t.Features.MinFeatureGroups = 0;
             t.Features.MaxFeatureGroups = 0;
@@ -2469,7 +2471,7 @@ namespace TrackGeneration
                 $"[TrackGenerator] Generated track{fallback}. Seed {result.RequestedSeed}, " +
                 $"attempts {result.AttemptsEvaluated}, candidates {result.ValidCandidateCount}, score {result.Report.SelectedCandidateScore:F1}, rating {result.Report.TrackRating}/100.\n" +
                 $"  Lap {m.LapLengthMeters / 1000f:F2}km, est. {m.EstimatedNeutralLapTimeSeconds:F1}s | turns {m.TurnCount} | " +
-                $"loops {m.LoopCount}, corkscrews {m.CorkscrewCount}, spirals {m.SpiralCount}, half-loops {m.HalfLoopCount}, jumps {m.JumpCount} | " +
+                $"loops {m.LoopCount}, corkscrews {m.CorkscrewCount}, spirals {m.SpiralCount}, half-helix turnarounds {m.HalfHelixTurnaroundCount}, half-loops {m.HalfLoopCount}, jumps {m.JumpCount} | " +
                 $"dual quarters {m.DualRoadQuarterCount} | elevation {m.MinElevation:F0}..{m.MaxElevation:F0}m | rings {m.TotalRings}.");
 
             foreach (var b in result.Report.QuarterBalance)

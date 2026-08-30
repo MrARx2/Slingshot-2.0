@@ -66,6 +66,7 @@ namespace TrackGeneration.Planning
                 case TrackPatternType.SweeperIntoHairpin:
                 case TrackPatternType.WideTurnaround:
                 case TrackPatternType.Horseshoe:
+                case TrackPatternType.HalfHelixTurnaround:
                 case TrackPatternType.Cutback:
                     return TrackEncounterFamily.Reversal;
                 case TrackPatternType.FullLoop:
@@ -105,6 +106,7 @@ namespace TrackGeneration.Planning
                 case SemanticElementId.SweeperIntoHairpin:
                 case SemanticElementId.WideTurnaround:
                 case SemanticElementId.Horseshoe:
+                case SemanticElementId.HalfHelixTurnaround:
                 case SemanticElementId.Cutback:
                     return TrackEncounterFamily.Reversal;
                 case SemanticElementId.VerticalLoop:
@@ -224,6 +226,102 @@ namespace TrackGeneration.Planning
             float coverage = Mathf.Min(12f, summary.DistinctFamilies * 1.75f);
             summary.Score = Mathf.Clamp(88f + coverage - penalty, 0f, 100f);
             return summary;
+        }
+
+        /// <summary>
+        /// Audits the route that was actually built, rather than trusting planning
+        /// bookkeeping alone. Topology-owned features are counted once per stable slot;
+        /// unowned S-curve sections (including closure-solver S-bends) remain visible
+        /// encounters and therefore cannot bypass procedural rhythm validation.
+        /// Alternating Radius Sequence expands to its two visible S-curve encounters.
+        /// </summary>
+        public static TrackRhythmSummary AnalyzeBuiltLayout(
+            GeneratedTrackLayout layout,
+            ResolvedTrackGenerationConfig cfg)
+        {
+            if (layout?.Sections == null)
+                return new TrackRhythmSummary();
+
+            var records = new List<TopologySlotRecord>();
+            var seenSlots = new HashSet<string>(StringComparer.Ordinal);
+            int syntheticIndex = 0;
+
+            for (int sectionIndex = 0; sectionIndex < layout.Sections.Count; sectionIndex++)
+            {
+                GeneratedTrackSection section = layout.Sections[sectionIndex];
+                TrackMacroSectionDefinition definition = section?.Definition;
+                if (definition == null) continue;
+
+                int road = section.RoadId;
+                int quarter = section.QuarterIndex;
+                string slotId = string.IsNullOrWhiteSpace(section.TopologySlotId)
+                    ? definition.TopologySlotId
+                    : section.TopologySlotId;
+                SemanticElementId semantic = BuiltSemantic(definition);
+
+                if (!string.IsNullOrWhiteSpace(slotId))
+                {
+                    // Entry/recovery primitives can share the feature slot while
+                    // carrying no gameplay semantic. Wait for the owned core instead
+                    // of marking the slot as seen too early.
+                    if (FamilyOf(semantic) == TrackEncounterFamily.None) continue;
+                    string routeSlot = $"{quarter}|{road}|{slotId}";
+                    if (!seenSlots.Add(routeSlot)) continue;
+
+                    int visibleEncounters = semantic == SemanticElementId.AlternatingRadiusSequence ? 2 : 1;
+                    for (int copy = 0; copy < visibleEncounters; copy++)
+                    {
+                        records.Add(new TopologySlotRecord
+                        {
+                            TopologySlotId = $"{slotId}:built:{copy}",
+                            CanonicalOrder = sectionIndex * 3 + copy,
+                            RouteOrder = sectionIndex * 3 + copy,
+                            QuarterIndex = quarter,
+                            RoadId = road,
+                            CurrentRealization = semantic,
+                            OriginalRealization = semantic
+                        });
+                    }
+                    continue;
+                }
+
+                // Solver-created or legacy S sections have no gameplay slot, but they
+                // are still felt by the driver and must participate in the visual rhythm.
+                if (definition.SectionType != TrackMacroSectionType.SCurve) continue;
+                records.Add(new TopologySlotRecord
+                {
+                    TopologySlotId = $"built-s-flow-{syntheticIndex++}",
+                    CanonicalOrder = sectionIndex * 3,
+                    RouteOrder = sectionIndex * 3,
+                    QuarterIndex = quarter,
+                    RoadId = road,
+                    CurrentRealization = SemanticElementId.SCurve,
+                    OriginalRealization = SemanticElementId.SCurve
+                });
+            }
+
+            return Analyze(records, cfg);
+        }
+
+        private static SemanticElementId BuiltSemantic(TrackMacroSectionDefinition definition)
+        {
+            if (definition.SemanticElement != SemanticElementId.None)
+                return definition.SemanticElement;
+
+            switch (definition.SectionType)
+            {
+                case TrackMacroSectionType.BankedCurve: return SemanticElementId.OrdinaryCurve;
+                case TrackMacroSectionType.BankedHairpin: return SemanticElementId.Hairpin;
+                case TrackMacroSectionType.SCurve: return SemanticElementId.SCurve;
+                case TrackMacroSectionType.Chicane: return SemanticElementId.Chicane;
+                case TrackMacroSectionType.Loop: return SemanticElementId.VerticalLoop;
+                case TrackMacroSectionType.Corkscrew: return SemanticElementId.InlineCorkscrew;
+                case TrackMacroSectionType.Spiral: return SemanticElementId.Spiral;
+                case TrackMacroSectionType.HalfLoopTwist: return SemanticElementId.Immelmann;
+                case TrackMacroSectionType.FullPipe: return SemanticElementId.FullPipe;
+                case TrackMacroSectionType.WallrideTurn: return SemanticElementId.WallrideTurn;
+                default: return SemanticElementId.None;
+            }
         }
 
         private static int SequencePenalty(
